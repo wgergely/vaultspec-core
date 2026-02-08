@@ -1,22 +1,33 @@
-"""Unit tests for acp_dispatch core functions: parse_frontmatter, safe_read_text, load_agent."""
-
 from __future__ import annotations
 
 import pathlib
+import sys
 
-import pytest
+_SCRIPTS_DIR = pathlib.Path(__file__).resolve().parent.parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 
-import acp_dispatch
-from acp_dispatch import parse_frontmatter, safe_read_text, SecurityError, AgentNotFoundError, load_agent
+import pytest  # noqa: E402
+
+from acp_dispatch import (  # noqa: E402
+    parse_frontmatter,
+    safe_read_text,
+    SecurityError,
+    AgentNotFoundError,
+    load_agent,
+)
 
 
 # ---------------------------------------------------------------------------
 # TestParseFrontmatter
 # ---------------------------------------------------------------------------
 
+
 class TestParseFrontmatter:
     def test_valid_frontmatter(self):
-        content = "---\ntier: LOW\nmodel: gemini-2.5-flash\n---\n\n# Persona\nBody text here."
+        content = (
+            "---\ntier: LOW\nmodel: gemini-2.5-flash\n---\n\n# Persona\nBody text here."
+        )
         meta, body = parse_frontmatter(content)
         assert meta["tier"] == "LOW"
         assert meta["model"] == "gemini-2.5-flash"
@@ -35,7 +46,7 @@ class TestParseFrontmatter:
         assert "Body after empty frontmatter." in body
 
     def test_colon_in_value(self):
-        content = '---\ndescription: A test: with colons: everywhere\n---\nBody.'
+        content = "---\ndescription: A test: with colons: everywhere\n---\nBody."
         meta, body = parse_frontmatter(content)
         assert meta["description"] == "A test: with colons: everywhere"
 
@@ -60,6 +71,7 @@ class TestParseFrontmatter:
 # TestSafeReadText
 # ---------------------------------------------------------------------------
 
+
 class TestSafeReadText:
     def test_read_existing_file(self, mock_root_dir):
         test_file = mock_root_dir / "test.txt"
@@ -73,6 +85,7 @@ class TestSafeReadText:
 
     def test_path_outside_workspace_raises(self, mock_root_dir):
         import tempfile
+
         with tempfile.TemporaryDirectory() as td:
             outside_file = pathlib.Path(td) / "secret.txt"
             outside_file.write_text("secret data", encoding="utf-8")
@@ -84,9 +97,12 @@ class TestSafeReadText:
 # TestLoadAgent
 # ---------------------------------------------------------------------------
 
+
 class TestLoadAgent:
     def test_loads_from_canonical(self, mock_root_dir, test_agent_md):
-        (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(test_agent_md, encoding="utf-8")
+        (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(
+            test_agent_md, encoding="utf-8"
+        )
         meta, persona = load_agent("test-agent")
         assert meta["tier"] == "LOW"
         assert "French Baker" in persona
@@ -94,9 +110,12 @@ class TestLoadAgent:
     def test_provider_hint_claude(self, mock_root_dir, test_agent_md):
         # Write to both claude and rules dirs
         (mock_root_dir / ".claude" / "agents" / "test-agent.md").write_text(
-            "---\ntier: HIGH\nmodel: claude-opus-4-6\n---\n# Claude Persona\nClaude specific.", encoding="utf-8"
+            "---\ntier: HIGH\nmodel: claude-opus-4-6\n---\n# Claude Persona\nClaude specific.",
+            encoding="utf-8",
         )
-        (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(test_agent_md, encoding="utf-8")
+        (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(
+            test_agent_md, encoding="utf-8"
+        )
 
         meta, persona = load_agent("test-agent", provider_name="claude")
         assert meta["model"] == "claude-opus-4-6"
@@ -104,16 +123,21 @@ class TestLoadAgent:
 
     def test_provider_hint_gemini(self, mock_root_dir, test_agent_md):
         (mock_root_dir / ".gemini" / "agents" / "test-agent.md").write_text(
-            "---\ntier: MEDIUM\nmodel: gemini-3-flash-preview\n---\n# Gemini Persona\nGemini specific.", encoding="utf-8"
+            "---\ntier: MEDIUM\nmodel: gemini-3-flash-preview\n---\n# Gemini Persona\nGemini specific.",
+            encoding="utf-8",
         )
-        (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(test_agent_md, encoding="utf-8")
+        (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(
+            test_agent_md, encoding="utf-8"
+        )
 
         meta, persona = load_agent("test-agent", provider_name="gemini")
         assert meta["model"] == "gemini-3-flash-preview"
 
     def test_provider_hint_falls_back_to_canonical(self, mock_root_dir, test_agent_md):
         # Only canonical dir has the agent
-        (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(test_agent_md, encoding="utf-8")
+        (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(
+            test_agent_md, encoding="utf-8"
+        )
         meta, persona = load_agent("test-agent", provider_name="claude")
         assert meta["tier"] == "LOW"  # Falls back to canonical
 

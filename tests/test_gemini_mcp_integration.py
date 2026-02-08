@@ -1,39 +1,25 @@
-"""Gemini & Claude MCP Client Integration Tests.
-
-Real end-to-end integration tests that validate the MCP tool call sequences
-a team lead would invoke when coordinating sub-agents via the pp-dispatch
-MCP server. No mocking -- all tests dispatch real agents via real API calls.
-
-Requires API keys:
-  - GEMINI_API_KEY for Gemini-backed tests
-  - ANTHROPIC_API_KEY for Claude-backed tests
-
-Run with::
-
-    pytest -m "integration and gemini_mcp" -v
-    pytest -m "integration and claude_mcp" -v
-"""
-
 from __future__ import annotations
 
-import asyncio
-import json
-import os
 import pathlib
 import sys
-
-import pytest
 
 _SCRIPTS_DIR = pathlib.Path(__file__).resolve().parent.parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-import mcp_dispatch
+import asyncio  # noqa: E402
+import json  # noqa: E402
+import os  # noqa: E402
+
+import pytest  # noqa: E402
+
+import mcp_dispatch  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def has_gemini_key() -> bool:
     return bool(os.environ.get("GEMINI_API_KEY"))
@@ -64,6 +50,7 @@ async def _poll_until_terminal(task_id: str, timeout: float = 180.0) -> dict:
 # ---------------------------------------------------------------------------
 # Gemini MCP Team-Lead Tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.skipif(not has_gemini_key(), reason="GEMINI_API_KEY not set")
 class TestGeminiMcpTeamLead:
@@ -151,8 +138,7 @@ class TestGeminiMcpTeamLead:
 
         locks_after = json.loads(await mcp_dispatch.get_locks())
         task_locks = [
-            lk for lk in locks_after.get("locks", [])
-            if lk.get("taskId") == task_id
+            lk for lk in locks_after.get("locks", []) if lk.get("taskId") == task_id
         ]
         assert len(task_locks) == 0
 
@@ -174,6 +160,7 @@ class TestGeminiMcpTeamLead:
 # ---------------------------------------------------------------------------
 # Claude MCP Team-Lead Tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.skipif(not has_anthropic_key(), reason="ANTHROPIC_API_KEY not set")
 class TestClaudeMcpTeamLead:

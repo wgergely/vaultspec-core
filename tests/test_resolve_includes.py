@@ -1,13 +1,16 @@
-"""Tests for resolve_includes() in both Claude and Gemini providers."""
-
 from __future__ import annotations
 
 import pathlib
+import sys
 
-import pytest
+_SCRIPTS_DIR = pathlib.Path(__file__).resolve().parent.parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from agent_providers.claude import ClaudeProvider
-from agent_providers.gemini import GeminiProvider
+import pytest  # noqa: E402
+
+from agent_providers.claude import ClaudeProvider  # noqa: E402
+from agent_providers.gemini import GeminiProvider  # noqa: E402
 
 
 @pytest.fixture(params=["claude", "gemini"], ids=["claude", "gemini"])

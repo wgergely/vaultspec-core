@@ -17,9 +17,9 @@ This skill governs the autonomous execution of `<Plan>`s. It ensures that code i
 
 Invoke the `task-subagent` skill with the appropriate executor agent. Instruct it to "Execute the plan at [[...-plan.md]]. Start with Phase [X]."
 
-*   **Complex Tasks:** `complex-executor` (High Tier). Use for architectural changes or core logic refactors.
-*   **Standard Tasks:** `standard-executor` (Medium Tier). Use for typical features and components.
-*   **Simple Tasks:** `simple-executor` (Low Tier). Use for straightforward edits or documentation.
+- **Complex Tasks:** `complex-executor` (High Tier). Use for architectural changes or core logic refactors.
+- **Standard Tasks:** `standard-executor` (Medium Tier). Use for typical features and components.
+- **Simple Tasks:** `simple-executor` (Low Tier). Use for straightforward edits or documentation.
 
 ### 3. Step Execution & Logging
 
@@ -31,14 +31,14 @@ Invoke the `task-subagent` skill with the appropriate executor agent. Instruct i
 
 Every artifact (`Step Record`, `Summary`, `Review`) MUST strictly adhere to the following schema:
 
-1.  **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
-    *   **Directory Tag**: Exactly `#exec`.
-    *   *Feature Tag:* Exactly one kebab-case `#<feature>` tag.
-    *   *Syntax:* `tags: ["#exec", "#feature"]` (Must be quoted strings in a list).
-2.  **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
-    *   *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
-3.  **`date`**: MUST use `yyyy-mm-dd` format.
-4.  **No `feature` key**: Use `tags:` exclusively for feature identification.
+1. **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
+    - **Directory Tag**: Exactly `#exec`.
+    - *Feature Tag:* Exactly one kebab-case `#<feature>` tag.
+    - *Syntax:* `tags: ["#exec", "#feature"]` (Must be quoted strings in a list).
+2. **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
+    - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
+3. **`date`**: MUST use `yyyy-mm-dd` format.
+4. **No `feature` key**: Use `tags:` exclusively for feature identification.
 
 ### 4. Mandatory Code Review
 

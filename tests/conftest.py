@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pathlib
 import sys
-import tempfile
 
 import pytest
 
@@ -25,7 +24,9 @@ def temp_workspace(tmp_path: pathlib.Path):
 
     # Create a test file for file I/O tests
     test_file = tmp_path / "test.txt"
-    test_file.write_text("Hello from test workspace\nLine 2\nLine 3\n", encoding="utf-8")
+    test_file.write_text(
+        "Hello from test workspace\nLine 2\nLine 3\n", encoding="utf-8"
+    )
 
     return tmp_path
 

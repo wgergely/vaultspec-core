@@ -1,21 +1,21 @@
-"""Unit tests for GeminiDispatchClient: permissions, session_update, file I/O, terminals."""
-
 from __future__ import annotations
 
-import asyncio
 import pathlib
 import sys
-import tempfile
 
-import pytest
+_SCRIPTS_DIR = pathlib.Path(__file__).resolve().parent.parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from acp_dispatch import GeminiDispatchClient, _Terminal
-from acp.schema import (
+import tempfile  # noqa: E402
+
+import pytest  # noqa: E402
+
+from acp_dispatch import GeminiDispatchClient  # noqa: E402
+from acp.schema import (  # noqa: E402
     AgentMessageChunk,
     AgentPlanUpdate,
     AgentThoughtChunk,
-    AvailableCommandsUpdate,
-    CurrentModeUpdate,
     PlanEntry,
     PermissionOption,
     SessionInfoUpdate,
@@ -23,13 +23,13 @@ from acp.schema import (
     ToolCallProgress,
     ToolCallStart,
     ToolCallUpdate,
-    UserMessageChunk,
 )
 
 
 # ---------------------------------------------------------------------------
 # TestRequestPermission
 # ---------------------------------------------------------------------------
+
 
 class TestRequestPermission:
     @pytest.fixture
@@ -43,7 +43,9 @@ class TestRequestPermission:
             PermissionOption(option_id="reject", name="Reject", kind="reject_once"),
         ]
         tool_call = ToolCallUpdate(tool_call_id="tc-1")
-        result = await client.request_permission(options=options, session_id="s1", tool_call=tool_call)
+        result = await client.request_permission(
+            options=options, session_id="s1", tool_call=tool_call
+        )
         assert result["outcome"]["outcome"] == "selected"
         assert result["outcome"]["optionId"] == "allow"
 
@@ -51,10 +53,14 @@ class TestRequestPermission:
     async def test_allow_always_selected(self, client):
         options = [
             PermissionOption(option_id="reject", name="Reject", kind="reject_once"),
-            PermissionOption(option_id="allow-session", name="Allow Session", kind="allow_always"),
+            PermissionOption(
+                option_id="allow-session", name="Allow Session", kind="allow_always"
+            ),
         ]
         tool_call = ToolCallUpdate(tool_call_id="tc-2")
-        result = await client.request_permission(options=options, session_id="s1", tool_call=tool_call)
+        result = await client.request_permission(
+            options=options, session_id="s1", tool_call=tool_call
+        )
         assert result["outcome"]["outcome"] == "selected"
         assert result["outcome"]["optionId"] == "allow-session"
 
@@ -62,10 +68,14 @@ class TestRequestPermission:
     async def test_only_reject_options(self, client):
         options = [
             PermissionOption(option_id="reject-1", name="Reject", kind="reject_once"),
-            PermissionOption(option_id="reject-2", name="Reject Always", kind="reject_always"),
+            PermissionOption(
+                option_id="reject-2", name="Reject Always", kind="reject_always"
+            ),
         ]
         tool_call = ToolCallUpdate(tool_call_id="tc-3")
-        result = await client.request_permission(options=options, session_id="s1", tool_call=tool_call)
+        result = await client.request_permission(
+            options=options, session_id="s1", tool_call=tool_call
+        )
         # Falls through to first option when no allow found
         assert result["outcome"]["outcome"] == "selected"
         assert result["outcome"]["optionId"] == "reject-1"
@@ -73,25 +83,32 @@ class TestRequestPermission:
     @pytest.mark.asyncio
     async def test_empty_options(self, client):
         tool_call = ToolCallUpdate(tool_call_id="tc-4")
-        result = await client.request_permission(options=[], session_id="s1", tool_call=tool_call)
+        result = await client.request_permission(
+            options=[], session_id="s1", tool_call=tool_call
+        )
         assert result["outcome"]["outcome"] == "selected"
         assert result["outcome"]["optionId"] == "allow"  # Default fallback
 
     @pytest.mark.asyncio
     async def test_none_options(self, client):
         tool_call = ToolCallUpdate(tool_call_id="tc-5")
-        result = await client.request_permission(options=None, session_id="s1", tool_call=tool_call)
+        result = await client.request_permission(
+            options=None, session_id="s1", tool_call=tool_call
+        )
         assert result["outcome"]["outcome"] == "selected"
 
     @pytest.mark.asyncio
     async def test_validates_against_schema(self, client):
         """Verify the response can be validated by the ACP schema."""
         from acp.schema import RequestPermissionResponse
+
         options = [
             PermissionOption(option_id="approve", name="Approve", kind="allow_once"),
         ]
         tool_call = ToolCallUpdate(tool_call_id="tc-6")
-        result = await client.request_permission(options=options, session_id="s1", tool_call=tool_call)
+        result = await client.request_permission(
+            options=options, session_id="s1", tool_call=tool_call
+        )
         validated = RequestPermissionResponse.model_validate(result)
         assert validated.outcome.outcome == "selected"
 
@@ -99,6 +116,7 @@ class TestRequestPermission:
 # ---------------------------------------------------------------------------
 # TestSessionUpdate
 # ---------------------------------------------------------------------------
+
 
 class TestSessionUpdate:
     @pytest.fixture
@@ -175,6 +193,7 @@ class TestSessionUpdate:
 # ---------------------------------------------------------------------------
 # TestFileIO
 # ---------------------------------------------------------------------------
+
 
 class TestFileIO:
     @pytest.fixture
@@ -254,6 +273,7 @@ class TestFileIO:
 # TestTerminalLifecycle
 # ---------------------------------------------------------------------------
 
+
 class TestTerminalLifecycle:
     @pytest.fixture
     def client(self):
@@ -299,7 +319,9 @@ class TestTerminalLifecycle:
             args=["-c", "exit(0)"],
         )
         terminal_id = result["terminalId"]
-        exit_result = await client.wait_for_terminal_exit(session_id="s1", terminal_id=terminal_id)
+        exit_result = await client.wait_for_terminal_exit(
+            session_id="s1", terminal_id=terminal_id
+        )
         assert exit_result["exitCode"] == 0
         await client.release_terminal(session_id="s1", terminal_id=terminal_id)
 
@@ -313,7 +335,9 @@ class TestTerminalLifecycle:
         terminal_id = result["terminalId"]
 
         await client.kill_terminal(session_id="s1", terminal_id=terminal_id)
-        exit_result = await client.wait_for_terminal_exit(session_id="s1", terminal_id=terminal_id)
+        exit_result = await client.wait_for_terminal_exit(
+            session_id="s1", terminal_id=terminal_id
+        )
         assert exit_result["exitCode"] is not None
 
         await client.release_terminal(session_id="s1", terminal_id=terminal_id)
@@ -338,5 +362,7 @@ class TestTerminalLifecycle:
 
     @pytest.mark.asyncio
     async def test_wait_unknown_terminal(self, client):
-        result = await client.wait_for_terminal_exit(session_id="s1", terminal_id="unknown-id")
+        result = await client.wait_for_terminal_exit(
+            session_id="s1", terminal_id="unknown-id"
+        )
         assert result["exitCode"] is None

@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import dataclasses
 
+
 class SecurityError(Exception):
     """Raised when a path access violates workspace boundaries."""
+
     pass
 
 
 class DispatchError(Exception):
     """Raised when agent dispatch fails."""
+
     pass
 
 

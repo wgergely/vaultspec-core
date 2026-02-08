@@ -13,12 +13,14 @@ A2A is an open standard created by Google (April 2025), donated to Linux Foundat
 **Latest version**: 0.3.x. 150+ supporting organizations.
 
 ### Core Principles
+
 - Built on HTTP, JSON-RPC, SSE -- no reinvention
 - Enterprise-ready: auth, security, tracing
 - Asynchronous: native long-running task support
 - Opaque execution: agents collaborate without exposing internals
 
 ### Protocol Stack
+
 | Protocol | Focus |
 |---|---|
 | **A2A** | Agent-to-agent collaboration (horizontal) |
@@ -85,6 +87,7 @@ submitted --> working --> input_required --> completed
 ## 5. Core Data Types
 
 ### Task
+
 ```protobuf
 message Task {
   string id = 1;                       // UUID, server-generated
@@ -103,6 +106,7 @@ message TaskStatus {
 ```
 
 ### Message
+
 ```protobuf
 message Message {
   string message_id = 1;
@@ -117,6 +121,7 @@ message Message {
 ```
 
 ### Part (Content Container)
+
 ```protobuf
 message Part {
   oneof content {
@@ -132,6 +137,7 @@ message Part {
 ```
 
 ### Artifact (Task Output)
+
 ```protobuf
 message Artifact {
   string artifact_id = 1;
@@ -144,6 +150,7 @@ message Artifact {
 ```
 
 ### Streaming Event Types
+
 ```protobuf
 message TaskStatusUpdateEvent {
   string task_id = 1;
@@ -229,6 +236,7 @@ message AgentSkill {
 ```
 
 ### Agent Card JSON Example
+
 ```json
 {
   "name": "Currency Agent",
@@ -254,12 +262,14 @@ message AgentSkill {
 ```
 
 ### Discovery Methods
+
 1. **Well-Known URI** (recommended): `GET https://{domain}/.well-known/agent-card.json`
 2. **Curated Registries**: Central repositories queried by skill/tags/capabilities
 3. **Direct Configuration**: Hardcoded URLs for tightly coupled systems
 4. **Extended Agent Card**: Authenticated endpoint at `GET /extendedAgentCard`
 
 ### Security Schemes
+
 Supports: API keys, HTTP auth (Bearer/Basic), OAuth 2.0 (authorization code, client credentials, device code), OpenID Connect, mTLS.
 
 ---
@@ -267,12 +277,15 @@ Supports: API keys, HTTP auth (Bearer/Basic), OAuth 2.0 (authorization code, cli
 ## 7. Interaction Mechanisms
 
 ### Request/Response (Polling)
+
 `POST /message:send` -> returns `Task` or `Message`. Poll with `GET /tasks/{id}`.
 
 ### Streaming (SSE)
+
 `POST /message:stream` -> `Content-Type: text/event-stream`. Events: `Task`, `TaskStatusUpdateEvent`, `TaskArtifactUpdateEvent`. Resubscribe via `GET /tasks/{id}:subscribe`.
 
 ### Push Notifications
+
 Webhook-based. Server POSTs `StreamResponse` to client URL. Security: JWT + JWKS, HMAC, mTLS.
 
 ---
@@ -337,6 +350,7 @@ message PushNotificationConfig {
 ### Core Classes
 
 **AgentExecutor** (implement this):
+
 ```python
 class AgentExecutor(ABC):
     @abstractmethod
@@ -352,6 +366,7 @@ class AgentExecutor(ABC):
 **TaskUpdater**: `update_status()`, `add_artifact()`, `complete()`.
 
 **Client** (abstract):
+
 ```python
 class Client(ABC):
     async def send_message(self, request, **kwargs) -> AsyncIterator[ClientEvent | Message]: ...
@@ -364,6 +379,7 @@ class Client(ABC):
 ```
 
 ### Server Setup
+
 ```python
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
@@ -378,6 +394,7 @@ uvicorn.run(server.build(), host='0.0.0.0', port=9999)
 ```
 
 ### Client Usage
+
 ```python
 from a2a.client import A2ACardResolver, A2AClient
 
@@ -394,6 +411,7 @@ response = await a2a_client.send_message(request)
 ### 11.1 HelloWorld Agent (Minimal)
 
 **Server:**
+
 ```python
 import uvicorn
 from a2a.server.apps import A2AStarletteApplication
@@ -435,6 +453,7 @@ uvicorn.run(server.build(), host='0.0.0.0', port=9999)
 ```
 
 **Client:**
+
 ```python
 import httpx
 from uuid import uuid4
@@ -462,6 +481,7 @@ async def main():
 ### 11.2 Currency Agent (Streaming + Multi-turn + Task State)
 
 **Executor with TaskUpdater:**
+
 ```python
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
@@ -508,6 +528,7 @@ class CurrencyAgentExecutor(AgentExecutor):
 ```
 
 **Server with push notifications:**
+
 ```python
 import httpx
 from a2a.server.apps import A2AStarletteApplication
@@ -545,7 +566,9 @@ Turn 2: Client responds with same taskId + contextId
 ```
 
 ### Parallel Follow-ups
+
 Multiple concurrent tasks within the same context:
+
 - Task 1: Book a flight to Helsinki
 - Task 2: Based on Task 1 -> Book a hotel (via `referenceTaskIds`)
 - Task 3: Based on Task 1 -> Book a snowmobile activity
@@ -588,29 +611,29 @@ Client                        A2A Server               Auth Server
 
 ## Sources
 
-- https://github.com/a2aproject/A2A
-- https://a2a-protocol.org/latest/specification/
-- https://a2a-protocol.org/latest/definitions/
-- https://a2a-protocol.org/dev/topics/life-of-a-task/
-- https://a2a-protocol.org/latest/topics/key-concepts/
-- https://a2a-protocol.org/latest/topics/streaming-and-async/
-- https://a2a-protocol.org/latest/topics/agent-discovery/
-- https://a2a-protocol.org/latest/topics/a2a-and-mcp/
-- https://a2a-protocol.org/latest/sdk/python/api/
-- https://github.com/a2aproject/a2a-python
-- https://pypi.org/project/a2a-sdk/
-- https://github.com/a2aproject/a2a-samples
-- https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/
-- https://cloud.google.com/blog/products/ai-machine-learning/agent2agent-protocol-is-getting-an-upgrade
-- https://www.linuxfoundation.org/press/linux-foundation-launches-the-agent2agent-protocol-project
-- https://www.ibm.com/think/topics/agent2agent-protocol
-- https://a2aprotocol.ai/blog/2025-full-guide-a2a-protocol
-- https://codelabs.developers.google.com/intro-a2a-purchasing-concierge
-- https://semgrep.dev/blog/2025/a-security-engineers-guide-to-the-a2a-protocol/
-- https://heidloff.net/article/mcp-acp-a2a-agent-protocols/
-- https://auth0.com/blog/mcp-vs-a2a/
-- https://akka.io/blog/mcp-a2a-acp-what-does-it-all-mean
-- https://workos.com/guide/understanding-mcp-acp-a2a
-- https://huggingface.co/blog/1bo/a2a-protocol-explained
-- https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-a2a-protocol-contract.html
-- https://arxiv.org/html/2505.02279v1
+- <https://github.com/a2aproject/A2A>
+- <https://a2a-protocol.org/latest/specification/>
+- <https://a2a-protocol.org/latest/definitions/>
+- <https://a2a-protocol.org/dev/topics/life-of-a-task/>
+- <https://a2a-protocol.org/latest/topics/key-concepts/>
+- <https://a2a-protocol.org/latest/topics/streaming-and-async/>
+- <https://a2a-protocol.org/latest/topics/agent-discovery/>
+- <https://a2a-protocol.org/latest/topics/a2a-and-mcp/>
+- <https://a2a-protocol.org/latest/sdk/python/api/>
+- <https://github.com/a2aproject/a2a-python>
+- <https://pypi.org/project/a2a-sdk/>
+- <https://github.com/a2aproject/a2a-samples>
+- <https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/>
+- <https://cloud.google.com/blog/products/ai-machine-learning/agent2agent-protocol-is-getting-an-upgrade>
+- <https://www.linuxfoundation.org/press/linux-foundation-launches-the-agent2agent-protocol-project>
+- <https://www.ibm.com/think/topics/agent2agent-protocol>
+- <https://a2aprotocol.ai/blog/2025-full-guide-a2a-protocol>
+- <https://codelabs.developers.google.com/intro-a2a-purchasing-concierge>
+- <https://semgrep.dev/blog/2025/a-security-engineers-guide-to-the-a2a-protocol/>
+- <https://heidloff.net/article/mcp-acp-a2a-agent-protocols/>
+- <https://auth0.com/blog/mcp-vs-a2a/>
+- <https://akka.io/blog/mcp-a2a-acp-what-does-it-all-mean>
+- <https://workos.com/guide/understanding-mcp-acp-a2a>
+- <https://huggingface.co/blog/1bo/a2a-protocol-explained>
+- <https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-a2a-protocol-contract.html>
+- <https://arxiv.org/html/2505.02279v1>

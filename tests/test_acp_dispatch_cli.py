@@ -1,34 +1,24 @@
-"""Tests for acp_dispatch.py CLI features.
-
-Covers:
-- --list-agents flag (list_available_agents function)
-- --mode flag (read-only permission prompt injection)
-- Argument validation (--agent required without --list-agents)
-- H2: Read-only enforcement in write_text_file()
-- H4: InitializeResponse capabilities storage
-- M3: Terminal restriction in read-only mode
-- GeminiDispatchClient mode parameter
-"""
-
 from __future__ import annotations
 
-import asyncio
 import pathlib
 import sys
-
-import pytest
 
 # Ensure scripts dir is importable
 _SCRIPTS_DIR = pathlib.Path(__file__).resolve().parent.parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-import acp_dispatch
+import asyncio  # noqa: E402
+
+import pytest  # noqa: E402
+
+import acp_dispatch  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def agents_workspace(tmp_path: pathlib.Path, monkeypatch):
@@ -87,6 +77,7 @@ def empty_agents_workspace(tmp_path: pathlib.Path, monkeypatch):
 # TestListAvailableAgents
 # ---------------------------------------------------------------------------
 
+
 class TestListAvailableAgents:
     """Tests for list_available_agents()."""
 
@@ -135,6 +126,7 @@ class TestListAvailableAgents:
 # TestCliReadonlyPrompt
 # ---------------------------------------------------------------------------
 
+
 class TestCliReadonlyPrompt:
     """Tests for the CLI read-only permission prompt constant."""
 
@@ -177,6 +169,7 @@ class TestDispatchResult:
 # ---------------------------------------------------------------------------
 # TestReadOnlyEnforcement (H2)
 # ---------------------------------------------------------------------------
+
 
 class TestReadOnlyEnforcement:
     """Tests for protocol-level read-only enforcement in write_text_file()."""
@@ -300,6 +293,7 @@ class TestReadOnlyEnforcement:
 # TestClientCapabilities (H4)
 # ---------------------------------------------------------------------------
 
+
 class TestClientCapabilities:
     """Tests for agent capabilities storage on GeminiDispatchClient."""
 
@@ -326,6 +320,7 @@ class TestClientCapabilities:
 # TestClientMode
 # ---------------------------------------------------------------------------
 
+
 class TestClientMode:
     """Tests for the GeminiDispatchClient mode parameter."""
 
@@ -348,6 +343,7 @@ class TestClientMode:
 # ---------------------------------------------------------------------------
 # TestGracefulCancel (M2)
 # ---------------------------------------------------------------------------
+
 
 class TestGracefulCancel:
     """Tests for the graceful_cancel method on GeminiDispatchClient."""

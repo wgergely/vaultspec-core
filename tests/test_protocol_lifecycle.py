@@ -1,23 +1,15 @@
-"""Live ACP protocol lifecycle tests using real agents.
-
-All tests dispatch real agents (french-croissant) via the ACP transport layer.
-No mock agents -- every test uses actual Gemini API calls.
-
-Requires GEMINI_API_KEY to be set.
-"""
-
 from __future__ import annotations
 
 import pathlib
 import sys
 
-import pytest
-
 _SCRIPTS_DIR = pathlib.Path(__file__).resolve().parent.parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from acp_dispatch import AgentNotFoundError, DispatchResult, run_dispatch
+import pytest  # noqa: E402
+
+from acp_dispatch import AgentNotFoundError, DispatchResult, run_dispatch  # noqa: E402
 
 
 class TestACPLifecycle:
@@ -110,9 +102,7 @@ class TestSessionResume:
         result = DispatchResult(response_text="hello")
         assert result.session_id is None
 
-        result_with_sid = DispatchResult(
-            response_text="hello", session_id="ses-123"
-        )
+        result_with_sid = DispatchResult(response_text="hello", session_id="ses-123")
         assert result_with_sid.session_id == "ses-123"
 
     def test_session_resume_feature_gate(self):
@@ -133,17 +123,22 @@ class TestSessionResume:
         env_on = {**os.environ, "PP_DISPATCH_SESSION_RESUME": "1"}
         proc = subprocess.run(
             [sys.executable, "-c", check_script],
-            env=env_on, capture_output=True, text=True,
+            env=env_on,
+            capture_output=True,
+            text=True,
         )
         assert proc.returncode == 0, proc.stderr
         assert proc.stdout.strip() == "True"
 
         # Disabled (default)
-        env_off = {k: v for k, v in os.environ.items()
-                   if k != "PP_DISPATCH_SESSION_RESUME"}
+        env_off = {
+            k: v for k, v in os.environ.items() if k != "PP_DISPATCH_SESSION_RESUME"
+        }
         proc = subprocess.run(
             [sys.executable, "-c", check_script],
-            env=env_off, capture_output=True, text=True,
+            env=env_off,
+            capture_output=True,
+            text=True,
         )
         assert proc.returncode == 0, proc.stderr
         assert proc.stdout.strip() == "False"

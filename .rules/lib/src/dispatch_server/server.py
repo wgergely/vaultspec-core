@@ -7,20 +7,23 @@ import pathlib
 import re
 import sys
 import time
-from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.resources.types import FunctionResource
 
-from ..orchestration.dispatch import AgentNotFoundError, DispatchError, DispatchResult, run_dispatch
-from ..orchestration.task_engine import (
+from orchestration.dispatch import (
+    AgentNotFoundError,
+    DispatchError,
+    DispatchResult,
+    run_dispatch,
+)
+from orchestration.task_engine import (
     InvalidTransitionError,
     LockManager,
     TaskEngine,
     TaskNotFoundError,
-    TaskStatus,
 )
-from ..orchestration.utils import find_project_root, parse_frontmatter, safe_read_text
+from orchestration.utils import find_project_root, parse_frontmatter, safe_read_text
 
 # Configure logging to stderr (stdout is reserved for MCP JSON-RPC messages)
 logging.basicConfig(
@@ -65,12 +68,9 @@ _active_clients: dict[str, list] = {}
 # ---------------------------------------------------------------------------
 
 _READONLY_PERMISSION_PROMPT = (
-    "PERMISSION MODE: READ-ONLY
-"
+    "PERMISSION MODE: READ-ONLY\n"
     "You MUST only write files within the `.docs/` directory. "
-    "Do not modify any source code files.
-
-"
+    "Do not modify any source code files.\n\n"
 )
 
 
@@ -96,16 +96,16 @@ def _inject_permission_prompt(task_content: str, mode: str) -> str:
 # ---------------------------------------------------------------------------
 
 _ARTIFACT_PATTERN = re.compile(
-    r"""(?:^|[\s"'`(])"""               # word boundary or quote/backtick
+    r"""(?:^|[\s"'`(])"""  # word boundary or quote/backtick
     r"""("""
-    r"""\.docs/[\w./-]+"""              # .docs/ paths
-    r"""|\.rules/[\w./-]+"""            # .rules/ paths
-    r"""|src/[\w./-]+"""                # src/ paths
-    r"""|crates/[\w./-]+"""             # crates/ paths
-    r"""|tests?/[\w./-]+"""             # test(s)/ paths
-    r"""|[\w./-]+\.(?:md|rs|toml|py)""" # files with known extensions
+    r"""\.docs/[\w./-]+"""  # .docs/ paths
+    r"""|\.rules/[\w./-]+"""  # .rules/ paths
+    r"""|src/[\w./-]+"""  # src/ paths
+    r"""|crates/[\w./-]+"""  # crates/ paths
+    r"""|tests?/[\w./-]+"""  # test(s)/ paths
+    r"""|[\w./-]+\.(?:md|rs|toml|py)"""  # files with known extensions
     r""")"""
-    r"""(?=[\s"'`),;:]|$)""",           # word boundary or quote/backtick
+    r"""(?=[\s"'`),;:]|$)""",  # word boundary or quote/backtick
     re.MULTILINE,
 )
 
@@ -118,7 +118,7 @@ def _extract_artifacts(text: str) -> list[str]:
     seen: set[str] = set()
     unique: list[str] = []
     for m in matches:
-        normalized = m.replace("", "/")
+        normalized = m.replace("\\", "/")
         if normalized not in seen:
             seen.add(normalized)
             unique.append(normalized)
@@ -130,7 +130,7 @@ def _merge_artifacts(text_artifacts: list[str], written_files: list[str]) -> lis
     seen: set[str] = set()
     merged: list[str] = []
     for path in (*written_files, *text_artifacts):
-        normalized = path.replace("", "/")
+        normalized = path.replace("\\", "/")
         if normalized not in seen:
             seen.add(normalized)
             merged.append(normalized)
@@ -213,6 +213,7 @@ def _register_agent_resources() -> None:
         del rm._resources[k]
 
     for name, metadata in _agent_cache.items():
+
         def _make_reader(meta: dict[str, object]):  # noqa: E301
             return lambda: json.dumps(meta, indent=2)
 
@@ -262,35 +263,45 @@ _register_agent_resources()
 # MCP Tools
 # ---------------------------------------------------------------------------
 
+
 @mcp.tool(structured_output=False)
 async def list_agents() -> str:
     """List available agents and their capabilities."""
     agents = []
 
     if not AGENTS_DIR.is_dir():
-        return json.dumps({"agents": [], "error": f"Agents directory not found: {AGENTS_DIR}"})
+        return json.dumps(
+            {"agents": [], "error": f"Agents directory not found: {AGENTS_DIR}"}
+        )
 
     for agent_path in sorted(AGENTS_DIR.glob("*.md")):
         try:
             content = agent_path.read_text(encoding="utf-8")
             meta, _body = parse_frontmatter(content)
-            agents.append({
-                "name": agent_path.stem,
-                "tier": meta.get("tier", "UNKNOWN"),
-                "description": _strip_quotes(meta.get("description", "")),
-            })
+            agents.append(
+                {
+                    "name": agent_path.stem,
+                    "tier": meta.get("tier", "UNKNOWN"),
+                    "description": _strip_quotes(meta.get("description", "")),
+                }
+            )
         except Exception as exc:
             logger.warning("Failed to parse agent %s: %s", agent_path.name, exc)
-            agents.append({
-                "name": agent_path.stem,
-                "tier": "UNKNOWN",
-                "description": f"(parse error: {exc})",
-            })
+            agents.append(
+                {
+                    "name": agent_path.stem,
+                    "tier": "UNKNOWN",
+                    "description": f"(parse error: {exc})",
+                }
+            )
 
-    return json.dumps({
-        "agents": agents,
-        "hint": "Use resources/read with URI 'agents://{name}' for detailed agent metadata",
-    }, indent=2)
+    return json.dumps(
+        {
+            "agents": agents,
+            "hint": "Use resources/read with URI 'agents://{name}' for detailed agent metadata",
+        },
+        indent=2,
+    )
 
 
 @mcp.tool(structured_output=False)
@@ -304,11 +315,13 @@ async def dispatch_agent(
     effective_mode = _resolve_effective_mode(agent, mode)
 
     if effective_mode not in ("read-write", "read-only"):
-        return json.dumps({
-            "status": "failed",
-            "agent": agent,
-            "error": f"Invalid mode '{effective_mode}'. Must be 'read-write' or 'read-only'.",
-        })
+        return json.dumps(
+            {
+                "status": "failed",
+                "agent": agent,
+                "error": f"Invalid mode '{effective_mode}'. Must be 'read-write' or 'read-only'.",
+            }
+        )
 
     task_content = task
     task_path = (ROOT_DIR / task).resolve()
@@ -320,13 +333,17 @@ async def dispatch_agent(
             logger.warning("Failed to read task file %s: %s", task_path, exc)
 
     dispatch_task = task_engine.create_task(
-        agent, model=model, mode=effective_mode,
+        agent,
+        model=model,
+        mode=effective_mode,
     )
     task_id = dispatch_task.task_id
 
     lock_paths: set[str] = {".docs/"} if effective_mode == "read-only" else {"."}
     _lock, lock_warnings = lock_manager.acquire_lock(
-        task_id, lock_paths, effective_mode,
+        task_id,
+        lock_paths,
+        effective_mode,
     )
     for warning in lock_warnings:
         logger.warning("Advisory lock: %s (taskId=%s)", warning, task_id)
@@ -335,22 +352,30 @@ async def dispatch_agent(
 
     logger.info(
         "Dispatching agent=%s model=%s mode=%s taskId=%s",
-        agent, model, effective_mode, task_id,
+        agent,
+        model,
+        effective_mode,
+        task_id,
     )
 
     bg_task = asyncio.create_task(
-        _run_dispatch_background(task_id, agent, enforced_content, model, effective_mode)
+        _run_dispatch_background(
+            task_id, agent, enforced_content, model, effective_mode
+        )
     )
     _background_tasks[task_id] = bg_task
     bg_task.add_done_callback(lambda _t: _background_tasks.pop(task_id, None))
 
-    return json.dumps({
-        "taskId": task_id,
-        "status": "working",
-        "agent": agent,
-        "model": model,
-        "mode": effective_mode,
-    }, indent=2)
+    return json.dumps(
+        {
+            "taskId": task_id,
+            "status": "working",
+            "agent": agent,
+            "model": model,
+            "mode": effective_mode,
+        },
+        indent=2,
+    )
 
 
 async def _run_dispatch_background(
@@ -388,7 +413,7 @@ async def _run_dispatch_background(
         response_text = dispatch_result.response_text or ""
         text_artifacts = _extract_artifacts(response_text)
         all_artifacts = _merge_artifacts(text_artifacts, dispatch_result.written_files)
-        
+
         result = {
             "taskId": task_id,
             "status": "completed",
@@ -418,7 +443,11 @@ async def _run_dispatch_background(
             logger.info("Task %s already terminal, skipping fail", task_id)
             return
         logger.warning(
-            "Task %s failed (agent=%s, %.1fs): %s", task_id, agent, duration, exc,
+            "Task %s failed (agent=%s, %.1fs): %s",
+            task_id,
+            agent,
+            duration,
+            exc,
         )
 
     except Exception as exc:
@@ -429,7 +458,10 @@ async def _run_dispatch_background(
             logger.info("Task %s already terminal, skipping fail", task_id)
             return
         logger.exception(
-            "Task %s unexpected failure (agent=%s, %.1fs)", task_id, agent, duration,
+            "Task %s unexpected failure (agent=%s, %.1fs)",
+            task_id,
+            agent,
+            duration,
         )
 
     _active_clients.pop(task_id, None)
@@ -440,9 +472,11 @@ async def get_task_status(task_id: str) -> str:
     """Get the current status of a dispatched task."""
     task = task_engine.get_task(task_id)
     if task is None:
-        return json.dumps({
-            "error": f"Task not found: {task_id}",
-        })
+        return json.dumps(
+            {
+                "error": f"Task not found: {task_id}",
+            }
+        )
 
     response: dict[str, object] = {
         "taskId": task.task_id,
@@ -475,7 +509,7 @@ async def cancel_task(task_id: str) -> str:
     """Cancel a running or pending task."""
     try:
         task = task_engine.cancel_task(task_id)
-        
+
         client_ref = _active_clients.pop(task_id, None)
         if client_ref:
             client = client_ref[0] if client_ref else None
@@ -490,20 +524,26 @@ async def cancel_task(task_id: str) -> str:
             bg_task.cancel()
 
         logger.info("Cancelled task %s (agent=%s)", task_id, task.agent)
-        return json.dumps({
-            "taskId": task.task_id,
-            "status": task.status.value,
-            "agent": task.agent,
-        })
+        return json.dumps(
+            {
+                "taskId": task.task_id,
+                "status": task.status.value,
+                "agent": task.agent,
+            }
+        )
     except TaskNotFoundError:
-        return json.dumps({
-            "error": f"Task not found: {task_id}",
-        })
+        return json.dumps(
+            {
+                "error": f"Task not found: {task_id}",
+            }
+        )
     except InvalidTransitionError as exc:
-        return json.dumps({
-            "error": str(exc),
-            "taskId": task_id,
-        })
+        return json.dumps(
+            {
+                "error": str(exc),
+                "taskId": task_id,
+            }
+        )
 
 
 @mcp.tool(structured_output=False)
@@ -513,13 +553,15 @@ async def get_locks() -> str:
     result = []
     for lock in locks:
         task = task_engine.get_task(lock.task_id)
-        result.append({
-            "taskId": lock.task_id,
-            "agent": task.agent if task else "(unknown)",
-            "paths": sorted(lock.paths),
-            "mode": lock.mode,
-            "acquired_at": lock.acquired_at,
-        })
+        result.append(
+            {
+                "taskId": lock.task_id,
+                "agent": task.agent if task else "(unknown)",
+                "paths": sorted(lock.paths),
+                "mode": lock.mode,
+                "acquired_at": lock.acquired_at,
+            }
+        )
     return json.dumps({"locks": result, "count": len(result)}, indent=2)
 
 

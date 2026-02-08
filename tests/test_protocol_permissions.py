@@ -1,24 +1,15 @@
-"""Live permission protocol tests using real agents.
-
-Tests that the ACP dispatch framework correctly handles permission enforcement
-during real agent dispatch. Uses french-croissant in read-only mode to verify
-that permission requests are auto-approved and read-only constraints hold.
-
-Requires GEMINI_API_KEY to be set.
-"""
-
 from __future__ import annotations
 
 import pathlib
 import sys
 
-import pytest
-
 _SCRIPTS_DIR = pathlib.Path(__file__).resolve().parent.parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from acp_dispatch import DispatchResult, run_dispatch
+import pytest  # noqa: E402
+
+from acp_dispatch import DispatchResult, run_dispatch  # noqa: E402
 
 
 class TestPermissionProtocol:

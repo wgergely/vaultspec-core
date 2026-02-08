@@ -24,7 +24,7 @@ import logging
 import threading
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
@@ -42,26 +42,32 @@ class TaskStatus(str, Enum):
 
 
 # Terminal states: no further transitions allowed.
-TERMINAL_STATES = frozenset({
-    TaskStatus.COMPLETED,
-    TaskStatus.FAILED,
-    TaskStatus.CANCELLED,
-})
+TERMINAL_STATES = frozenset(
+    {
+        TaskStatus.COMPLETED,
+        TaskStatus.FAILED,
+        TaskStatus.CANCELLED,
+    }
+)
 
 # Valid transitions from each state.
 _VALID_TRANSITIONS: dict[TaskStatus, frozenset[TaskStatus]] = {
-    TaskStatus.WORKING: frozenset({
-        TaskStatus.INPUT_REQUIRED,
-        TaskStatus.COMPLETED,
-        TaskStatus.FAILED,
-        TaskStatus.CANCELLED,
-    }),
-    TaskStatus.INPUT_REQUIRED: frozenset({
-        TaskStatus.WORKING,
-        TaskStatus.COMPLETED,
-        TaskStatus.FAILED,
-        TaskStatus.CANCELLED,
-    }),
+    TaskStatus.WORKING: frozenset(
+        {
+            TaskStatus.INPUT_REQUIRED,
+            TaskStatus.COMPLETED,
+            TaskStatus.FAILED,
+            TaskStatus.CANCELLED,
+        }
+    ),
+    TaskStatus.INPUT_REQUIRED: frozenset(
+        {
+            TaskStatus.WORKING,
+            TaskStatus.COMPLETED,
+            TaskStatus.FAILED,
+            TaskStatus.CANCELLED,
+        }
+    ),
     # Terminal states cannot transition.
     TaskStatus.COMPLETED: frozenset(),
     TaskStatus.FAILED: frozenset(),
@@ -324,9 +330,7 @@ class TaskEngine:
     def _cleanup_expired(self) -> None:
         """Remove tasks that have exceeded their TTL. Called lazily on access."""
         now = time.monotonic()
-        expired = [
-            tid for tid, exp in self._expiry.items() if now >= exp
-        ]
+        expired = [tid for tid, exp in self._expiry.items() if now >= exp]
         for tid in expired:
             self._release_lock(tid)
             self._tasks.pop(tid, None)

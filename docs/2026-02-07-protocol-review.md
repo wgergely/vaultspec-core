@@ -18,6 +18,7 @@
 - **Discovery:** None — editor knows which agent to launch
 
 **Core primitives:**
+
 - `initialize` → `session/new` → `session/prompt` → `session/update` (streaming) → response
 - Client callbacks: `request_permission`, `fs/read_text_file`, `fs/write_text_file`, `terminal/*`
 - The client (editor) provides the environment: filesystem, terminals, permissions
@@ -35,6 +36,7 @@
 - **Discovery:** Agent Cards — self-describing manifests with capabilities, skills, security schemes
 
 **Core primitives:**
+
 - `SendMessage` → `Task` (states: SUBMITTED → WORKING → COMPLETED/FAILED/CANCELED)
 - `Artifact` — typed outputs produced by a task (text, binary, URLs, structured JSON)
 - `SubscribeToTask` — real-time streaming of status/artifact updates
@@ -73,6 +75,7 @@ Human → Claude Code (team lead) → acp_dispatch.py (headless ACP client) → 
 ```
 
 The dispatcher (`GeminiDispatchClient`) acts as an ACP client, implementing:
+
 - Permission handling (auto-approves all tool calls — YOLO mode)
 - File I/O (workspace-scoped read/write pass-through)
 - Terminal management (spawns and tracks subprocesses)
@@ -129,6 +132,7 @@ The architecture conflates two distinct communication boundaries:
 2. **Agent ↔ Agent** (A2A's domain) — the team lead delegating to sub-agents
 
 Boundary 2 is currently implemented by faking Boundary 1. The cost:
+
 - No real permissions at the sub-agent layer
 - No structured task handoff
 - No coordination on shared mutable state

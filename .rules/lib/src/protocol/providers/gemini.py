@@ -10,12 +10,18 @@ import sys
 import tempfile
 from typing import Dict, List, Optional, Tuple
 
-from .base import AgentProvider, ProcessSpec, CapabilityLevel, resolve_includes, load_mcp_servers
+from .base import (
+    AgentProvider,
+    ProcessSpec,
+    CapabilityLevel,
+    resolve_includes,
+    load_mcp_servers,
+)
 
 logger = logging.getLogger(__name__)
 
 # Minimum versions for Gemini CLI ACP support
-_MIN_VERSION_WINDOWS = (0, 9, 0)   # v0.9.0 fixes Windows ACP hang
+_MIN_VERSION_WINDOWS = (0, 9, 0)  # v0.9.0 fixes Windows ACP hang
 _MIN_VERSION_RECOMMENDED = (0, 27, 0)  # v0.27.0 has stable agent skills
 
 # Cache for version check result
@@ -27,6 +33,7 @@ SUPPORTED_MODELS = [
     "gemini-2.5-pro",
     "gemini-2.5-flash",
 ]
+
 
 class GeminiProvider(AgentProvider):
     """Gemini-based agent provider."""
@@ -66,7 +73,9 @@ class GeminiProvider(AgentProvider):
             return "gemini-3-pro-preview"
         return "gemini-3-flash-preview"
 
-    def resolve_includes(self, content: str, base_dir: pathlib.Path, root_dir: pathlib.Path) -> str:
+    def resolve_includes(
+        self, content: str, base_dir: pathlib.Path, root_dir: pathlib.Path
+    ) -> str:
         """Delegates to the shared resolve_includes utility."""
         return resolve_includes(content, base_dir, root_dir)
 
@@ -74,24 +83,20 @@ class GeminiProvider(AgentProvider):
         """Loads system rules from GEMINI.md and recursively resolves all includes."""
         gemini_dir = root_dir / ".gemini"
         gemini_config = gemini_dir / "GEMINI.md"
-        
+
         if not gemini_config.exists():
             return ""
-        
+
         # Safe read manual check
         resolved_path = gemini_config.resolve()
         if not resolved_path.is_relative_to(root_dir):
-             return ""
-        
+            return ""
+
         content = resolved_path.read_text(encoding="utf-8")
         return self.resolve_includes(content, gemini_dir, root_dir)
 
     def construct_system_prompt(self, persona: str, rules: str) -> str:
-        return f"# AGENT PERSONA
-{persona}
-
-# SYSTEM RULES & CONTEXT
-{rules}"
+        return f"# AGENT PERSONA\n{persona}\n\n# SYSTEM RULES & CONTEXT\n{rules}"
 
     @staticmethod
     def check_version(executable: str) -> Optional[Tuple[int, ...]]:
@@ -151,9 +156,8 @@ class GeminiProvider(AgentProvider):
         agent_persona: str,
         task_context: str,
         root_dir: pathlib.Path,
-        model_override: Optional[str] = None
+        model_override: Optional[str] = None,
     ) -> ProcessSpec:
-        
         # 0. Locate executable and check version
         executable = shutil.which("gemini") or "gemini"
         self.check_version(executable)
@@ -184,11 +188,8 @@ class GeminiProvider(AgentProvider):
         # 5. Load MCP servers from .gemini/settings.json
         mcp_servers = load_mcp_servers(root_dir)
 
-        # 6. TODO: investigate - Dual delivery: env var + prompt prepend as fallback
-        initial_prompt = f"{system_prompt}
-
-# TASK
-{task_context}"
+        # 6. Dual delivery: env var + prompt prepend as fallback
+        initial_prompt = f"{system_prompt}\n\n# TASK\n{task_context}"
 
         return ProcessSpec(
             executable=executable,

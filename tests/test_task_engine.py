@@ -1,36 +1,20 @@
-"""Tests for the internal task engine (task_engine.py).
-
-Covers:
-- Task creation and UUID generation
-- State transitions (valid and invalid)
-- Terminal state enforcement
-- Task lookup and listing
-- TTL-based expiry
-- Async wait/notify mechanism
-- Concurrent task tracking
-- Advisory file locking (LockManager)
-- Lock release on terminal state transitions
-"""
-
 from __future__ import annotations
 
-import asyncio
 import pathlib
 import sys
-import time
-
-import pytest
 
 # Ensure scripts dir is importable
 _SCRIPTS_DIR = pathlib.Path(__file__).resolve().parent.parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from task_engine import (
-    DispatchTask,
-    FileLock,
+import asyncio  # noqa: E402
+import time  # noqa: E402
+
+import pytest  # noqa: E402
+
+from task_engine import (  # noqa: E402
     InvalidTransitionError,
-    LockConflictError,
     LockManager,
     TaskEngine,
     TaskNotFoundError,
@@ -43,6 +27,7 @@ from task_engine import (
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def engine():
@@ -82,6 +67,7 @@ def short_ttl_engine_with_locks():
 # TestHelpers
 # ---------------------------------------------------------------------------
 
+
 class TestHelpers:
     def test_generate_task_id_unique(self):
         ids = {generate_task_id() for _ in range(100)}
@@ -107,6 +93,7 @@ class TestHelpers:
 # TestCreateTask
 # ---------------------------------------------------------------------------
 
+
 class TestCreateTask:
     def test_creates_with_working_status(self, engine):
         task = engine.create_task("test-agent")
@@ -126,9 +113,7 @@ class TestCreateTask:
             engine.create_task("test-agent", task_id="dup-id")
 
     def test_stores_metadata(self, engine):
-        task = engine.create_task(
-            "test-agent", model="gemini-3-pro", mode="read-only"
-        )
+        task = engine.create_task("test-agent", model="gemini-3-pro", mode="read-only")
         assert task.agent == "test-agent"
         assert task.model == "gemini-3-pro"
         assert task.mode == "read-only"
@@ -153,6 +138,7 @@ class TestCreateTask:
 # TestGetTask
 # ---------------------------------------------------------------------------
 
+
 class TestGetTask:
     def test_get_existing_task(self, engine):
         task = engine.create_task("test-agent")
@@ -167,6 +153,7 @@ class TestGetTask:
 # ---------------------------------------------------------------------------
 # TestStateTransitions
 # ---------------------------------------------------------------------------
+
 
 class TestStateTransitions:
     def test_working_to_completed(self, engine):
@@ -248,6 +235,7 @@ class TestStateTransitions:
 # TestCompleteTask
 # ---------------------------------------------------------------------------
 
+
 class TestCompleteTask:
     def test_sets_status_and_result(self, engine):
         task = engine.create_task("test-agent")
@@ -277,6 +265,7 @@ class TestCompleteTask:
 # TestFailTask
 # ---------------------------------------------------------------------------
 
+
 class TestFailTask:
     def test_sets_status_and_error(self, engine):
         task = engine.create_task("test-agent")
@@ -298,6 +287,7 @@ class TestFailTask:
 # ---------------------------------------------------------------------------
 # TestCancelTask
 # ---------------------------------------------------------------------------
+
 
 class TestCancelTask:
     def test_cancel_working_task(self, engine):
@@ -322,6 +312,7 @@ class TestCancelTask:
 # TestListTasks
 # ---------------------------------------------------------------------------
 
+
 class TestListTasks:
     def test_empty_engine(self, engine):
         assert engine.list_tasks() == []
@@ -338,6 +329,7 @@ class TestListTasks:
 # TestDeleteTask
 # ---------------------------------------------------------------------------
 
+
 class TestDeleteTask:
     def test_delete_existing(self, engine):
         task = engine.create_task("test-agent")
@@ -351,6 +343,7 @@ class TestDeleteTask:
 # ---------------------------------------------------------------------------
 # TestTTLExpiry
 # ---------------------------------------------------------------------------
+
 
 class TestTTLExpiry:
     def test_terminal_task_expires(self, short_ttl_engine):
@@ -382,6 +375,7 @@ class TestTTLExpiry:
 # TestConcurrency
 # ---------------------------------------------------------------------------
 
+
 class TestConcurrency:
     def test_multiple_tasks_independent(self, engine):
         """Multiple tasks can be tracked independently."""
@@ -401,9 +395,11 @@ class TestConcurrency:
 # TestWaitForUpdate
 # ---------------------------------------------------------------------------
 
+
 class TestWaitForUpdate:
     def test_wait_wakes_on_update(self, engine):
         """wait_for_update unblocks when status changes."""
+
         async def _test():
             task = engine.create_task("test-agent")
 
@@ -420,6 +416,7 @@ class TestWaitForUpdate:
 
     def test_wait_timeout(self, engine):
         """wait_for_update raises TimeoutError when timeout expires."""
+
         async def _test():
             task = engine.create_task("test-agent")
             with pytest.raises(asyncio.TimeoutError):
@@ -429,6 +426,7 @@ class TestWaitForUpdate:
 
     def test_wait_nonexistent_raises(self, engine):
         """wait_for_update raises TaskNotFoundError for missing tasks."""
+
         async def _test():
             with pytest.raises(TaskNotFoundError):
                 await engine.wait_for_update("nonexistent")
@@ -439,6 +437,7 @@ class TestWaitForUpdate:
 # ---------------------------------------------------------------------------
 # TestLockManager
 # ---------------------------------------------------------------------------
+
 
 class TestLockManager:
     """Tests for the advisory file lock manager."""
@@ -475,9 +474,7 @@ class TestLockManager:
 
     def test_no_conflict_disjoint_paths(self, lock_mgr):
         lock_mgr.acquire_lock("t1", {".docs/plan.md"}, "read-only")
-        _lock, warnings = lock_mgr.acquire_lock(
-            "t2", {"src/main.rs"}, "read-write"
-        )
+        _lock, warnings = lock_mgr.acquire_lock("t2", {"src/main.rs"}, "read-write")
         assert warnings == []
 
     def test_check_conflicts(self, lock_mgr):
@@ -505,7 +502,7 @@ class TestLockManager:
         lock_mgr.acquire_lock("t2", {"src/b.rs"}, "read-write")
         locks = lock_mgr.get_locks()
         assert len(locks) == 2
-        ids = {l.task_id for l in locks}
+        ids = {lock.task_id for lock in locks}
         assert ids == {"t1", "t2"}
 
     def test_get_locks_empty_initially(self, lock_mgr):
@@ -522,6 +519,7 @@ class TestLockManager:
 # ---------------------------------------------------------------------------
 # TestValidateReadonlyPaths
 # ---------------------------------------------------------------------------
+
 
 class TestValidateReadonlyPaths:
     """Tests for LockManager.validate_readonly_paths()."""
@@ -558,6 +556,7 @@ class TestValidateReadonlyPaths:
 # ---------------------------------------------------------------------------
 # TestLockReleaseOnTerminalTransitions
 # ---------------------------------------------------------------------------
+
 
 class TestLockReleaseOnTerminalTransitions:
     """Tests that locks are released when tasks reach terminal states."""
@@ -682,6 +681,7 @@ class TestLockReleaseOnTerminalTransitions:
 # ---------------------------------------------------------------------------
 # TestSessionIdStorage
 # ---------------------------------------------------------------------------
+
 
 class TestSessionIdStorage:
     """Tests for session_id storage on DispatchTask."""

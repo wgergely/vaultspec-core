@@ -24,6 +24,7 @@
 Released with Opus 4.6 (February 2026).
 
 ### Architecture
+
 ```
       Team Lead (Coordination)
        /         |         \
@@ -33,22 +34,27 @@ Released with Opus 4.6 (February 2026).
 ```
 
 ### Core Tools
+
 - `Teammate(spawnTeam)` / `Teammate(cleanup)` -- team lifecycle
 - `SendMessage(message/broadcast/shutdown_request)` -- communication
 - `TaskCreate/TaskUpdate/TaskList` -- shared task list
 
 ### Communication Model
+
 Direct messaging via `SendMessage`. Async delivery with queueing. Broadcast available but expensive.
 
 ### Delegation Pattern
+
 Team lead creates tasks via `TaskCreate`, assigns with `TaskUpdate(owner)`. Task states: `pending` -> `in_progress` -> `completed`. Dependencies via `blockedBy`.
 
 ### Shared State
+
 - Task list at `~/.claude/tasks/{team-name}/`
 - Team config at `~/.claude/teams/{team-name}/config.json`
 - No shared context window -- only messages and task list
 
 ### Limitations
+
 - No session resumption for teammates
 - Multiple teammates editing same file causes conflicts
 - Experimental status
@@ -58,15 +64,18 @@ Team lead creates tasks via `TaskCreate`, assigns with `TaskUpdate(owner)`. Task
 ## 3. OpenAI Agents SDK
 
 ### Architecture
+
 ```
 Triage Agent -> handoff -> Specialist A
                        \-> Specialist B
 ```
 
 ### Communication Model
+
 Function-based handoffs. LLM sees handoffs as callable tools (`transfer_to_{agent_name}`). Full conversation history passes with each handoff.
 
 ### Key Characteristics
+
 - **Stateless pass-through** -- no persistent state between calls
 - **Linear chain** -- no "reporting back", agent that has control owns the conversation
 - **No parallelism** -- single thread of execution
@@ -77,15 +86,18 @@ Function-based handoffs. LLM sees handoffs as callable tools (`transfer_to_{agen
 ## 4. LangGraph Supervisor Pattern
 
 ### Architecture
+
 ```
 Supervisor (LLM node) -> handoff_tool -> Worker A -> return to supervisor
                                       -> Worker B -> return to supervisor
 ```
 
 ### Communication Model
+
 Graph-based routing. Supervisor calls `create_handoff_tool` to delegate. Workers return via `add_handoff_back_messages`.
 
 ### Key Characteristics
+
 - **Stateful graph** with checkpointing (`InMemorySaver`)
 - **Supervisor re-routes** based on worker results
 - **Shared memory** via `InMemoryStore` key-value storage
@@ -95,6 +107,7 @@ Graph-based routing. Supervisor calls `create_handoff_tool` to delegate. Workers
 ## 5. Microsoft Magentic-One (AutoGen)
 
 ### Architecture
+
 ```
 Orchestrator (Outer Loop: Task Ledger)
      |
@@ -104,11 +117,13 @@ Orchestrator (Outer Loop: Task Ledger)
 ```
 
 ### Dual-Loop Pattern
+
 - **Outer Loop**: Task Ledger with facts, guesses, plan
 - **Inner Loop**: Progress Ledger for self-reflection -- is progress being made? Which agent next?
 - If progress stalls, re-enters outer loop and replans
 
 ### Semantic Kernel Orchestration Patterns
+
 Five patterns: Sequential, Concurrent, Handoff, GroupChat, Magentic.
 
 ---
@@ -116,11 +131,14 @@ Five patterns: Sequential, Concurrent, Handoff, GroupChat, Magentic.
 ## 6. CrewAI
 
 ### Communication Model
+
 Agents with `allow_delegation=True` get two built-in tools:
+
 1. **Delegate Work** -- assign subtask to teammate
 2. **Ask Question** -- query teammate for information
 
 ### Key Characteristics
+
 - `allowed_agents` parameter for controlled delegation hierarchies
 - Task context chain: `context=[other_task]` for dependency injection
 - Processes: `sequential` or `hierarchical`
@@ -130,6 +148,7 @@ Agents with `allow_delegation=True` get two built-in tools:
 ## 7. Google ADK + A2A
 
 ### Architecture
+
 ```
 Root Agent -> Local sub-agent A
            -> Local sub-agent B
@@ -137,6 +156,7 @@ Root Agent -> Local sub-agent A
 ```
 
 ### Key Pattern
+
 ```python
 remote_agent = RemoteA2aAgent(
     name="approval_service",
@@ -188,10 +208,10 @@ Remote agents appear identical to local sub-agents from the root's perspective.
 
 ## Sources
 
-- https://code.claude.com/docs/en/agent-teams
-- https://github.com/openai/openai-agents-python
-- https://github.com/langchain-ai/langgraph-supervisor-py
-- https://microsoft.github.io/autogen/stable/
-- https://docs.crewai.com/en/concepts/collaboration
-- https://google.github.io/adk-docs/a2a/
-- https://lfaidata.foundation/communityblog/2025/08/29/acp-joins-forces-with-a2a/
+- <https://code.claude.com/docs/en/agent-teams>
+- <https://github.com/openai/openai-agents-python>
+- <https://github.com/langchain-ai/langgraph-supervisor-py>
+- <https://microsoft.github.io/autogen/stable/>
+- <https://docs.crewai.com/en/concepts/collaboration>
+- <https://google.github.io/adk-docs/a2a/>
+- <https://lfaidata.foundation/communityblog/2025/08/29/acp-joins-forces-with-a2a/>

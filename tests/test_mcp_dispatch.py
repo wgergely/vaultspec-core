@@ -1,41 +1,27 @@
-"""Tests for the MCP dispatch server (mcp_dispatch.py).
-
-Covers:
-- Server initialization and tool registration
-- list_agents tool returning correct agent metadata
-- dispatch_agent async dispatch and background task lifecycle
-- get_task_status and cancel_task tools
-- Error paths (DispatchError, generic Exception, path traversal)
-- quiet=True propagation to run_dispatch
-- MCP resource registration, listing, reading, and cache invalidation
-- Permission enforcement (mode resolution, prompt injection, advisory locks)
-- Mode propagation to run_dispatch (Phase 5A)
-- Graceful ACP session/cancel on task cancellation (M2)
-- Active client tracking for cancellation (M2)
-"""
-
 from __future__ import annotations
 
-import asyncio
-import json
 import pathlib
 import sys
-from unittest.mock import AsyncMock, patch
-
-import pytest
 
 # Ensure scripts dir is importable (conftest also does this)
 _SCRIPTS_DIR = pathlib.Path(__file__).resolve().parent.parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-import mcp_dispatch
-from acp_dispatch import DispatchResult
+import asyncio  # noqa: E402
+import json  # noqa: E402
+from unittest.mock import AsyncMock, patch  # noqa: E402
+
+import pytest  # noqa: E402
+
+import mcp_dispatch  # noqa: E402
+from acp_dispatch import DispatchResult  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def mcp_workspace(tmp_path: pathlib.Path, monkeypatch):
@@ -64,10 +50,12 @@ def mcp_workspace(tmp_path: pathlib.Path, monkeypatch):
 
     # Reset task engine and lock manager to avoid cross-test leaks.
     from task_engine import LockManager, TaskEngine
+
     new_lock_manager = LockManager()
     mcp_dispatch.lock_manager = new_lock_manager
     mcp_dispatch.task_engine = TaskEngine(
-        ttl_seconds=3600.0, lock_manager=new_lock_manager,
+        ttl_seconds=3600.0,
+        lock_manager=new_lock_manager,
     )
 
     # Re-register resources so they point to the temp workspace.
@@ -87,6 +75,7 @@ def empty_workspace(tmp_path: pathlib.Path, monkeypatch):
 # ---------------------------------------------------------------------------
 # TestHelpers
 # ---------------------------------------------------------------------------
+
 
 class TestHelpers:
     def test_strip_quotes_normal(self):
@@ -115,6 +104,7 @@ class TestHelpers:
 # TestServerInit
 # ---------------------------------------------------------------------------
 
+
 class TestServerInit:
     def test_server_name(self):
         assert mcp_dispatch.mcp.name == "pp-dispatch"
@@ -136,6 +126,7 @@ class TestServerInit:
 # ---------------------------------------------------------------------------
 # TestListAgents
 # ---------------------------------------------------------------------------
+
 
 class TestListAgents:
     def test_returns_agents(self, mcp_workspace):
@@ -183,6 +174,7 @@ class TestListAgents:
 # TestDispatchAgent
 # ---------------------------------------------------------------------------
 
+
 class TestDispatchAgent:
     def test_invalid_mode_rejected(self, mcp_workspace):
         result = asyncio.run(
@@ -194,6 +186,7 @@ class TestDispatchAgent:
 
     def test_async_dispatch_returns_working(self, mcp_workspace):
         """dispatch_agent returns immediately with status=working and a taskId."""
+
         async def _test():
             result = await mcp_dispatch.dispatch_agent("nonexistent-agent", "do stuff")
             data = json.loads(result)
@@ -213,6 +206,7 @@ class TestDispatchAgent:
 
     def test_missing_agent_fails_in_background(self, mcp_workspace):
         """A nonexistent agent causes the background task to fail, visible via get_task_status."""
+
         async def _test():
             result = await mcp_dispatch.dispatch_agent("nonexistent-agent", "do stuff")
             data = json.loads(result)
@@ -232,7 +226,9 @@ class TestDispatchAgent:
         task_file.write_text("# My Task\nDo something important.", encoding="utf-8")
 
         async def _test():
-            result = await mcp_dispatch.dispatch_agent("nonexistent-agent", "test-task.md")
+            result = await mcp_dispatch.dispatch_agent(
+                "nonexistent-agent", "test-task.md"
+            )
             data = json.loads(result)
             task_id = data["taskId"]
             await asyncio.sleep(0.1)
@@ -271,9 +267,14 @@ class TestDispatchAgent:
 
     def test_successful_dispatch(self, mcp_workspace):
         """Mock run_dispatch returning successfully and verify task completes."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
-                mock_rd.return_value = DispatchResult(response_text="Agent completed the task successfully.")
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
+                mock_rd.return_value = DispatchResult(
+                    response_text="Agent completed the task successfully."
+                )
                 result = await mcp_dispatch.dispatch_agent(
                     "test-researcher", "do stuff", model="test-model"
                 )
@@ -301,9 +302,13 @@ class TestDispatchAgent:
         from acp_dispatch import DispatchError as AcpDispatchError
 
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.side_effect = AcpDispatchError("Quota exhausted")
-                result = await mcp_dispatch.dispatch_agent("test-researcher", "do stuff")
+                result = await mcp_dispatch.dispatch_agent(
+                    "test-researcher", "do stuff"
+                )
                 data = json.loads(result)
                 task_id = data["taskId"]
                 await asyncio.sleep(0.1)
@@ -316,10 +321,15 @@ class TestDispatchAgent:
 
     def test_generic_exception_path(self, mcp_workspace):
         """Unexpected Exception from run_dispatch marks task as failed."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.side_effect = RuntimeError("Something unexpected")
-                result = await mcp_dispatch.dispatch_agent("test-researcher", "do stuff")
+                result = await mcp_dispatch.dispatch_agent(
+                    "test-researcher", "do stuff"
+                )
                 data = json.loads(result)
                 task_id = data["taskId"]
                 await asyncio.sleep(0.1)
@@ -332,6 +342,7 @@ class TestDispatchAgent:
 
     def test_path_traversal_rejected(self, mcp_workspace):
         """Path traversal attempts should not read files outside workspace."""
+
         async def _test():
             # Use a path traversal string as the task.
             result = await mcp_dispatch.dispatch_agent(
@@ -350,8 +361,11 @@ class TestDispatchAgent:
 
     def test_quiet_propagation(self, mcp_workspace):
         """Verify run_dispatch is called with quiet=True."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="done")
                 await mcp_dispatch.dispatch_agent("test-researcher", "do stuff")
                 await asyncio.sleep(0.1)
@@ -366,6 +380,7 @@ class TestDispatchAgent:
 # ---------------------------------------------------------------------------
 # TestGetTaskStatus
 # ---------------------------------------------------------------------------
+
 
 class TestGetTaskStatus:
     def test_unknown_task_id(self):
@@ -413,6 +428,7 @@ class TestGetTaskStatus:
 # TestCancelTask
 # ---------------------------------------------------------------------------
 
+
 class TestCancelTask:
     def test_cancel_working_task(self):
         task = mcp_dispatch.task_engine.create_task("test-agent")
@@ -440,20 +456,26 @@ class TestCancelTask:
 # TestAsyncDispatchIntegration
 # ---------------------------------------------------------------------------
 
+
 class TestAsyncDispatchIntegration:
     """Integration tests for the full async dispatch lifecycle."""
 
     def test_poll_status_while_working(self, mcp_workspace):
         """get_task_status returns 'working' while background dispatch is still running."""
+
         async def _test():
             # Make run_dispatch block long enough to poll mid-flight.
             async def slow_dispatch(**kwargs):
                 await asyncio.sleep(0.5)
                 return DispatchResult(response_text="Eventually done.")
 
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.side_effect = slow_dispatch
-                result = await mcp_dispatch.dispatch_agent("test-researcher", "do stuff")
+                result = await mcp_dispatch.dispatch_agent(
+                    "test-researcher", "do stuff"
+                )
                 data = json.loads(result)
                 task_id = data["taskId"]
 
@@ -475,6 +497,7 @@ class TestAsyncDispatchIntegration:
 
     def test_cancel_terminates_background_task(self, mcp_workspace):
         """cancel_task stops the in-flight asyncio background task."""
+
         async def _test():
             dispatch_started = asyncio.Event()
 
@@ -483,9 +506,13 @@ class TestAsyncDispatchIntegration:
                 await asyncio.sleep(10.0)  # Would block forever without cancel.
                 return DispatchResult(response_text="Should not reach here.")
 
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.side_effect = blocking_dispatch
-                result = await mcp_dispatch.dispatch_agent("test-researcher", "do stuff")
+                result = await mcp_dispatch.dispatch_agent(
+                    "test-researcher", "do stuff"
+                )
                 data = json.loads(result)
                 task_id = data["taskId"]
 
@@ -512,6 +539,7 @@ class TestAsyncDispatchIntegration:
 
     def test_concurrent_dispatches_independent(self, mcp_workspace):
         """Multiple concurrent dispatches are tracked independently."""
+
         async def _test():
             call_count = 0
 
@@ -522,7 +550,9 @@ class TestAsyncDispatchIntegration:
                 await asyncio.sleep(0.05)
                 return DispatchResult(response_text=f"Done by {agent}")
 
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.side_effect = mock_dispatch
 
                 # Dispatch three tasks concurrently.
@@ -555,9 +585,14 @@ class TestAsyncDispatchIntegration:
 
     def test_completed_result_structure(self, mcp_workspace):
         """Completed task result contains all ADR-required fields."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
-                mock_rd.return_value = DispatchResult(response_text="Full analysis complete with findings.")
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
+                mock_rd.return_value = DispatchResult(
+                    response_text="Full analysis complete with findings."
+                )
                 result = await mcp_dispatch.dispatch_agent(
                     "test-researcher", "analyze this", model="gemini-3-pro"
                 )
@@ -584,8 +619,11 @@ class TestAsyncDispatchIntegration:
 
     def test_default_model_in_result(self, mcp_workspace):
         """When no model override is provided, result shows '(default)'."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="Done.")
                 result = await mcp_dispatch.dispatch_agent(
                     "test-researcher", "do stuff"
@@ -603,13 +641,18 @@ class TestAsyncDispatchIntegration:
 
     def test_dispatch_run_dispatch_receives_correct_args(self, mcp_workspace):
         """Verify the full argument set passed to run_dispatch."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="ok")
                 # Use mode="read-write" explicitly to avoid permission prompt injection.
                 await mcp_dispatch.dispatch_agent(
-                    "test-researcher", "my task text",
-                    model="custom-model", mode="read-write",
+                    "test-researcher",
+                    "my task text",
+                    model="custom-model",
+                    mode="read-write",
                 )
                 await asyncio.sleep(0.1)
                 return mock_rd
@@ -629,7 +672,9 @@ class TestAsyncDispatchIntegration:
         long_task = "A" * 5000
 
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="done")
                 await mcp_dispatch.dispatch_agent(
                     "test-researcher", long_task, mode="read-write"
@@ -644,10 +689,15 @@ class TestAsyncDispatchIntegration:
 
     def test_summary_truncation(self, mcp_workspace):
         """Completed task summary is truncated to at most 500 chars."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="x" * 1000)
-                result = await mcp_dispatch.dispatch_agent("test-researcher", "do stuff")
+                result = await mcp_dispatch.dispatch_agent(
+                    "test-researcher", "do stuff"
+                )
                 data = json.loads(result)
                 task_id = data["taskId"]
                 await asyncio.sleep(0.1)
@@ -660,8 +710,11 @@ class TestAsyncDispatchIntegration:
 
     def test_empty_task_string_dispatches(self, mcp_workspace):
         """dispatch_agent with empty task string dispatches without error."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="done")
                 result = await mcp_dispatch.dispatch_agent("test-researcher", "")
                 data = json.loads(result)
@@ -675,6 +728,7 @@ class TestAsyncDispatchIntegration:
 
     def test_cancel_complete_race_no_crash(self, mcp_workspace):
         """If cancel_task races with background completion, no unhandled error occurs."""
+
         async def _test():
             complete_gate = asyncio.Event()
 
@@ -683,9 +737,13 @@ class TestAsyncDispatchIntegration:
                 await complete_gate.wait()
                 return DispatchResult(response_text="Completed after cancel.")
 
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.side_effect = gated_dispatch
-                result = await mcp_dispatch.dispatch_agent("test-researcher", "do stuff")
+                result = await mcp_dispatch.dispatch_agent(
+                    "test-researcher", "do stuff"
+                )
                 data = json.loads(result)
                 task_id = data["taskId"]
 
@@ -721,7 +779,11 @@ class TestAsyncDispatchIntegration:
                 uri = str(r.uri)
                 if uri.startswith("agents://"):
                     contents = await mcp_dispatch.mcp.read_resource(uri)
-                    text = contents[0].content if hasattr(contents[0], "content") else str(contents[0])
+                    text = (
+                        contents[0].content
+                        if hasattr(contents[0], "content")
+                        else str(contents[0])
+                    )
                     data = json.loads(text)
                     res_descs[data["name"]] = data["description"]
             return res_descs
@@ -741,6 +803,7 @@ class TestAsyncDispatchIntegration:
 # TestAgentResources
 # ---------------------------------------------------------------------------
 
+
 class TestAgentResources:
     """Tests for MCP agent resource registration, listing, and reading."""
 
@@ -755,13 +818,16 @@ class TestAgentResources:
 
     def test_resources_read_correct_metadata(self, mcp_workspace):
         """resources/read returns correct JSON metadata for a known agent."""
+
         async def _test():
             contents = await mcp_dispatch.mcp.read_resource("agents://test-researcher")
             return contents
 
         contents = asyncio.run(_test())
         assert len(contents) > 0
-        text = contents[0].content if hasattr(contents[0], "content") else str(contents[0])
+        text = (
+            contents[0].content if hasattr(contents[0], "content") else str(contents[0])
+        )
         data = json.loads(text)
         assert data["name"] == "test-researcher"
         assert data["tier"] == "HIGH"
@@ -775,12 +841,15 @@ class TestAgentResources:
 
     def test_resources_read_executor_metadata(self, mcp_workspace):
         """resources/read for test-executor returns correct schema."""
+
         async def _test():
             contents = await mcp_dispatch.mcp.read_resource("agents://test-executor")
             return contents
 
         contents = asyncio.run(_test())
-        text = contents[0].content if hasattr(contents[0], "content") else str(contents[0])
+        text = (
+            contents[0].content if hasattr(contents[0], "content") else str(contents[0])
+        )
         data = json.loads(text)
         assert data["name"] == "test-executor"
         assert data["tier"] == "LOW"
@@ -789,6 +858,7 @@ class TestAgentResources:
 
     def test_unknown_agent_uri_errors(self, mcp_workspace):
         """resources/read for a nonexistent agent URI raises an error."""
+
         async def _test():
             return await mcp_dispatch.mcp.read_resource("agents://nonexistent-agent")
 
@@ -805,6 +875,7 @@ class TestAgentResources:
 
     def test_resource_content_matches_schema(self, mcp_workspace):
         """Every resource content has all required schema fields."""
+
         async def _test():
             resources = await mcp_dispatch.mcp.list_resources()
             results = {}
@@ -812,12 +883,23 @@ class TestAgentResources:
                 uri = str(r.uri)
                 if uri.startswith("agents://"):
                     contents = await mcp_dispatch.mcp.read_resource(uri)
-                    text = contents[0].content if hasattr(contents[0], "content") else str(contents[0])
+                    text = (
+                        contents[0].content
+                        if hasattr(contents[0], "content")
+                        else str(contents[0])
+                    )
                     results[uri] = json.loads(text)
             return results
 
         results = asyncio.run(_test())
-        required_keys = {"name", "description", "tier", "default_model", "default_mode", "tools"}
+        required_keys = {
+            "name",
+            "description",
+            "tier",
+            "default_model",
+            "default_mode",
+            "tools",
+        }
         for uri, data in results.items():
             missing = required_keys - set(data.keys())
             assert not missing, f"{uri} missing keys: {missing}"
@@ -834,6 +916,7 @@ class TestAgentResources:
 # ---------------------------------------------------------------------------
 # TestFileWatching
 # ---------------------------------------------------------------------------
+
 
 class TestFileWatching:
     """Tests for mtime-based file change detection and cache refresh."""
@@ -914,13 +997,17 @@ class TestFileWatching:
 # TestPermissionEnforcement
 # ---------------------------------------------------------------------------
 
+
 class TestPermissionEnforcement:
     """Integration tests for permission mode enforcement (Phase 4)."""
 
     def test_readonly_mode_injects_permission_prompt(self, mcp_workspace):
         """dispatch_agent with mode=read-only prepends permission instructions."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="done")
                 await mcp_dispatch.dispatch_agent(
                     "test-researcher", "analyze code", mode="read-only"
@@ -936,8 +1023,11 @@ class TestPermissionEnforcement:
 
     def test_readwrite_mode_no_prompt_injection(self, mcp_workspace):
         """dispatch_agent with mode=read-write does NOT inject permission text."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="done")
                 await mcp_dispatch.dispatch_agent(
                     "test-executor", "fix code", mode="read-write"
@@ -952,8 +1042,11 @@ class TestPermissionEnforcement:
 
     def test_default_mode_from_agent_frontmatter(self, mcp_workspace):
         """When mode is not specified, agent's frontmatter default_mode is used."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="done")
                 # test-researcher has mode: read-only in frontmatter.
                 result = await mcp_dispatch.dispatch_agent(
@@ -972,8 +1065,11 @@ class TestPermissionEnforcement:
 
     def test_explicit_mode_overrides_agent_default(self, mcp_workspace):
         """Explicit mode parameter overrides agent frontmatter default."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="done")
                 # test-researcher has mode: read-only, but we pass read-write.
                 result = await mcp_dispatch.dispatch_agent(
@@ -999,7 +1095,9 @@ class TestPermissionEnforcement:
         mcp_dispatch._register_agent_resources()
 
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="done")
                 result = await mcp_dispatch.dispatch_agent(
                     "no-mode-agent", "do something"
@@ -1018,6 +1116,7 @@ class TestPermissionEnforcement:
 # TestGetLocks
 # ---------------------------------------------------------------------------
 
+
 class TestGetLocks:
     """Tests for the get_locks MCP tool."""
 
@@ -1030,8 +1129,12 @@ class TestGetLocks:
 
     def test_get_locks_returns_active_lock(self, mcp_workspace):
         """get_locks returns locks held by dispatched tasks."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
+
                 async def slow_dispatch(**kwargs):
                     await asyncio.sleep(1.0)
                     return DispatchResult(response_text="done")
@@ -1063,13 +1166,16 @@ class TestGetLocks:
 
     def test_lock_released_after_task_completes(self, mcp_workspace):
         """After a task completes, its lock is released."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="done")
                 result = await mcp_dispatch.dispatch_agent(
                     "test-researcher", "research", mode="read-only"
                 )
-                data = json.loads(result)
+                json.loads(result)
 
                 # Wait for completion.
                 await asyncio.sleep(0.1)
@@ -1083,8 +1189,12 @@ class TestGetLocks:
 
     def test_task_status_includes_lock_info(self, mcp_workspace):
         """get_task_status includes lock information for working tasks."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
+
                 async def slow_dispatch(**kwargs):
                     await asyncio.sleep(1.0)
                     return DispatchResult(response_text="done")
@@ -1112,8 +1222,12 @@ class TestGetLocks:
 
     def test_conflict_warning_on_overlapping_dispatch(self, mcp_workspace):
         """Dispatching two tasks with overlapping paths logs a conflict warning."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
+
                 async def slow_dispatch(**kwargs):
                     await asyncio.sleep(1.0)
                     return DispatchResult(response_text="done")
@@ -1152,6 +1266,7 @@ class TestGetLocks:
 # ---------------------------------------------------------------------------
 # TestExtractArtifacts
 # ---------------------------------------------------------------------------
+
 
 class TestExtractArtifacts:
     """Tests for the _extract_artifacts helper function."""
@@ -1277,8 +1392,11 @@ class TestArtifactTracking:
 
     def test_artifacts_populated_from_response_text(self, mcp_workspace):
         """Completed task result includes artifacts extracted from response text."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(
                     response_text="Created .docs/plan/feature-plan.md and modified src/main.rs",
                 )
@@ -1299,8 +1417,11 @@ class TestArtifactTracking:
 
     def test_artifacts_populated_from_written_files(self, mcp_workspace):
         """Completed task result includes artifacts from file write log."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(
                     response_text="Task done.",
                     written_files=[".docs/adr/test-adr.md", "src/lib.rs"],
@@ -1322,8 +1443,11 @@ class TestArtifactTracking:
 
     def test_artifacts_merged_from_both_sources(self, mcp_workspace):
         """Artifacts from response text and file write log are merged and deduplicated."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(
                     response_text="Wrote .docs/plan.md and src/main.rs",
                     written_files=[".docs/plan.md", "src/new_module.rs"],
@@ -1347,8 +1471,11 @@ class TestArtifactTracking:
 
     def test_empty_response_empty_artifacts(self, mcp_workspace):
         """Empty response text and no written files yields empty artifacts list."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="")
                 result = await mcp_dispatch.dispatch_agent(
                     "test-researcher", "do stuff"
@@ -1365,8 +1492,11 @@ class TestArtifactTracking:
 
     def test_no_file_paths_empty_artifacts(self, mcp_workspace):
         """Response with no file paths and no writes yields empty artifacts list."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(
                     response_text="Task completed successfully with no file changes.",
                 )
@@ -1385,8 +1515,11 @@ class TestArtifactTracking:
 
     def test_written_files_only_no_text_mentions(self, mcp_workspace):
         """When agent writes files but doesn't mention them in text, artifacts still populated."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(
                     response_text="I completed the task.",
                     written_files=[".docs/exec/step-1.md", ".docs/exec/step-2.md"],
@@ -1411,13 +1544,17 @@ class TestArtifactTracking:
 # TestModePassthrough
 # ---------------------------------------------------------------------------
 
+
 class TestModePassthrough:
     """Tests that mode is passed through to run_dispatch."""
 
     def test_readonly_mode_passed_to_run_dispatch(self, mcp_workspace):
         """dispatch_agent with mode=read-only passes mode to run_dispatch."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="done")
                 await mcp_dispatch.dispatch_agent(
                     "test-researcher", "analyze code", mode="read-only"
@@ -1431,8 +1568,11 @@ class TestModePassthrough:
 
     def test_readwrite_mode_passed_to_run_dispatch(self, mcp_workspace):
         """dispatch_agent with mode=read-write passes mode to run_dispatch."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="done")
                 await mcp_dispatch.dispatch_agent(
                     "test-executor", "fix code", mode="read-write"
@@ -1446,13 +1586,14 @@ class TestModePassthrough:
 
     def test_default_mode_passed_to_run_dispatch(self, mcp_workspace):
         """When agent has frontmatter mode, it is passed to run_dispatch."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="done")
                 # test-researcher has mode: read-only in frontmatter
-                await mcp_dispatch.dispatch_agent(
-                    "test-researcher", "research task"
-                )
+                await mcp_dispatch.dispatch_agent("test-researcher", "research task")
                 await asyncio.sleep(0.1)
                 return mock_rd
 
@@ -1462,8 +1603,11 @@ class TestModePassthrough:
 
     def test_client_ref_passed_to_run_dispatch(self, mcp_workspace):
         """dispatch_agent passes client_ref to run_dispatch for cancellation support."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="done")
                 await mcp_dispatch.dispatch_agent(
                     "test-researcher", "do stuff", mode="read-write"
@@ -1481,11 +1625,13 @@ class TestModePassthrough:
 # TestGracefulCancelIntegration (M2)
 # ---------------------------------------------------------------------------
 
+
 class TestGracefulCancelIntegration:
     """Tests for graceful ACP cancellation from MCP cancel_task."""
 
     def test_active_clients_populated_during_dispatch(self, mcp_workspace):
         """_active_clients is populated while a task is running."""
+
         async def _test():
             dispatch_started = asyncio.Event()
 
@@ -1494,6 +1640,7 @@ class TestGracefulCancelIntegration:
                 client_ref = kwargs.get("client_ref")
                 if client_ref is not None:
                     from unittest.mock import MagicMock, AsyncMock as AM
+
                     mock_client = MagicMock()
                     mock_client.graceful_cancel = AM()
                     client_ref.clear()
@@ -1502,7 +1649,9 @@ class TestGracefulCancelIntegration:
                 await asyncio.sleep(10.0)
                 return DispatchResult(response_text="done")
 
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.side_effect = blocking_dispatch
                 result = await mcp_dispatch.dispatch_agent(
                     "test-researcher", "do stuff"
@@ -1527,8 +1676,11 @@ class TestGracefulCancelIntegration:
 
     def test_active_clients_cleaned_up_after_completion(self, mcp_workspace):
         """_active_clients entry is removed after task completes."""
+
         async def _test():
-            with patch.object(mcp_dispatch, "run_dispatch", new_callable=AsyncMock) as mock_rd:
+            with patch.object(
+                mcp_dispatch, "run_dispatch", new_callable=AsyncMock
+            ) as mock_rd:
                 mock_rd.return_value = DispatchResult(response_text="done")
                 result = await mcp_dispatch.dispatch_agent(
                     "test-researcher", "do stuff"

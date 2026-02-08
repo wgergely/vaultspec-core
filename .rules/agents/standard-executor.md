@@ -13,7 +13,7 @@ Utilize:
 
 - Relevant tools (domain knowledge tools, language tools, search tools).
 - Invoke the `task-subagent` skill with the appropriate agent. Instruct it to "Perform [task]."
-    - *Alternatives:* `adr-researcher`, `reference-auditor`.
+  - *Alternatives:* `adr-researcher`, `reference-auditor`.
 - If you have to compact your context, ensure any original document paths are preserved.
 
 ## Core Implementation Mandate

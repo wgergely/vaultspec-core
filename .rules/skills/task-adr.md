@@ -24,14 +24,14 @@ When to use this skill:
 
 Every document MUST strictly adhere to the following schema:
 
-1.  **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
-    *   **Directory Tag**: Exactly `#adr`.
-    *   **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
-    *   *Syntax:* `tags: ["#adr", "#feature"]` (Must be quoted strings in a list).
-2.  **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
-    *   *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
-3.  **`date`**: MUST use `yyyy-mm-dd` format.
-4.  **No `feature` key**: Use `tags:` exclusively for feature identification.
+1. **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
+    - **Directory Tag**: Exactly `#adr`.
+    - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
+    - *Syntax:* `tags: ["#adr", "#feature"]` (Must be quoted strings in a list).
+2. **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
+    - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
+3. **`date`**: MUST use `yyyy-mm-dd` format.
+4. **No `feature` key**: Use `tags:` exclusively for feature identification.
 
 ## Workflow
 

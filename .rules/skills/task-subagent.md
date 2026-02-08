@@ -25,6 +25,7 @@ Agents dispatched via this skill MUST prioritize the following tools for all rep
 1. **Discovery**: Use the `fd` skill for locating files. DO NOT use `ls` or `dir`.
 2. **Search**: Use the `rg` (ripgrep) skill for searching content.
 3. **Manipulation**: Use the `sg` (ast-grep) skill for complex code manipulation and refactoring.
+4. **Text Processing**: Use the `sd` (search-and-displace) skill for fast, intuitive find-and-replace.
 
 ### Examples
 

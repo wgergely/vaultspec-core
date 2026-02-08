@@ -3,22 +3,24 @@ from __future__ import annotations
 import abc
 import json
 import logging
-import os
 import pathlib
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
 
 class CapabilityLevel(IntEnum):
     LOW = 1
     MEDIUM = 2
     HIGH = 3
 
+
 @dataclass
 class ProcessSpec:
     """Specification for launching an agent process."""
+
     executable: str
     args: List[str]
     env: Dict[str, str]
@@ -27,7 +29,10 @@ class ProcessSpec:
     initial_prompt_override: Optional[str] = None
     mcp_servers: List[Dict[str, Any]] = field(default_factory=list)
 
-def resolve_includes(content: str, base_dir: pathlib.Path, root_dir: pathlib.Path) -> str:
+
+def resolve_includes(
+    content: str, base_dir: pathlib.Path, root_dir: pathlib.Path
+) -> str:
     """Recursively resolves @path/to/file.md includes within markdown content.
 
     Resolution strategy:
@@ -36,8 +41,7 @@ def resolve_includes(content: str, base_dir: pathlib.Path, root_dir: pathlib.Pat
       3. Security: resolved path must be within root_dir
     """
     resolved_root = root_dir.resolve()
-    lines = content.split("
-")
+    lines = content.split("\n")
     resolved_lines = []
     for line in lines:
         stripped = line.strip()
@@ -53,7 +57,7 @@ def resolve_includes(content: str, base_dir: pathlib.Path, root_dir: pathlib.Pat
             continue
 
         # Normalize backslashes for cross-platform compatibility
-        normalized = include_path_str.replace("", "/")
+        normalized = include_path_str.replace("\\", "/")
 
         # Try base_dir first (relative to including file), then root_dir
         include_path = None
@@ -79,39 +83,48 @@ def resolve_includes(content: str, base_dir: pathlib.Path, root_dir: pathlib.Pat
                 continue
 
             included_content = include_path.read_text(encoding="utf-8")
-            display_path = str(include_path.relative_to(resolved_root)).replace("", "/")
-            resolved_lines.append(f"
-<!-- Included from {display_path} -->
-")
+            display_path = str(include_path.relative_to(resolved_root)).replace(
+                "\\", "/"
+            )
+            resolved_lines.append(f"\n<!-- Included from {display_path} -->\n")
             resolved_lines.append(
                 resolve_includes(included_content, include_path.parent, root_dir)
             )
-            resolved_lines.append(f"
-<!-- End of {display_path} -->
-")
+            resolved_lines.append(f"\n<!-- End of {display_path} -->\n")
         except Exception as e:
             resolved_lines.append(f"<!-- ERROR: Include failed: {e} -->")
 
-    return "
-".join(resolved_lines)
+    return "\n".join(resolved_lines)
 
 
 def load_mcp_servers(root_dir: pathlib.Path) -> List[Dict[str, Any]]:
-    """Load MCP server configurations from .gemini/settings.json.
+    """Load MCP server configurations from settings.json.
 
+    Searches for settings.json in .gemini, .claude, or .agent directories.
     Reads the mcpServers block and converts each entry into the ACP
-    McpServerConfig format: {"name": ..., "command": ..., "args": [...], "env": {...}}.
+    McpServerConfig format.
 
-    Returns an empty list if the settings file is missing or malformed.
+    Returns an empty list if no settings file is found or if it's malformed.
     """
-    settings_path = root_dir / ".gemini" / "settings.json"
-    if not settings_path.exists():
+    search_paths = [
+        root_dir / ".gemini" / "settings.json",
+        root_dir / ".claude" / "settings.json",
+        root_dir / ".agent" / "settings.json",
+    ]
+
+    settings_path = None
+    for path in search_paths:
+        if path.exists():
+            settings_path = path
+            break
+
+    if not settings_path:
         return []
 
     try:
         data = json.loads(settings_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
-        logger.warning("Failed to read .gemini/settings.json: %s", exc)
+        logger.warning("Failed to read settings file %s: %s", settings_path, exc)
         return []
 
     mcp_block = data.get("mcpServers")
@@ -123,12 +136,14 @@ def load_mcp_servers(root_dir: pathlib.Path) -> List[Dict[str, Any]]:
         if not isinstance(cfg, dict) or "command" not in cfg:
             logger.warning("Skipping malformed MCP server entry: %s", name)
             continue
-        servers.append({
-            "name": name,
-            "command": cfg["command"],
-            "args": cfg.get("args", []),
-            "env": cfg.get("env", {}),
-        })
+        servers.append(
+            {
+                "name": name,
+                "command": cfg["command"],
+                "args": cfg.get("args", []),
+                "env": cfg.get("env", {}),
+            }
+        )
 
     return servers
 
@@ -151,7 +166,7 @@ class AgentProvider(abc.ABC):
     @abc.abstractmethod
     def get_model_capability(self, model: str) -> CapabilityLevel:
         """Returns the capability level of a specific model.
-        
+
         Raises:
             ValueError: If model is not supported by this provider.
         """
@@ -164,13 +179,13 @@ class AgentProvider(abc.ABC):
 
     @abc.abstractmethod
     def prepare_process(
-        self, 
-        agent_name: str, 
-        agent_meta: Dict[str, str], 
-        agent_persona: str, 
+        self,
+        agent_name: str,
+        agent_meta: Dict[str, str],
+        agent_persona: str,
         task_context: str,
         root_dir: pathlib.Path,
-        model_override: Optional[str] = None
+        model_override: Optional[str] = None,
     ) -> ProcessSpec:
         """Prepares the process specification for spawning the agent.
 

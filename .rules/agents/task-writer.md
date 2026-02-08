@@ -29,14 +29,14 @@ You must use the template at `.rules/templates/PLAN.md` and persist `<Plan>` to 
 
 Every document MUST strictly adhere to the following schema:
 
-1.  **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
-    *   **Directory Tag**: Exactly one of `#plan`, `#exec`, `#adr` (based on file location).
-    *   **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
-    *   *Syntax:* `tags: ["#doc-type", "#feature"]` (Must be quoted strings in a list).
-2.  **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
-    *   *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
-3.  **`date`**: MUST use `yyyy-mm-dd` format.
-4.  **No `feature` key**: Use `tags:` exclusively for feature identification.
+1. **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
+    - **Directory Tag**: Exactly one of `#plan`, `#exec`, `#adr` (based on file location).
+    - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
+    - _Syntax:_ `tags: ["#doc-type", "#feature"]` (Must be quoted strings in a list).
+2. **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
+    - _Constraint:_ No relative paths (`../`), no bare strings, no `@ref`.
+3. **`date`**: MUST use `yyyy-mm-dd` format.
+4. **No `feature` key**: Use `tags:` exclusively for feature identification.
 
 **Linking**: Use `[[wiki-links]]` for all file and artifact references.
 **Template**: Read `.rules/templates/PLAN.md` and populate the YAML frontmatter correctly.
@@ -56,7 +56,7 @@ Use this exact template for step items in the "Steps" section:
 
 - **Phasing:** If a task involves more than 3 distinct logical contexts or exceeds ~200 lines of potential code change, break it into Phases.
 - **Assignment:** Autonomously assign the most appropriate sub-agent for each step.
-  - *Options:* `code-reviewer` (for safety/intent checks), `standard-executor` (for typical features), `complex-executor` (for core logic).
+  - _Options:_ `code-reviewer` (for safety/intent checks), `standard-executor` (for typical features), `complex-executor` (for core logic).
 
 ### The Audit Loop
 

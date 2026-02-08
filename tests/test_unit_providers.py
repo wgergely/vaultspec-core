@@ -1,29 +1,32 @@
-"""Unit tests for provider classes: GeminiProvider, ClaudeProvider, get_provider_for_model."""
-
 from __future__ import annotations
 
-import json
 import pathlib
-import tempfile
-from unittest import mock
+import sys
 
-import pytest
+_SCRIPTS_DIR = pathlib.Path(__file__).resolve().parent.parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from agent_providers.base import (
-    AgentProvider,
+import json  # noqa: E402
+from unittest import mock  # noqa: E402
+
+import pytest  # noqa: E402
+
+from agent_providers.base import (  # noqa: E402
     CapabilityLevel,
     ProcessSpec,
     resolve_includes,
     load_mcp_servers,
 )
-from agent_providers.gemini import GeminiProvider, _cached_version
-from agent_providers.claude import ClaudeProvider
-from acp_dispatch import get_provider_for_model
+from agent_providers.gemini import GeminiProvider  # noqa: E402
+from agent_providers.claude import ClaudeProvider  # noqa: E402
+from acp_dispatch import get_provider_for_model  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
 # TestSharedResolveIncludes (base.py free function)
 # ---------------------------------------------------------------------------
+
 
 class TestSharedResolveIncludes:
     def test_basic(self, tmp_path):
@@ -45,6 +48,7 @@ class TestSharedResolveIncludes:
 # ---------------------------------------------------------------------------
 # TestLoadMcpServers (base.py free function)
 # ---------------------------------------------------------------------------
+
 
 class TestLoadMcpServers:
     def test_no_settings_file(self, tmp_path):
@@ -71,7 +75,9 @@ class TestLoadMcpServers:
 
     def test_malformed_json(self, tmp_path):
         (tmp_path / ".gemini").mkdir()
-        (tmp_path / ".gemini" / "settings.json").write_text("not json", encoding="utf-8")
+        (tmp_path / ".gemini" / "settings.json").write_text(
+            "not json", encoding="utf-8"
+        )
         assert load_mcp_servers(tmp_path) == []
 
     def test_no_mcp_block(self, tmp_path):
@@ -115,6 +121,7 @@ class TestLoadMcpServers:
 # TestGeminiProvider
 # ---------------------------------------------------------------------------
 
+
 class TestGeminiProvider:
     @pytest.fixture
     def provider(self):
@@ -124,6 +131,7 @@ class TestGeminiProvider:
     def _clear_version_cache(self):
         """Reset the module-level version cache before each test."""
         import agent_providers.gemini as gmod
+
         gmod._cached_version = None
         yield
         gmod._cached_version = None
@@ -139,10 +147,16 @@ class TestGeminiProvider:
         assert "gemini-2.5-flash" in models
 
     def test_capability_3_pro_is_high(self, provider):
-        assert provider.get_model_capability("gemini-3-pro-preview") == CapabilityLevel.HIGH
+        assert (
+            provider.get_model_capability("gemini-3-pro-preview")
+            == CapabilityLevel.HIGH
+        )
 
     def test_capability_3_flash_is_medium(self, provider):
-        assert provider.get_model_capability("gemini-3-flash-preview") == CapabilityLevel.MEDIUM
+        assert (
+            provider.get_model_capability("gemini-3-flash-preview")
+            == CapabilityLevel.MEDIUM
+        )
 
     def test_capability_2_5_pro_is_medium(self, provider):
         """M6 fix: gemini-2.5-pro is MEDIUM, not LOW."""
@@ -152,14 +166,23 @@ class TestGeminiProvider:
         assert provider.get_model_capability("gemini-2.5-flash") == CapabilityLevel.LOW
 
     def test_best_model_high(self, provider):
-        assert provider.get_best_model_for_capability(CapabilityLevel.HIGH) == "gemini-3-pro-preview"
+        assert (
+            provider.get_best_model_for_capability(CapabilityLevel.HIGH)
+            == "gemini-3-pro-preview"
+        )
 
     def test_best_model_medium(self, provider):
-        assert provider.get_best_model_for_capability(CapabilityLevel.MEDIUM) == "gemini-3-flash-preview"
+        assert (
+            provider.get_best_model_for_capability(CapabilityLevel.MEDIUM)
+            == "gemini-3-flash-preview"
+        )
 
     def test_best_model_low(self, provider):
         """M6 fix: LOW now maps to gemini-2.5-flash (not gemini-2.5-pro)."""
-        assert provider.get_best_model_for_capability(CapabilityLevel.LOW) == "gemini-2.5-flash"
+        assert (
+            provider.get_best_model_for_capability(CapabilityLevel.LOW)
+            == "gemini-2.5-flash"
+        )
 
     def test_no_circular_fallback(self, provider):
         """M6 fix: LOW -> flash (LOW), MEDIUM -> 3-flash (MEDIUM). No circular mapping."""
@@ -175,7 +198,10 @@ class TestGeminiProvider:
         assert "Included content" in resolved
 
     def test_prepare_process_returns_spec(self, provider, tmp_path):
-        with mock.patch("agent_providers.gemini.GeminiProvider.check_version", return_value=(0, 27, 0)):
+        with mock.patch(
+            "agent_providers.gemini.GeminiProvider.check_version",
+            return_value=(0, 27, 0),
+        ):
             spec = provider.prepare_process(
                 agent_name="test-agent",
                 agent_meta={"model": "gemini-2.5-flash"},
@@ -196,7 +222,10 @@ class TestGeminiProvider:
 
     def test_prepare_process_sets_initial_prompt(self, provider, tmp_path):
         """M1 fix: dual delivery -- initial_prompt_override is set."""
-        with mock.patch("agent_providers.gemini.GeminiProvider.check_version", return_value=(0, 27, 0)):
+        with mock.patch(
+            "agent_providers.gemini.GeminiProvider.check_version",
+            return_value=(0, 27, 0),
+        ):
             spec = provider.prepare_process(
                 agent_name="test-agent",
                 agent_meta={},
@@ -224,7 +253,10 @@ class TestGeminiProvider:
             json.dumps(settings), encoding="utf-8"
         )
 
-        with mock.patch("agent_providers.gemini.GeminiProvider.check_version", return_value=(0, 27, 0)):
+        with mock.patch(
+            "agent_providers.gemini.GeminiProvider.check_version",
+            return_value=(0, 27, 0),
+        ):
             spec = provider.prepare_process(
                 agent_name="test-agent",
                 agent_meta={},
@@ -251,10 +283,12 @@ class TestGeminiProvider:
 # TestGeminiVersionCheck
 # ---------------------------------------------------------------------------
 
+
 class TestGeminiVersionCheck:
     @pytest.fixture(autouse=True)
     def _clear_version_cache(self):
         import agent_providers.gemini as gmod
+
         gmod._cached_version = None
         yield
         gmod._cached_version = None
@@ -279,7 +313,9 @@ class TestGeminiVersionCheck:
         result = mock.MagicMock()
         result.stdout = "v0.27.0"
         result.stderr = ""
-        with mock.patch("agent_providers.gemini.subprocess.run", return_value=result) as mock_run:
+        with mock.patch(
+            "agent_providers.gemini.subprocess.run", return_value=result
+        ) as mock_run:
             v1 = GeminiProvider.check_version("gemini")
             v2 = GeminiProvider.check_version("gemini")
         assert v1 == v2
@@ -315,6 +351,7 @@ class TestGeminiVersionCheck:
 
     def test_timeout(self):
         import subprocess as sp
+
         with mock.patch(
             "agent_providers.gemini.subprocess.run",
             side_effect=sp.TimeoutExpired(cmd="gemini --version", timeout=10),
@@ -335,6 +372,7 @@ class TestGeminiVersionCheck:
 # TestClaudeProvider
 # ---------------------------------------------------------------------------
 
+
 class TestClaudeProvider:
     @pytest.fixture
     def provider(self):
@@ -353,22 +391,35 @@ class TestClaudeProvider:
         assert provider.get_model_capability("claude-opus-4-6") == CapabilityLevel.HIGH
 
     def test_capability_sonnet_is_medium(self, provider):
-        assert provider.get_model_capability("claude-sonnet-4-5") == CapabilityLevel.MEDIUM
+        assert (
+            provider.get_model_capability("claude-sonnet-4-5") == CapabilityLevel.MEDIUM
+        )
 
     def test_capability_haiku_is_low(self, provider):
         assert provider.get_model_capability("claude-haiku-4-5") == CapabilityLevel.LOW
 
     def test_capability_unknown_defaults_medium(self, provider):
-        assert provider.get_model_capability("claude-unknown-42") == CapabilityLevel.MEDIUM
+        assert (
+            provider.get_model_capability("claude-unknown-42") == CapabilityLevel.MEDIUM
+        )
 
     def test_best_model_high(self, provider):
-        assert provider.get_best_model_for_capability(CapabilityLevel.HIGH) == "claude-opus-4-6"
+        assert (
+            provider.get_best_model_for_capability(CapabilityLevel.HIGH)
+            == "claude-opus-4-6"
+        )
 
     def test_best_model_medium(self, provider):
-        assert provider.get_best_model_for_capability(CapabilityLevel.MEDIUM) == "claude-sonnet-4-5"
+        assert (
+            provider.get_best_model_for_capability(CapabilityLevel.MEDIUM)
+            == "claude-sonnet-4-5"
+        )
 
     def test_best_model_low(self, provider):
-        assert provider.get_best_model_for_capability(CapabilityLevel.LOW) == "claude-haiku-4-5"
+        assert (
+            provider.get_best_model_for_capability(CapabilityLevel.LOW)
+            == "claude-haiku-4-5"
+        )
 
     def test_resolve_includes_delegates_to_shared(self, provider, tmp_path):
         (tmp_path / "included.md").write_text("Included content", encoding="utf-8")
@@ -421,6 +472,7 @@ class TestClaudeProvider:
 # TestPromptOrderingConsistency
 # ---------------------------------------------------------------------------
 
+
 class TestPromptOrderingConsistency:
     """M5 fix: Both providers should use the same prompt ordering."""
 
@@ -436,15 +488,21 @@ class TestPromptOrderingConsistency:
 # TestProcessSpecMcpServers
 # ---------------------------------------------------------------------------
 
+
 class TestProcessSpecMcpServers:
     def test_default_empty(self):
         spec = ProcessSpec(executable="test", args=[], env={}, cleanup_paths=[])
         assert spec.mcp_servers == []
 
     def test_populated(self):
-        servers = [{"name": "rust", "command": "rust-mcp-server", "args": [], "env": {}}]
+        servers = [
+            {"name": "rust", "command": "rust-mcp-server", "args": [], "env": {}}
+        ]
         spec = ProcessSpec(
-            executable="test", args=[], env={}, cleanup_paths=[],
+            executable="test",
+            args=[],
+            env={},
+            cleanup_paths=[],
             mcp_servers=servers,
         )
         assert len(spec.mcp_servers) == 1
@@ -454,6 +512,7 @@ class TestProcessSpecMcpServers:
 # ---------------------------------------------------------------------------
 # TestGetProviderForModel
 # ---------------------------------------------------------------------------
+
 
 class TestGetProviderForModel:
     def test_none_returns_gemini(self):

@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import pathlib
 
-import pytest
 
 import cli as cli_mod
 
@@ -27,20 +26,28 @@ def _make_args(**kwargs) -> argparse.Namespace:
     return argparse.Namespace(**defaults)
 
 
-def _write_rule(workspace: pathlib.Path, name: str, body: str, *, custom: bool = False) -> None:
+def _write_rule(
+    workspace: pathlib.Path, name: str, body: str, *, custom: bool = False
+) -> None:
     subdir = "rules-custom" if custom else "rules"
     path = workspace / ".rules" / subdir / name
     path.write_text(body, encoding="utf-8")
 
 
-def _write_agent(workspace: pathlib.Path, name: str, description: str, tier: str, body: str) -> None:
+def _write_agent(
+    workspace: pathlib.Path, name: str, description: str, tier: str, body: str
+) -> None:
     content = cli_mod.build_file({"description": description, "tier": tier}, body)
     (workspace / ".rules" / "agents" / name).write_text(content, encoding="utf-8")
 
 
-def _write_skill(workspace: pathlib.Path, name: str, description: str, body: str) -> None:
+def _write_skill(
+    workspace: pathlib.Path, name: str, description: str, body: str
+) -> None:
     content = cli_mod.build_file({"description": description}, body)
-    (workspace / ".rules" / "skills" / f"{name}.md").write_text(content, encoding="utf-8")
+    (workspace / ".rules" / "skills" / f"{name}.md").write_text(
+        content, encoding="utf-8"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +69,9 @@ class TestRulesSync:
         cli_mod.rules_sync(_make_args())
 
         # Claude should have name + trigger
-        content = (cli_workspace / ".claude" / "rules" / "test-rule.md").read_text(encoding="utf-8")
+        content = (cli_workspace / ".claude" / "rules" / "test-rule.md").read_text(
+            encoding="utf-8"
+        )
         meta, body = cli_mod.parse_frontmatter(content)
         assert meta["name"] == "test-rule"
         assert meta["trigger"] == "always_on"
@@ -72,7 +81,9 @@ class TestRulesSync:
         _write_rule(cli_workspace, "shared.md", "Custom version.\n", custom=True)
         cli_mod.rules_sync(_make_args())
 
-        content = (cli_workspace / ".claude" / "rules" / "shared.md").read_text(encoding="utf-8")
+        content = (cli_workspace / ".claude" / "rules" / "shared.md").read_text(
+            encoding="utf-8"
+        )
         assert "Custom version." in content
 
     def test_prune_removes_orphans(self, cli_workspace):
@@ -92,7 +103,9 @@ class TestRulesSync:
         _write_rule(cli_workspace, "no-name.md", "Agent rule body.\n")
         cli_mod.rules_sync(_make_args())
 
-        content = (cli_workspace / ".agent" / "rules" / "no-name.md").read_text(encoding="utf-8")
+        content = (cli_workspace / ".agent" / "rules" / "no-name.md").read_text(
+            encoding="utf-8"
+        )
         meta, _ = cli_mod.parse_frontmatter(content)
         assert "name" not in meta
         assert meta["trigger"] == "always_on"
@@ -105,7 +118,9 @@ class TestRulesSync:
 
 class TestAgentsSync:
     def test_sync_creates_agent_files(self, cli_workspace):
-        _write_agent(cli_workspace, "my-agent.md", "Test agent", "MEDIUM", "# Persona\n")
+        _write_agent(
+            cli_workspace, "my-agent.md", "Test agent", "MEDIUM", "# Persona\n"
+        )
         cli_mod.agents_sync(_make_args())
 
         # Claude and Gemini should have agent files
@@ -125,8 +140,12 @@ class TestAgentsSync:
         cli_mod.agents_sync(_make_args())
 
         for name, (_, claude_model, gemini_model) in tiers.items():
-            claude_content = (cli_workspace / ".claude" / "agents" / name).read_text(encoding="utf-8")
-            gemini_content = (cli_workspace / ".gemini" / "agents" / name).read_text(encoding="utf-8")
+            claude_content = (cli_workspace / ".claude" / "agents" / name).read_text(
+                encoding="utf-8"
+            )
+            gemini_content = (cli_workspace / ".gemini" / "agents" / name).read_text(
+                encoding="utf-8"
+            )
 
             claude_fm, _ = cli_mod.parse_frontmatter(claude_content)
             gemini_fm, _ = cli_mod.parse_frontmatter(gemini_content)
@@ -161,7 +180,9 @@ class TestSkillsSync:
         _write_skill(cli_workspace, "task-check", "Check skill", "# Check\n")
         cli_mod.skills_sync(_make_args())
 
-        content = (cli_workspace / ".claude" / "skills" / "task-check" / "SKILL.md").read_text(encoding="utf-8")
+        content = (
+            cli_workspace / ".claude" / "skills" / "task-check" / "SKILL.md"
+        ).read_text(encoding="utf-8")
         meta, body = cli_mod.parse_frontmatter(content)
         assert meta["name"] == "task-check"
         assert meta["description"] == "Check skill"
@@ -283,6 +304,7 @@ class TestCollectRules:
     def test_empty_when_dirs_missing(self, cli_workspace):
         # Remove source dirs
         import shutil
+
         shutil.rmtree(cli_workspace / ".rules" / "rules")
         shutil.rmtree(cli_workspace / ".rules" / "rules-custom")
 

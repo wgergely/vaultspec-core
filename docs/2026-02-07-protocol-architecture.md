@@ -29,6 +29,7 @@ The AI agent ecosystem is crystallizing around three complementary protocol laye
 **Architecture**: The editor (client) spawns the agent as a subprocess over stdio. Communication is bidirectional JSON-RPC 2.0. The editor provides the environment (filesystem, terminals, permissions), while the agent requests resources through the editor.
 
 **Lifecycle**:
+
 ```
 Client                          Agent
   |--- initialize ------------->|     (version + capability negotiation)
@@ -43,6 +44,7 @@ Client                          Agent
 ```
 
 **Key capabilities**:
+
 - File I/O: `fs/read_text_file`, `fs/write_text_file`
 - Terminal: `terminal/create`, `terminal/output`, `terminal/wait_for_exit`, `terminal/kill`, `terminal/release`
 - Permission system: `request_permission` with `allow_once`, `allow_always`, `reject_once`, `reject_always`
@@ -62,6 +64,7 @@ Client                          Agent
 **Architecture**: Agents are independent HTTP services. Discovery happens through Agent Cards served at `/.well-known/agent-card.json`. Communication uses JSON-RPC 2.0 over HTTPS with SSE for streaming and optional push notifications.
 
 **Task state machine** (9 states):
+
 ```
 submitted --> working --> input_required --> completed
                     \                   /
@@ -69,12 +72,14 @@ submitted --> working --> input_required --> completed
 ```
 
 **Core data types**:
+
 - **Task**: UUID, context_id, status, artifacts, history, metadata
 - **Message**: role (USER/AGENT), parts (text, binary, URL, structured JSON)
 - **Artifact**: Named, described output with typed parts
 - **AgentSkill**: Describes what an agent can do, with examples and I/O modes
 
 **Service definition** (11 RPCs):
+
 - `SendMessage` / `SendStreamingMessage` — initiate interaction
 - `GetTask` / `ListTasks` / `CancelTask` — task lifecycle
 - `SubscribeToTask` — real-time streaming
@@ -84,6 +89,7 @@ submitted --> working --> input_required --> completed
 **Security**: API keys, HTTP auth (Bearer/Basic), OAuth 2.0 (authorization code, client credentials, device code), OpenID Connect, mTLS.
 
 **Python SDK** (`a2a-sdk`):
+
 ```python
 class AgentExecutor(ABC):
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None: ...
@@ -115,6 +121,7 @@ Released with Opus 4.6 (February 2026). **Proprietary**, filesystem-based coordi
 ```
 
 **Coordination primitives**:
+
 - `Teammate(spawnTeam)` / `Teammate(cleanup)` — team lifecycle
 - `SendMessage(message/broadcast/shutdown_request)` — communication
 - `TaskCreate/TaskUpdate/TaskList` — shared task list
@@ -219,24 +226,31 @@ The dispatcher needs the **process control** of ACP (spawn subprocess, stdio, fi
 ## 6. Gaps and Open Problems in the Ecosystem
 
 ### 6.1 No Standard Agent-to-Agent Layer in ACP
+
 Proxy chains are conductor-mediated orchestration patterns, not true peer-to-peer. The community is converging on A2A for genuine agent-to-agent communication.
 
 ### 6.2 Protocol Fragmentation
+
 Three different "ACPs" (Zed, IBM/now-A2A, Cisco) + MCP + A2A + ANP + IETF drafts. No unified ontology.
 
 ### 6.3 No Cross-Protocol Bridge
+
 No standard bridge between ACP (client layer) and A2A (agent layer). An agent spawned via ACP cannot natively discover or delegate to an A2A peer.
 
 ### 6.4 Proprietary Agent Teams
+
 Anthropic's Agent Teams use filesystem-based coordination not exposed via any standard protocol. Non-Claude agents cannot participate.
 
 ### 6.5 No Shared Memory Protocol
+
 Both ACP and A2A lack robust shared memory. Each teammate has an isolated context window. No protocol exists for semantic state transfer between agents.
 
 ### 6.6 Security Model Immaturity
+
 Credential delegation, permission scoping across proxy chains, sandboxing — all unsolved at the protocol level.
 
 ### 6.7 No Nested Orchestration Standard
+
 Claude Teams prohibit nested teams. ACP proxy chains allow nesting in theory but no implementations demonstrate deep nesting. No standard for hierarchical agent orchestration.
 
 ---
@@ -244,6 +258,7 @@ Claude Teams prohibit nested teams. ACP proxy chains allow nesting in theory but
 ## 7. Emerging Standards and Future Direction
 
 ### IETF Work
+
 | Draft | Topic |
 |---|---|
 | `draft-narvaneni-agent-uri-02` | `agent://` URI scheme |
@@ -253,12 +268,15 @@ Claude Teams prohibit nested teams. ACP proxy chains allow nesting in theory but
 | `draft-yl-agent-id-requirements` | Digital Identity for agents |
 
 ### ACP Proxy Chains
+
 The closest existing mechanism within ACP for agent-to-agent patterns. Central conductor orchestrates routing through composable proxy components. Future extension: optional `peer` field in `proxy/successor` for M:N topologies.
 
 ### SymmACP Vision
+
 Niko Matsakis proposed symmetric ACP capabilities (October 2025): either side can provide initial conversation state, editors can provide MCP tools to agents, conversations can be serialized. Vision: "Build AI tools like Unix pipes or browser extensions."
 
 ### ACP Agent Registry
+
 Launched January 2026. Live in JetBrains IDE 2025.3+. Four discovery methods: Basic, Open, Registry-Based, Embedded. 19 RFD documents as of February 2026.
 
 ---
@@ -325,20 +343,20 @@ For our architecture — sub-agent driven development where agents report to a t
 
 ## Sources
 
-- https://agentclientprotocol.com/protocol
-- https://agentclientprotocol.com/rfds/proxy-chains
-- https://agentclientprotocol.com/rfds/mcp-over-acp
-- https://a2a-protocol.org/latest/specification/
-- https://github.com/a2aproject/A2A
-- https://github.com/agentclientprotocol/agent-client-protocol
-- https://smallcultfollowing.com/babysteps/blog/2025/10/08/symmacp/
-- https://code.claude.com/docs/en/agent-teams
-- https://github.com/openai/openai-agents-python
-- https://github.com/langchain-ai/langgraph-supervisor-py
-- https://microsoft.github.io/autogen/stable/
-- https://docs.crewai.com/en/concepts/collaboration
-- https://google.github.io/adk-docs/a2a/
-- https://lfaidata.foundation/communityblog/2025/08/29/acp-joins-forces-with-a2a/
-- https://www.npmjs.com/package/@zed-industries/claude-code-acp
-- https://blog.jetbrains.com/ai/2026/01/acp-agent-registry/
-- https://datatracker.ietf.org/doc/draft-narvaneni-agent-uri/02/
+- <https://agentclientprotocol.com/protocol>
+- <https://agentclientprotocol.com/rfds/proxy-chains>
+- <https://agentclientprotocol.com/rfds/mcp-over-acp>
+- <https://a2a-protocol.org/latest/specification/>
+- <https://github.com/a2aproject/A2A>
+- <https://github.com/agentclientprotocol/agent-client-protocol>
+- <https://smallcultfollowing.com/babysteps/blog/2025/10/08/symmacp/>
+- <https://code.claude.com/docs/en/agent-teams>
+- <https://github.com/openai/openai-agents-python>
+- <https://github.com/langchain-ai/langgraph-supervisor-py>
+- <https://microsoft.github.io/autogen/stable/>
+- <https://docs.crewai.com/en/concepts/collaboration>
+- <https://google.github.io/adk-docs/a2a/>
+- <https://lfaidata.foundation/communityblog/2025/08/29/acp-joins-forces-with-a2a/>
+- <https://www.npmjs.com/package/@zed-industries/claude-code-acp>
+- <https://blog.jetbrains.com/ai/2026/01/acp-agent-registry/>
+- <https://datatracker.ietf.org/doc/draft-narvaneni-agent-uri/02/>

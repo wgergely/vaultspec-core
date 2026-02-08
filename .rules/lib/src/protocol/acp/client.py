@@ -9,28 +9,22 @@ import os
 import pathlib
 import sys
 import uuid
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from acp.interfaces import Client
 from acp.schema import (
     AgentMessageChunk,
     AgentPlanUpdate,
     AgentThoughtChunk,
-    AvailableCommandsUpdate,
-    ClientCapabilities,
-    CurrentModeUpdate,
-    FileSystemCapability,
-    Implementation,
-    SessionInfoUpdate,
     TextContentBlock,
     ToolCallProgress,
     ToolCallStart,
     UserMessageChunk,
 )
 
-from .types import SecurityError
 
 logger = logging.getLogger(__name__)
+
 
 class SessionLogger:
     """Handles persistent logging of agent session events to disk."""
@@ -46,8 +40,7 @@ class SessionLogger:
         timestamp = datetime.datetime.now().isoformat()
         log_entry = {"timestamp": timestamp, "type": event_type, "data": data}
         with self.log_file.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(log_entry) + "
-")
+            f.write(json.dumps(log_entry) + "\n")
 
 
 class _Terminal:
@@ -70,7 +63,7 @@ class DispatchClient(Client):
         debug: bool = False,
         quiet: bool = False,
         mode: str = "read-write",
-        logger_instance: Optional[SessionLogger] = None
+        logger_instance: Optional[SessionLogger] = None,
     ):
         self.root_dir = root_dir
         self.debug = debug
@@ -135,7 +128,7 @@ class DispatchClient(Client):
         self._log("session_update", data)
 
         if self.debug:
-             logger.debug(f"Update Received: {type(update).__name__}")
+            logger.debug(f"Update Received: {type(update).__name__}")
 
         if isinstance(update, (AgentMessageChunk, AgentThoughtChunk)):
             self._handle_content_chunk(update)
@@ -151,14 +144,15 @@ class DispatchClient(Client):
             if self.on_tool_update:
                 self.on_tool_update(update)
             elif not self.quiet:
-                 sys.stderr.write(f"\033[94m[Tool] {update.title} ({update.tool_call_id})\033[0m
-")
+                sys.stderr.write(
+                    f"\033[94m[Tool] {update.title} ({update.tool_call_id})\033[0m\n"
+                )
 
         if isinstance(update, ToolCallProgress):
             # status_str = f" [{update.status}]" if update.status else ""
             # logger.info(f"[Tool Update] {update.tool_call_id}{status_str}")
             pass
-            
+
         if isinstance(update, AgentPlanUpdate):
             # logger.info("[Plan Update]")
             pass
@@ -178,7 +172,7 @@ class DispatchClient(Client):
                 # Default CLI behavior if no callback
                 sys.stdout.write(text)
                 sys.stdout.flush()
-            
+
             self.response_text += text
         else:
             if self.on_thought_chunk:
@@ -191,7 +185,12 @@ class DispatchClient(Client):
     # -- File I/O (required by ACP Client protocol) --
 
     async def read_text_file(
-        self, path: str, session_id: str, limit: int | None = None, line: int | None = None, **kwargs: Any
+        self,
+        path: str,
+        session_id: str,
+        limit: int | None = None,
+        line: int | None = None,
+        **kwargs: Any,
     ) -> Dict[str, Any]:
         """Read a text file from the workspace."""
         file_path = pathlib.Path(path).resolve()
@@ -227,7 +226,7 @@ class DispatchClient(Client):
         # Enforce read-only mode: only .docs/ writes allowed.
         if self.mode == "read-only":
             rel_path = file_path.relative_to(self.root_dir).as_posix()
-            if not rel_path.startswith(".docs/") and not rel_path.startswith(".docs"):
+            if not rel_path.startswith(".docs/") and not rel_path.startswith(".docs\\"):
                 self._log("write_blocked", {"path": path, "reason": "read-only mode"})
                 raise ValueError(
                     f"Write rejected: read-only mode only allows writes to .docs/ "
@@ -244,8 +243,14 @@ class DispatchClient(Client):
     # -- Terminal management --
 
     async def create_terminal(
-        self, command: str, session_id: str, args: Any = None, cwd: str | None = None,
-        env: Any = None, output_byte_limit: int | None = None, **kwargs: Any,
+        self,
+        command: str,
+        session_id: str,
+        args: Any = None,
+        cwd: str | None = None,
+        env: Any = None,
+        output_byte_limit: int | None = None,
+        **kwargs: Any,
     ) -> Dict[str, Any]:
         """Spawn a subprocess and track it as an ACP terminal."""
         terminal_id = str(uuid.uuid4())
@@ -286,7 +291,9 @@ class DispatchClient(Client):
         self._log("create_terminal", {"terminal_id": terminal_id, "command": command})
         return {"terminalId": terminal_id}
 
-    async def terminal_output(self, session_id: str, terminal_id: str, **kwargs: Any) -> Dict[str, Any]:
+    async def terminal_output(
+        self, session_id: str, terminal_id: str, **kwargs: Any
+    ) -> Dict[str, Any]:
         """Return current output from a tracked terminal."""
         terminal = self._terminals.get(terminal_id)
         if terminal is None:
@@ -295,7 +302,7 @@ class DispatchClient(Client):
         raw = b"".join(terminal.output_chunks)
         truncated = len(raw) > terminal.byte_limit
         if truncated:
-            raw = raw[-terminal.byte_limit:]
+            raw = raw[-terminal.byte_limit :]
 
         text = raw.decode("utf-8", errors="replace")
         result: Dict[str, Any] = {"output": text, "truncated": truncated}
@@ -303,7 +310,9 @@ class DispatchClient(Client):
             result["exitStatus"] = {"exitCode": terminal.proc.returncode}
         return result
 
-    async def wait_for_terminal_exit(self, session_id: str, terminal_id: str, **kwargs: Any) -> Dict[str, Any]:
+    async def wait_for_terminal_exit(
+        self, session_id: str, terminal_id: str, **kwargs: Any
+    ) -> Dict[str, Any]:
         """Wait for a terminal process to finish."""
         terminal = self._terminals.get(terminal_id)
         if terminal is None:
@@ -315,7 +324,9 @@ class DispatchClient(Client):
                 await terminal.reader_task
         return {"exitCode": exit_code}
 
-    async def kill_terminal(self, session_id: str, terminal_id: str, **kwargs: Any) -> Dict[str, Any] | None:
+    async def kill_terminal(
+        self, session_id: str, terminal_id: str, **kwargs: Any
+    ) -> Dict[str, Any] | None:
         """Kill a tracked terminal process."""
         terminal = self._terminals.get(terminal_id)
         if terminal is None:
@@ -325,7 +336,9 @@ class DispatchClient(Client):
             terminal.proc.kill()
         return {}
 
-    async def release_terminal(self, session_id: str, terminal_id: str, **kwargs: Any) -> Dict[str, Any] | None:
+    async def release_terminal(
+        self, session_id: str, terminal_id: str, **kwargs: Any
+    ) -> Dict[str, Any] | None:
         """Release and clean up a tracked terminal."""
         terminal = self._terminals.pop(terminal_id, None)
         if terminal is None:

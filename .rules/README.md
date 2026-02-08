@@ -10,42 +10,43 @@ The rules are compatible with Google Antigravity, Gemini CLI and Claude Code.
 The system enforces a strict **Research → Decide → Plan → Execute** cycle. You do not simply "write code"; you build a trail of documentation that ensures quality and context preservation.
 
 **High-Level Summary:**
-*   **Research (`task-research`)** & **Reference (`task-reference`)** gather the data.
-*   **ADR (`task-adr`)** formalizes the choice.
-*   **Plan (`task-write`)** defines the steps.
-*   **Execute (`task-execute`)** builds it.
-*   **Review (`task-review`)** validates it.
-*   **Curate (`docs-curator`)** cleans up.
+
+* **Research (`task-research`)** & **Reference (`task-reference`)** gather the data.
+* **ADR (`task-adr`)** formalizes the choice.
+* **Plan (`task-write`)** defines the steps.
+* **Execute (`task-execute`)** builds it.
+* **Review (`task-review`)** validates it.
+* **Curate (`docs-curator`)** cleans up.
 
 #### Detailed Steps
 
-1.  **Research (`task-research`)**:
-    *   **Goal:** Understand the problem, explore libraries, and find "frontier" patterns.
-    *   **Agent:** `adr-researcher` (High Tier).
-    *   **Output:** `.docs/research/...` artifact.
-    *   *Usage:* "Activate `task-research` to investigate [topic]."
+1. **Research (`task-research`)**:
+    * **Goal:** Understand the problem, explore libraries, and find "frontier" patterns.
+    * **Agent:** `adr-researcher` (High Tier).
+    * **Output:** `.docs/research/...` artifact.
+    * *Usage:* "Activate `task-research` to investigate [topic]."
 
-2.  **Architect (`task-adr`)**:
-    *   **Goal:** Make binding technical decisions based on your research.
-    *   **Output:** `.docs/adr/...` artifact.
-    *   *Usage:* "Activate `task-adr` to formalize our decision on [topic]."
+2. **Architect (`task-adr`)**:
+    * **Goal:** Make binding technical decisions based on your research.
+    * **Output:** `.docs/adr/...` artifact.
+    * *Usage:* "Activate `task-adr` to formalize our decision on [topic]."
 
-3.  **Plan (`task-write`)**:
-    *   **Goal:** Convert the ADR into a step-by-step implementation plan.
-    *   **Agent:** `task-writer` (High Tier).
-    *   **Output:** `.docs/plan/...` artifact.
-    *   *Usage:* "Activate `task-write` to create a plan for [feature]."
+3. **Plan (`task-write`)**:
+    * **Goal:** Convert the ADR into a step-by-step implementation plan.
+    * **Agent:** `task-writer` (High Tier).
+    * **Output:** `.docs/plan/...` artifact.
+    * *Usage:* "Activate `task-write` to create a plan for [feature]."
 
-4.  **Execute (`task-execute`)**:
-    *   **Goal:** Implement the plan using specialized sub-agents.
-    *   **Agent:** Orchestrator (You) + Executors (`simple-executor`, `complex-executor`).
-    *   **Output:** Code changes + `.docs/exec/...` logs.
-    *   *Usage:* "Activate `task-execute` to implement the plan."
+4. **Execute (`task-execute`)**:
+    * **Goal:** Implement the plan using specialized sub-agents.
+    * **Agent:** Orchestrator (You) + Executors (`simple-executor`, `complex-executor`).
+    * **Output:** Code changes + `.docs/exec/...` logs.
+    * *Usage:* "Activate `task-execute` to implement the plan."
 
-5.  **Curate (`docs-curator`)**:
-    *   **Goal:** Maintain the hygiene of the `.docs/` vault.
-    *   **Agent:** `docs-curator` (Medium Tier).
-    *   *Usage:* "Run the `docs-curator` agent to audit the vault."
+5. **Curate (`docs-curator`)**:
+    * **Goal:** Maintain the hygiene of the `.docs/` vault.
+    * **Agent:** `docs-curator` (Medium Tier).
+    * *Usage:* "Run the `docs-curator` agent to audit the vault."
 
 ### 2. Agent Reference
 
@@ -59,6 +60,27 @@ The system enforces a strict **Research → Decide → Plan → Execute** cycle.
 | **`standard-executor`** | MEDIUM | Engineer | For typical feature work, component implementation, and standard logic. |
 | **`simple-executor`** | LOW | Junior Engineer | For rote tasks, text updates, simple fixes, and menial labor dispatched by other agents. |
 | **`code-reviewer`** | HIGH | Reviewer & Safety Officer | To audit code for safety, intent compliance, and quality. Replaces the legacy safety-auditor. |
+
+## Context Management
+
+The system context (what the AI knows about the project and its goals) is managed through three primary files in `.rules/`:
+
+1. **`INTERNAL.md` (Immutable):** Contains the core system context, mission statement, and internal rules. This file should be considered "read-only" for general project work and only modified when the underlying development framework changes.
+2. **`CUSTOM.md` (User-Editable):** A placeholder for project-specific instructions, extra context, or user preferences. This content is appended verbatim to the generated config files.
+3. **`cli.py config sync`:** This command synchronizes `INTERNAL.md` and `CUSTOM.md` into the root `AGENTS.md` and tool-specific files (`CLAUDE.md`, `GEMINI.md`).
+
+**Syntactic Stability:**
+Internal context is stored in the **YAML frontmatter** (under the `system_internal` key) of the generated files to ensure it remains syntactically stable and separated from user-provided content.
+
+### File Responsibilities
+
+| File | Location | Purpose | Managed By |
+| :--- | :--- | :--- | :--- |
+| `INTERNAL.md` | `.rules/INTERNAL.md` | Core framework & mission | Developer |
+| `CUSTOM.md` | `.rules/CUSTOM.md` | Project-specific context | User |
+| `AGENTS.md` | `./AGENTS.md` | Root-level AI entry point | `cli.py` |
+| `CLAUDE.md` | `.claude/CLAUDE.md` | Claude Code config | `cli.py` |
+| `GEMINI.md` | `.gemini/GEMINI.md` | Gemini CLI config | `cli.py` |
 
 ## Overview Diagram
 

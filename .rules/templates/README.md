@@ -70,6 +70,7 @@ related:
 ```
 
 **Examples:**
+
 - Plan file: `tags: ["#plan", "#editor-demo"]`
 - ADR file: `tags: ["#adr", "#editor-demo"]`
 - Exec step: `tags: ["#exec", "#editor-demo"]`

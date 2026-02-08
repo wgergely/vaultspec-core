@@ -21,6 +21,7 @@ ACP is a JSON-RPC 2.0 based protocol enabling bidirectional communication betwee
 **Direction**: Client -> Agent (request/response)
 
 ### Request
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -42,6 +43,7 @@ ACP is a JSON-RPC 2.0 based protocol enabling bidirectional communication betwee
 ```
 
 ### Response
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -62,6 +64,7 @@ ACP is a JSON-RPC 2.0 based protocol enabling bidirectional communication betwee
 ```
 
 ### Version Negotiation
+
 - Client sends its latest supported version.
 - If agent supports it: responds with same version.
 - If not: responds with agent's latest version.
@@ -89,6 +92,7 @@ ACP is a JSON-RPC 2.0 based protocol enabling bidirectional communication betwee
 | `mcpCapabilities.sse` | boolean | false | SSE MCP transport |
 
 ### Baseline Requirements
+
 - All agents MUST support: `ContentBlock::Text` and `ContentBlock::ResourceLink`
 - All agents MUST implement: `initialize`, `authenticate`, `session/new`, `session/prompt`, `session/cancel`
 - All clients MUST implement: `session/request_permission`
@@ -155,6 +159,7 @@ Agent can also change modes autonomously via `session/update` with `current_mode
 ## 5. Prompt Turn (`session/prompt`)
 
 ### Request
+
 ```json
 {
   "jsonrpc": "2.0", "id": 10,
@@ -170,6 +175,7 @@ Agent can also change modes autonomously via `session/update` with `current_mode
 ```
 
 ### Response
+
 ```json
 { "result": { "stopReason": "end_turn" } }
 ```
@@ -229,6 +235,7 @@ Notification, no response. Agent returns `stopReason: "cancelled"`.
 | `session_info_update` | Session metadata update (unstable) |
 
 ### Plan Update Example
+
 ```json
 {
   "sessionUpdate": "plan",
@@ -241,6 +248,7 @@ Notification, no response. Agent returns `stopReason: "cancelled"`.
 ```
 
 ### Tool Call Start Example
+
 ```json
 {
   "sessionUpdate": "tool_call",
@@ -260,12 +268,15 @@ Notification, no response. Agent returns `stopReason: "cancelled"`.
 ## 7. Tool Calls
 
 ### Tool Kinds
+
 `read`, `edit`, `delete`, `move`, `search`, `execute`, `think`, `fetch`, `other`
 
 ### Tool Call Status Lifecycle
+
 `pending` -> `in_progress` -> `completed` | `failed` | `cancelled`
 
 ### Tool Call Content Types
+
 - **Regular content**: `{"type": "content", "content": {"type": "text", "text": "..."}}`
 - **Diff**: `{"type": "diff", "path": "...", "oldText": "...", "newText": "..."}`
 - **Terminal reference**: `{"type": "terminal", "terminalId": "term_xyz789"}`
@@ -302,10 +313,12 @@ Notification, no response. Agent returns `stopReason: "cancelled"`.
 ## 9. File System
 
 ### Read (`fs/read_text_file`)
+
 Agent -> Client. Params: `path` (absolute), `sessionId`, `line` (1-based, optional), `limit` (optional).
 Response: `{"content": "file contents..."}`
 
 ### Write (`fs/write_text_file`)
+
 Agent -> Client. Params: `path` (absolute), `sessionId`, `content`. Client MUST create file if not exists.
 Response: `null`.
 
@@ -324,6 +337,7 @@ All require `clientCapabilities.terminal: true`.
 | `terminal/release` | Kill + release all resources, ID becomes invalid |
 
 ### Create Parameters
+
 - `command` (string): Executable path
 - `args` (string[]): Arguments
 - `env` ([{name, value}]): Environment variables
@@ -331,11 +345,13 @@ All require `clientCapabilities.terminal: true`.
 - `outputByteLimit` (number): Truncation limit
 
 ### Output Response
+
 - `output` (string): Current terminal output
 - `truncated` (boolean): Whether byte limit caused truncation
 - `exitStatus` (optional): `{ exitCode: number|null, signal: string|null }` -- only present when exited
 
 ### Recommended Pattern
+
 ```
 1. terminal/create -> get terminalId
 2. Race: terminal/wait_for_exit vs timeout
@@ -348,21 +364,25 @@ All require `clientCapabilities.terminal: true`.
 ## 11. Content Blocks
 
 ### Text (baseline, always supported)
+
 ```json
 {"type": "text", "text": "Hello world", "annotations": null}
 ```
 
 ### Image (requires `promptCapabilities.image`)
+
 ```json
 {"type": "image", "mimeType": "image/png", "data": "<base64>", "uri": "file:///path/to/image.png"}
 ```
 
 ### Audio (requires `promptCapabilities.audio`)
+
 ```json
 {"type": "audio", "mimeType": "audio/wav", "data": "<base64>"}
 ```
 
 ### Resource Link (baseline, always supported)
+
 ```json
 {
   "type": "resource_link", "uri": "file:///path/to/file.py", "name": "file.py",
@@ -371,6 +391,7 @@ All require `clientCapabilities.terminal: true`.
 ```
 
 ### Embedded Resource (requires `promptCapabilities.embeddedContext`)
+
 ```json
 {
   "type": "resource",
@@ -383,9 +404,11 @@ All require `clientCapabilities.terminal: true`.
 ## 12. Extensibility
 
 ### `_meta` Field
+
 All protocol types include optional `_meta: { [key: string]: unknown }`. Reserved keys: `traceparent`, `tracestate`, `baggage` (W3C trace context).
 
 ### Custom Methods
+
 Any method starting with `_` is a custom extension. Must return `-32601` for unrecognized extensions.
 
 ### Error Codes
@@ -405,6 +428,7 @@ Any method starting with `_` is a custom extension. Must return `-32601` for unr
 ## 13. Proxy Chains (RFD)
 
 ### Architecture
+
 ```
 Client -> Conductor -> Proxy1 -> Proxy2 -> Agent
 ```
@@ -412,31 +436,37 @@ Client -> Conductor -> Proxy1 -> Proxy2 -> Agent
 A **conductor** orchestrates all message routing. Single new method: **`proxy/successor`**.
 
 ### Component Roles
+
 - **Terminal Client**: Originates requests; only has a successor
 - **Conductor**: Manages proxy chains; spawns components; routes messages
 - **Proxy**: Non-terminal; has both predecessor and successor; transforms messages
 - **Terminal Agent**: Final destination; processes messages directly
 
 ### Key Methods
+
 - `proxy/initialize`: Signals a component operates as a proxy (has a successor)
 - `initialize`: Signals a terminal agent (no successor)
 - `proxy/successor`: Wraps inner messages traveling to/from successors
 
 ### What Proxies Can Do
+
 - Inject/modify prompts, add global context, transform responses
 - Add MCP servers for tool provisioning, filter tools
 - Switch between session modes, delay client prompts during initialization
 
 ### What Proxies Cannot Do
+
 - Modify system prompts directly (only prepend messages)
 - Access internal agent state or model parameters
 
 ### Conductor Modes
+
 - **Terminal mode**: Receives `initialize`; manages chains; acts as agent
 - **Proxy mode**: Receives `proxy/initialize`; forwards to parent
 - **Hierarchical nesting**: Conductor chains
 
 ### Future Extensions
+
 Multi-agent support via optional `peer` field in `proxy/successor` for M:N topologies.
 
 ---
@@ -446,11 +476,13 @@ Multi-agent support via optional `peer` field in `proxy/successor` for M:N topol
 Enables MCP servers to communicate through ACP channels.
 
 ### Capability Advertisement
+
 ```json
 { "capabilities": { "mcpCapabilities": { "acp": true } } }
 ```
 
 ### Connection Protocol
+
 - `mcp/connect` -> `{ "connectionId": "conn-123" }`
 - `mcp/message` -> Exchange MCP methods over the connection
 - `mcp/disconnect` -> Close connection
@@ -464,9 +496,11 @@ Supports connection multiplexing and bidirectional messaging.
 **Crate**: `agent-client-protocol` (v0.9.4), Edition 2024, Apache-2.0
 
 ### Workspace Crates
+
 `agent-client-protocol`, `agent-client-protocol-schema`, `sacp`, `sacp-tokio`, `sacp-proxy`, `sacp-rmcp`, `sacp-conductor`, `sacp-test`, `sacp-tee`
 
 ### Key: Non-Send Futures
+
 Uses `async_trait(?Send)` -- requires `tokio::task::LocalSet` and `spawn_local`.
 
 ### Agent Trait (Complete)
@@ -581,6 +615,7 @@ pub enum SessionUpdate {
 ```
 
 ### Unstable Feature Flags
+
 ```toml
 [dependencies]
 agent-client-protocol = { version = "0.9", features = ["unstable"] }
@@ -890,9 +925,9 @@ asyncio.run(run_agent(ExampleAgent()))
 
 ## Sources
 
-- https://agentclientprotocol.com/protocol (overview, schema, transports)
-- https://agentclientprotocol.com/protocol/tool-calls
-- https://agentclientprotocol.com/rfds/proxy-chains
-- https://agentclientprotocol.com/rfds/mcp-over-acp
+- <https://agentclientprotocol.com/protocol> (overview, schema, transports)
+- <https://agentclientprotocol.com/protocol/tool-calls>
+- <https://agentclientprotocol.com/rfds/proxy-chains>
+- <https://agentclientprotocol.com/rfds/mcp-over-acp>
 - GitHub: `agentclientprotocol/rust-sdk`
 - GitHub: `agentclientprotocol/python-sdk`

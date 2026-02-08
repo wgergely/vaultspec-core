@@ -47,14 +47,14 @@ Items the curator cannot auto-fix are listed under **Recommendations**. Address 
 
 Every document MUST strictly adhere to the following schema:
 
-1.  **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
-    *   **Directory Tag**: Exactly one of `#adr`, `#exec`, `#plan`, `#reference`, or `#research` (based on file location).
-    *   **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
-    *   *Syntax:* `tags: ["#doc-type", "#feature"]` (Must be quoted strings in a list).
-2.  **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
-    *   *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
-3.  **`date`**: MUST use `yyyy-mm-dd` format.
-4.  **No `feature` key**: Use `tags:` exclusively for feature identification.
+1. **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
+    - **Directory Tag**: Exactly one of `#adr`, `#exec`, `#plan`, `#reference`, or `#research` (based on file location).
+    - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
+    - *Syntax:* `tags: ["#doc-type", "#feature"]` (Must be quoted strings in a list).
+2. **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
+    - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
+3. **`date`**: MUST use `yyyy-mm-dd` format.
+4. **No `feature` key**: Use `tags:` exclusively for feature identification.
 
 ## Requirements
 

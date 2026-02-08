@@ -1,0 +1,7 @@
+default: true
+MD013: false # Line length
+MD024: false # Multiple headers with same content (allowed for phases/steps)
+MD029: false # Ordered list item prefix (we use non-sequential or custom numbering)
+MD033: false # Allow inline HTML
+MD040: false # Fenced code blocks language (sometimes we use generic blocks)
+MD041: false # First line in file doesn't have to be a top-level header

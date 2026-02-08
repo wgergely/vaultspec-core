@@ -2,18 +2,23 @@
 
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from acp.schema import PromptResponse, TextContentBlock
-from acp_dispatch import _interactive_loop, run_dispatch, GeminiDispatchClient, SessionLogger, AgentNotFoundError
+from acp.schema import PromptResponse
+from acp_dispatch import (
+    _interactive_loop,
+    run_dispatch,
+    SessionLogger,
+    AgentNotFoundError,
+)
 
 
 # ---------------------------------------------------------------------------
 # TestOneShotMode
 # ---------------------------------------------------------------------------
+
 
 class TestOneShotMode:
     @pytest.mark.asyncio
@@ -71,6 +76,7 @@ class TestOneShotMode:
 # ---------------------------------------------------------------------------
 # TestInteractiveMode
 # ---------------------------------------------------------------------------
+
 
 class TestInteractiveMode:
     @pytest.mark.asyncio
@@ -130,6 +136,7 @@ class TestInteractiveMode:
 # ---------------------------------------------------------------------------
 # TestProviderFallback
 # ---------------------------------------------------------------------------
+
 
 class TestProviderFallback:
     @pytest.mark.asyncio

@@ -1,0 +1,45 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check fix
+        entry: .venv/Scripts/ruff.exe check --fix
+        language: system
+        types: [python]
+        pass_filenames: true
+
+      - id: ruff-format
+        name: ruff format
+        entry: .venv/Scripts/ruff.exe format
+        language: system
+        types: [python]
+        pass_filenames: true
+
+      - id: ty
+        name: ty
+        entry: .venv/Scripts/python.exe -m ty check
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      - id: check-naming
+        name: check docs naming
+        entry: .venv/Scripts/python.exe .rules/scripts/check_naming.py
+        language: system
+        types: [markdown]
+        pass_filenames: false
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.44.0
+    hooks:
+      - id: markdownlint
+        name: markdownlint
+        args: ["--config", ".markdownlint.yaml", "--fix"]
+        # Now checking everything, including .docs/
+
+  - repo: https://github.com/lycheeverse/lychee.git
+    rev: v0.15.1
+    hooks:
+      - id: lychee
+        name: lychee link check
+        args: ["--no-progress", "--exclude-path", "README.md"] # Example args
