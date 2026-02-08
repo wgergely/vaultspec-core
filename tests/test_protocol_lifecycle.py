@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -35,13 +35,19 @@ class StubProvider(AgentProvider):
 
     def prepare_process(
         self,
-        _agent_name: str,
-        _agent_meta: dict[str, str],
-        _agent_persona: str,
-        _task_context: str,
-        _root_dir: pathlib.Path,
-        _model_override: str | None = None,
+        agent_name: str,
+        agent_meta: dict[str, str],
+        agent_persona: str,
+        task_context: str,
+        root_dir: pathlib.Path,
+        model_override: str | None = None,
     ) -> ProcessSpec:
+        _ = agent_name
+        _ = agent_meta
+        _ = agent_persona
+        _ = task_context
+        _ = root_dir
+        _ = model_override
         return ProcessSpec(
             executable=sys.executable,
             args=["-c", "import sys; print('STUB-READY'); sys.stdout.flush()"],
@@ -49,18 +55,23 @@ class StubProvider(AgentProvider):
             cleanup_paths=[],
         )
 
-    def load_rules(self, _root_dir: pathlib.Path) -> str:
+    def load_rules(self, root_dir: pathlib.Path) -> str:
+        _ = root_dir
         return ""
 
-    def get_model_capability(self, _model: str) -> CapabilityLevel:
+    def get_model_capability(self, model: str) -> CapabilityLevel:
+        _ = model
         return CapabilityLevel.MEDIUM
 
-    def get_best_model_for_capability(self, _level: CapabilityLevel) -> str:
+    def get_best_model_for_capability(self, level: CapabilityLevel) -> str:
+        _ = level
         return "stub-model"
 
     def resolve_includes(
-        self, text: str, _root_dir: pathlib.Path, _current_dir: pathlib.Path
+        self, text: str, root_dir: pathlib.Path, current_dir: pathlib.Path
     ) -> str:
+        _ = root_dir
+        _ = current_dir
         return text
 
 
@@ -88,7 +99,9 @@ async def test_provider_stub_lifecycle(mock_root):
             super().__init__(*args, **kwargs)
             self.updates = []
 
-        async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
+        async def session_update(
+            self, session_id: str, update: Any, **kwargs: Any
+        ) -> None:
             self.updates.append(update)
             await super().session_update(session_id, update, **kwargs)
 

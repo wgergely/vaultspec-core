@@ -13,7 +13,11 @@ from graph.api import VaultGraph  # noqa: E402
 from metrics.api import get_vault_metrics  # noqa: E402
 from vault.hydration import get_template_path, hydrate_template  # noqa: E402
 from vault.models import DocType  # noqa: E402
-from verification.api import get_malformed, list_features  # noqa: E402
+from verification.api import (  # noqa: E402
+    get_malformed,
+    list_features,
+    verify_vertical_integrity,
+)
 
 
 def main():
@@ -140,6 +144,8 @@ def handle_audit(args):
 
     if args.verify:
         errors = get_malformed(root_dir)
+        errors.extend(verify_vertical_integrity(root_dir))
+        
         results["verification"] = {
             "passed": len(errors) == 0,
             "errors": [{"path": str(e.path), "message": e.message} for e in errors],

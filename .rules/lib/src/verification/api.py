@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Set
 
 from vault.models import DocType, VaultConstants
 from vault.parser import parse_vault_metadata
@@ -19,13 +19,13 @@ class VerificationError:
         return f"{self.path}: {self.message}"
 
 
-def verify_vault_structure(root_dir: pathlib.Path) -> list[VerificationError]:
+def verify_vault_structure(root_dir: pathlib.Path) -> List[VerificationError]:
     """Checks for unsupported directories and files in .docs/ root."""
     errors = VaultConstants.validate_vault_structure(root_dir)
     return [VerificationError(root_dir / VaultConstants.DOCS_DIR, e) for e in errors]
 
 
-def verify_file(path: pathlib.Path, root_dir: pathlib.Path) -> list[VerificationError]:
+def verify_file(path: pathlib.Path, root_dir: pathlib.Path) -> List[VerificationError]:
     """Performs all checks on a single file."""
     errors = []
     doc_type = get_doc_type(path, root_dir)
@@ -58,7 +58,7 @@ def verify_file(path: pathlib.Path, root_dir: pathlib.Path) -> list[Verification
     return errors
 
 
-def get_malformed(root_dir: pathlib.Path) -> list[VerificationError]:
+def get_malformed(root_dir: pathlib.Path) -> List[VerificationError]:
     """Returns all documents that fail verification."""
     all_errors = verify_vault_structure(root_dir)
     for path in scan_vault(root_dir):
@@ -66,7 +66,7 @@ def get_malformed(root_dir: pathlib.Path) -> list[VerificationError]:
     return all_errors
 
 
-def list_features(root_dir: pathlib.Path) -> set[str]:
+def list_features(root_dir: pathlib.Path) -> Set[str]:
     """Infers features from tags across all documents."""
     features = set()
     for path in scan_vault(root_dir):
@@ -80,3 +80,35 @@ def list_features(root_dir: pathlib.Path) -> set[str]:
         except Exception:
             continue
     return features
+
+
+def verify_vertical_integrity(root_dir: pathlib.Path) -> List[VerificationError]:
+    """Ensures every feature used has a corresponding plan doc."""
+    features_found = set()
+    planned_features = set()
+    errors = []
+
+    for path in scan_vault(root_dir):
+        try:
+            content = path.read_text(encoding="utf-8")
+            metadata, _ = parse_vault_metadata(content)
+            
+            doc_features = [t.lstrip("#") for t in metadata.tags if not DocType.from_tag(t)]
+            features_found.update(doc_features)
+            
+            doc_type = get_doc_type(path, root_dir)
+            if doc_type == DocType.PLAN:
+                planned_features.update(doc_features)
+        except Exception:
+            continue
+
+    missing_plans = features_found - planned_features
+    for feature in sorted(missing_plans):
+        errors.append(
+            VerificationError(
+                root_dir / VaultConstants.DOCS_DIR / "plan",
+                f"Integrity violation: Feature '#{feature}' is missing a master plan document."
+            )
+        )
+        
+    return errors
