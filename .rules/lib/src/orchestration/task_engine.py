@@ -269,7 +269,7 @@ class LockManager:
         """
         violations: list[str] = []
         for path in paths:
-            normalized = path.replace("\\", "/")
+            normalized = path.replace("", "/")
             if not any(
                 normalized.startswith(prefix)
                 for prefix in LockManager.READONLY_ALLOWED_PREFIXES

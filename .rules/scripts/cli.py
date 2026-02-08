@@ -83,12 +83,14 @@ except ImportError:
 # Provider imports for tier-based model resolution
 # ---------------------------------------------------------------------------
 _SCRIPTS_DIR = Path(__file__).parent
-sys.path.insert(0, str(_SCRIPTS_DIR))
+ROOT_DIR = _SCRIPTS_DIR.parent.parent
+LIB_SRC_DIR = ROOT_DIR / ".rules" / "lib" / "src"
+sys.path.insert(0, str(LIB_SRC_DIR))
 
 try:
-    from agent_providers.base import CapabilityLevel
-    from agent_providers.gemini import GeminiProvider
-    from agent_providers.claude import ClaudeProvider
+    from protocol.providers.base import CapabilityLevel
+    from protocol.providers.gemini import GeminiProvider
+    from protocol.providers.claude import ClaudeProvider
 
     PROVIDERS: Dict[str, Any] = {
         "claude": ClaudeProvider(),

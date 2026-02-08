@@ -36,7 +36,8 @@ def resolve_includes(content: str, base_dir: pathlib.Path, root_dir: pathlib.Pat
       3. Security: resolved path must be within root_dir
     """
     resolved_root = root_dir.resolve()
-    lines = content.split("\n")
+    lines = content.split("
+")
     resolved_lines = []
     for line in lines:
         stripped = line.strip()
@@ -52,7 +53,7 @@ def resolve_includes(content: str, base_dir: pathlib.Path, root_dir: pathlib.Pat
             continue
 
         # Normalize backslashes for cross-platform compatibility
-        normalized = include_path_str.replace("\\", "/")
+        normalized = include_path_str.replace("", "/")
 
         # Try base_dir first (relative to including file), then root_dir
         include_path = None
@@ -78,16 +79,21 @@ def resolve_includes(content: str, base_dir: pathlib.Path, root_dir: pathlib.Pat
                 continue
 
             included_content = include_path.read_text(encoding="utf-8")
-            display_path = str(include_path.relative_to(resolved_root)).replace("\\", "/")
-            resolved_lines.append(f"\n<!-- Included from {display_path} -->\n")
+            display_path = str(include_path.relative_to(resolved_root)).replace("", "/")
+            resolved_lines.append(f"
+<!-- Included from {display_path} -->
+")
             resolved_lines.append(
                 resolve_includes(included_content, include_path.parent, root_dir)
             )
-            resolved_lines.append(f"\n<!-- End of {display_path} -->\n")
+            resolved_lines.append(f"
+<!-- End of {display_path} -->
+")
         except Exception as e:
             resolved_lines.append(f"<!-- ERROR: Include failed: {e} -->")
 
-    return "\n".join(resolved_lines)
+    return "
+".join(resolved_lines)
 
 
 def load_mcp_servers(root_dir: pathlib.Path) -> List[Dict[str, Any]]:

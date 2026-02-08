@@ -1,0 +1,365 @@
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import datetime
+import json
+import logging
+import os
+import pathlib
+import sys
+import uuid
+from typing import Any, Dict, List, Optional, Union
+
+from acp.interfaces import Client
+from acp.schema import (
+    AgentMessageChunk,
+    AgentPlanUpdate,
+    AgentThoughtChunk,
+    AvailableCommandsUpdate,
+    ClientCapabilities,
+    CurrentModeUpdate,
+    FileSystemCapability,
+    Implementation,
+    SessionInfoUpdate,
+    TextContentBlock,
+    ToolCallProgress,
+    ToolCallStart,
+    UserMessageChunk,
+)
+
+from .types import SecurityError
+
+logger = logging.getLogger(__name__)
+
+class SessionLogger:
+    """Handles persistent logging of agent session events to disk."""
+
+    def __init__(self, session_id: str, root_dir: pathlib.Path):
+        self.session_id = session_id
+        self.log_dir = root_dir / ".rules" / "logs"
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.log_file = self.log_dir / f"{session_id}.log"
+        self.start_time = datetime.datetime.now()
+
+    def log(self, event_type: str, data: Any) -> None:
+        timestamp = datetime.datetime.now().isoformat()
+        log_entry = {"timestamp": timestamp, "type": event_type, "data": data}
+        with self.log_file.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry) + "
+")
+
+
+class _Terminal:
+    """Tracks a subprocess spawned via the ACP terminal API."""
+
+    def __init__(self, proc: asyncio.subprocess.Process, byte_limit: int):
+        self.proc = proc
+        self.output_chunks: list[bytes] = []
+        self.total_bytes = 0
+        self.byte_limit = byte_limit
+        self.reader_task: Optional[asyncio.Task] = None
+
+
+class DispatchClient(Client):
+    """ACP Client implementation that handles protocol messages."""
+
+    def __init__(
+        self,
+        root_dir: pathlib.Path,
+        debug: bool = False,
+        quiet: bool = False,
+        mode: str = "read-write",
+        logger_instance: Optional[SessionLogger] = None
+    ):
+        self.root_dir = root_dir
+        self.debug = debug
+        self.quiet = quiet
+        self.mode = mode
+        self.response_text = ""
+        self.written_files: list[str] = []
+        self.session_logger: Optional[SessionLogger] = logger_instance
+        self._terminals: Dict[str, _Terminal] = {}
+        self.agent_capabilities: Optional[Any] = None
+        self._conn: Optional[Any] = None
+        self._session_id: Optional[str] = None
+
+        # Callbacks for UI/Output handling
+        self.on_message_chunk: Optional[callable] = None
+        self.on_thought_chunk: Optional[callable] = None
+        self.on_tool_update: Optional[callable] = None
+
+    def set_logger(self, logger_instance: SessionLogger) -> None:
+        self.session_logger = logger_instance
+
+    def _log(self, event_type: str, data: Any) -> None:
+        if self.session_logger:
+            self.session_logger.log(event_type, data)
+
+    async def request_permission(
+        self, options: Any, session_id: str, tool_call: Any, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """Auto-approves tool call permissions (Emulates YOLO mode).
+
+        Selects the first 'allow' option per ACP AllowedOutcome schema.
+        """
+        if self.debug:
+            logger.debug(f"Auto-approving tool call: {tool_call}")
+
+        self._log(
+            "permission_request",
+            {
+                "tool_call": tool_call.model_dump()
+                if hasattr(tool_call, "model_dump")
+                else str(tool_call)
+            },
+        )
+
+        # ACP requires AllowedOutcome: {outcome: "selected", optionId: <id>}
+        selected_id = "allow"
+        if options:
+            for opt in options:
+                opt_kind = getattr(opt, "kind", None)
+                if opt_kind in ("allow_once", "allow_always"):
+                    selected_id = getattr(opt, "option_id", selected_id)
+                    break
+            else:
+                # No explicit allow option; select the first option
+                selected_id = getattr(options[0], "option_id", selected_id)
+
+        return {"outcome": {"outcome": "selected", "optionId": selected_id}}
+
+    async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
+        """Handles and displays protocol updates from the agent."""
+        data = update.model_dump() if hasattr(update, "model_dump") else str(update)
+        self._log("session_update", data)
+
+        if self.debug:
+             logger.debug(f"Update Received: {type(update).__name__}")
+
+        if isinstance(update, (AgentMessageChunk, AgentThoughtChunk)):
+            self._handle_content_chunk(update)
+            return
+
+        # Delegate UI rendering to callbacks or default to logging
+        if isinstance(update, UserMessageChunk):
+            # content = update.content
+            # logger.info(f"User Message Replay: {content}")
+            pass
+
+        if isinstance(update, ToolCallStart):
+            if self.on_tool_update:
+                self.on_tool_update(update)
+            elif not self.quiet:
+                 sys.stderr.write(f"\033[94m[Tool] {update.title} ({update.tool_call_id})\033[0m
+")
+
+        if isinstance(update, ToolCallProgress):
+            # status_str = f" [{update.status}]" if update.status else ""
+            # logger.info(f"[Tool Update] {update.tool_call_id}{status_str}")
+            pass
+            
+        if isinstance(update, AgentPlanUpdate):
+            # logger.info("[Plan Update]")
+            pass
+
+    def _handle_content_chunk(
+        self, update: Union[AgentMessageChunk, AgentThoughtChunk]
+    ) -> None:
+        content = update.content
+        if not isinstance(content, TextContentBlock):
+            return
+
+        text = content.text
+        if isinstance(update, AgentMessageChunk):
+            if self.on_message_chunk:
+                self.on_message_chunk(text)
+            elif not self.quiet:
+                # Default CLI behavior if no callback
+                sys.stdout.write(text)
+                sys.stdout.flush()
+            
+            self.response_text += text
+        else:
+            if self.on_thought_chunk:
+                self.on_thought_chunk(text)
+            elif not self.quiet:
+                # Default CLI behavior
+                sys.stderr.write(f"\033[90m{text}\033[0m")
+                sys.stderr.flush()
+
+    # -- File I/O (required by ACP Client protocol) --
+
+    async def read_text_file(
+        self, path: str, session_id: str, limit: int | None = None, line: int | None = None, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """Read a text file from the workspace."""
+        file_path = pathlib.Path(path).resolve()
+        if not file_path.is_relative_to(self.root_dir):
+            raise ValueError(f"Path outside workspace: {path}")
+
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {path}")
+
+        content = file_path.read_text(encoding="utf-8")
+
+        if line is not None or limit is not None:
+            lines = content.splitlines(keepends=True)
+            start = (line - 1) if line and line > 0 else 0
+            end = (start + limit) if limit else len(lines)
+            content = "".join(lines[start:end])
+
+        self._log("read_text_file", {"path": path})
+        return {"content": content}
+
+    async def write_text_file(
+        self, content: str, path: str, session_id: str, **kwargs: Any
+    ) -> Dict[str, Any] | None:
+        """Write a text file to the workspace.
+
+        In read-only mode, only writes to `.docs/` are permitted.
+        All other writes are rejected with a ValueError.
+        """
+        file_path = pathlib.Path(path).resolve()
+        if not file_path.is_relative_to(self.root_dir):
+            raise ValueError(f"Path outside workspace: {path}")
+
+        # Enforce read-only mode: only .docs/ writes allowed.
+        if self.mode == "read-only":
+            rel_path = file_path.relative_to(self.root_dir).as_posix()
+            if not rel_path.startswith(".docs/") and not rel_path.startswith(".docs"):
+                self._log("write_blocked", {"path": path, "reason": "read-only mode"})
+                raise ValueError(
+                    f"Write rejected: read-only mode only allows writes to .docs/ "
+                    f"(attempted: {path})"
+                )
+
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(content, encoding="utf-8")
+
+        self._log("write_text_file", {"path": path, "size": len(content)})
+        self.written_files.append(path)
+        return {}
+
+    # -- Terminal management --
+
+    async def create_terminal(
+        self, command: str, session_id: str, args: Any = None, cwd: str | None = None,
+        env: Any = None, output_byte_limit: int | None = None, **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Spawn a subprocess and track it as an ACP terminal."""
+        terminal_id = str(uuid.uuid4())
+
+        cmd_parts = [command] + (args or [])
+        env_dict = os.environ.copy()
+        if env:
+            for var in env:
+                env_dict[getattr(var, "name", "")] = getattr(var, "value", "")
+
+        proc = await asyncio.create_subprocess_exec(
+            *cmd_parts,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            cwd=cwd or str(self.root_dir),
+            env=env_dict,
+        )
+
+        terminal = _Terminal(proc, output_byte_limit or 1_000_000)
+
+        async def _reader() -> None:
+            assert proc.stdout is not None
+            try:
+                while True:
+                    chunk = await proc.stdout.read(8192)
+                    if not chunk:
+                        break
+                    terminal.output_chunks.append(chunk)
+                    terminal.total_bytes += len(chunk)
+            except asyncio.CancelledError:
+                pass
+
+        terminal.reader_task = asyncio.create_task(_reader())
+        self._terminals[terminal_id] = terminal
+
+        if self.debug:
+            logger.debug(f"Terminal created: {terminal_id} ({command})")
+        self._log("create_terminal", {"terminal_id": terminal_id, "command": command})
+        return {"terminalId": terminal_id}
+
+    async def terminal_output(self, session_id: str, terminal_id: str, **kwargs: Any) -> Dict[str, Any]:
+        """Return current output from a tracked terminal."""
+        terminal = self._terminals.get(terminal_id)
+        if terminal is None:
+            return {"output": "", "truncated": False}
+
+        raw = b"".join(terminal.output_chunks)
+        truncated = len(raw) > terminal.byte_limit
+        if truncated:
+            raw = raw[-terminal.byte_limit:]
+
+        text = raw.decode("utf-8", errors="replace")
+        result: Dict[str, Any] = {"output": text, "truncated": truncated}
+        if terminal.proc.returncode is not None:
+            result["exitStatus"] = {"exitCode": terminal.proc.returncode}
+        return result
+
+    async def wait_for_terminal_exit(self, session_id: str, terminal_id: str, **kwargs: Any) -> Dict[str, Any]:
+        """Wait for a terminal process to finish."""
+        terminal = self._terminals.get(terminal_id)
+        if terminal is None:
+            return {"exitCode": None}
+
+        exit_code = await terminal.proc.wait()
+        if terminal.reader_task:
+            with contextlib.suppress(asyncio.CancelledError):
+                await terminal.reader_task
+        return {"exitCode": exit_code}
+
+    async def kill_terminal(self, session_id: str, terminal_id: str, **kwargs: Any) -> Dict[str, Any] | None:
+        """Kill a tracked terminal process."""
+        terminal = self._terminals.get(terminal_id)
+        if terminal is None:
+            return {}
+
+        with contextlib.suppress(ProcessLookupError):
+            terminal.proc.kill()
+        return {}
+
+    async def release_terminal(self, session_id: str, terminal_id: str, **kwargs: Any) -> Dict[str, Any] | None:
+        """Release and clean up a tracked terminal."""
+        terminal = self._terminals.pop(terminal_id, None)
+        if terminal is None:
+            return {}
+
+        if terminal.reader_task and not terminal.reader_task.done():
+            terminal.reader_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await terminal.reader_task
+
+        if terminal.proc.returncode is None:
+            with contextlib.suppress(ProcessLookupError):
+                terminal.proc.kill()
+            await terminal.proc.wait()
+        return {}
+
+    # -- Extension methods --
+
+    async def ext_method(self, method: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        if self.debug:
+            logger.debug(f"Extension method: {method}")
+        return {}
+
+    async def ext_notification(self, method: str, params: Dict[str, Any]) -> None:
+        if self.debug:
+            logger.debug(f"Extension notification: {method}")
+
+    def on_connect(self, conn: Any) -> None:
+        pass
+
+    async def graceful_cancel(self) -> None:
+        """Send ACP session/cancel notification before termination."""
+        if self._conn and self._session_id:
+            try:
+                await self._conn.cancel(session_id=self._session_id)
+            except Exception:
+                pass  # Best-effort
