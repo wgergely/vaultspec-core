@@ -217,37 +217,32 @@ async def run_dispatch(
 
             # Main Execution Block
             async with spawn_agent_process(
-                "agent",
                 client,
-                executable=spec.executable,
+                command=spec.executable,
                 args=spec.args,
                 env=spec.env,
                 cwd=str(root_dir),
-            ) as _proc_tuple:
-                # spawn_agent_process returns a tuple (connection, process)
-                _conn_obj, _proc = _proc_tuple
-
+            ) as (conn, _proc):
                 # Start stderr consumer
                 t = asyncio.create_task(_read_stderr(_proc, debug))
                 background_tasks.add(t)
                 t.add_done_callback(background_tasks.discard)
 
-                conn = await stack.enter_async_context(
-                    ClientSideConnection(client, _proc.stdin, _proc.stdout)
-                )
-
                 # Protocol Handshake
-                caps = ClientCapabilities()
+                caps = ClientCapabilities(
+                    terminal=True,
+                )
                 impl = Implementation(name="gemini-dispatch", version="0.1.0")
 
-                await conn.initialize(capabilities=caps, implementation=impl)
+                await conn.initialize(
+                    protocol_version=1, client_capabilities=caps, client_info=impl
+                )
 
                 # Session setup
                 # Note: We pass MCP servers if supported by the provider/spec
                 mcp_servers = getattr(spec, "mcp_servers", [])
 
-                await conn.session_new(
-                    session_id=session_id,
+                session = await conn.new_session(
                     cwd=str(root_dir),
                     mcp_servers=mcp_servers,
                 )
@@ -258,7 +253,7 @@ async def run_dispatch(
                 # Run conversation loop
                 await _interactive_loop(
                     conn=conn,
-                    session_id=session_id,
+                    session_id=session.session_id,
                     agent_name=agent_name,
                     initial_prompt=initial_prompt,
                     debug=debug,
@@ -268,10 +263,14 @@ async def run_dispatch(
                 )
 
                 # Shutdown
-                await conn.session_cancel(session_id=session_id)
+                await conn.cancel(session_id=session.session_id)
+
+                t.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await t
 
                 return DispatchResult(
-                    session_id=session_id,
+                    session_id=session.session_id,
                     response_text=client.response_text,
                     written_files=client.written_files,
                 )

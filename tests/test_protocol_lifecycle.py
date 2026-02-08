@@ -88,7 +88,7 @@ async def test_provider_stub_lifecycle(mock_root):
             super().__init__(*args, **kwargs)
             self.updates = []
 
-        async def session_update(self, session_id, update, **kwargs):
+        async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
             self.updates.append(update)
             await super().session_update(session_id, update, **kwargs)
 

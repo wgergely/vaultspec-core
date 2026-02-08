@@ -111,14 +111,16 @@ class DispatchClient(Client):
     async def request_permission(
         self,
         options: list[PermissionOption],
-        _session_id: str,
+        session_id: str,
         tool_call: ToolCallUpdate,
-        **_kwargs: Any,
+        **kwargs: Any,
     ) -> RequestPermissionResponse:
         """Auto-approves tool call permissions (Emulates YOLO mode).
 
         Selects the first 'allow' option per ACP AllowedOutcome schema.
         """
+        _ = session_id
+        _ = kwargs
         if self.debug:
             logger.debug(f"Auto-approving tool call: {tool_call}")
 
@@ -150,7 +152,7 @@ class DispatchClient(Client):
 
     async def session_update(
         self,
-        _session_id: str,
+        session_id: str,
         update: UserMessageChunk
         | AgentMessageChunk
         | AgentThoughtChunk
@@ -162,9 +164,11 @@ class DispatchClient(Client):
         | ConfigOptionUpdate
         | SessionInfoUpdate
         | UsageUpdate,
-        **_kwargs: Any,
+        **kwargs: Any,
     ) -> None:
         """Handles and displays protocol updates from the agent."""
+        _ = session_id
+        _ = kwargs
         data = update.model_dump() if hasattr(update, "model_dump") else str(update)
         self._log("session_update", data)
 
@@ -228,12 +232,14 @@ class DispatchClient(Client):
     async def read_text_file(
         self,
         path: str,
-        _session_id: str,
+        session_id: str,
         limit: int | None = None,
         line: int | None = None,
-        **_kwargs: Any,
+        **kwargs: Any,
     ) -> ReadTextFileResponse:
         """Read a text file from the workspace."""
+        _ = session_id
+        _ = kwargs
         file_path = pathlib.Path(path).resolve()
         if not file_path.is_relative_to(self.root_dir):
             raise ValueError(f"Path outside workspace: {path}")
@@ -253,13 +259,15 @@ class DispatchClient(Client):
         return ReadTextFileResponse(content=content)
 
     async def write_text_file(
-        self, content: str, path: str, _session_id: str, **_kwargs: Any
+        self, content: str, path: str, session_id: str, **kwargs: Any
     ) -> WriteTextFileResponse | None:
         """Write a text file to the workspace.
 
         In read-only mode, only writes to `.docs/` are permitted.
         All other writes are rejected with a ValueError.
         """
+        _ = session_id
+        _ = kwargs
         file_path = pathlib.Path(path).resolve()
         if not file_path.is_relative_to(self.root_dir):
             raise ValueError(f"Path outside workspace: {path}")
@@ -286,14 +294,16 @@ class DispatchClient(Client):
     async def create_terminal(
         self,
         command: str,
-        _session_id: str,
+        session_id: str,
         args: list[str] | None = None,
         cwd: str | None = None,
         env: list[EnvVariable] | None = None,
         output_byte_limit: int | None = None,
-        **_kwargs: Any,
+        **kwargs: Any,
     ) -> CreateTerminalResponse:
         """Spawn a subprocess and track it as an ACP terminal."""
+        _ = session_id
+        _ = kwargs
         terminal_id = str(uuid.uuid4())
 
         cmd_parts = [command] + (args or [])
@@ -333,10 +343,11 @@ class DispatchClient(Client):
         return CreateTerminalResponse(terminal_id=terminal_id)
 
     async def terminal_output(
-        self, _session_id: str, terminal_id: str, **_kwargs: Any
+        self, session_id: str, terminal_id: str, **kwargs: Any
     ) -> TerminalOutputResponse:
         """Return current output from a tracked terminal."""
-
+        _ = session_id
+        _ = kwargs
         terminal = self._terminals.get(terminal_id)
 
         if terminal is None:
@@ -361,10 +372,11 @@ class DispatchClient(Client):
         )
 
     async def wait_for_terminal_exit(
-        self, _session_id: str, terminal_id: str, **_kwargs: Any
+        self, session_id: str, terminal_id: str, **kwargs: Any
     ) -> WaitForTerminalExitResponse:
         """Wait for a terminal process to finish."""
-
+        _ = session_id
+        _ = kwargs
         terminal = self._terminals.get(terminal_id)
 
         if terminal is None:
@@ -379,9 +391,11 @@ class DispatchClient(Client):
         return WaitForTerminalExitResponse(exit_code=exit_code)
 
     async def kill_terminal(
-        self, _session_id: str, terminal_id: str, **_kwargs: Any
+        self, session_id: str, terminal_id: str, **kwargs: Any
     ) -> KillTerminalCommandResponse:
         """Kill a tracked terminal process."""
+        _ = session_id
+        _ = kwargs
         terminal = self._terminals.get(terminal_id)
         if terminal is not None:
             with contextlib.suppress(ProcessLookupError):
@@ -389,9 +403,11 @@ class DispatchClient(Client):
         return KillTerminalCommandResponse()
 
     async def release_terminal(
-        self, _session_id: str, terminal_id: str, **_kwargs: Any
+        self, session_id: str, terminal_id: str, **kwargs: Any
     ) -> ReleaseTerminalResponse:
         """Release and clean up a tracked terminal."""
+        _ = session_id
+        _ = kwargs
         terminal = self._terminals.pop(terminal_id, None)
         if terminal is not None:
             if terminal.reader_task and not terminal.reader_task.done():
@@ -408,12 +424,14 @@ class DispatchClient(Client):
 
     # -- Extension methods --
 
-    async def ext_method(self, method: str, _params: dict[str, Any]) -> dict[str, Any]:
+    async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+        _ = params
         if self.debug:
             logger.debug(f"Extension method: {method}")
         return {}
 
-    async def ext_notification(self, method: str, _params: dict[str, Any]) -> None:
+    async def ext_notification(self, method: str, params: dict[str, Any]) -> None:
+        _ = params
         if self.debug:
             logger.debug(f"Extension notification: {method}")
 

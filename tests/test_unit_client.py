@@ -124,7 +124,7 @@ class TestSessionUpdate:
             session_update="agent_message_chunk",
             content=TextContentBlock(type="text", text="Hello from agent"),
         )
-        await client.session_update(session_id="s1", update=update)
+        await client.session_update("s1", update)
         captured = capsys.readouterr()
         assert "Hello from agent" in captured.out
         assert client.response_text == "Hello from agent"
@@ -135,7 +135,7 @@ class TestSessionUpdate:
             session_update="agent_thought_chunk",
             content=TextContentBlock(type="text", text="Thinking..."),
         )
-        await client.session_update(session_id="s1", update=update)
+        await client.session_update("s1", update)
         captured = capsys.readouterr()
         assert "Thinking..." in captured.err
 
@@ -146,7 +146,7 @@ class TestSessionUpdate:
             tool_call_id="tc-1",
             title="read_file",
         )
-        await client.session_update(session_id="s1", update=update)
+        await client.session_update("s1", update)
         captured = capsys.readouterr()
         assert "read_file" in captured.err
 
@@ -158,7 +158,7 @@ class TestSessionUpdate:
             title="read_file",
             status="in_progress",
         )
-        await client.session_update(session_id="s1", update=update)
+        await client.session_update("s1", update)
         captured = capsys.readouterr()
         assert "tc-1" in captured.err
 
@@ -171,7 +171,7 @@ class TestSessionUpdate:
                 PlanEntry(content="Step 2", status="pending", priority="medium"),
             ],
         )
-        await client.session_update(session_id="s1", update=update)
+        await client.session_update("s1", update)
         captured = capsys.readouterr()
         assert "Step 1" in captured.err
         assert "Step 2" in captured.err
@@ -180,7 +180,7 @@ class TestSessionUpdate:
     async def test_debug_mode_shows_info_updates(self, capsys, tmp_path):
         client = DispatchClient(root_dir=tmp_path, debug=True)
         update = SessionInfoUpdate(session_update="session_info_update")
-        await client.session_update(session_id="s1", update=update)
+        await client.session_update("s1", update)
         captured = capsys.readouterr()
         assert "SessionInfoUpdate" in captured.err
 
