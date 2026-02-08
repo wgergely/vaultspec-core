@@ -29,8 +29,8 @@ MANIFEST
 # Whitelist .rules/lib
 !/.rules/lib/
 !/.rules/lib/**
-!/.rules/lib/**/__pycache__/
-!/.rules/lib/**/*.pyc
+.rules/lib/**/__pycache__/
+.rules/lib/**/*.pyc
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
