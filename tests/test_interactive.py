@@ -24,12 +24,12 @@ class TestInteractiveLoop:
         await _interactive_loop(
             conn=typing.cast("ClientSideConnection", conn),
             session_id="s1",
-            _agent_name="test",
+            agent_name="test",
             initial_prompt="hello",
             debug=False,
             interactive=False,
             proc=proc,
-            _logger_instance=None,
+            logger_instance=None,
         )
 
         # Check that prompt was called. Note: actual blocks are complex,
@@ -52,12 +52,12 @@ class TestInteractiveLoop:
             await _interactive_loop(
                 conn=typing.cast("ClientSideConnection", conn),
                 session_id="s2",
-                _agent_name="test",
+                agent_name="test",
                 initial_prompt="hello",
                 debug=False,
                 interactive=True,
                 proc=proc,
-                _logger_instance=None,
+                logger_instance=None,
             )
 
         # Should prompt once initially
