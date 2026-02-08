@@ -36,12 +36,13 @@ The `.docs/` vault is growing, but finding relevant information depends on manua
 ## Implementation
 
 We will implement a **Synthetic Semantic Search** system:
-1.  **Indexing (`docs index`)**: For each document, ask Gemini to generate a dense, keyword-rich "Semantic Signature" (e.g., a 50-word summary containing core concepts, technologies, and decisions).
-2.  **Storage**: Persist these signatures in `.gemini/vault_index.json` along with metadata.
-3.  **Search (`docs search`)**:
-    -   **Step 1**: Filter documents by tags/date if provided.
-    -   **Step 2**: Use Gemini to rank the "Semantic Signatures" of the remaining documents against the user's query.
-    -   **Optimization**: For very large vaults, use a simple TF-IDF or Jaccard similarity in Python as a pre-filter before LLM ranking.
+
+1. **Indexing (`docs index`)**: For each document, ask Gemini to generate a dense, keyword-rich "Semantic Signature" (e.g., a 50-word summary containing core concepts, technologies, and decisions).
+2. **Storage**: Persist these signatures in `.gemini/vault_index.json` along with metadata.
+3. **Search (`docs search`)**:
+    - **Step 1**: Filter documents by tags/date if provided.
+    - **Step 2**: Use Gemini to rank the "Semantic Signatures" of the remaining documents against the user's query.
+    - **Optimization**: For very large vaults, use a simple TF-IDF or Jaccard similarity in Python as a pre-filter before LLM ranking.
 
 ## Rationale
 

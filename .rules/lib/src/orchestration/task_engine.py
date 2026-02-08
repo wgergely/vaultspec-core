@@ -334,7 +334,8 @@ class TaskEngine:
 
             # Set TTL expiry and release lock for terminal states.
             if is_terminal(status):
-                self._expiry[task_id] = time.monotonic() + self._ttl_seconds
+                task.completed_at = task.updated_at
+                self._expiry[task_id] = task.updated_at + self._ttl_seconds
                 self._release_lock(task_id)
 
         # Notify any async waiters outside the lock.
@@ -360,6 +361,7 @@ class TaskEngine:
 
             task.status = TaskStatus.COMPLETED
             task.updated_at = time.monotonic()
+            task.completed_at = task.updated_at
             task.result = result
             self._expiry[task_id] = time.monotonic() + self._ttl_seconds
             self._release_lock(task_id)
@@ -385,6 +387,7 @@ class TaskEngine:
 
             task.status = TaskStatus.FAILED
             task.updated_at = time.monotonic()
+            task.completed_at = task.updated_at
             task.error = error
             self._expiry[task_id] = time.monotonic() + self._ttl_seconds
             self._release_lock(task_id)

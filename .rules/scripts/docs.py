@@ -1,4 +1,5 @@
 import argparse
+import importlib.util
 import json
 import pathlib
 import sys
@@ -7,20 +8,25 @@ from datetime import datetime
 # Add lib/src to path
 SCRIPTS_DIR = pathlib.Path(__file__).parent
 ROOT_DIR = SCRIPTS_DIR.parent.parent
-sys.path.insert(0, str(ROOT_DIR / ".rules" / "lib" / "src"))
+LIB_SRC = str(ROOT_DIR / ".rules" / "lib" / "src")
+if LIB_SRC not in sys.path:
+    sys.path.insert(0, LIB_SRC)
 
-from graph.api import VaultGraph
-from metrics.api import get_vault_metrics
-from vault.hydration import get_template_path, hydrate_template
-from vault.models import DocType
-from verification.api import (
-    get_malformed,
-    list_features,
-    verify_vertical_integrity,
-)
+
+# Dynamic imports to avoid E402 without noqa
+def _import_internal(name):
+    return importlib.import_module(name)
 
 
 def main():
+    # Pre-load internal modules
+    graph_api = _import_internal("graph.api")
+    metrics_api = _import_internal("metrics.api")
+    vault_hydration = _import_internal("vault.hydration")
+    vault_models = _import_internal("vault.models")
+    vault_rag = _import_internal("vault.rag")
+    verification_api = _import_internal("verification.api")
+
     parser = argparse.ArgumentParser(description="Audit and manage the .docs vault.")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
@@ -60,7 +66,7 @@ def main():
         "--type",
         type=str,
         required=True,
-        choices=[dt.value for dt in DocType],
+        choices=[dt.value for dt in vault_models.DocType],
         help="Type of doc to create.",
     )
     create_parser.add_argument(
@@ -71,6 +77,20 @@ def main():
         "--root", type=str, default=str(ROOT_DIR), help="Vault root directory."
     )
 
+    # Index command
+    index_parser = subparsers.add_parser(
+        "index", help="Index vault for semantic search."
+    )
+    index_parser.add_argument("--root", default=".", help="Root directory.")
+    index_parser.add_argument("--force", action="store_true", help="Force re-indexing.")
+    index_parser.add_argument("--limit", type=int, help="Limit number of docs to index.")
+
+    # Search command
+    search_parser = subparsers.add_parser("search", help="Semantic search in vault.")
+    search_parser.add_argument("query", help="Search query.")
+    search_parser.add_argument("--root", default=".", help="Root directory.")
+    search_parser.add_argument("--limit", type=int, default=5, help="Result limit.")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -78,24 +98,44 @@ def main():
         return
 
     if args.command == "create":
-        handle_create(args)
+        handle_create(args, vault_models, vault_hydration)
     elif args.command == "audit":
-        handle_audit(args)
+        handle_audit(args, metrics_api, verification_api, graph_api, vault_models)
+    elif args.command == "index":
+        import asyncio
+        asyncio.run(handle_index(args, vault_rag))
+    elif args.command == "search":
+        import asyncio
+        asyncio.run(handle_search(args, vault_rag))
 
 
-def handle_create(args):
+async def handle_index(args, vault_rag):
     root_dir = pathlib.Path(args.root)
-    doc_type = DocType(args.type)
+    await vault_rag.index_vault(
+        root_dir, force=args.force, project_root=ROOT_DIR, limit=args.limit
+    )
+
+
+async def handle_search(args, vault_rag):
+    root_dir = pathlib.Path(args.root)
+    await vault_rag.search_vault(
+        root_dir, args.query, top_k=args.limit, project_root=ROOT_DIR
+    )
+
+
+def handle_create(args, vault_models, vault_hydration):
+    root_dir = pathlib.Path(args.root)
+    doc_type = vault_models.DocType(args.type)
     feature = args.feature.strip("#")
     date_str = datetime.now().strftime("%Y-%m-%d")
 
-    template_path = get_template_path(ROOT_DIR, doc_type)
+    template_path = vault_hydration.get_template_path(ROOT_DIR, doc_type)
     if template_path is None:
         print(f"Error: No template found for type '{doc_type.value}'")
         sys.exit(1)
 
     content = template_path.read_text(encoding="utf-8")
-    hydrated = hydrate_template(content, feature, date_str, args.title)
+    hydrated = vault_hydration.hydrate_template(content, feature, date_str, args.title)
 
     # Generate filename: yyyy-mm-dd-<feature>-<type>.md
     filename = f"{date_str}-{feature}-{doc_type.value}.md"
@@ -111,12 +151,12 @@ def handle_create(args):
     print(f"Created {target_path}")
 
 
-def handle_audit(args):
+def handle_audit(args, metrics_api, verification_api, graph_api, vault_models):
     root_dir = pathlib.Path(args.root)
     results = {}
 
     if args.summary:
-        metrics = get_vault_metrics(root_dir)
+        metrics = metrics_api.get_vault_metrics(root_dir)
         results["summary"] = {
             "total_docs": metrics.total_docs,
             "total_features": metrics.total_features,
@@ -134,7 +174,7 @@ def handle_audit(args):
             print()
 
     if args.features:
-        features = list_features(root_dir)
+        features = verification_api.list_features(root_dir)
         results["features"] = sorted(features)
         if not args.json:
             print(f"Features ({len(features)}):")
@@ -143,9 +183,9 @@ def handle_audit(args):
             print()
 
     if args.verify:
-        errors = get_malformed(root_dir)
-        errors.extend(verify_vertical_integrity(root_dir))
-        
+        errors = verification_api.get_malformed(root_dir)
+        errors.extend(verification_api.verify_vertical_integrity(root_dir))
+
         results["verification"] = {
             "passed": len(errors) == 0,
             "errors": [{"path": str(e.path), "message": e.message} for e in errors],
@@ -160,8 +200,8 @@ def handle_audit(args):
             print()
 
     if args.graph:
-        graph = VaultGraph(root_dir)
-        doc_type_filter = DocType(args.type) if args.type else None
+        graph = graph_api.VaultGraph(root_dir)
+        doc_type_filter = vault_models.DocType(args.type) if args.type else None
 
         hotspots = graph.get_hotspots(
             limit=args.limit, doc_type=doc_type_filter, feature=args.feature

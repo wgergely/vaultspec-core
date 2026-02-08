@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-import pathlib
+from typing import TYPE_CHECKING
+
 import pytest
-import os
 
 from orchestration.dispatch import run_dispatch
 from protocol.acp.types import DispatchResult
 from protocol.providers.gemini import GeminiProvider
+
+if TYPE_CHECKING:
+    import pathlib
+
 
 @pytest.fixture
 def mock_root(tmp_path: pathlib.Path) -> pathlib.Path:
@@ -17,6 +21,7 @@ def mock_root(tmp_path: pathlib.Path) -> pathlib.Path:
     # Create a minimal settings file to avoid gemini CLI error
     (tmp_path / ".gemini" / "settings.json").write_text("{}", encoding="utf-8")
     return tmp_path
+
 
 @pytest.mark.integration
 @pytest.mark.gemini
@@ -30,7 +35,8 @@ tier: LOW
 ---
 # Persona
 You are a helpful assistant. Keep your responses extremely short.
-""", encoding="utf-8"
+""",
+        encoding="utf-8",
     )
 
     provider = GeminiProvider()
@@ -43,7 +49,7 @@ You are a helpful assistant. Keep your responses extremely short.
         initial_task="Please say only the word 'ACK'.",
         provider_instance=provider,
         interactive=False,
-        debug=True
+        debug=True,
     )
 
     assert isinstance(result, DispatchResult)

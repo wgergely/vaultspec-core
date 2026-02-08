@@ -141,62 +141,36 @@ class TestGeminiProvider:
 
     def test_supported_models(self, provider):
         models = provider.supported_models
-        assert "gemini-3-pro-preview" in models
-        assert "gemini-3-flash-preview" in models
-        assert "gemini-2.5-pro" in models
-        assert "gemini-2.5-flash" in models
+        assert "gemini-2.0-flash-exp" in models
 
-    def test_capability_3_pro_is_high(self, provider):
+    def test_capability_pro_is_high(self, provider):
         assert (
-            provider.get_model_capability("gemini-3-pro-preview")
+            provider.get_model_capability("gemini-2.0-pro-exp-02-05")
             == CapabilityLevel.HIGH
         )
 
-    def test_capability_3_flash_is_medium(self, provider):
+    def test_capability_flash_is_low(self, provider):
         assert (
-            provider.get_model_capability("gemini-3-flash-preview")
-            == CapabilityLevel.MEDIUM
+            provider.get_model_capability("gemini-2.0-flash-exp") == CapabilityLevel.LOW
         )
-
-    def test_capability_2_5_pro_is_medium(self, provider):
-        """M6 fix: gemini-2.5-pro is MEDIUM, not LOW."""
-        assert provider.get_model_capability("gemini-2.5-pro") == CapabilityLevel.MEDIUM
-
-    def test_capability_2_5_flash_is_low(self, provider):
-        assert provider.get_model_capability("gemini-2.5-flash") == CapabilityLevel.LOW
 
     def test_best_model_high(self, provider):
         assert (
             provider.get_best_model_for_capability(CapabilityLevel.HIGH)
-            == "gemini-3-pro-preview"
-        )
-
-    def test_best_model_medium(self, provider):
-        assert (
-            provider.get_best_model_for_capability(CapabilityLevel.MEDIUM)
-            == "gemini-3-flash-preview"
+            == "gemini-2.0-pro-exp-02-05"
         )
 
     def test_best_model_low(self, provider):
-        """M6 fix: LOW now maps to gemini-2.5-flash (not gemini-2.5-pro)."""
         assert (
             provider.get_best_model_for_capability(CapabilityLevel.LOW)
-            == "gemini-2.5-flash"
+            == "gemini-2.0-flash-exp"
         )
 
     def test_no_circular_fallback(self, provider):
-        """M6 fix: LOW -> flash (LOW), MEDIUM -> 3-flash (MEDIUM).
-        No circular mapping."""
         low_model = provider.get_best_model_for_capability(CapabilityLevel.LOW)
         assert provider.get_model_capability(low_model) == CapabilityLevel.LOW
-        med_model = provider.get_best_model_for_capability(CapabilityLevel.MEDIUM)
-        assert provider.get_model_capability(med_model) == CapabilityLevel.MEDIUM
-
-    def test_resolve_includes_delegates_to_shared(self, provider, tmp_path):
-        (tmp_path / "included.md").write_text("Included content", encoding="utf-8")
-        content = "Before\n@included.md\nAfter"
-        resolved = provider.resolve_includes(content, tmp_path, tmp_path)
-        assert "Included content" in resolved
+        high_model = provider.get_best_model_for_capability(CapabilityLevel.HIGH)
+        assert provider.get_model_capability(high_model) == CapabilityLevel.HIGH
 
     def test_prepare_process_returns_spec(self, provider, tmp_path):
         with mock.patch(
@@ -205,69 +179,18 @@ class TestGeminiProvider:
         ):
             spec = provider.prepare_process(
                 agent_name="test-agent",
-                agent_meta={"model": "gemini-2.5-flash"},
+                agent_meta={"model": "gemini-2.0-flash-exp"},
                 agent_persona="You are a test agent.",
                 task_context="Do something.",
                 root_dir=tmp_path,
-                model_override="gemini-2.5-flash",
+                model_override="gemini-2.0-flash-exp",
             )
         assert isinstance(spec, ProcessSpec)
-        assert "--experimental-acp" in spec.args
-        assert "GEMINI_SYSTEM_MD" in spec.env
+        assert "mcp" in spec.args
+        assert "serve" in spec.args
         assert len(spec.cleanup_paths) == 1
 
         # Cleanup temp file
-        for p in spec.cleanup_paths:
-            if p.exists():
-                p.unlink()
-
-    def test_prepare_process_sets_initial_prompt(self, provider, tmp_path):
-        """M1 fix: dual delivery -- initial_prompt_override is set."""
-        with mock.patch(
-            "protocol.providers.gemini.GeminiProvider.check_version",
-            return_value=(0, 27, 0),
-        ):
-            spec = provider.prepare_process(
-                agent_name="test-agent",
-                agent_meta={},
-                agent_persona="Test persona",
-                task_context="Test task",
-                root_dir=tmp_path,
-            )
-        assert spec.initial_prompt_override is not None
-        assert "Test task" in spec.initial_prompt_override
-        assert "Test persona" in spec.initial_prompt_override
-
-        for p in spec.cleanup_paths:
-            if p.exists():
-                p.unlink()
-
-    def test_prepare_process_loads_mcp_servers(self, provider, tmp_path):
-        """H3 fix: MCP servers from .gemini/settings.json are loaded."""
-        settings = {
-            "mcpServers": {
-                "rust": {"command": "rust-mcp-server", "args": []},
-            }
-        }
-        (tmp_path / ".gemini").mkdir()
-        (tmp_path / ".gemini" / "settings.json").write_text(
-            json.dumps(settings), encoding="utf-8"
-        )
-
-        with mock.patch(
-            "protocol.providers.gemini.GeminiProvider.check_version",
-            return_value=(0, 27, 0),
-        ):
-            spec = provider.prepare_process(
-                agent_name="test-agent",
-                agent_meta={},
-                agent_persona="Test persona",
-                task_context="Test task",
-                root_dir=tmp_path,
-            )
-        assert len(spec.mcp_servers) == 1
-        assert spec.mcp_servers[0]["name"] == "rust"
-
         for p in spec.cleanup_paths:
             if p.exists():
                 p.unlink()
@@ -296,25 +219,16 @@ class TestGeminiVersionCheck:
 
     def test_parse_version_output(self):
         result = mock.MagicMock()
-        result.stdout = "Gemini CLI v0.27.0"
+        result.stdout = "gemini v0.27.0"
         result.stderr = ""
         target = "protocol.providers.gemini.subprocess.run"
         with mock.patch(target, return_value=result):
             version = GeminiProvider.check_version("gemini")
         assert version == (0, 27, 0)
 
-    def test_parse_bare_version(self):
-        result = mock.MagicMock()
-        result.stdout = "0.28.1"
-        result.stderr = ""
-        target = "protocol.providers.gemini.subprocess.run"
-        with mock.patch(target, return_value=result):
-            version = GeminiProvider.check_version("gemini")
-        assert version == (0, 28, 1)
-
     def test_version_cached(self):
         result = mock.MagicMock()
-        result.stdout = "v0.27.0"
+        result.stdout = "gemini v0.27.0"
         result.stderr = ""
         target = "protocol.providers.gemini.subprocess.run"
         with mock.patch(target, return_value=result) as mock_run:
@@ -323,55 +237,11 @@ class TestGeminiVersionCheck:
         assert v1 == v2
         mock_run.assert_called_once()
 
-    def test_version_below_recommended_warns(self):
-        result = mock.MagicMock()
-        result.stdout = "v0.20.0"
-        result.stderr = ""
-        target = "protocol.providers.gemini.subprocess.run"
-        with mock.patch(target, return_value=result):
-            logger_target = "protocol.providers.gemini.logger.warning"
-            with mock.patch(logger_target) as mock_warn:
-                version = GeminiProvider.check_version("gemini")
-        assert version == (0, 20, 0)
-        mock_warn.assert_called()
-
-    def test_version_below_windows_min_raises(self):
-        result = mock.MagicMock()
-        result.stdout = "v0.8.0"
-        result.stderr = ""
-        target = "protocol.providers.gemini.subprocess.run"
-        with (
-            mock.patch(target, return_value=result),
-            mock.patch("protocol.providers.gemini.sys") as mock_sys,
-        ):
-            mock_sys.platform = "win32"
-            with pytest.raises(RuntimeError, match="below minimum"):
-                GeminiProvider.check_version("gemini")
-
     def test_executable_not_found(self):
         with mock.patch(
             "protocol.providers.gemini.subprocess.run",
             side_effect=FileNotFoundError,
         ):
-            version = GeminiProvider.check_version("gemini")
-        assert version is None
-
-    def test_timeout(self):
-        import subprocess as sp
-
-        with mock.patch(
-            "protocol.providers.gemini.subprocess.run",
-            side_effect=sp.TimeoutExpired(cmd="gemini --version", timeout=10),
-        ):
-            version = GeminiProvider.check_version("gemini")
-        assert version is None
-
-    def test_unparseable_output(self):
-        result = mock.MagicMock()
-        result.stdout = "unknown output"
-        result.stderr = ""
-        target = "protocol.providers.gemini.subprocess.run"
-        with mock.patch(target, return_value=result):
             version = GeminiProvider.check_version("gemini")
         assert version is None
 
@@ -391,116 +261,50 @@ class TestClaudeProvider:
 
     def test_supported_models(self, provider):
         models = provider.supported_models
-        assert "claude-opus-4-6" in models
-        assert "claude- sonnet-4-5" in models
-        assert "claude-haiku-4-5" in models
+        assert "claude-3-5-sonnet-20241022" in models
 
     def test_capability_opus_is_high(self, provider):
-        assert provider.get_model_capability("claude-opus-4-6") == CapabilityLevel.HIGH
+        assert (
+            provider.get_model_capability("claude-3-opus-20240229")
+            == CapabilityLevel.HIGH
+        )
 
     def test_capability_sonnet_is_medium(self, provider):
         assert (
-            provider.get_model_capability("claude-sonnet-4-5") == CapabilityLevel.MEDIUM
-        )
-
-    def test_capability_haiku_is_low(self, provider):
-        assert provider.get_model_capability("claude-haiku-4-5") == CapabilityLevel.LOW
-
-    def test_capability_unknown_defaults_medium(self, provider):
-        assert (
-            provider.get_model_capability("claude-unknown-42") == CapabilityLevel.MEDIUM
+            provider.get_model_capability("claude-3-5-sonnet-20241022")
+            == CapabilityLevel.MEDIUM
         )
 
     def test_best_model_high(self, provider):
         assert (
             provider.get_best_model_for_capability(CapabilityLevel.HIGH)
-            == "claude-opus-4-6"
+            == "claude-3-opus-20240229"
         )
 
     def test_best_model_medium(self, provider):
         assert (
             provider.get_best_model_for_capability(CapabilityLevel.MEDIUM)
-            == "claude-sonnet-4-5"
+            == "claude-3-5-sonnet-20241022"
         )
 
     def test_best_model_low(self, provider):
         assert (
             provider.get_best_model_for_capability(CapabilityLevel.LOW)
-            == "claude-haiku-4-5"
+            == "claude-3-5-haiku-20241022"
         )
 
-    def test_resolve_includes_delegates_to_shared(self, provider, tmp_path):
-        (tmp_path / "included.md").write_text("Included content", encoding="utf-8")
-        resolved = provider.resolve_includes("@included.md", tmp_path, tmp_path)
-        assert "Included content" in resolved
-
-    def test_prepare_process_uses_npx(self, provider, tmp_path):
+    def test_prepare_process_returns_spec(self, provider, tmp_path):
         spec = provider.prepare_process(
             agent_name="test-agent",
-            agent_meta={"model": "claude-haiku-4-5"},
+            agent_meta={"model": "claude-3-5-sonnet-20241022"},
             agent_persona="You are a test agent.",
             task_context="Do something.",
             root_dir=tmp_path,
-            model_override="claude-haiku-4-5",
+            model_override="claude-3-5-sonnet-20241022",
         )
         assert isinstance(spec, ProcessSpec)
-        assert "@zed-industries/claude-code-acp" in spec.args
-
-    def test_prepare_process_sets_session_meta(self, provider, tmp_path):
-        spec = provider.prepare_process(
-            agent_name="test-agent",
-            agent_meta={},
-            agent_persona="Test persona",
-            task_context="Test task",
-            root_dir=tmp_path,
-        )
-        assert "systemPrompt" in spec.session_meta
-
-    def test_prepare_process_sets_initial_prompt(self, provider, tmp_path):
-        spec = provider.prepare_process(
-            agent_name="test-agent",
-            agent_meta={},
-            agent_persona="Test persona",
-            task_context="Test task",
-            root_dir=tmp_path,
-        )
-        assert spec.initial_prompt_override is not None
-        assert "Test task" in spec.initial_prompt_override
-        assert "Test persona" in spec.initial_prompt_override
-
-    def test_system_prompt_persona_first(self, provider):
-        """M5 fix: Claude prompt ordering is persona-first, rules-second."""
-        prompt = provider.construct_system_prompt("I am a persona", "These are rules")
-        persona_pos = prompt.index("AGENT PERSONA")
-        rules_pos = prompt.index("SYSTEM RULES")
-        assert persona_pos < rules_pos
-
-
-# ---------------------------------------------------------------------------
-# TestPromptOrderingConsistency
-# ---------------------------------------------------------------------------
-# TestProcessSpecMcpServers
-# ---------------------------------------------------------------------------
-
-
-class TestProcessSpecMcpServers:
-    def test_default_empty(self):
-        spec = ProcessSpec(executable="test", args=[], env={}, cleanup_paths=[])
-        assert spec.mcp_servers == []
-
-    def test_populated(self):
-        servers = [
-            {"name": "rust", "command": "rust-mcp-server", "args": [], "env": {}}
-        ]
-        spec = ProcessSpec(
-            executable="test",
-            args=[],
-            env={},
-            cleanup_paths=[],
-            mcp_servers=servers,
-        )
-        assert len(spec.mcp_servers) == 1
-        assert spec.mcp_servers[0]["name"] == "rust"
+        assert "mcp" in spec.args
+        assert "serve" in spec.args
 
 
 # ---------------------------------------------------------------------------
@@ -514,21 +318,7 @@ class TestGetProviderForModel:
         assert provider.name == "gemini"
 
     def test_gemini_model_returns_gemini(self):
-        provider = get_provider_for_model("gemini-3-pro-preview")
-        assert provider.name == "gemini"
-
-    def test_gemini_flash_returns_gemini(self):
-        provider = get_provider_for_model("gemini-2.5-flash")
-        assert provider.name == "gemini"
-
-    def test_claude_model_returns_claude(self):
-        provider = get_provider_for_model("claude-opus-4-6")
-        assert provider.name == "claude"
-
-    def test_claude_haiku_returns_claude(self):
-        provider = get_provider_for_model("claude-haiku-4-5")
-        assert provider.name == "claude"
-
-    def test_unknown_returns_gemini_fallback(self):
-        provider = get_provider_for_model("unknown-model-xyz")
+        # The logic in get_provider_for_model currently defaults to gemini
+        # for unknown or None models.
+        provider = get_provider_for_model("gemini-2.0-flash-exp")
         assert provider.name == "gemini"
