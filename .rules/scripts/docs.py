@@ -9,11 +9,11 @@ SCRIPTS_DIR = pathlib.Path(__file__).parent
 ROOT_DIR = SCRIPTS_DIR.parent.parent
 sys.path.insert(0, str(ROOT_DIR / ".rules" / "lib" / "src"))
 
-from graph.api import VaultGraph  # noqa: E402
-from metrics.api import get_vault_metrics  # noqa: E402
-from vault.hydration import get_template_path, hydrate_template  # noqa: E402
-from vault.models import DocType  # noqa: E402
-from verification.api import (  # noqa: E402
+from graph.api import VaultGraph
+from metrics.api import get_vault_metrics
+from vault.hydration import get_template_path, hydrate_template
+from vault.models import DocType
+from verification.api import (
     get_malformed,
     list_features,
     verify_vertical_integrity,

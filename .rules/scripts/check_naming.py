@@ -6,7 +6,7 @@ SCRIPTS_DIR = pathlib.Path(__file__).parent
 ROOT_DIR = SCRIPTS_DIR.parent.parent
 sys.path.insert(0, str(ROOT_DIR / ".rules" / "lib" / "src"))
 
-import verification.api  # noqa: E402
+import verification.api
 
 
 def check_vault():
