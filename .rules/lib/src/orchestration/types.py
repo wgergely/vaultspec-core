@@ -33,7 +33,7 @@ class DocType(str, Enum):
 
 @dataclass
 class DocumentMetadata:
-    """Rigid representation of the mandatory YAML frontmatter for all .docs/ files."""
+    """Rigid representation of YAML frontmatter for all .docs/ files."""
 
     tags: List[str] = field(default_factory=list)
     date: Optional[str] = None
@@ -100,7 +100,7 @@ class VaultConstants:
 
     DOCS_DIR = ".docs"
 
-    # Supported directories within .docs/ (excluding internal config like .obsidian)
+    # Supported directories within .docs/
     SUPPORTED_DIRECTORIES: Set[str] = {dt.value for dt in DocType}
 
     # Supported directory tags
@@ -139,7 +139,6 @@ class VaultConstants:
                     errors.append(msg)
             elif item.is_file():
                 # Usually we don't expect files in the root of .docs/
-                # except maybe a README
                 if item.name.lower() != "readme.md":
                     msg = (
                         f"Vault violation: File found in {cls.DOCS_DIR}/ root: "
@@ -172,8 +171,8 @@ class VaultConstants:
         )
         if not re.match(pattern, filename):
             msg = (
-                f"Vault violation: Filename '{filename}' deviates from standard "
-                "yyyy-mm-dd-<feature>-<type>.md pattern."
+                f"Vault violation: Filename '{filename}' deviates from "
+                "standard yyyy-mm-dd-<feature>-<type>.md pattern."
             )
             errors.append(msg)
             return errors
@@ -181,19 +180,19 @@ class VaultConstants:
         # If doc_type is provided, ensure it matches the filename suffix
         if doc_type:
             suffix = f"-{doc_type.value}"
-            # Special case for exec records which might have extra components after type
+            # Special case for exec records
             if doc_type == DocType.EXEC:
                 if f"-{DocType.EXEC.value}" not in filename:
                     msg = (
-                        f"Vault violation: Filename '{filename}' does not contain "
-                        "expected type suffix '-exec'."
+                        f"Vault violation: Filename '{filename}' does not "
+                        "contain expected type suffix '-exec'."
                     )
                     errors.append(msg)
             else:
                 if not filename.endswith(f"{suffix}.md"):
                     msg = (
-                        f"Vault violation: Filename '{filename}' does not match "
-                        f"expected type suffix '{suffix}.md'."
+                        f"Vault violation: Filename '{filename}' does not "
+                        f"match expected type suffix '{suffix}.md'."
                     )
                     errors.append(msg)
 
