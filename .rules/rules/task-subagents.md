@@ -1,0 +1,35 @@
+---
+name: task-subagents
+---
+
+# Sub-Agents
+
+Sub-agents are the de facto standard for performing any meaningful work. They are invoked using the `task-subagent` skill.
+
+## Mechanism
+
+This is the **utility skill** that powers the project's agentic workflows.
+
+*   **Primary Usage:** You will be instructed to use this skill by high-level workflow skills (e.g., `task-execute` will tell you to "Invoke `task-subagent` with `complex-executor`").
+*   **Direct Usage:** You should only invoke this skill directly if the user explicitly requests a specific, isolated agent dispatch (e.g., "Dispatch the safety-auditor to check file X") that falls outside the standard Research -> Plan -> Execute workflow.
+
+## Internal Dispatch Protocol
+
+Internally, the skill uses the `acp_dispatch.py`:
+
+```bash
+python .rules/scripts/acp_dispatch.py --agent <agent_name> --task "<task_description|plan_document>"
+```
+
+> `--agent`: The name of the agent to load
+> `--task`: A clear, natural language description of the task (or a `<Plan>` document path)
+> `--model` (Optional): Override the model
+
+## MCP Server (preferred)
+
+The dispatch system is also available as an MCP server (`pp-dispatch`) configured in `.mcp.json`. When available, prefer MCP tool calls over CLI invocation:
+
+- **`list_agents`**: Discover available agents and their capabilities.
+- **`dispatch_agent`**: Dispatch a sub-agent with a task. Parameters: `agent` (required), `task` (required), `model` (optional), `mode` (optional: `read-write` or `read-only`).
+
+The MCP server wraps the same ACP dispatch logic and returns structured JSON results.
