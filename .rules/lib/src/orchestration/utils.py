@@ -24,7 +24,7 @@ def find_project_root() -> pathlib.Path:
         if (candidate / ".git").exists():
             return candidate
         candidate = candidate.parent
-    # No .git found — fall back to CWD (non-git usage)
+    # No .git found - fall back to CWD (non-git usage)
     return pathlib.Path.cwd().resolve()
 
 
@@ -33,7 +33,8 @@ def safe_read_text(path: pathlib.Path, root_dir: pathlib.Path) -> str:
     resolved_path = path.resolve()
     resolved_root = root_dir.resolve()
     if not resolved_path.is_relative_to(resolved_root):
-        raise SecurityError(f"Attempted to access path outside workspace: {path}")
+        msg = f"Attempted to access path outside workspace: {path}"
+        raise SecurityError(msg)
 
     if not resolved_path.exists():
         return ""

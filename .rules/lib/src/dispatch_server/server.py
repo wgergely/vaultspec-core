@@ -204,7 +204,7 @@ def _build_agent_cache() -> dict[str, dict[str, object]]:
 
 
 def _register_agent_resources() -> None:
-    global _agent_cache, _agent_mtimes  # noqa: PLW0603
+    global _agent_cache, _agent_mtimes
     _agent_cache = _build_agent_cache()
     _agent_mtimes = _snapshot_mtimes()
 
@@ -215,7 +215,7 @@ def _register_agent_resources() -> None:
 
     for name, metadata in _agent_cache.items():
 
-        def _make_reader(meta: dict[str, object]):  # noqa: E301
+        def _make_reader(meta: dict[str, object]):
             return lambda: json.dumps(meta, indent=2)
 
         resource = FunctionResource(
