@@ -49,7 +49,11 @@ class TestLoadMcpServers:
     def test_valid_settings(self, tmp_path):
         settings = {
             "mcpServers": {
-                "rust": {"command": "rust-mcp-server", "args": [], "trust": True},
+                "rust": {
+                    "command": "rust-mcp-server",
+                    "args": [],
+                    "trust": True,
+                },
                 "dispatch": {"command": "python", "args": ["mcp.py"]},
             }
         }
@@ -98,7 +102,11 @@ class TestLoadMcpServers:
     def test_env_passed_through(self, tmp_path):
         settings = {
             "mcpServers": {
-                "srv": {"command": "cmd", "args": ["-v"], "env": {"FOO": "bar"}},
+                "srv": {
+                    "command": "cmd",
+                    "args": ["-v"],
+                    "env": {"FOO": "bar"},
+                },
             }
         }
         (tmp_path / ".gemini").mkdir()
@@ -308,9 +316,8 @@ class TestGeminiVersionCheck:
         result = mock.MagicMock()
         result.stdout = "v0.27.0"
         result.stderr = ""
-        with mock.patch(
-            "protocol.providers.gemini.subprocess.run", return_value=result
-        ) as mock_run:
+        target = "protocol.providers.gemini.subprocess.run"
+        with mock.patch(target, return_value=result) as mock_run:
             v1 = GeminiProvider.check_version("gemini")
             v2 = GeminiProvider.check_version("gemini")
         assert v1 == v2
@@ -322,7 +329,8 @@ class TestGeminiVersionCheck:
         result.stderr = ""
         target = "protocol.providers.gemini.subprocess.run"
         with mock.patch(target, return_value=result):
-            with mock.patch("protocol.providers.gemini.logger.warning") as mock_warn:
+            logger_target = "protocol.providers.gemini.logger.warning"
+            with mock.patch(logger_target) as mock_warn:
                 version = GeminiProvider.check_version("gemini")
         assert version == (0, 20, 0)
         mock_warn.assert_called()

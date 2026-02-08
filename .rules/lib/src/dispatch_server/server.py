@@ -13,20 +13,20 @@ from mcp.server.fastmcp.resources.types import FunctionResource
 from pydantic import AnyUrl
 
 from orchestration.dispatch import (
-    AgentNotFoundError,
     DispatchError,
-    DispatchResult,
     run_dispatch,
 )
 from orchestration.task_engine import (
-    InvalidTransitionError,
     LockManager,
     TaskEngine,
-    TaskNotFoundError,
 )
-from orchestration.utils import find_project_root, parse_frontmatter, safe_read_text
+from orchestration.utils import (
+    find_project_root,
+    parse_frontmatter,
+    safe_read_text,
+)
 
-# Configure logging to stderr (stdout is reserved for MCP JSON-RPC messages)
+# Configure logging to stderr
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
@@ -250,51 +250,28 @@ async def _send_list_changed() -> None:
 async def _poll_agent_files() -> None:
     while True:
         await asyncio.sleep(_POLL_INTERVAL)
-        try:
-            if _refresh_if_changed():
-                await _send_list_changed()
-        except Exception as exc:
-            logger.warning("Agent file poll error: %s", exc)
-
-
-_register_agent_resources()
+        if _refresh_if_changed():
+            await _send_list_changed()
 
 
 # ---------------------------------------------------------------------------
-# MCP Tools
+# MCP Tool implementations
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(structured_output=False)
+@mcp.tool()
 async def list_agents() -> str:
-    """List available agents and their capabilities."""
+    """Return a list of all available sub-agents and their tiers."""
+    _refresh_if_changed()
     agents = []
-
-    if not AGENTS_DIR.is_dir():
-        return json.dumps(
-            {"agents": [], "error": f"Agents directory not found: {AGENTS_DIR}"}
+    for name, metadata in _agent_cache.items():
+        agents.append(
+            {
+                "name": name,
+                "tier": metadata.get("tier", "UNKNOWN"),
+                "description": metadata.get("description", ""),
+            }
         )
-
-    for agent_path in sorted(AGENTS_DIR.glob("*.md")):
-        try:
-            content = agent_path.read_text(encoding="utf-8")
-            meta, _body = parse_frontmatter(content)
-            agents.append(
-                {
-                    "name": agent_path.stem,
-                    "tier": meta.get("tier", "UNKNOWN"),
-                    "description": _strip_quotes(meta.get("description", "")),
-                }
-            )
-        except Exception as exc:
-            logger.warning("Failed to parse agent %s: %s", agent_path.name, exc)
-            agents.append(
-                {
-                    "name": agent_path.stem,
-                    "tier": "UNKNOWN",
-                    "description": f"(parse error: {exc})",
-                }
-            )
 
     return json.dumps(
         {
@@ -305,75 +282,113 @@ async def list_agents() -> str:
     )
 
 
-@mcp.tool(structured_output=False)
+@mcp.tool()
 async def dispatch_agent(
     agent: str,
     task: str,
     model: str | None = None,
     mode: str | None = None,
 ) -> str:
-    """Dispatch a sub-agent to perform a task asynchronously."""
-    effective_mode = _resolve_effective_mode(agent, mode)
+    """
+    Run a sub-agent asynchronously to perform a task.
+    Returns immediately with a taskId.
+    """
+    _refresh_if_changed()
 
+    if agent not in _agent_cache:
+        return json.dumps({"status": "failed", "error": f"Agent '{agent}' not found."})
+
+    effective_mode = _resolve_effective_mode(agent, mode)
     if effective_mode not in ("read-write", "read-only"):
         return json.dumps(
             {
                 "status": "failed",
                 "agent": agent,
-                "error": (
-                    f"Invalid mode '{effective_mode}'. Use 'read-write' or 'read-only'."
-                ),
+                "error": f"Invalid mode '{effective_mode}'. Use 'read-write'.",
             }
         )
 
-    task_content = task
-    task_path = (ROOT_DIR / task).resolve()
-    if task_path.is_file() and task_path.is_relative_to(ROOT_DIR):
+    # Pre-acquire advisory lock for .docs/ if read-only
+    try:
+        task_obj = task_engine.create_task(agent, model=model, mode=effective_mode)
+    except ValueError as e:
+        return json.dumps({"status": "failed", "error": str(e)})
+
+    task_id = task_obj.task_id
+
+    # Background execution
+    async def _run_in_background():
+        client_ref = []
+        _active_clients[task_id] = client_ref
+
         try:
-            task_content = safe_read_text(task_path, ROOT_DIR)
-            logger.info("Loaded task from file: %s", task_path)
-        except Exception as exc:
-            logger.warning("Failed to read task file %s: %s", task_path, exc)
+            # Task resolution
+            task_content = task
+            if task.endswith(".md") or "/" in task or "\\" in task:
+                try:
+                    p = ROOT_DIR / task
+                    if p.exists() and p.is_file():
+                        task_content = safe_read_text(p, ROOT_DIR)
+                except Exception:
+                    pass
 
-    dispatch_task = task_engine.create_task(
-        agent,
-        model=model,
-        mode=effective_mode,
-    )
-    task_id = dispatch_task.task_id
+            full_task = _inject_permission_prompt(task_content, effective_mode)
 
-    lock_paths: set[str] = {".docs/"} if effective_mode == "read-only" else {"."}
-    _lock, lock_warnings = lock_manager.acquire_lock(
-        task_id,
-        lock_paths,
-        effective_mode,
-    )
-    for warning in lock_warnings:
-        logger.warning("Advisory lock: %s (taskId=%s)", warning, task_id)
+            result = await run_dispatch(
+                agent_name=agent,
+                initial_task=full_task,
+                root_dir=ROOT_DIR,
+                model_override=model,
+                interactive=False,
+                debug=False,
+                quiet=True,
+                mode=effective_mode,
+                client_ref=client_ref,
+            )
 
-    enforced_content = _inject_permission_prompt(task_content, effective_mode)
+            # Record session ID for potential resume
+            if result.session_id:
+                task_engine.set_session_id(task_id, result.session_id)
 
-    logger.info(
-        "Dispatching agent=%s model=%s mode=%s taskId=%s",
-        agent,
-        model,
-        effective_mode,
-        task_id,
-    )
+            # Artifacts
+            text_artifacts = _extract_artifacts(result.response_text)
+            final_artifacts = _merge_artifacts(text_artifacts, result.written_files)
 
-    bg_task = asyncio.create_task(
-        _run_dispatch_background(
-            task_id, agent, enforced_content, model, effective_mode
-        )
-    )
+            # Final summary (truncated)
+            summary = result.response_text[:500]
+            if len(result.response_text) > 500:
+                summary += "..."
+
+            task_engine.complete_task(
+                task_id,
+                {
+                    "taskId": task_id,
+                    "status": "completed",
+                    "agent": agent,
+                    "model_used": model or "(default)",
+                    "duration_seconds": time.monotonic() - task_obj.created_at,
+                    "summary": summary,
+                    "response": result.response_text,
+                    "artifacts": final_artifacts,
+                },
+            )
+        except DispatchError as e:
+            task_engine.fail_task(task_id, str(e))
+        except Exception as e:
+            logger.exception("Unexpected error in background dispatch")
+            task_engine.fail_task(task_id, f"Unexpected error: {e}")
+        finally:
+            _background_tasks.pop(task_id, None)
+            _active_clients.pop(task_id, None)
+
+    bg_task = asyncio.create_task(_run_in_background())
     _background_tasks[task_id] = bg_task
-    bg_task.add_done_callback(lambda _t: _background_tasks.pop(task_id, None))
 
     return json.dumps(
         {
-            "taskId": task_id,
             "status": "working",
             "agent": agent,
+            "taskId": task_id,
             "model": model,
             "mode": effective_mode,
         },
@@ -381,107 +396,14 @@ async def dispatch_agent(
     )
 
 
-async def _run_dispatch_background(
-    task_id: str,
-    agent: str,
-    task_content: str,
-    model: str | None,
-    mode: str = "read-write",
-) -> None:
-    """Execute run_dispatch() in background and update the task engine."""
-    start_time = time.monotonic()
-    client_ref: list = []
-    _active_clients[task_id] = client_ref
-
-    try:
-        dispatch_result: DispatchResult = await run_dispatch(
-            agent_name=agent,
-            initial_task=task_content,
-            root_dir=ROOT_DIR,
-            model_override=model,
-            interactive=False,
-            debug=False,
-            quiet=True,
-            mode=mode,
-            client_ref=client_ref,
-        )
-
-        if dispatch_result.session_id:
-            try:
-                task_engine.set_session_id(task_id, dispatch_result.session_id)
-            except Exception:
-                pass
-
-        duration = time.monotonic() - start_time
-        response_text = dispatch_result.response_text or ""
-        text_artifacts = _extract_artifacts(response_text)
-        all_artifacts = _merge_artifacts(text_artifacts, dispatch_result.written_files)
-
-        result = {
-            "taskId": task_id,
-            "status": "completed",
-            "agent": agent,
-            "model_used": model or "(default)",
-            "duration_seconds": round(duration, 1),
-            "summary": response_text[:500],
-            "response": response_text,
-            "artifacts": all_artifacts,
-        }
-
-        try:
-            task_engine.complete_task(task_id, result)
-        except InvalidTransitionError:
-            logger.info("Task %s already terminal, skipping complete", task_id)
-            return
-        logger.info("Task %s completed (agent=%s, %.1fs)", task_id, agent, duration)
-
-    except asyncio.CancelledError:
-        logger.info("Task %s cancelled (agent=%s)", task_id, agent)
-
-    except (AgentNotFoundError, DispatchError) as exc:
-        duration = time.monotonic() - start_time
-        try:
-            task_engine.fail_task(task_id, str(exc))
-        except InvalidTransitionError:
-            logger.info("Task %s already terminal, skipping fail", task_id)
-            return
-        logger.warning(
-            "Task %s failed (agent=%s, %.1fs): %s",
-            task_id,
-            agent,
-            duration,
-            exc,
-        )
-
-    except Exception as exc:
-        duration = time.monotonic() - start_time
-        try:
-            task_engine.fail_task(task_id, f"Unexpected error: {exc}")
-        except InvalidTransitionError:
-            logger.info("Task %s already terminal, skipping fail", task_id)
-            return
-        logger.exception(
-            "Task %s unexpected failure (agent=%s, %.1fs)",
-            task_id,
-            agent,
-            duration,
-        )
-
-    _active_clients.pop(task_id, None)
-
-
-@mcp.tool(structured_output=False)
+@mcp.tool()
 async def get_task_status(task_id: str) -> str:
-    """Get the current status of a dispatched task."""
+    """Check the status and result of a previously dispatched task."""
     task = task_engine.get_task(task_id)
-    if task is None:
-        return json.dumps(
-            {
-                "error": f"Task not found: {task_id}",
-            }
-        )
+    if not task:
+        return json.dumps({"error": f"Task '{task_id}' not found or expired."})
 
-    response: dict[str, object] = {
+    res = {
         "taskId": task.task_id,
         "status": task.status.value,
         "agent": task.agent,
@@ -489,100 +411,76 @@ async def get_task_status(task_id: str) -> str:
         "mode": task.mode,
     }
 
-    if task.status_message:
-        response["statusMessage"] = task.status_message
-    if task.result is not None:
-        response["result"] = task.result
-    if task.error is not None:
-        response["error"] = task.error
+    if task.result:
+        res["result"] = task.result
+    if task.error:
+        res["error"] = task.error
 
-    lock = lock_manager.get_lock(task.task_id)
-    if lock is not None:
-        response["lock"] = {
-            "paths": sorted(lock.paths),
+    # Add active lock info if working
+    lock = lock_manager.get_lock(task_id)
+    if lock:
+        res["lock"] = {
+            "paths": list(lock.paths),
             "mode": lock.mode,
             "acquired_at": lock.acquired_at,
         }
 
-    return json.dumps(response, indent=2)
+    return json.dumps(res, indent=2)
 
 
-@mcp.tool(structured_output=False)
+@mcp.tool()
 async def cancel_task(task_id: str) -> str:
-    """Cancel a running or pending task."""
-    try:
-        task = task_engine.cancel_task(task_id)
+    """Cancel a running task and its agent session."""
+    task = task_engine.get_task(task_id)
+    if not task:
+        return json.dumps({"error": f"Task '{task_id}' not found."})
 
-        client_ref = _active_clients.pop(task_id, None)
-        if client_ref:
-            client = client_ref[0] if client_ref else None
-            if client and hasattr(client, "graceful_cancel"):
-                try:
-                    await client.graceful_cancel()
-                except Exception:
-                    pass
+    if task.completed_at:
+        return json.dumps({"error": "Task already completed."})
 
-        bg_task = _background_tasks.pop(task_id, None)
-        if bg_task is not None and not bg_task.done():
-            bg_task.cancel()
+    # 1. Graceful ACP cancel if client is active
+    client_ref = _active_clients.get(task_id)
+    if client_ref:
+        client = client_ref[0]
+        await client.graceful_cancel()
 
-        logger.info("Cancelled task %s (agent=%s)", task_id, task.agent)
-        return json.dumps(
-            {
-                "taskId": task.task_id,
-                "status": task.status.value,
-                "agent": task.agent,
-            }
-        )
-    except TaskNotFoundError:
-        return json.dumps(
-            {
-                "error": f"Task not found: {task_id}",
-            }
-        )
-    except InvalidTransitionError as exc:
-        return json.dumps(
-            {
-                "error": str(exc),
-                "taskId": task_id,
-            }
-        )
+    # 2. Stop the background coroutine
+    bg_task = _background_tasks.get(task_id)
+    if bg_task:
+        bg_task.cancel()
+
+    # 3. Update engine state
+    task_engine.cancel_task(task_id)
+
+    return json.dumps({"status": "cancelled", "taskId": task_id, "agent": task.agent})
 
 
-@mcp.tool(structured_output=False)
+@mcp.tool()
 async def get_locks() -> str:
-    """List all active advisory file locks."""
+    """List all active advisory file locks across the workspace."""
     locks = lock_manager.get_locks()
-    result = []
+    res = []
     for lock in locks:
-        task = task_engine.get_task(lock.task_id)
-        result.append(
+        res.append(
             {
                 "taskId": lock.task_id,
-                "agent": task.agent if task else "(unknown)",
-                "paths": sorted(lock.paths),
+                "agent": task_engine.get_task(lock.task_id).agent
+                if task_engine.get_task(lock.task_id)
+                else "unknown",
+                "paths": list(lock.paths),
                 "mode": lock.mode,
                 "acquired_at": lock.acquired_at,
             }
         )
-    return json.dumps({"locks": result, "count": len(result)}, indent=2)
+    return json.dumps({"locks": res, "count": len(res)}, indent=2)
 
 
-def main() -> None:
-    logger.info("Starting pp-dispatch MCP server (Library Version)")
+def main():
+    """Start the MCP server."""
+    _register_agent_resources()
+    asyncio.create_task(_poll_agent_files())
+    mcp.run()
 
-    _original_run = mcp.run_stdio_async
 
-    async def _run_with_polling() -> None:
-        poll_task = asyncio.create_task(_poll_agent_files())
-        try:
-            await _original_run()
-        finally:
-            poll_task.cancel()
-            try:
-                await poll_task
-            except asyncio.CancelledError:
-                pass
-
-    mcp.run_stdio_async = _run_with_polling  # type: ignore[assignment]
-    mcp.run(transport="stdio")
+if __name__ == "__main__":
+    main()

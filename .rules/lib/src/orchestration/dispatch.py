@@ -96,7 +96,7 @@ def _build_task_prompt(
     """Constructs a structured task prompt from goal and context files."""
     parts = [
         "# TASK CONTEXT",
-        "The following documents define the constraints and design for this task.",
+        "The following documents define the design for this task.",
         "You MUST adhere to the decisions recorded here.",
         "",
     ]
@@ -179,31 +179,25 @@ async def _interactive_loop(
         if debug:
             logger.debug(f"stop_reason: {response.stop_reason}")
 
-        # In one-shot mode, we always exit after one turn regardless of stop_reason
+        # One-shot mode exit
         if not interactive:
             if debug:
-                logger.debug(
-                    f"Turn finished ({response.stop_reason}). Exiting one-shot task."
-                )
+                logger.debug("Turn finished. Exiting one-shot task.")
             break
 
         # Check if process is still alive
         if proc.returncode is not None:
             if debug:
-                logger.debug(
-                    f"Agent process exited with code {proc.returncode}. Exiting loop."
-                )
+                logger.debug(f"Agent exited with code {proc.returncode}. Exiting loop.")
             break
 
-        # If we got here, we decide whether to prompt for more input
+        # Decision whether to prompt for more input
         if not sys.stdin.isatty():
             if debug:
                 logger.debug("Not a TTY, breaking loop.")
             break
 
-        print(
-            "\nType your response (or press Enter to exit): ", end="", file=sys.stderr
-        )
+        print("\nType your response (or Enter to exit): ", end="", file=sys.stderr)
 
         # Wait for either user input or process exit
         input_task = asyncio.create_task(_get_user_input())
@@ -216,7 +210,7 @@ async def _interactive_loop(
         for t in pending:
             t.cancel()
 
-        # Reap pending tasks to avoid loop closure issues
+        # Reap pending tasks
         if pending:
             await asyncio.gather(*pending, return_exceptions=True)
 
@@ -228,7 +222,7 @@ async def _interactive_loop(
         else:
             # Process exited
             if debug:
-                logger.debug("Agent process terminated while waiting for input.")
+                logger.debug("Agent terminated while waiting for input.")
             break
 
 
@@ -261,7 +255,7 @@ async def run_dispatch(
         elif model_override.startswith("gemini"):
             initial_provider_hint = "gemini"
 
-    # Load Agent Definition
+    # 1. Load Agent Definition
     if debug:
         logger.debug(f"Loading sub-agent: {agent_name}...")
     meta, persona = load_agent(
@@ -278,7 +272,7 @@ async def run_dispatch(
     full_prompt = _build_task_prompt(initial_task, context_files, plan_file, root_dir)
 
     while True:
-        #  Select Provider
+        # 2. Select Provider
         if provider_instance:
             provider = provider_instance
         elif provider_override:
@@ -289,7 +283,7 @@ async def run_dispatch(
             else:
                 provider = gemini
 
-            # If provider override mismatches current model type, resolve equivalent.
+            # Resolve mismatch
             is_mismatch = (
                 provider.name == "claude" and current_model.startswith("gemini")
             ) or (provider.name == "gemini" and current_model.startswith("claude"))
@@ -316,11 +310,12 @@ async def run_dispatch(
                 provider = get_provider_for_model(current_model)
             except ValueError:
                 provider = gemini
+
         if debug:
             logger.debug(f"Using provider: {provider.name} with model: {current_model}")
 
         try:
-            #  Prepare Process
+            # 3. Prepare Process
             spec = provider.prepare_process(
                 agent_name,
                 meta,
@@ -332,9 +327,7 @@ async def run_dispatch(
             cleanup_paths = spec.cleanup_paths
 
             if debug:
-                logger.debug(
-                    f"Spawning agent process: {spec.executable} {' '.join(spec.args)}"
-                )
+                logger.debug(f"Spawning: {spec.executable} {' '.join(spec.args)}")
 
             client = client_class(
                 root_dir=root_dir, debug=debug, quiet=quiet, mode=mode
@@ -370,8 +363,8 @@ async def run_dispatch(
                 *spec.args,
                 env=spec.env,
                 transport_kwargs={
-                    "limit": 100 * 1024 * 1024,  # 100MB limit for large outputs
-                    "shutdown_timeout": 5.0,  # 5s grace period for clean exit
+                    "limit": 100 * 1024 * 1024,
+                    "shutdown_timeout": 5.0,
                 },
             ) as (conn, _proc):
                 stderr_task = asyncio.create_task(_read_stderr(_proc, debug))
@@ -409,7 +402,7 @@ async def run_dispatch(
                                 logger.debug(f"Resumed session: {session.session_id}")
                         except Exception as exc:
                             if debug:
-                                msg = f"Session resume failed ({exc}), new session"
+                                msg = f"Session resume failed ({exc}), new"
                                 logger.debug(msg)
                             session = await conn.new_session(
                                 cwd=str(root_dir),
@@ -434,11 +427,9 @@ async def run_dispatch(
                         logger.debug(f"Logging to: {session_logger.log_file}")
 
                     # Interactive Loop
-                    # We pass the full_prompt as the initial task prompt.
-                    # If there's a provider override (e.g. for System Prompt
-                    # injection), we prefer that, but typically it includes the task.
-                    # Here we rely on provider.prepare_process to have
-                    # incorporated full_prompt into initial_prompt_override if needed.
+                    # Dual delivery support:
+                    # Rely on prepare_process to have incorporated full_prompt
+                    # into initial_prompt_override if needed.
                     start_prompt = (
                         getattr(spec, "initial_prompt_override", None) or full_prompt
                     )
@@ -455,14 +446,13 @@ async def run_dispatch(
                     )
 
                     if debug:
-                        logger.debug("Interaction loop finished. Shutting down...")
+                        logger.debug("Interaction loop finished.")
 
                 finally:
                     stderr_task.cancel()
                     with contextlib.suppress(asyncio.CancelledError):
                         await stderr_task
 
-                    # Use a more robust check for transport to satisfy ty
                     transport = getattr(_proc, "_transport", None)
                     if transport is not None:
                         with contextlib.suppress(Exception):
@@ -517,9 +507,7 @@ async def run_dispatch(
                 continue
 
             else:
-                raise DispatchError(
-                    f"Execution failed, no fallback available: {e}"
-                ) from e
+                raise DispatchError(f"Execution failed, no fallback: {e}") from e
         finally:
             if "cleanup_paths" in locals():
                 for path in cleanup_paths:
