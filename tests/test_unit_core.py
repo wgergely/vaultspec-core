@@ -113,6 +113,7 @@ class TestLoadAgent:
 
     def test_provider_hint_claude(self, mock_root_dir, test_agent_md):
         # Write to both claude and rules dirs
+        (mock_root_dir / ".claude" / "agents").mkdir(parents=True, exist_ok=True)
         (mock_root_dir / ".claude" / "agents" / "test-agent.md").write_text(
             "---\n"
             "tier: HIGH\n"
@@ -122,6 +123,7 @@ class TestLoadAgent:
             "Claude specific.",
             encoding="utf-8",
         )
+        (mock_root_dir / ".rules" / "agents").mkdir(parents=True, exist_ok=True)
         (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(
             test_agent_md, encoding="utf-8"
         )
@@ -131,6 +133,7 @@ class TestLoadAgent:
         assert "Claude Persona" in persona
 
     def test_provider_hint_gemini(self, mock_root_dir, test_agent_md):
+        (mock_root_dir / ".gemini" / "agents").mkdir(parents=True, exist_ok=True)
         (mock_root_dir / ".gemini" / "agents" / "test-agent.md").write_text(
             "---\n"
             "tier: MEDIUM\n"
@@ -140,6 +143,7 @@ class TestLoadAgent:
             "Gemini specific.",
             encoding="utf-8",
         )
+        (mock_root_dir / ".rules" / "agents").mkdir(parents=True, exist_ok=True)
         (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(
             test_agent_md, encoding="utf-8"
         )

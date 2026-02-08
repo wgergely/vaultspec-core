@@ -1,9 +1,15 @@
 from __future__ import annotations
 
-import pathlib
+from typing import TYPE_CHECKING
+
 import pytest
+
 from orchestration.dispatch import run_dispatch
 from protocol.acp.types import DispatchResult
+
+if TYPE_CHECKING:
+    import pathlib
+
 
 @pytest.fixture
 def mock_root(tmp_path: pathlib.Path) -> pathlib.Path:
@@ -13,6 +19,7 @@ def mock_root(tmp_path: pathlib.Path) -> pathlib.Path:
     (tmp_path / ".gemini").mkdir()
     (tmp_path / ".gemini" / "settings.json").write_text("{}", encoding="utf-8")
     return tmp_path
+
 
 @pytest.mark.integration
 @pytest.mark.gemini
@@ -25,7 +32,8 @@ tier: LOW
 ---
 # Persona
 You are a helpful assistant.
-""", encoding="utf-8"
+""",
+        encoding="utf-8",
     )
 
     result = await run_dispatch(
@@ -33,7 +41,7 @@ You are a helpful assistant.
         root_dir=mock_root,
         initial_task="Say hello",
         model_override="gemini-2.0-flash-exp",
-        interactive=False
+        interactive=False,
     )
 
     assert isinstance(result, DispatchResult)

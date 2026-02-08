@@ -107,7 +107,8 @@ class TestTaskEngine:
     def test_locks_integrated(self, engine):
         engine.create_task("test-agent", mode="read-only")
         # Assuming TaskEngine automatically acquires locks for .docs/ in read-only
-        engine.lock_manager.get_locks()
+        if engine._lock_manager:
+            engine._lock_manager.get_locks()
         # If TaskEngine doesn't automatically acquire them (it should based on ADR),
         # this test might need adjustment.
         pass

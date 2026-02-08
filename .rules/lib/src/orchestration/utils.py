@@ -33,5 +33,5 @@ def safe_read_text(path: pathlib.Path, root_dir: pathlib.Path) -> str:
         raise SecurityError(msg)
 
     if not resolved_path.exists():
-        return ""
+        raise FileNotFoundError(f"File not found: {path}")
     return resolved_path.read_text(encoding="utf-8")

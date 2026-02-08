@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-import pathlib
+from typing import TYPE_CHECKING
+
 import pytest
-import os
 
 from orchestration.dispatch import run_dispatch
 from protocol.acp.types import DispatchResult
 from protocol.providers.claude import ClaudeProvider
+
+if TYPE_CHECKING:
+    import pathlib
+
 
 @pytest.fixture
 def mock_root(tmp_path: pathlib.Path) -> pathlib.Path:
@@ -15,6 +19,7 @@ def mock_root(tmp_path: pathlib.Path) -> pathlib.Path:
     (tmp_path / ".rules" / "agents").mkdir(parents=True)
     (tmp_path / ".claude" / "rules").mkdir(parents=True)
     return tmp_path
+
 
 @pytest.mark.integration
 @pytest.mark.claude
@@ -28,7 +33,8 @@ tier: MEDIUM
 ---
 # Persona
 You are a helpful assistant. Keep your responses extremely short.
-""", encoding="utf-8"
+""",
+        encoding="utf-8",
     )
 
     provider = ClaudeProvider()
@@ -41,7 +47,7 @@ You are a helpful assistant. Keep your responses extremely short.
         initial_task="Please say only the word 'ACK'.",
         provider_instance=provider,
         interactive=False,
-        debug=True
+        debug=True,
     )
 
     assert isinstance(result, DispatchResult)

@@ -9,15 +9,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import pathlib
 
+    from acp.client.connection import ClientSideConnection
     from protocol.providers.base import AgentProvider
 
 from vault.parser import parse_frontmatter
 
 from acp import spawn_agent_process
-
-if TYPE_CHECKING:
-    from acp.client.connection import ClientSideConnection
-
 from acp.schema import (
     ClientCapabilities,
     Implementation,
@@ -223,8 +220,8 @@ async def run_dispatch(
             # Main Execution Block
             async with spawn_agent_process(
                 client,
-                command=spec.executable,
-                args=spec.args,
+                spec.executable,
+                *spec.args,
                 env=spec.env,
                 cwd=str(root_dir),
             ) as (conn, _proc):
@@ -240,7 +237,9 @@ async def run_dispatch(
                 impl = Implementation(name="gemini-dispatch", version="0.1.0")
 
                 await conn.initialize(
-                    protocol_version=1, client_capabilities=caps, client_info=impl
+                    protocol_version=1,
+                    client_capabilities=caps,
+                    client_info=impl,
                 )
 
                 # Session setup
