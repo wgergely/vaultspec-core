@@ -77,14 +77,14 @@ class ClaudeProvider(AgentProvider):
         model_override: Optional[str] = None
     ) -> ProcessSpec:
         
-        # 1. Load and Mix Rules (Same as Gemini)
+        # Load and Mix Rules (Same as Gemini)
         rules = self.load_rules(root_dir)
         system_prompt = self.construct_system_prompt(agent_persona, rules)
 
-        # 2. Prepare Environment
+        # Prepare Environment
         env = os.environ.copy()
         
-        # 3. Construct Command
+        # Construct Command
         # Use npx to run the adapter
         executable = shutil.which("npx")
         if not executable:
@@ -106,7 +106,7 @@ class ClaudeProvider(AgentProvider):
         # But we can try to hint it if we want.
         # For now, let's stick to just launching the adapter.
         
-        # 4. Session Metadata for System Prompt
+        # Session Metadata for System Prompt
         # We also prepend to the first message to ensure adherence (fallback strategy)
         initial_prompt = f"{system_prompt}\n\n# TASK\n{task_context}"
         

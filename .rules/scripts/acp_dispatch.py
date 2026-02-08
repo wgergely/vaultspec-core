@@ -579,7 +579,7 @@ async def run_dispatch(
         elif model_override.startswith("gemini"):
             initial_provider_hint = "gemini"
 
-    # 1. Load Agent Definition (raises AgentNotFoundError on failure)
+    # Load Agent Definition (raises AgentNotFoundError on failure)
     if debug:
         print(f"Loading sub-agent: {agent_name}...", file=sys.stderr)
     meta, persona = load_agent(agent_name, provider_name=initial_provider_hint)
@@ -592,7 +592,7 @@ async def run_dispatch(
     gemini = GeminiProvider() # Default/Primary provider
 
     while True:
-        # 2. Select Provider
+        # Select Provider
         if provider_override:
             if provider_override == "gemini":
                 provider = gemini
@@ -629,7 +629,7 @@ async def run_dispatch(
             print(f"Using provider: {provider.name} with model: {current_model}", file=sys.stderr)
         
         try:
-            # 3. Prepare Process
+            # Prepare Process
             spec = provider.prepare_process(
                 agent_name, meta, persona, initial_task, ROOT_DIR, model_override=current_model
             )
@@ -814,7 +814,7 @@ async def run_dispatch(
             if provider.name == "gemini":
                 print("Attempting fallback to Claude...", file=sys.stderr)
 
-                # 1. Determine capability of failed model
+                # Determine capability of failed model
                 try:
                     level = provider.get_model_capability(current_model)
                 except Exception as cap_err:
@@ -823,7 +823,7 @@ async def run_dispatch(
                     # Default to MEDIUM (2) if unsure
                     level = 2
 
-                # 2. Switch Provider
+                # Switch Provider
                 fallback_provider = ClaudeProvider()
                 fallback_model = fallback_provider.get_best_model_for_capability(level)
 
