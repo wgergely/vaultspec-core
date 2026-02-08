@@ -1,19 +1,23 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
-import pathlib
 import re
 import sys
 import time
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pathlib
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.resources.types import FunctionResource
 from pydantic import AnyUrl
+from vault.parser import parse_frontmatter
 
 from orchestration.dispatch import (
-    DispatchError,
     run_dispatch,
 )
 from orchestration.task_engine import (
@@ -22,9 +26,9 @@ from orchestration.task_engine import (
 )
 from orchestration.utils import (
     find_project_root,
-    parse_frontmatter,
     safe_read_text,
 )
+from protocol.acp.types import DispatchError
 
 # Configure logging to stderr
 logging.basicConfig(
@@ -175,10 +179,8 @@ def _snapshot_mtimes() -> dict[str, float]:
     if not AGENTS_DIR.is_dir():
         return mtimes
     for agent_path in AGENTS_DIR.glob("*.md"):
-        try:
+        with contextlib.suppress(OSError):
             mtimes[agent_path.stem] = agent_path.stat().st_mtime_ns
-        except OSError:
-            pass
     return mtimes
 
 
@@ -461,12 +463,11 @@ async def get_locks() -> str:
     locks = lock_manager.get_locks()
     res = []
     for lock in locks:
+        task = task_engine.get_task(lock.task_id)
         res.append(
             {
                 "taskId": lock.task_id,
-                "agent": task_engine.get_task(lock.task_id).agent
-                if task_engine.get_task(lock.task_id)
-                else "unknown",
+                "agent": task.agent if task else "unknown",
                 "paths": list(lock.paths),
                 "mode": lock.mode,
                 "acquired_at": lock.acquired_at,
@@ -478,7 +479,9 @@ async def get_locks() -> str:
 def main():
     """Start the MCP server."""
     _register_agent_resources()
-    asyncio.create_task(_poll_agent_files())
+    task = asyncio.create_task(_poll_agent_files())
+    # Keep a reference to the task to prevent garbage collection
+    _background_tasks["agent_poller"] = task
     mcp.run()
 
 

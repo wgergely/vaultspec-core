@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import os
 import pathlib
 import re
@@ -8,157 +7,113 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import Dict, List, Optional, Tuple
 
 from .base import (
     AgentProvider,
     CapabilityLevel,
     ProcessSpec,
-    load_mcp_servers,
     resolve_includes,
 )
 
-logger = logging.getLogger(__name__)
-
-# Minimum versions for Gemini CLI ACP support
 _MIN_VERSION_WINDOWS = (0, 9, 0)  # v0.9.0 fixes Windows ACP hang
 _MIN_VERSION_RECOMMENDED = (0, 27, 0)  # v0.27.0 has stable agent skills
 
 # Cache for version check result
-_cached_version: Optional[Tuple[int, ...]] = None
+_cached_version: tuple[int, ...] | None = None
 
 SUPPORTED_MODELS = [
-    "gemini-3-pro-preview",
-    "gemini-3-flash-preview",
-    "gemini-2.5-pro",
-    "gemini-2.5-flash",
+    "gemini-2.0-pro-exp-02-05",
+    "gemini-2.0-flash-exp",
+    "gemini-2.0-flash-thinking-exp-01-21",
 ]
 
 
 class GeminiProvider(AgentProvider):
-    """Gemini-based agent provider."""
+    """Provider for Google Gemini models via Gemini CLI."""
 
     @property
     def name(self) -> str:
         return "gemini"
 
     @property
-    def supported_models(self) -> List[str]:
-        return [
-            "gemini-3-pro-preview",
-            "gemini-3-flash-preview",
-            "gemini-2.5-pro",
-            "gemini-2.5-flash",
-        ]
+    def supported_models(self) -> list[str]:
+        return SUPPORTED_MODELS
 
     def get_model_capability(self, model: str) -> CapabilityLevel:
-        if "3-pro" in model:
+        if "pro" in model:
             return CapabilityLevel.HIGH
-        if "3-flash" in model:
-            return CapabilityLevel.MEDIUM
-        if "2.5-pro" in model:
-            return CapabilityLevel.MEDIUM
-        if "2.5-flash" in model:
-            return CapabilityLevel.LOW
-        if "flash" in model:
-            return CapabilityLevel.LOW
-        return CapabilityLevel.MEDIUM
+        return CapabilityLevel.LOW
 
     def get_best_model_for_capability(self, level: CapabilityLevel) -> str:
-        if level == CapabilityLevel.LOW:
-            return "gemini-2.5-flash"
-        if level == CapabilityLevel.MEDIUM:
-            return "gemini-3-flash-preview"
-        if level == CapabilityLevel.HIGH:
-            return "gemini-3-pro-preview"
-        return "gemini-3-flash-preview"
-
-    def resolve_includes(
-        self, content: str, base_dir: pathlib.Path, root_dir: pathlib.Path
-    ) -> str:
-        """Delegates to the shared resolve_includes utility."""
-        return resolve_includes(content, base_dir, root_dir)
+        if level >= CapabilityLevel.HIGH:
+            return "gemini-2.0-pro-exp-02-05"
+        return "gemini-2.0-flash-exp"
 
     def load_rules(self, root_dir: pathlib.Path) -> str:
-        """Loads system rules from GEMINI.md and recursively resolves all includes."""
-        gemini_dir = root_dir / ".gemini"
-        gemini_config = gemini_dir / "GEMINI.md"
-
-        if not gemini_config.exists():
+        """Loads and resolves nested rules from .gemini/rules/."""
+        rules_dir = root_dir / ".gemini" / "rules"
+        if not rules_dir.exists():
             return ""
 
-        # Safe read manual check
-        resolved_path = gemini_config.resolve()
-        if not resolved_path.is_relative_to(root_dir):
-            return ""
+        all_rules = []
+        for rule_file in sorted(rules_dir.glob("*.md")):
+            content = rule_file.read_text(encoding="utf-8")
+            resolved = resolve_includes(content, root_dir, rules_dir)
+            all_rules.append(resolved)
 
-        content = resolved_path.read_text(encoding="utf-8")
-        return self.resolve_includes(content, gemini_dir, root_dir)
+        return "\n\n".join(all_rules)
 
     def construct_system_prompt(self, persona: str, rules: str) -> str:
+        """Combines persona and rules into a single system prompt."""
         return f"# AGENT PERSONA\n{persona}\n\n# SYSTEM RULES & CONTEXT\n{rules}"
 
     @staticmethod
-    def check_version(executable: str) -> Optional[Tuple[int, ...]]:
+    def check_version(executable: str) -> tuple[int, ...] | None:
         """Check Gemini CLI version and warn/fail based on known-good baselines.
 
         Returns the parsed version tuple or None if version could not be determined.
-        Results are cached to avoid repeated subprocess calls.
         """
         global _cached_version
-        if _cached_version is not None:
+        if _cached_version:
             return _cached_version
 
         try:
-            result = subprocess.run(
+            res = subprocess.run(
                 [executable, "--version"],
                 capture_output=True,
                 text=True,
-                timeout=10,
+                check=False,
             )
-            output = result.stdout.strip() or result.stderr.strip()
-            # Parse version from output like "Gemini CLI v0.27.0" or "0.27.0"
-            match = re.search(r"(\d+)\.(\d+)\.(\d+)", output)
+            # Match "gemini v0.27.0" or just "v0.27.0"
+            match = re.search(r"v(\d+)\.(\d+)\.(\d+)", res.stdout)
             if not match:
-                logger.warning("Could not parse Gemini CLI version from: %s", output)
                 return None
 
             version = tuple(int(x) for x in match.groups())
             _cached_version = version
 
+            # Enforcement
             if sys.platform == "win32" and version < _MIN_VERSION_WINDOWS:
                 msg = (
-                    f"Gemini CLI v{'.'.join(str(x) for x in version)} is below minimum "
-                    f"v{'.'.join(str(x) for x in _MIN_VERSION_WINDOWS)} required on "
-                    "Windows (ACP hang bug). Please upgrade: "
-                    "npm install -g @anthropic-ai/gemini-cli"
+                    f"Gemini CLI version {version} is below minimum "
+                    f"{_MIN_VERSION_WINDOWS} for Windows."
                 )
                 raise RuntimeError(msg)
 
-            if version < _MIN_VERSION_RECOMMENDED:
-                logger.warning(
-                    "Gemini CLI v%s is below recommended v%s. "
-                    "Some features may not work correctly.",
-                    ".".join(str(x) for x in version),
-                    ".".join(str(x) for x in _MIN_VERSION_RECOMMENDED),
-                )
-
             return version
-        except FileNotFoundError:
-            logger.warning("Gemini CLI executable not found: %s", executable)
-            return None
-        except subprocess.TimeoutExpired:
-            logger.warning("Gemini CLI version check timed out")
+        except Exception as e:
+            if isinstance(e, RuntimeError):
+                raise
             return None
 
     def prepare_process(
         self,
         agent_name: str,
-        agent_meta: Dict[str, str],
+        agent_meta: dict[str, str],
         agent_persona: str,
         task_context: str,
         root_dir: pathlib.Path,
-        model_override: Optional[str] = None,
+        model_override: str | None = None,
     ) -> ProcessSpec:
         #  Locate executable and check version
         executable = shutil.which("gemini") or "gemini"
@@ -169,35 +124,29 @@ class GeminiProvider(AgentProvider):
         system_prompt = self.construct_system_prompt(agent_persona, rules)
 
         #  Persist to temp file
-        tf = tempfile.NamedTemporaryFile(
+        with tempfile.NamedTemporaryFile(
             mode="w", suffix=".md", delete=False, encoding="utf-8"
-        )
-        tf.write(system_prompt)
-        tf.close()
-        temp_path = pathlib.Path(tf.name)
+        ) as tf:
+            tf.write(system_prompt)
+            temp_path = pathlib.Path(tf.name)
 
         #  Prepare Environment
         env = os.environ.copy()
-        env["GEMINI_SYSTEM_MD"] = str(temp_path)
+        # Ensure Gemini CLI uses the project's CWD for its internal MCP lookups
+        env["GEMINI_CWD"] = str(root_dir)
 
-        #  Construct Command
-        cmd_args = ["--experimental-acp"]
+        #  Determine Model
+        model = model_override or agent_meta.get("model")
+        if not model:
+            tier = agent_meta.get("tier", "MEDIUM")
+            model = self.get_best_model_for_capability(CapabilityLevel[tier.upper()])
 
-        target_model = model_override or agent_meta.get("model")
-        if target_model:
-            cmd_args.extend(["--model", target_model])
-
-        #  Load MCP servers from .gemini/settings.json
-        mcp_servers = load_mcp_servers(root_dir)
-
-        #  Dual delivery: env var + prompt prepend as fallback
-        initial_prompt = f"{system_prompt}\n\n# TASK\n{task_context}"
+        #  Build Args
+        args = ["--system", str(temp_path), "mcp", "serve", "--model", model]
 
         return ProcessSpec(
             executable=executable,
-            args=cmd_args,
+            args=args,
             env=env,
             cleanup_paths=[temp_path],
-            mcp_servers=mcp_servers,
-            initial_prompt_override=initial_prompt,
         )

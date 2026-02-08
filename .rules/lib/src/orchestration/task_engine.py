@@ -24,13 +24,13 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Dict, Optional, Set
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(StrEnum):
     """Lifecycle states for a dispatch task."""
 
     WORKING = "working"
@@ -41,7 +41,7 @@ class TaskStatus(str, Enum):
 
 
 # Valid state transitions
-_VALID_TRANSITIONS: Dict[TaskStatus, Set[TaskStatus]] = {
+_VALID_TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
     TaskStatus.WORKING: {
         TaskStatus.INPUT_REQUIRED,
         TaskStatus.COMPLETED,
@@ -76,15 +76,15 @@ class DispatchTask:
     status: TaskStatus
     created_at: float  # monotonic
     updated_at: float  # monotonic
-    completed_at: Optional[float] = None
-    model: Optional[str] = None
+    completed_at: float | None = None
+    model: str | None = None
     mode: str = "read-write"
-    status_message: Optional[str] = None
+    status_message: str | None = None
     # Result or error payload
-    result: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    result: dict[str, Any] | None = None
+    error: str | None = None
     # ACP internal state
-    session_id: Optional[str] = None
+    session_id: str | None = None
 
 
 @dataclass(frozen=True)

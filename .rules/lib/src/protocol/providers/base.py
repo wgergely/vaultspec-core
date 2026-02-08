@@ -3,10 +3,12 @@ from __future__ import annotations
 import abc
 import json
 import logging
-import pathlib
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import pathlib
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +24,12 @@ class ProcessSpec:
     """Specification for launching an agent process."""
 
     executable: str
-    args: List[str]
-    env: Dict[str, str]
-    cleanup_paths: List[pathlib.Path]
-    session_meta: Dict[str, Any] = field(default_factory=dict)
-    initial_prompt_override: Optional[str] = None
-    mcp_servers: List[Dict[str, Any]] = field(default_factory=list)
+    args: list[str]
+    env: dict[str, str]
+    cleanup_paths: list[pathlib.Path]
+    session_meta: dict[str, Any] = field(default_factory=dict)
+    initial_prompt_override: str | None = None
+    mcp_servers: list[dict[str, Any]] = field(default_factory=list)
 
 
 def resolve_includes(
@@ -97,7 +99,7 @@ def resolve_includes(
     return "\n".join(resolved_lines)
 
 
-def load_mcp_servers(root_dir: pathlib.Path) -> List[Dict[str, Any]]:
+def load_mcp_servers(root_dir: pathlib.Path) -> list[dict[str, Any]]:
     """Load MCP server configurations from settings.json.
 
     Searches for settings.json in .gemini, .claude, or .agent directories.
@@ -131,7 +133,7 @@ def load_mcp_servers(root_dir: pathlib.Path) -> List[Dict[str, Any]]:
     if not isinstance(mcp_block, dict):
         return []
 
-    servers: List[Dict[str, Any]] = []
+    servers: list[dict[str, Any]] = []
     for name, cfg in mcp_block.items():
         if not isinstance(cfg, dict) or "command" not in cfg:
             logger.warning("Skipping malformed MCP server entry: %s", name)
@@ -159,7 +161,7 @@ class AgentProvider(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def supported_models(self) -> List[str]:
+    def supported_models(self) -> list[str]:
         """List of models supported by this provider."""
         pass
 
@@ -181,11 +183,11 @@ class AgentProvider(abc.ABC):
     def prepare_process(
         self,
         agent_name: str,
-        agent_meta: Dict[str, str],
+        agent_meta: dict[str, str],
         agent_persona: str,
         task_context: str,
         root_dir: pathlib.Path,
-        model_override: Optional[str] = None,
+        model_override: str | None = None,
     ) -> ProcessSpec:
         """Prepares the process specification for spawning the agent.
 

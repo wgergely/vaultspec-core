@@ -3,6 +3,7 @@ from __future__ import annotations
 import pathlib
 
 import pytest
+from vault.parser import parse_frontmatter
 
 from orchestration.dispatch import (
     AgentNotFoundError,
@@ -10,7 +11,6 @@ from orchestration.dispatch import (
 )
 from orchestration.utils import (
     SecurityError,
-    parse_frontmatter,
     safe_read_text,
 )
 
@@ -43,7 +43,7 @@ class TestParseFrontmatter:
 
     def test_colon_in_value(self):
         content = "---\ndescription: A test: with colons: everywhere\n---\nBody."
-        meta, body = parse_frontmatter(content)
+        meta, _body = parse_frontmatter(content)
         assert meta["description"] == "A test: with colons: everywhere"
 
     def test_quoted_description(self):
@@ -54,18 +54,18 @@ class TestParseFrontmatter:
             "---\n"
             "Body."
         )
-        meta, body = parse_frontmatter(content)
+        meta, _body = parse_frontmatter(content)
         assert meta["description"] == '"A quoted description with special chars"'
         assert meta["tier"] == "HIGH"
 
     def test_whitespace_handling(self):
         content = "---\n  key  :  value with spaces  \n---\nBody."
-        meta, body = parse_frontmatter(content)
+        meta, _body = parse_frontmatter(content)
         assert meta["key"] == "value with spaces"
 
     def test_body_preserved(self):
         content = "---\ntier: LOW\n---\nLine 1\nLine 2\nLine 3"
-        meta, body = parse_frontmatter(content)
+        _meta, body = parse_frontmatter(content)
         assert body == "Line 1\nLine 2\nLine 3"
 
 
@@ -144,7 +144,7 @@ class TestLoadAgent:
             test_agent_md, encoding="utf-8"
         )
 
-        meta, persona = load_agent("test-agent", mock_root_dir, provider_name="gemini")
+        meta, _persona = load_agent("test-agent", mock_root_dir, provider_name="gemini")
         assert meta["model"] == "gemini-3-flash-preview"
 
     def test_provider_hint_falls_back_to_canonical(self, mock_root_dir, test_agent_md):
@@ -152,7 +152,7 @@ class TestLoadAgent:
         (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(
             test_agent_md, encoding="utf-8"
         )
-        meta, persona = load_agent("test-agent", mock_root_dir, provider_name="claude")
+        meta, _persona = load_agent("test-agent", mock_root_dir, provider_name="claude")
         assert meta["tier"] == "LOW"  # Falls back to canonical
 
     def test_agent_not_found_raises(self, mock_root_dir):

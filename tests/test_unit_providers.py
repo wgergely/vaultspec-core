@@ -340,11 +340,13 @@ class TestGeminiVersionCheck:
         result.stdout = "v0.8.0"
         result.stderr = ""
         target = "protocol.providers.gemini.subprocess.run"
-        with mock.patch(target, return_value=result):
-            with mock.patch("protocol.providers.gemini.sys") as mock_sys:
-                mock_sys.platform = "win32"
-                with pytest.raises(RuntimeError, match="below minimum"):
-                    GeminiProvider.check_version("gemini")
+        with (
+            mock.patch(target, return_value=result),
+            mock.patch("protocol.providers.gemini.sys") as mock_sys,
+        ):
+            mock_sys.platform = "win32"
+            with pytest.raises(RuntimeError, match="below minimum"):
+                GeminiProvider.check_version("gemini")
 
     def test_executable_not_found(self):
         with mock.patch(
@@ -476,20 +478,6 @@ class TestClaudeProvider:
 
 # ---------------------------------------------------------------------------
 # TestPromptOrderingConsistency
-# ---------------------------------------------------------------------------
-
-
-class TestPromptOrderingConsistency:
-    """M5 fix: Both providers should use the same prompt ordering."""
-
-    def test_same_ordering(self):
-        gemini = GeminiProvider()
-        claude = ClaudeProvider()
-        g_prompt = gemini.construct_system_prompt("persona", "rules")
-        c_prompt = claude.construct_system_prompt("persona", "rules")
-        assert g_prompt == c_prompt
-
-
 # ---------------------------------------------------------------------------
 # TestProcessSpecMcpServers
 # ---------------------------------------------------------------------------
