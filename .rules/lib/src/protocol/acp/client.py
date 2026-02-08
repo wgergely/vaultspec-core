@@ -9,30 +9,38 @@ import os
 import pathlib
 import sys
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, Optional, Union
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from acp.interfaces import Client
 from acp.schema import (
     AgentMessageChunk,
     AgentPlanUpdate,
     AgentThoughtChunk,
+    AvailableCommandsUpdate,
+    ConfigOptionUpdate,
     CreateTerminalResponse,
+    CurrentModeUpdate,
+    EnvVariable,
     KillTerminalCommandResponse,
+    PermissionOption,
     ReadTextFileResponse,
     ReleaseTerminalResponse,
     RequestPermissionResponse,
+    SessionInfoUpdate,
     TerminalExitStatus,
     TerminalOutputResponse,
     TextContentBlock,
     ToolCallProgress,
     ToolCallStart,
+    ToolCallUpdate,
+    UsageUpdate,
     UserMessageChunk,
     WaitForTerminalExitResponse,
     WriteTextFileResponse,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +70,7 @@ class _Terminal:
         self.output_chunks: list[bytes] = []
         self.total_bytes = 0
         self.byte_limit = byte_limit
-        self.reader_task: Optional[asyncio.Task] = None
+        self.reader_task: asyncio.Task | None = None
 
 
 class DispatchClient(Client):
@@ -74,7 +82,7 @@ class DispatchClient(Client):
         debug: bool = False,
         quiet: bool = False,
         mode: str = "read-write",
-        logger_instance: Optional[SessionLogger] = None,
+        logger_instance: SessionLogger | None = None,
     ):
         self.root_dir = root_dir
         self.debug = debug
@@ -82,16 +90,16 @@ class DispatchClient(Client):
         self.mode = mode
         self.response_text = ""
         self.written_files: list[str] = []
-        self.session_logger: Optional[SessionLogger] = logger_instance
-        self._terminals: Dict[str, _Terminal] = {}
-        self.agent_capabilities: Optional[Any] = None
-        self._conn: Optional[Any] = None
-        self._session_id: Optional[str] = None
+        self.session_logger: SessionLogger | None = logger_instance
+        self._terminals: dict[str, _Terminal] = {}
+        self.agent_capabilities: Any | None = None
+        self._conn: Any | None = None
+        self._session_id: str | None = None
 
         # Callbacks for UI/Output handling
-        self.on_message_chunk: Optional[Callable[[str], None]] = None
-        self.on_thought_chunk: Optional[Callable[[str], None]] = None
-        self.on_tool_update: Optional[Callable[[ToolCallStart], None]] = None
+        self.on_message_chunk: Callable[[str], None] | None = None
+        self.on_thought_chunk: Callable[[str], None] | None = None
+        self.on_tool_update: Callable[[ToolCallStart], None] | None = None
 
     def set_logger(self, logger_instance: SessionLogger) -> None:
         self.session_logger = logger_instance
@@ -101,7 +109,11 @@ class DispatchClient(Client):
             self.session_logger.log(event_type, data)
 
     async def request_permission(
-        self, options: Any, session_id: str, tool_call: Any, **kwargs: Any
+        self,
+        options: list[PermissionOption],
+        _session_id: str,
+        tool_call: ToolCallUpdate,
+        **_kwargs: Any,
     ) -> RequestPermissionResponse:
         """Auto-approves tool call permissions (Emulates YOLO mode).
 
@@ -136,7 +148,22 @@ class DispatchClient(Client):
             {"outcome": {"outcome": "selected", "optionId": selected_id}}
         )
 
-    async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
+    async def session_update(
+        self,
+        _session_id: str,
+        update: UserMessageChunk
+        | AgentMessageChunk
+        | AgentThoughtChunk
+        | ToolCallStart
+        | ToolCallProgress
+        | AgentPlanUpdate
+        | AvailableCommandsUpdate
+        | CurrentModeUpdate
+        | ConfigOptionUpdate
+        | SessionInfoUpdate
+        | UsageUpdate,
+        **_kwargs: Any,
+    ) -> None:
         """Handles and displays protocol updates from the agent."""
         data = update.model_dump() if hasattr(update, "model_dump") else str(update)
         self._log("session_update", data)
@@ -172,7 +199,7 @@ class DispatchClient(Client):
             pass
 
     def _handle_content_chunk(
-        self, update: Union[AgentMessageChunk, AgentThoughtChunk]
+        self, update: AgentMessageChunk | AgentThoughtChunk
     ) -> None:
         content = update.content
         if not isinstance(content, TextContentBlock):
@@ -201,10 +228,10 @@ class DispatchClient(Client):
     async def read_text_file(
         self,
         path: str,
-        session_id: str,
+        _session_id: str,
         limit: int | None = None,
         line: int | None = None,
-        **kwargs: Any,
+        **_kwargs: Any,
     ) -> ReadTextFileResponse:
         """Read a text file from the workspace."""
         file_path = pathlib.Path(path).resolve()
@@ -226,7 +253,7 @@ class DispatchClient(Client):
         return ReadTextFileResponse(content=content)
 
     async def write_text_file(
-        self, content: str, path: str, session_id: str, **kwargs: Any
+        self, content: str, path: str, _session_id: str, **_kwargs: Any
     ) -> WriteTextFileResponse | None:
         """Write a text file to the workspace.
 
@@ -259,12 +286,12 @@ class DispatchClient(Client):
     async def create_terminal(
         self,
         command: str,
-        session_id: str,
-        args: Any = None,
+        _session_id: str,
+        args: list[str] | None = None,
         cwd: str | None = None,
-        env: Any = None,
+        env: list[EnvVariable] | None = None,
         output_byte_limit: int | None = None,
-        **kwargs: Any,
+        **_kwargs: Any,
     ) -> CreateTerminalResponse:
         """Spawn a subprocess and track it as an ACP terminal."""
         terminal_id = str(uuid.uuid4())
@@ -273,7 +300,7 @@ class DispatchClient(Client):
         env_dict = os.environ.copy()
         if env:
             for var in env:
-                env_dict[getattr(var, "name", "")] = getattr(var, "value", "")
+                env_dict[var.name] = var.value
 
         proc = await asyncio.create_subprocess_exec(
             *cmd_parts,
@@ -305,54 +332,54 @@ class DispatchClient(Client):
         self._log("create_terminal", {"terminal_id": terminal_id, "command": command})
         return CreateTerminalResponse(terminal_id=terminal_id)
 
-        async def terminal_output(
-            self, session_id: str, terminal_id: str, **kwargs: Any
-        ) -> TerminalOutputResponse:
-            """Return current output from a tracked terminal."""
+    async def terminal_output(
+        self, _session_id: str, terminal_id: str, **_kwargs: Any
+    ) -> TerminalOutputResponse:
+        """Return current output from a tracked terminal."""
 
-            terminal = self._terminals.get(terminal_id)
+        terminal = self._terminals.get(terminal_id)
 
-            if terminal is None:
-                return TerminalOutputResponse(output="", truncated=False)
+        if terminal is None:
+            return TerminalOutputResponse(output="", truncated=False)
 
-            raw = b"".join(terminal.output_chunks)
+        raw = b"".join(terminal.output_chunks)
 
-            truncated = len(raw) > terminal.byte_limit
+        truncated = len(raw) > terminal.byte_limit
 
-            if truncated:
-                raw = raw[-terminal.byte_limit :]
+        if truncated:
+            raw = raw[-terminal.byte_limit :]
 
-            text = raw.decode("utf-8", errors="replace")
+        text = raw.decode("utf-8", errors="replace")
 
-            exit_status = None
+        exit_status = None
 
-            if terminal.proc.returncode is not None:
-                exit_status = TerminalExitStatus(exit_code=terminal.proc.returncode)
+        if terminal.proc.returncode is not None:
+            exit_status = TerminalExitStatus(exit_code=terminal.proc.returncode)
 
-            return TerminalOutputResponse(
-                output=text, truncated=truncated, exit_status=exit_status
-            )
+        return TerminalOutputResponse(
+            output=text, truncated=truncated, exit_status=exit_status
+        )
 
-        async def wait_for_terminal_exit(
-            self, session_id: str, terminal_id: str, **kwargs: Any
-        ) -> WaitForTerminalExitResponse:
-            """Wait for a terminal process to finish."""
+    async def wait_for_terminal_exit(
+        self, _session_id: str, terminal_id: str, **_kwargs: Any
+    ) -> WaitForTerminalExitResponse:
+        """Wait for a terminal process to finish."""
 
-            terminal = self._terminals.get(terminal_id)
+        terminal = self._terminals.get(terminal_id)
 
-            if terminal is None:
-                return WaitForTerminalExitResponse(exit_code=None)
+        if terminal is None:
+            return WaitForTerminalExitResponse(exit_code=None)
 
-            exit_code = await terminal.proc.wait()
+        exit_code = await terminal.proc.wait()
 
-            if terminal.reader_task:
-                with contextlib.suppress(asyncio.CancelledError):
-                    await terminal.reader_task
+        if terminal.reader_task:
+            with contextlib.suppress(asyncio.CancelledError):
+                await terminal.reader_task
 
-            return WaitForTerminalExitResponse(exit_code=exit_code)
+        return WaitForTerminalExitResponse(exit_code=exit_code)
 
     async def kill_terminal(
-        self, session_id: str, terminal_id: str, **kwargs: Any
+        self, _session_id: str, terminal_id: str, **_kwargs: Any
     ) -> KillTerminalCommandResponse:
         """Kill a tracked terminal process."""
         terminal = self._terminals.get(terminal_id)
@@ -362,7 +389,7 @@ class DispatchClient(Client):
         return KillTerminalCommandResponse()
 
     async def release_terminal(
-        self, session_id: str, terminal_id: str, **kwargs: Any
+        self, _session_id: str, terminal_id: str, **_kwargs: Any
     ) -> ReleaseTerminalResponse:
         """Release and clean up a tracked terminal."""
         terminal = self._terminals.pop(terminal_id, None)
@@ -381,12 +408,12 @@ class DispatchClient(Client):
 
     # -- Extension methods --
 
-    async def ext_method(self, method: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def ext_method(self, method: str, _params: dict[str, Any]) -> dict[str, Any]:
         if self.debug:
             logger.debug(f"Extension method: {method}")
         return {}
 
-    async def ext_notification(self, method: str, params: Dict[str, Any]) -> None:
+    async def ext_notification(self, method: str, _params: dict[str, Any]) -> None:
         if self.debug:
             logger.debug(f"Extension notification: {method}")
 
@@ -396,7 +423,5 @@ class DispatchClient(Client):
     async def graceful_cancel(self) -> None:
         """Send ACP session/cancel notification before termination."""
         if self._conn and self._session_id:
-            try:
+            with contextlib.suppress(Exception):
                 await self._conn.cancel(session_id=self._session_id)
-            except Exception:
-                pass  # Best-effort

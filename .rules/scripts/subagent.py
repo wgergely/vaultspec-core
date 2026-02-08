@@ -138,12 +138,12 @@ def command_run(args):
         loop.close()
 
 
-def command_serve(args):
+def command_serve(_args):
     """Handle 'serve' subcommand."""
     server_main()
 
 
-def command_list(args):
+def command_list(_args):
     """Handle 'list' subcommand."""
     list_available_agents()
 

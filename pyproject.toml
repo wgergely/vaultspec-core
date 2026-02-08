@@ -19,6 +19,8 @@ dependencies = [
     "pydantic>=2.0.0",
     "uvicorn>=0.23.0",
     "starlette>=0.27.0",
+    "mcp>=0.1.0",
+    "PyYAML>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -26,8 +28,11 @@ dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "ruff>=0.1.0",
-    "ty>=0.1.0",
-    "prek>=0.3.0",
+    "ty>=0.0.15",
+    "prek>=0.3.2",
+    "lychee>=0.0.1",
+    "identify>=2.0.0",
+    "nodeenv>=1.0.0",
 ]
 
 [tool.ruff]
@@ -35,7 +40,21 @@ line-length = 88
 target-version = "py313"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "W"]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "ARG",  # flake8-unused-arguments
+    "SIM",  # flake8-simplify
+    "TCH",  # flake8-type-checking
+    "RUF",  # ruff-specific rules
+    "N",    # pep8-naming
+]
+unfixable = ["B"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["orchestration", "protocol", "acp", "mcp_dispatch", "acp_dispatch"]

@@ -1,5 +1,6 @@
+from vault.parser import parse_vault_metadata
+
 from orchestration.types import DocType, DocumentMetadata, VaultConstants
-from orchestration.utils import parse_vault_metadata
 
 
 def test_doctype_enum():
@@ -67,11 +68,11 @@ related:
 ---
 # Content
 """
-    meta, body = parse_vault_metadata(content)
+    meta, _body = parse_vault_metadata(content)
     assert meta.tags == ["#adr", "#editor-demo"]
     assert meta.date == "2026-02-08"
     assert meta.related == ["[[ref1]]", "[[ref2]]"]
-    assert "# Content" in body
+    assert "# Content" in _body
 
 
 def test_parse_vault_metadata_inline_list():
@@ -80,6 +81,6 @@ tags: ["#plan", "#feat"]
 date: "2026-02-08"
 ---
 """
-    meta, body = parse_vault_metadata(content)
+    meta, _body = parse_vault_metadata(content)
     assert meta.tags == ["#plan", "#feat"]
     assert meta.date == "2026-02-08"
