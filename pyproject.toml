@@ -7,7 +7,7 @@ name = "task-driven-development"
 version = "0.1.0"
 description = "Research, Design, Task Driven Development Framework"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 license = {file = "LICENSE"}
 authors = [
     {name = "Gergely Wootsch", email = "hello@gergely-wootsch.com"}
@@ -31,9 +31,9 @@ dev = [
 
 [tool.ruff]
 line-length = 88
-target-version = "py310"
+target-version = "py313"
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.13"
 strict = true
 ignore_missing_imports = true
