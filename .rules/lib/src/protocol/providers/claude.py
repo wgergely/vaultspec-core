@@ -62,6 +62,11 @@ class ClaudeProvider(AgentProvider):
         root_dir: pathlib.Path,
         model_override: str | None = None,
     ) -> ProcessSpec:
+        _ = agent_name
+        _ = agent_meta
+        _ = agent_persona
+        _ = task_context
+        _ = model_override
         #  Load Rules (ensure they are loadable even if not used in CLI args)
         _rules = self.load_rules(root_dir)
 

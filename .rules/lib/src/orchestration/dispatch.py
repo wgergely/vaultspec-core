@@ -14,7 +14,10 @@ if TYPE_CHECKING:
 from vault.parser import parse_frontmatter
 
 from acp import spawn_agent_process
-from acp.client.connection import ClientSideConnection
+
+if TYPE_CHECKING:
+    from acp.client.connection import ClientSideConnection
+
 from acp.schema import (
     ClientCapabilities,
     Implementation,
@@ -105,6 +108,8 @@ async def _interactive_loop(
     logger_instance: SessionLogger | None,
 ) -> None:
     """Run an interactive conversation loop with the agent."""
+    _ = agent_name
+    _ = logger_instance
     current_prompt = initial_prompt
     while True:
         if current_prompt:

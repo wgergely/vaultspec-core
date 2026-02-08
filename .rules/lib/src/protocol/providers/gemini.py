@@ -115,6 +115,8 @@ class GeminiProvider(AgentProvider):
         root_dir: pathlib.Path,
         model_override: str | None = None,
     ) -> ProcessSpec:
+        _ = agent_name
+        _ = task_context
         #  Locate executable and check version
         executable = shutil.which("gemini") or "gemini"
         self.check_version(executable)

@@ -35,6 +35,7 @@ The `.docs/` universe was governed by rigid markdown rules (Rule of Two for tags
 ## Implementation
 
 The system is implemented as a modular suite under `.rules/lib/src/`:
+
 - **`vault/`**: Core primitives for scanning, parsing frontmatter, and extracting links.
 - **`verification/`**: Rule enforcement logic (`get_malformed`, `verify_file`).
 - **`graph/`**: Static connectivity analysis using a directed graph model.
