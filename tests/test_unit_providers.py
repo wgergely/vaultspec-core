@@ -1,27 +1,19 @@
 from __future__ import annotations
 
-import pathlib
-import sys
+import json
+from unittest import mock
 
-_SCRIPTS_DIR = pathlib.Path(__file__).resolve().parent.parent
-if str(_SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS_DIR))
+import pytest
 
-import json  # noqa: E402
-from unittest import mock  # noqa: E402
-
-import pytest  # noqa: E402
-
-from agent_providers.base import (  # noqa: E402
+from orchestration.dispatch import get_provider_for_model
+from protocol.providers.base import (
     CapabilityLevel,
     ProcessSpec,
-    resolve_includes,
     load_mcp_servers,
+    resolve_includes,
 )
-from agent_providers.gemini import GeminiProvider  # noqa: E402
-from agent_providers.claude import ClaudeProvider  # noqa: E402
-from acp_dispatch import get_provider_for_model  # noqa: E402
-
+from protocol.providers.claude import ClaudeProvider
+from protocol.providers.gemini import GeminiProvider
 
 # ---------------------------------------------------------------------------
 # TestSharedResolveIncludes (base.py free function)
@@ -130,7 +122,7 @@ class TestGeminiProvider:
     @pytest.fixture(autouse=True)
     def _clear_version_cache(self):
         """Reset the module-level version cache before each test."""
-        import agent_providers.gemini as gmod
+        from protocol.providers import gemini as gmod
 
         gmod._cached_version = None
         yield
@@ -185,7 +177,8 @@ class TestGeminiProvider:
         )
 
     def test_no_circular_fallback(self, provider):
-        """M6 fix: LOW -> flash (LOW), MEDIUM -> 3-flash (MEDIUM). No circular mapping."""
+        """M6 fix: LOW -> flash (LOW), MEDIUM -> 3-flash (MEDIUM).
+        No circular mapping."""
         low_model = provider.get_best_model_for_capability(CapabilityLevel.LOW)
         assert provider.get_model_capability(low_model) == CapabilityLevel.LOW
         med_model = provider.get_best_model_for_capability(CapabilityLevel.MEDIUM)
@@ -199,7 +192,7 @@ class TestGeminiProvider:
 
     def test_prepare_process_returns_spec(self, provider, tmp_path):
         with mock.patch(
-            "agent_providers.gemini.GeminiProvider.check_version",
+            "protocol.providers.gemini.GeminiProvider.check_version",
             return_value=(0, 27, 0),
         ):
             spec = provider.prepare_process(
@@ -223,7 +216,7 @@ class TestGeminiProvider:
     def test_prepare_process_sets_initial_prompt(self, provider, tmp_path):
         """M1 fix: dual delivery -- initial_prompt_override is set."""
         with mock.patch(
-            "agent_providers.gemini.GeminiProvider.check_version",
+            "protocol.providers.gemini.GeminiProvider.check_version",
             return_value=(0, 27, 0),
         ):
             spec = provider.prepare_process(
@@ -254,7 +247,7 @@ class TestGeminiProvider:
         )
 
         with mock.patch(
-            "agent_providers.gemini.GeminiProvider.check_version",
+            "protocol.providers.gemini.GeminiProvider.check_version",
             return_value=(0, 27, 0),
         ):
             spec = provider.prepare_process(
@@ -287,7 +280,7 @@ class TestGeminiProvider:
 class TestGeminiVersionCheck:
     @pytest.fixture(autouse=True)
     def _clear_version_cache(self):
-        import agent_providers.gemini as gmod
+        from protocol.providers import gemini as gmod
 
         gmod._cached_version = None
         yield
@@ -297,7 +290,8 @@ class TestGeminiVersionCheck:
         result = mock.MagicMock()
         result.stdout = "Gemini CLI v0.27.0"
         result.stderr = ""
-        with mock.patch("agent_providers.gemini.subprocess.run", return_value=result):
+        target = "protocol.providers.gemini.subprocess.run"
+        with mock.patch(target, return_value=result):
             version = GeminiProvider.check_version("gemini")
         assert version == (0, 27, 0)
 
@@ -305,7 +299,8 @@ class TestGeminiVersionCheck:
         result = mock.MagicMock()
         result.stdout = "0.28.1"
         result.stderr = ""
-        with mock.patch("agent_providers.gemini.subprocess.run", return_value=result):
+        target = "protocol.providers.gemini.subprocess.run"
+        with mock.patch(target, return_value=result):
             version = GeminiProvider.check_version("gemini")
         assert version == (0, 28, 1)
 
@@ -314,7 +309,7 @@ class TestGeminiVersionCheck:
         result.stdout = "v0.27.0"
         result.stderr = ""
         with mock.patch(
-            "agent_providers.gemini.subprocess.run", return_value=result
+            "protocol.providers.gemini.subprocess.run", return_value=result
         ) as mock_run:
             v1 = GeminiProvider.check_version("gemini")
             v2 = GeminiProvider.check_version("gemini")
@@ -325,8 +320,9 @@ class TestGeminiVersionCheck:
         result = mock.MagicMock()
         result.stdout = "v0.20.0"
         result.stderr = ""
-        with mock.patch("agent_providers.gemini.subprocess.run", return_value=result):
-            with mock.patch("agent_providers.gemini.logger.warning") as mock_warn:
+        target = "protocol.providers.gemini.subprocess.run"
+        with mock.patch(target, return_value=result):
+            with mock.patch("protocol.providers.gemini.logger.warning") as mock_warn:
                 version = GeminiProvider.check_version("gemini")
         assert version == (0, 20, 0)
         mock_warn.assert_called()
@@ -335,15 +331,16 @@ class TestGeminiVersionCheck:
         result = mock.MagicMock()
         result.stdout = "v0.8.0"
         result.stderr = ""
-        with mock.patch("agent_providers.gemini.subprocess.run", return_value=result):
-            with mock.patch("agent_providers.gemini.sys") as mock_sys:
+        target = "protocol.providers.gemini.subprocess.run"
+        with mock.patch(target, return_value=result):
+            with mock.patch("protocol.providers.gemini.sys") as mock_sys:
                 mock_sys.platform = "win32"
                 with pytest.raises(RuntimeError, match="below minimum"):
                     GeminiProvider.check_version("gemini")
 
     def test_executable_not_found(self):
         with mock.patch(
-            "agent_providers.gemini.subprocess.run",
+            "protocol.providers.gemini.subprocess.run",
             side_effect=FileNotFoundError,
         ):
             version = GeminiProvider.check_version("gemini")
@@ -353,7 +350,7 @@ class TestGeminiVersionCheck:
         import subprocess as sp
 
         with mock.patch(
-            "agent_providers.gemini.subprocess.run",
+            "protocol.providers.gemini.subprocess.run",
             side_effect=sp.TimeoutExpired(cmd="gemini --version", timeout=10),
         ):
             version = GeminiProvider.check_version("gemini")
@@ -363,7 +360,8 @@ class TestGeminiVersionCheck:
         result = mock.MagicMock()
         result.stdout = "unknown output"
         result.stderr = ""
-        with mock.patch("agent_providers.gemini.subprocess.run", return_value=result):
+        target = "protocol.providers.gemini.subprocess.run"
+        with mock.patch(target, return_value=result):
             version = GeminiProvider.check_version("gemini")
         assert version is None
 
@@ -384,7 +382,7 @@ class TestClaudeProvider:
     def test_supported_models(self, provider):
         models = provider.supported_models
         assert "claude-opus-4-6" in models
-        assert "claude-sonnet-4-5" in models
+        assert "claude- sonnet-4-5" in models
         assert "claude-haiku-4-5" in models
 
     def test_capability_opus_is_high(self, provider):

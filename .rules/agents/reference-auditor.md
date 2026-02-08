@@ -39,17 +39,17 @@ tools: Glob, Grep, Read, Bash
 
 **IDENTIFY** the intent:
 
-1. **Audit**:
-    - Use `fd` and `rg` to find and analyze code patterns.
-    - Use `sg` to discover complex structural relationships and trait implementations.
-    - Document findings in a `<Reference>` report.
-2. **Blueprinting**: You are asked to provide a `<Reference>` for implementation.
+- **Audit**:
+  - Use `fd` and `rg` to find and analyze code patterns.
+  - Use `sg` to discover complex structural relationships and trait implementations.
+  - Document findings in a `<Reference>` report.
+- **Blueprinting**: You are asked to provide a `<Reference>` for implementation.
 
 **EXECUTE** the following steps:
 
-1. **LOCATE** relevant crates and files using `fd` and `rg`.
-2. **IDENTIFY** key architectural patterns.
-3. **SYNTHESIZE** findings into a cohesive `<Reference>` document.
+- **LOCATE** relevant crates and files using `fd` and `rg`.
+- **IDENTIFY** key architectural patterns.
+- **SYNTHESIZE** findings into a cohesive `<Reference>` document.
 
 ## Reference Persistence
 

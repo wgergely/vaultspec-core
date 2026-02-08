@@ -6,7 +6,7 @@
 
 ---
 
-## 1. Critical Disambiguation: Three Different "ACPs"
+## Critical Disambiguation: Three Different "ACPs"
 
 | Protocol | Full Name | Origin | Focus |
 |---|---|---|---|
@@ -19,7 +19,7 @@
 
 ---
 
-## 2. ACP (Zed) Ecosystem Status
+## ACP (Zed) Ecosystem Status
 
 ### Adoption
 
@@ -45,7 +45,7 @@ Launched January 2026. Live in JetBrains IDE 2025.3+. Four discovery methods: Ba
 
 ---
 
-## 3. Proxy Chains RFD -- Key Agent-to-Agent Primitive
+## Proxy Chains RFD -- Key Agent-to-Agent Primitive
 
 Authored by **Niko Matsakis** (nikomatsakis).
 
@@ -75,7 +75,7 @@ Extending `proxy/successor` with optional `peer` field enables M:N topologies.
 
 ---
 
-## 4. SymmACP Vision
+## SymmACP Vision
 
 Niko Matsakis proposed **SymmACP** (October 2025) -- symmetric ACP capabilities:
 
@@ -87,7 +87,7 @@ Vision: **Build AI tools like Unix pipes or browser extensions.**
 
 ---
 
-## 5. Claude Code ACP Adapter
+## Claude Code ACP Adapter
 
 **Package**: `@zed-industries/claude-code-acp` v0.15.0 (2026-02-06)
 
@@ -95,7 +95,7 @@ Bridges Claude Code to ACP by translating between ACP, Claude Agent SDK, and Cla
 
 ---
 
-## 6. Anthropic Agent Teams -- Proprietary Protocol
+## Anthropic Agent Teams -- Proprietary Protocol
 
 Released with Opus 4.6 (2026-02-05). **Not ACP-based** -- uses filesystem-based coordination.
 
@@ -123,7 +123,7 @@ Released with Opus 4.6 (2026-02-05). **Not ACP-based** -- uses filesystem-based 
 
 ---
 
-## 7. Emerging IETF Work
+## Emerging IETF Work
 
 | Draft | Topic |
 |---|---|
@@ -137,39 +137,39 @@ The `agent://` protocol proposes layered architecture: addressing + transport + 
 
 ---
 
-## 8. Gaps and Open Problems
+## Gaps and Open Problems
 
-### 8.1 No Standard Agent-to-Agent Layer in ACP
+### No Standard Agent-to-Agent Layer in ACP
 
 Proxy chains are orchestration patterns (conductor-mediated), not true peer-to-peer. Community converging on A2A for genuine agent-to-agent.
 
-### 8.2 Protocol Fragmentation
+### Protocol Fragmentation
 
 Three "ACP"s + MCP + A2A + ANP + IETF drafts. No unified ontology.
 
-### 8.3 No Cross-Protocol Bridge
+### No Cross-Protocol Bridge
 
 No standard bridge between ACP (client) and A2A (agent). Agent spawned via ACP cannot natively discover/delegate to an A2A peer.
 
-### 8.4 Anthropic Agent Teams Are Proprietary
+### Anthropic Agent Teams Are Proprietary
 
 Filesystem-based coordination not exposed via ACP. Non-Claude agents cannot participate.
 
-### 8.5 No Shared Memory Protocol
+### No Shared Memory Protocol
 
 ACP and A2A both lack robust shared memory. Each teammate has isolated context. No protocol for semantic state transfer.
 
-### 8.6 Security Model Immaturity
+### Security Model Immaturity
 
 Credential delegation, permission scoping across proxy chains, sandboxing -- unsolved.
 
-### 8.7 No Nested Orchestration Standard
+### No Nested Orchestration Standard
 
 Claude Teams prohibit nested teams. ACP proxy chains allow nesting in theory but no implementations demonstrate deep nesting.
 
 ---
 
-## 9. Three-Layer Stack Crystallizing
+## Three-Layer Stack Crystallizing
 
 | Layer | Protocol | Status |
 |---|---|---|

@@ -6,7 +6,7 @@
 
 ---
 
-## 1. Protocol Summaries
+## Protocol Summaries
 
 ### ACP (Agent Client Protocol)
 
@@ -47,7 +47,7 @@
 
 ---
 
-## 2. Relationship Between Protocols
+## Relationship Between Protocols
 
 They are **complementary, not competing**.
 
@@ -63,7 +63,7 @@ A full-stack architecture might use ACP at the edges (human ↔ primary agent) a
 
 ---
 
-## 3. Current Architecture Assessment
+## Current Architecture Assessment
 
 ### What the codebase does
 
@@ -85,29 +85,29 @@ The dispatcher (`GeminiDispatchClient`) acts as an ACP client, implementing:
 
 The dispatcher is using ACP — a Human↔Agent protocol — to implement Agent↔Agent delegation. This works mechanically but introduces five specific tensions:
 
-#### 3.1 Permission model is vestigial
+#### - Permission model is vestigial
 
 ACP's `request_permission` exists for human approval of dangerous operations. The dispatcher rubber-stamps everything. The safety guarantee ACP provides doesn't exist at this layer — it has been pushed up to wherever Claude Code's own permission model lives.
 
-#### 3.2 Shared mutable workspace with no coordination
+#### - Shared mutable workspace with no coordination
 
 The team lead agent and the sub-agent both have write access to the same filesystem, through different channels, with no locking or conflict resolution. ACP assumes a single agent operates on the workspace at a time, supervised by a human. The current architecture has two agents operating concurrently on the same files.
 
-#### 3.3 One-shot delegation, not conversation
+#### - One-shot delegation, not conversation
 
 ACP's session model supports multi-turn human conversation. The dispatcher sends a task and waits for completion — a task delegation pattern, not a conversation. The interactive mode exists but isn't used by the skill/workflow system.
 
-#### 3.4 No task semantics
+#### - No task semantics
 
 When the sub-agent finishes, the dispatcher captures stdout text. There is no structured handoff — no artifacts, no status states, no typed outputs. The "result" is that the sub-agent wrote files to `.docs/` by convention, and the team lead reads them afterward. That convention lives entirely outside the protocol.
 
-#### 3.5 Discovery and capability negotiation don't exist
+#### - Discovery and capability negotiation don't exist
 
 The dispatcher hard-codes which agent to load, which model to use, and what provider to spawn. ACP doesn't define discovery because the human already chose their agent. A2A defines Agent Cards for exactly this purpose.
 
 ---
 
-## 4. Capability Gap Analysis
+## Capability Gap Analysis
 
 | Need | ACP provides | A2A provides |
 |---|---|---|
@@ -124,12 +124,12 @@ The dispatcher needs the **process control** of ACP (spawn, stdio, filesystem, t
 
 ---
 
-## 5. Boundary Confusion
+## Boundary Confusion
 
 The architecture conflates two distinct communication boundaries:
 
-1. **Human ↔ Agent** (ACP's domain) — Claude Code talking to the user
-2. **Agent ↔ Agent** (A2A's domain) — the team lead delegating to sub-agents
+- **Human ↔ Agent** (ACP's domain) — Claude Code talking to the user
+- **Agent ↔ Agent** (A2A's domain) — the team lead delegating to sub-agents
 
 Boundary 2 is currently implemented by faking Boundary 1. The cost:
 
@@ -140,7 +140,7 @@ Boundary 2 is currently implemented by faking Boundary 1. The cost:
 
 ---
 
-## 6. Open Questions for Further Work
+## Open Questions for Further Work
 
 - Could a thin A2A-like task layer be built on top of ACP's process control?
 - Should the dispatcher introduce its own task state machine (independent of protocol)?

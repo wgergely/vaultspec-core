@@ -6,7 +6,7 @@
 
 ---
 
-## 1. The Three-Layer Protocol Stack
+## The Three-Layer Protocol Stack
 
 The AI agent ecosystem is crystallizing around three complementary protocol layers. Each serves a distinct communication boundary.
 
@@ -20,9 +20,9 @@ The AI agent ecosystem is crystallizing around three complementary protocol laye
 
 ---
 
-## 2. Protocol Deep Dive
+## Protocol Deep Dive
 
-### 2.1 ACP — The Client-Agent Layer
+### ACP — The Client-Agent Layer
 
 **Purpose**: Decouple code editors from AI agents, the same way LSP decoupled editors from language compilers.
 
@@ -57,7 +57,7 @@ Client                          Agent
 
 > Full reference: [2026-02-07-acp-protocol-reference.md](./2026-02-07-acp-protocol-reference.md)
 
-### 2.2 A2A — The Agent-Agent Layer
+### A2A — The Agent-Agent Layer
 
 **Purpose**: Enable autonomous agents built on different frameworks, by different organizations, to discover, negotiate, and collaborate without exposing internal state.
 
@@ -98,7 +98,7 @@ class AgentExecutor(ABC):
 
 > Full reference: [2026-02-07-a2a-protocol-reference.md](./2026-02-07-a2a-protocol-reference.md)
 
-### 2.3 MCP — The Agent-Tool Layer
+### - MCP — The Agent-Tool Layer
 
 **Purpose**: Connect AI models to external tools and resources. Complementary to both ACP and A2A.
 
@@ -106,9 +106,9 @@ class AgentExecutor(ABC):
 
 ---
 
-## 3. Real-World Orchestration Patterns
+## Real-World Orchestration Patterns
 
-### 3.1 Claude Code Agent Teams (Anthropic)
+### - Claude Code Agent Teams (Anthropic)
 
 Released with Opus 4.6 (February 2026). **Proprietary**, filesystem-based coordination.
 
@@ -131,7 +131,7 @@ Released with Opus 4.6 (February 2026). **Proprietary**, filesystem-based coordi
 **Strengths**: Peer DMs, parallel execution, cross-process communication, shared task list.
 **Limitations**: No session resumption, concurrent file edits cause conflicts, no nested teams, one team per session, proprietary (non-Claude agents cannot participate).
 
-### 3.2 Google ADK + A2A
+### - Google ADK + A2A
 
 The only cross-boundary solution. Remote agents appear identical to local sub-agents from the orchestrator's perspective.
 
@@ -148,7 +148,7 @@ a2a_app = to_a2a(root_agent)  # Wrap any agent as A2A server
 
 **Key characteristic**: Protocol-mediated federation. Agents can be anywhere on the network. Discovery, negotiation, and collaboration happen through A2A's standard primitives.
 
-### 3.3 OpenAI Agents SDK
+### - OpenAI Agents SDK
 
 Function-based handoffs. Linear chain topology — the agent with control owns the conversation. Full history passes with each handoff.
 
@@ -159,11 +159,11 @@ Triage Agent -> handoff -> Specialist A
 
 Stateless, no parallelism, no shared state.
 
-### 3.4 LangGraph Supervisor
+### - LangGraph Supervisor
 
 Graph-based routing with checkpointing and shared memory (`InMemoryStore`). Supervisor re-routes based on worker results.
 
-### 3.5 Magentic-One (AutoGen)
+### - Magentic-One (AutoGen)
 
 Dual-loop planning: outer loop (Task Ledger with facts/plan) and inner loop (Progress Ledger for self-reflection). If progress stalls, re-enters outer loop and replans. Most sophisticated but heaviest overhead.
 
@@ -171,7 +171,7 @@ Dual-loop planning: outer loop (Task Ledger with facts/plan) and inner loop (Pro
 
 ---
 
-## 4. Comparative Matrix
+## Comparative Matrix
 
 | Dimension | Claude Teams | OpenAI SDK | LangGraph | Magentic-One | CrewAI | ADK+A2A |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
@@ -185,7 +185,7 @@ Dual-loop planning: outer loop (Task Ledger with facts/plan) and inner loop (Pro
 
 ---
 
-## 5. Our Current Architecture and Its Misalignment
+## Our Current Architecture and Its Misalignment
 
 ### What We Have
 
@@ -223,39 +223,39 @@ The dispatcher needs the **process control** of ACP (spawn subprocess, stdio, fi
 
 ---
 
-## 6. Gaps and Open Problems in the Ecosystem
+## Gaps and Open Problems in the Ecosystem
 
-### 6.1 No Standard Agent-to-Agent Layer in ACP
+### - No Standard Agent-to-Agent Layer in ACP
 
 Proxy chains are conductor-mediated orchestration patterns, not true peer-to-peer. The community is converging on A2A for genuine agent-to-agent communication.
 
-### 6.2 Protocol Fragmentation
+### - Protocol Fragmentation
 
 Three different "ACPs" (Zed, IBM/now-A2A, Cisco) + MCP + A2A + ANP + IETF drafts. No unified ontology.
 
-### 6.3 No Cross-Protocol Bridge
+### - No Cross-Protocol Bridge
 
 No standard bridge between ACP (client layer) and A2A (agent layer). An agent spawned via ACP cannot natively discover or delegate to an A2A peer.
 
-### 6.4 Proprietary Agent Teams
+### - Proprietary Agent Teams
 
 Anthropic's Agent Teams use filesystem-based coordination not exposed via any standard protocol. Non-Claude agents cannot participate.
 
-### 6.5 No Shared Memory Protocol
+### - No Shared Memory Protocol
 
 Both ACP and A2A lack robust shared memory. Each teammate has an isolated context window. No protocol exists for semantic state transfer between agents.
 
-### 6.6 Security Model Immaturity
+### - Security Model Immaturity
 
 Credential delegation, permission scoping across proxy chains, sandboxing — all unsolved at the protocol level.
 
-### 6.7 No Nested Orchestration Standard
+### - No Nested Orchestration Standard
 
 Claude Teams prohibit nested teams. ACP proxy chains allow nesting in theory but no implementations demonstrate deep nesting. No standard for hierarchical agent orchestration.
 
 ---
 
-## 7. Emerging Standards and Future Direction
+## Emerging Standards and Future Direction
 
 ### IETF Work
 
@@ -281,7 +281,7 @@ Launched January 2026. Live in JetBrains IDE 2025.3+. Four discovery methods: Ba
 
 ---
 
-## 8. The Central Tension
+## The Central Tension
 
 **Anthropic builds vertically-integrated agent teams** (proprietary, filesystem-based, Claude-only) while the **open-source community builds horizontally-composable protocol layers** (ACP + MCP + A2A).
 
@@ -293,43 +293,43 @@ For our architecture — sub-agent driven development where agents report to a t
 
 ### Architectural Options
 
-1. **Thin A2A-like task layer on top of ACP process control**: Keep `acp_dispatch.py` for subprocess management but add task state machine, structured artifacts, and status tracking on top. Pragmatic near-term.
+- **Thin A2A-like task layer on top of ACP process control**: Keep `acp_dispatch.py` for subprocess management but add task state machine, structured artifacts, and status tracking on top. Pragmatic near-term.
 
-2. **Full A2A adoption for agent-agent communication**: Stand up sub-agents as A2A services. Clean protocol separation but requires HTTP transport and service infrastructure overhead for what are currently local subprocesses.
+- **Full A2A adoption for agent-agent communication**: Stand up sub-agents as A2A services. Clean protocol separation but requires HTTP transport and service infrastructure overhead for what are currently local subprocesses.
 
-3. **ACP Proxy Chains**: Use the emerging conductor/proxy architecture. Proxies can inject context, provision tools, transform responses. Most aligned with ACP's direction but still in RFD stage.
+- **ACP Proxy Chains**: Use the emerging conductor/proxy architecture. Proxies can inject context, provision tools, transform responses. Most aligned with ACP's direction but still in RFD stage.
 
-4. **Hybrid**: ACP for transport (subprocess, stdio, filesystem) + A2A semantics for task lifecycle (states, artifacts, discovery) encoded as conventions on top of ACP messages. A pragmatic bridge until the ecosystem converges.
+- **Hybrid**: ACP for transport (subprocess, stdio, filesystem) + A2A semantics for task lifecycle (states, artifacts, discovery) encoded as conventions on top of ACP messages. A pragmatic bridge until the ecosystem converges.
 
 ---
 
-## 9. Recommendations for Our System
+## Recommendations for Our System
 
 ### Near-Term (Current Sprint)
 
-1. **Acknowledge the boundary confusion**: The dispatcher conflates client-agent and agent-agent communication. Document this explicitly in the codebase.
+- **Acknowledge the boundary confusion**: The dispatcher conflates client-agent and agent-agent communication. Document this explicitly in the codebase.
 
-2. **Add task semantics to dispatch results**: Introduce a structured result envelope that wraps sub-agent output with task state, timing, and artifact references — independent of the transport protocol.
+- **Add task semantics to dispatch results**: Introduce a structured result envelope that wraps sub-agent output with task state, timing, and artifact references — independent of the transport protocol.
 
-3. **Formalize the filesystem convention**: The current implicit contract (sub-agent writes to `.docs/`, team lead reads afterward) should become an explicit protocol with defined output paths, artifact manifests, and conflict detection.
+- **Formalize the filesystem convention**: The current implicit contract (sub-agent writes to `.docs/`, team lead reads afterward) should become an explicit protocol with defined output paths, artifact manifests, and conflict detection.
 
 ### Medium-Term (Next Phase)
 
-4. **Implement Agent Cards for sub-agent discovery**: Replace hard-coded agent selection with lightweight discovery manifests that describe capabilities, supported task types, and model tiers.
+- **Implement Agent Cards for sub-agent discovery**: Replace hard-coded agent selection with lightweight discovery manifests that describe capabilities, supported task types, and model tiers.
 
-5. **Add a task state machine to the dispatcher**: `submitted → working → input_required → completed/failed`. Enable the team lead to track sub-agent progress and react to failures.
+- **Add a task state machine to the dispatcher**: `submitted → working → input_required → completed/failed`. Enable the team lead to track sub-agent progress and react to failures.
 
-6. **Evaluate ACP proxy chains**: As the RFD matures and the Rust prototype stabilizes, assess whether proxy chains can replace the current dispatcher architecture entirely.
+- **Evaluate ACP proxy chains**: As the RFD matures and the Rust prototype stabilizes, assess whether proxy chains can replace the current dispatcher architecture entirely.
 
 ### Long-Term (Architecture Evolution)
 
-7. **Bridge ACP and A2A**: When a standard bridge emerges, adopt it to enable sub-agents spawned via ACP to discover and delegate to remote A2A peers.
+- **Bridge ACP and A2A**: When a standard bridge emerges, adopt it to enable sub-agents spawned via ACP to discover and delegate to remote A2A peers.
 
-8. **Support multi-vendor agent teams**: Move away from Claude-only or Gemini-only delegation toward protocol-mediated federation where any agent speaking the right protocol can participate.
+- **Support multi-vendor agent teams**: Move away from Claude-only or Gemini-only delegation toward protocol-mediated federation where any agent speaking the right protocol can participate.
 
 ---
 
-## 10. Reference Documents
+## Reference Documents
 
 | Document | Scope |
 |---|---|

@@ -18,14 +18,14 @@ Utilize:
 
 ## Core Implementation Mandate
 
-1. **Technical Excellence**: Deliver idiomatic, high-performance, and safe code.
-2. **Safety First**: Strictly adhere to the project's "No-Crash" policy. Use `Result` propagation and explicit safety documentation for any allowed unsafe blocks.
-3. **Autonomous Decisions**: Make technically sound implementation choices based on existing project conventions and established reference patterns.
-4. **Concise Documentation**: For every step, **UPDATE** or **CREATE** `<Step Record>` (`.docs/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-<step>.md`).
-    - **Template**: You MUST read and use the template at `.rules/templates/EXEC_STEP.md`.
-    - **Linking**: Use `[[wiki-links]]`.
-    - Modified files listed.
-    - Concise summary of key changes.
+- **Technical Excellence**: Deliver idiomatic, high-performance, and safe code.
+- **Safety First**: Strictly adhere to the project's "No-Crash" policy. Use `Result` propagation and explicit safety documentation for any allowed unsafe blocks.
+- **Autonomous Decisions**: Make technically sound implementation choices based on existing project conventions and established reference patterns.
+- **Concise Documentation**: For every step, **UPDATE** or **CREATE** `<Step Record>` (`.docs/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-<step>.md`).
+  - **Template**: You MUST read and use the template at `.rules/templates/EXEC_STEP.md`.
+  - **Linking**: Use `[[wiki-links]]`.
+  - Modified files listed.
+  - Concise summary of key changes.
 
 ## Standards & Tooling
 

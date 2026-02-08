@@ -18,10 +18,10 @@ Utilize:
 
 ## Core Implementation Mandate
 
-1. **DELIVER TECHNICAL EXCELLENCE**: Produce idiomatic, high-performance, and memory-safe Rust code (Edition 2024).
-2. **SAFETY FIRST**: Strictly adhere to the project's "No-Crash" policy. **USE** `Result` propagation and explicit safety documentation for any allowed unsafe blocks.
-3. **DECIDE AUTONOMOUSLY**: Make technically sound implementation choices based on existing project conventions and established reference patterns.
-4. **DOCUMENT CONCISELY**: For every step, **UPDATE** or **CREATE** `<Step Record>` (`.docs/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-<step>.md`).
+- **DELIVER TECHNICAL EXCELLENCE**: Produce idiomatic, high-performance, and memory-safe Rust code (Edition 2024).
+- **SAFETY FIRST**: Strictly adhere to the project's "No-Crash" policy. **USE** `Result` propagation and explicit safety documentation for any allowed unsafe blocks.
+- **DECIDE AUTONOMOUSLY**: Make technically sound implementation choices based on existing project conventions and established reference patterns.
+- **DOCUMENT CONCISELY**: For every step, **UPDATE** or **CREATE** `<Step Record>` (`.docs/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-<step>.md`).
 
 ## Standards & Tooling
 

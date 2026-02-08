@@ -36,8 +36,8 @@ The documentation trail follows a more-or-less strict dependency graph. Artifact
 
 Every document in `.docs/` MUST include **EXACTLY TWO** tags in the frontmatter `tags:` field:
 
-1. **Directory Tag**: Based on the `.docs/` subfolder location (`#adr`, `#exec`, `#plan`, `#reference`, `#research`)
-2. **Feature Tag**: Groups related documents across the feature lifecycle (kebab-case, e.g., `#editor-demo`)
+- **Directory Tag**: Based on the `.docs/` subfolder location (`#adr`, `#exec`, `#plan`, `#reference`, `#research`)
+- **Feature Tag**: Groups related documents across the feature lifecycle (kebab-case, e.g., `#editor-demo`)
 
 **CRITICAL:** No structural tags like `#step`, `#summary`, `#phase*`, or `#design` are allowed. Only the 6 tags listed above.
 

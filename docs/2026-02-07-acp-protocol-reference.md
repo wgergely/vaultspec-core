@@ -6,7 +6,7 @@
 
 ---
 
-## 1. Protocol Overview
+## Protocol Overview
 
 ACP is a JSON-RPC 2.0 based protocol enabling bidirectional communication between **Clients** (code editors, IDEs) and **Agents** (AI-powered coding tools). Created by Zed Industries.
 
@@ -16,7 +16,7 @@ ACP is a JSON-RPC 2.0 based protocol enabling bidirectional communication betwee
 
 ---
 
-## 2. Initialization (`initialize`)
+## Initialization (`initialize`)
 
 **Direction**: Client -> Agent (request/response)
 
@@ -99,7 +99,7 @@ ACP is a JSON-RPC 2.0 based protocol enabling bidirectional communication betwee
 
 ---
 
-## 3. Authentication (`authenticate`)
+## Authentication (`authenticate`)
 
 **Direction**: Client -> Agent
 
@@ -116,9 +116,9 @@ Response: `AuthenticateResponse` (default empty). Called when agent requires aut
 
 ---
 
-## 4. Session Setup
+## Session Setup
 
-### 4.1 New Session (`session/new`)
+### New Session (`session/new`)
 
 ```json
 {
@@ -146,17 +146,17 @@ Response: `{ "sessionId": "sess_abc123", "modes": { "currentModeId": "code", "av
 | **HTTP** (optional) | `type: "http"`, `name`, `url`, `headers` | `mcpCapabilities.http` |
 | **SSE** (deprecated) | `type: "sse"`, `name`, `url`, `headers` | `mcpCapabilities.sse` |
 
-### 4.2 Load Session (`session/load`)
+### Load Session (`session/load`)
 
 Only if agent advertises `loadSession: true`. Agent replays conversation history via `session/update` notifications before responding.
 
-### 4.3 Session Modes (`session/set_mode`)
+### Session Modes (`session/set_mode`)
 
 Agent can also change modes autonomously via `session/update` with `current_mode_update`.
 
 ---
 
-## 5. Prompt Turn (`session/prompt`)
+## Prompt Turn (`session/prompt`)
 
 ### Request
 
@@ -215,7 +215,7 @@ Notification, no response. Agent returns `stopReason: "cancelled"`.
 
 ---
 
-## 6. Session Updates (`session/update`)
+## Session Updates (`session/update`)
 
 **Direction**: Agent -> Client (notification)
 
@@ -265,7 +265,7 @@ Notification, no response. Agent returns `stopReason: "cancelled"`.
 
 ---
 
-## 7. Tool Calls
+## Tool Calls
 
 ### Tool Kinds
 
@@ -283,7 +283,7 @@ Notification, no response. Agent returns `stopReason: "cancelled"`.
 
 ---
 
-## 8. Permission System (`session/request_permission`)
+## Permission System (`session/request_permission`)
 
 **Direction**: Agent -> Client
 
@@ -310,7 +310,7 @@ Notification, no response. Agent returns `stopReason: "cancelled"`.
 
 ---
 
-## 9. File System
+## File System
 
 ### Read (`fs/read_text_file`)
 
@@ -324,7 +324,7 @@ Response: `null`.
 
 ---
 
-## 10. Terminals
+## Terminals
 
 All require `clientCapabilities.terminal: true`.
 
@@ -353,15 +353,15 @@ All require `clientCapabilities.terminal: true`.
 ### Recommended Pattern
 
 ```
-1. terminal/create -> get terminalId
-2. Race: terminal/wait_for_exit vs timeout
-3. If timeout: terminal/kill, then terminal/output
-4. Always: terminal/release
+- terminal/create -> get terminalId
+- Race: terminal/wait_for_exit vs timeout
+- If timeout: terminal/kill, then terminal/output
+- Always: terminal/release
 ```
 
 ---
 
-## 11. Content Blocks
+## Content Blocks
 
 ### Text (baseline, always supported)
 
@@ -401,7 +401,7 @@ All require `clientCapabilities.terminal: true`.
 
 ---
 
-## 12. Extensibility
+## Extensibility
 
 ### `_meta` Field
 
@@ -425,7 +425,7 @@ Any method starting with `_` is a custom extension. Must return `-32601` for unr
 
 ---
 
-## 13. Proxy Chains (RFD)
+## Proxy Chains (RFD)
 
 ### Architecture
 
@@ -471,7 +471,7 @@ Multi-agent support via optional `peer` field in `proxy/successor` for M:N topol
 
 ---
 
-## 14. MCP-over-ACP (RFD)
+## MCP-over-ACP (RFD)
 
 Enables MCP servers to communicate through ACP channels.
 
@@ -491,7 +491,7 @@ Supports connection multiplexing and bidirectional messaging.
 
 ---
 
-## 15. Rust SDK
+## Rust SDK
 
 **Crate**: `agent-client-protocol` (v0.9.4), Edition 2024, Apache-2.0
 
@@ -786,7 +786,7 @@ async fn main() -> anyhow::Result<()> {
 
 ---
 
-## 16. Python SDK
+## Python SDK
 
 **Package**: `agent-client-protocol` on PyPI, imported as `acp`
 
@@ -873,7 +873,7 @@ asyncio.run(run_agent(ExampleAgent()))
 
 ---
 
-## 17. JSON-RPC Method Reference
+## JSON-RPC Method Reference
 
 ### Agent Interface (Client -> Agent)
 
@@ -910,16 +910,16 @@ asyncio.run(run_agent(ExampleAgent()))
 
 ---
 
-## 18. Key Design Principles
+## Key Design Principles
 
-1. Paths must be absolute. Line numbers are 1-based.
-2. Capability-gated features -- check before calling.
-3. MCP alignment -- content blocks align with MCP types.
-4. Session-scoped operations -- all ops after init are scoped to `sessionId`.
-5. Streaming via notifications -- intermediate output flows through `session/update`, not prompt response.
-6. Agent owns cleanup -- responsible for releasing terminals.
-7. Non-Send futures -- Rust SDK uses `?Send` async traits, requiring `LocalSet` and `spawn_local`.
-8. Extension safety -- custom fields go in `_meta`; custom methods use underscore prefix.
+- Paths must be absolute. Line numbers are 1-based.
+- Capability-gated features -- check before calling.
+- MCP alignment -- content blocks align with MCP types.
+- Session-scoped operations -- all ops after init are scoped to `sessionId`.
+- Streaming via notifications -- intermediate output flows through `session/update`, not prompt response.
+- Agent owns cleanup -- responsible for releasing terminals.
+- Non-Send futures -- Rust SDK uses `?Send` async traits, requiring `LocalSet` and `spawn_local`.
+- Extension safety -- custom fields go in `_meta`; custom methods use underscore prefix.
 
 ---
 

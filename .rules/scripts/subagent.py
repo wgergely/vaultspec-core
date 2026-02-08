@@ -21,10 +21,11 @@ if str(LIB_SRC_DIR) not in sys.path:
     sys.path.insert(0, str(LIB_SRC_DIR))
 
 try:
+    from dispatch_server.server import main as server_main
+
     from orchestration.dispatch import run_dispatch
     from orchestration.utils import find_project_root
     from protocol.acp.client import DispatchClient
-    from dispatch_server.server import main as server_main
 except ImportError as e:
     print(f"Failed to import dispatch library: {e}", file=sys.stderr)
     sys.exit(1)

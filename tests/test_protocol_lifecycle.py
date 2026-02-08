@@ -2,143 +2,175 @@ from __future__ import annotations
 
 import pathlib
 import sys
+import tempfile
+from typing import Any, Dict, List, Optional
 
-_SCRIPTS_DIR = pathlib.Path(__file__).resolve().parent.parent
-if str(_SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS_DIR))
+import pytest
 
-import pytest  # noqa: E402
+from orchestration.dispatch import AgentNotFoundError, run_dispatch
+from protocol.acp.types import DispatchResult
+from protocol.providers.base import AgentProvider, CapabilityLevel, ProcessSpec
 
-from acp_dispatch import AgentNotFoundError, DispatchResult, run_dispatch  # noqa: E402
+# ---------------------------------------------------------------------------
+# Stub Agent Script
+# ---------------------------------------------------------------------------
+
+STUB_AGENT_PY = """
+import sys
+import json
+import asyncio
+
+async def main():
+    # Very basic ACP-like stdio handler
+    while True:
+        line = await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
+        if not line:
+            break
+        try:
+            req = json.loads(line)
+            method = req.get("method")
+            req_id = req.get("id")
+
+            if method == "initialize":
+                resp = {"jsonrpc": "2.0", "id": req_id, "result": {
+                    "protocolVersion": 1,
+                    "agentCapabilities": {"loadSession": True},
+                    "agentInfo": {"name": "stub-agent", "version": "0.1.0"}
+                }}
+            elif method == "session/new":
+                resp = {"jsonrpc": "2.0", "id": req_id, "result": {
+                    "sessionId": "stub-session-123"
+                }}
+            elif method == "session/prompt":
+                # Send some thought then the final answer
+                thought = {"jsonrpc": "2.0", "method": "session/update", "params": {
+                    "sessionId": "stub-session-123",
+                    "update": {
+                        "sessionUpdate": "agent_thought_chunk",
+                        "content": {"type": "text", "text": "I am thinking..."}
+                    }
+                }}
+                print(json.dumps(thought), flush=True)
+
+                msg = {"jsonrpc": "2.0", "method": "session/update", "params": {
+                    "sessionId": "stub-session-123",
+                    "update": {
+                        "sessionUpdate": "agent_message_chunk",
+                        "content": {"type": "text", "text": "Hello from stub agent!"}
+                    }
+                }}
+                print(json.dumps(msg), flush=True)
+
+                resp = {"jsonrpc": "2.0", "id": req_id, "result": {
+                    "stopReason": "end_turn"
+                }}
+            else:
+                resp = {"jsonrpc": "2.0", "id": req_id, "result": {}}
+
+            print(json.dumps(resp), flush=True)
+        except Exception:
+            break
+
+if __name__ == "__main__":
+    asyncio.run(main())
+"""
+
+# ---------------------------------------------------------------------------
+# Stub Provider
+# ---------------------------------------------------------------------------
 
 
-class TestACPLifecycle:
-    """Real agent dispatch lifecycle tests via ACP transport."""
+class StubProvider(AgentProvider):
+    def __init__(self, stub_script_path: pathlib.Path):
+        self._name = "stub-provider"
+        self.stub_script_path = stub_script_path
+        self._supported_models = ["stub-model"]
 
-    @pytest.mark.asyncio
-    async def test_successful_dispatch(self):
-        """Dispatching french-croissant returns a non-empty response."""
-        result = await run_dispatch(
-            agent_name="french-croissant",
-            initial_task="Say bonjour in one sentence.",
-            model_override="gemini-2.5-flash",
-            interactive=False,
-            debug=False,
-            quiet=True,
-            mode="read-only",
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def supported_models(self) -> List[str]:
+        return self._supported_models
+
+    def prepare_process(
+        self,
+        agent_name: str,
+        agent_meta: Dict[str, Any],
+        agent_persona: str,
+        task_context: str,
+        root_dir: pathlib.Path,
+        model_override: Optional[str] = None,
+    ) -> ProcessSpec:
+        return ProcessSpec(
+            executable=sys.executable,
+            args=[str(self.stub_script_path)],
+            env={},
+            cleanup_paths=[],
         )
+
+    def get_model_capability(self, model: str) -> CapabilityLevel:
+        return CapabilityLevel.MEDIUM
+
+    def get_best_model_for_capability(self, level: CapabilityLevel) -> str:
+        return "stub-model"
+
+    def resolve_includes(
+        self, text: str, root_dir: pathlib.Path, current_dir: pathlib.Path
+    ) -> str:
+        return text
+
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_agent_not_found(mock_root_dir):
+    with pytest.raises(AgentNotFoundError):
+        await run_dispatch(
+            agent_name="nonexistent",
+            initial_task="hello",
+            root_dir=mock_root_dir,
+            interactive=False,
+        )
+
+
+@pytest.mark.asyncio
+async def test_basic_dispatch_lifecycle_real_client(mock_root_dir, test_agent_md):
+    """
+    Test run_dispatch using the REAL DispatchClient and a real (stub) subprocess.
+    This verifies the orchestration, connection, and interactive loop logic.
+    """
+    # Create the agent definition
+    (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(
+        test_agent_md, encoding="utf-8"
+    )
+
+    # Create the stub agent script
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as tf:
+        tf.write(STUB_AGENT_PY)
+        stub_script = pathlib.Path(tf.name)
+
+    try:
+        provider = StubProvider(stub_script)
+
+        # Run dispatch with real client class and stub provider
+        result = await run_dispatch(
+            agent_name="test-agent",
+            initial_task="Please say hello.",
+            root_dir=mock_root_dir,
+            interactive=False,
+            provider_instance=provider,
+            debug=True,
+        )
+
         assert isinstance(result, DispatchResult)
-        assert len(result.response_text) > 0
+        assert "Hello from stub agent!" in result.response_text
+        assert result.session_id == "stub-session-123"
 
-    @pytest.mark.asyncio
-    async def test_french_response(self):
-        """french-croissant responds in French."""
-        result = await run_dispatch(
-            agent_name="french-croissant",
-            initial_task="Say hello and mention your love of croissants.",
-            model_override="gemini-2.5-flash",
-            interactive=False,
-            debug=False,
-            quiet=True,
-            mode="read-only",
-        )
-        text_lower = result.response_text.lower()
-        assert any(
-            word in text_lower
-            for word in ["bonjour", "croissant", "français", "boulanger", "pâtisserie"]
-        )
-
-    @pytest.mark.asyncio
-    async def test_dispatch_result_structure(self):
-        """DispatchResult contains expected fields after successful dispatch."""
-        result = await run_dispatch(
-            agent_name="french-croissant",
-            initial_task="One word: bonjour.",
-            model_override="gemini-2.5-flash",
-            interactive=False,
-            debug=False,
-            quiet=True,
-            mode="read-only",
-        )
-        assert hasattr(result, "response_text")
-        assert hasattr(result, "written_files")
-        assert hasattr(result, "session_id")
-        assert isinstance(result.written_files, list)
-
-    @pytest.mark.asyncio
-    async def test_nonexistent_agent_raises(self):
-        """Dispatching a nonexistent agent raises AgentNotFoundError."""
-        with pytest.raises(AgentNotFoundError):
-            await run_dispatch(
-                agent_name="agent-that-does-not-exist",
-                initial_task="This should fail.",
-                interactive=False,
-                debug=False,
-                quiet=True,
-            )
-
-    @pytest.mark.asyncio
-    async def test_session_id_populated(self):
-        """Completed dispatch populates session_id on the result."""
-        result = await run_dispatch(
-            agent_name="french-croissant",
-            initial_task="Bonjour!",
-            model_override="gemini-2.5-flash",
-            interactive=False,
-            debug=False,
-            quiet=True,
-            mode="read-only",
-        )
-        # session_id should be set after a successful ACP session
-        assert result.session_id is not None
-        assert len(result.session_id) > 0
-
-
-class TestSessionResume:
-    """Tests for session resume support structures."""
-
-    def test_dispatch_result_includes_session_id(self):
-        """DispatchResult has a session_id field that defaults to None."""
-        result = DispatchResult(response_text="hello")
-        assert result.session_id is None
-
-        result_with_sid = DispatchResult(response_text="hello", session_id="ses-123")
-        assert result_with_sid.session_id == "ses-123"
-
-    def test_session_resume_feature_gate(self):
-        """_SESSION_RESUME_ENABLED reads from PP_DISPATCH_SESSION_RESUME env var.
-
-        Uses subprocess to avoid importlib.reload() which breaks class identity
-        for DispatchResult across test modules.
-        """
-        import os
-        import subprocess
-
-        check_script = (
-            "import sys; sys.path.insert(0, r'{}'); "
-            "import acp_dispatch; print(acp_dispatch._SESSION_RESUME_ENABLED)"
-        ).format(_SCRIPTS_DIR)
-
-        # Enabled
-        env_on = {**os.environ, "PP_DISPATCH_SESSION_RESUME": "1"}
-        proc = subprocess.run(
-            [sys.executable, "-c", check_script],
-            env=env_on,
-            capture_output=True,
-            text=True,
-        )
-        assert proc.returncode == 0, proc.stderr
-        assert proc.stdout.strip() == "True"
-
-        # Disabled (default)
-        env_off = {
-            k: v for k, v in os.environ.items() if k != "PP_DISPATCH_SESSION_RESUME"
-        }
-        proc = subprocess.run(
-            [sys.executable, "-c", check_script],
-            env=env_off,
-            capture_output=True,
-            text=True,
-        )
-        assert proc.returncode == 0, proc.stderr
-        assert proc.stdout.strip() == "False"
+    finally:
+        if stub_script.exists():
+            stub_script.unlink()

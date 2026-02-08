@@ -6,7 +6,7 @@
 
 ---
 
-## 1. Protocol Layer Summary
+## Protocol Layer Summary
 
 | Protocol | Layer | Purpose | Status |
 |---|---|---|---|
@@ -19,7 +19,7 @@
 
 ---
 
-## 2. Claude Code Agent Teams
+## Claude Code Agent Teams
 
 Released with Opus 4.6 (February 2026).
 
@@ -61,7 +61,7 @@ Team lead creates tasks via `TaskCreate`, assigns with `TaskUpdate(owner)`. Task
 
 ---
 
-## 3. OpenAI Agents SDK
+## OpenAI Agents SDK
 
 ### Architecture
 
@@ -83,7 +83,7 @@ Function-based handoffs. LLM sees handoffs as callable tools (`transfer_to_{agen
 
 ---
 
-## 4. LangGraph Supervisor Pattern
+## LangGraph Supervisor Pattern
 
 ### Architecture
 
@@ -104,7 +104,7 @@ Graph-based routing. Supervisor calls `create_handoff_tool` to delegate. Workers
 
 ---
 
-## 5. Microsoft Magentic-One (AutoGen)
+## Microsoft Magentic-One (AutoGen)
 
 ### Architecture
 
@@ -128,14 +128,14 @@ Five patterns: Sequential, Concurrent, Handoff, GroupChat, Magentic.
 
 ---
 
-## 6. CrewAI
+## CrewAI
 
 ### Communication Model
 
 Agents with `allow_delegation=True` get two built-in tools:
 
-1. **Delegate Work** -- assign subtask to teammate
-2. **Ask Question** -- query teammate for information
+- **Delegate Work** -- assign subtask to teammate
+- **Ask Question** -- query teammate for information
 
 ### Key Characteristics
 
@@ -145,7 +145,7 @@ Agents with `allow_delegation=True` get two built-in tools:
 
 ---
 
-## 7. Google ADK + A2A
+## Google ADK + A2A
 
 ### Architecture
 
@@ -172,7 +172,7 @@ Remote agents appear identical to local sub-agents from the root's perspective.
 
 ---
 
-## 8. Comparative Matrix
+## Comparative Matrix
 
 | Dimension | Claude Teams | OpenAI SDK | LangGraph | Magentic-One | CrewAI | ADK+A2A |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
@@ -186,23 +186,23 @@ Remote agents appear identical to local sub-agents from the root's perspective.
 
 ---
 
-## 9. Five Dominant Patterns
+## Five Dominant Patterns
 
-1. **Supervisor/Star** (LangGraph, CrewAI, Magentic-One) -- central coordinator, bottleneck
-2. **Handoff Chain** (OpenAI) -- linear, stateless, no parallelism
-3. **Team with Peer Communication** (Claude Code) -- most flexible, most complex
-4. **Dual-Loop Planning** (Magentic-One) -- most sophisticated, heaviest overhead
-5. **Protocol-Mediated Federation** (ADK + A2A) -- only cross-boundary approach
+- **Supervisor/Star** (LangGraph, CrewAI, Magentic-One) -- central coordinator, bottleneck
+- **Handoff Chain** (OpenAI) -- linear, stateless, no parallelism
+- **Team with Peer Communication** (Claude Code) -- most flexible, most complex
+- **Dual-Loop Planning** (Magentic-One) -- most sophisticated, heaviest overhead
+- **Protocol-Mediated Federation** (ADK + A2A) -- only cross-boundary approach
 
 ---
 
-## 10. Key Takeaways
+## Key Takeaways
 
-1. MCP + A2A is the emerging standard stack
-2. Dual-loop replanning (Magentic-One) is most robust for complex tasks
-3. Claude Code Agent Teams is most practical for software engineering
-4. Google ADK + A2A is the only cross-boundary solution
-5. Industry converging on supervisor/orchestrator pattern
+- MCP + A2A is the emerging standard stack
+- Dual-loop replanning (Magentic-One) is most robust for complex tasks
+- Claude Code Agent Teams is most practical for software engineering
+- Google ADK + A2A is the only cross-boundary solution
+- Industry converging on supervisor/orchestrator pattern
 
 ---
 

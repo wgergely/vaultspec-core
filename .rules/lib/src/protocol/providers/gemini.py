@@ -12,10 +12,10 @@ from typing import Dict, List, Optional, Tuple
 
 from .base import (
     AgentProvider,
-    ProcessSpec,
     CapabilityLevel,
-    resolve_includes,
+    ProcessSpec,
     load_mcp_servers,
+    resolve_includes,
 )
 
 logger = logging.getLogger(__name__)
@@ -127,11 +127,13 @@ class GeminiProvider(AgentProvider):
             _cached_version = version
 
             if sys.platform == "win32" and version < _MIN_VERSION_WINDOWS:
-                raise RuntimeError(
+                msg = (
                     f"Gemini CLI v{'.'.join(str(x) for x in version)} is below minimum "
-                    f"v{'.'.join(str(x) for x in _MIN_VERSION_WINDOWS)} required on Windows "
-                    f"(ACP hang bug). Please upgrade: npm install -g @anthropic-ai/gemini-cli"
+                    f"v{'.'.join(str(x) for x in _MIN_VERSION_WINDOWS)} required on "
+                    "Windows (ACP hang bug). Please upgrade: "
+                    "npm install -g @anthropic-ai/gemini-cli"
                 )
+                raise RuntimeError(msg)
 
             if version < _MIN_VERSION_RECOMMENDED:
                 logger.warning(
@@ -158,15 +160,15 @@ class GeminiProvider(AgentProvider):
         root_dir: pathlib.Path,
         model_override: Optional[str] = None,
     ) -> ProcessSpec:
-        # 0. Locate executable and check version
+        #  Locate executable and check version
         executable = shutil.which("gemini") or "gemini"
         self.check_version(executable)
 
-        # 1. Load and Mix Rules
+        #  Load and Mix Rules
         rules = self.load_rules(root_dir)
         system_prompt = self.construct_system_prompt(agent_persona, rules)
 
-        # 2. Persist to temp file
+        #  Persist to temp file
         tf = tempfile.NamedTemporaryFile(
             mode="w", suffix=".md", delete=False, encoding="utf-8"
         )
@@ -174,21 +176,21 @@ class GeminiProvider(AgentProvider):
         tf.close()
         temp_path = pathlib.Path(tf.name)
 
-        # 3. Prepare Environment
+        #  Prepare Environment
         env = os.environ.copy()
         env["GEMINI_SYSTEM_MD"] = str(temp_path)
 
-        # 4. Construct Command
+        #  Construct Command
         cmd_args = ["--experimental-acp"]
 
         target_model = model_override or agent_meta.get("model")
         if target_model:
             cmd_args.extend(["--model", target_model])
 
-        # 5. Load MCP servers from .gemini/settings.json
+        #  Load MCP servers from .gemini/settings.json
         mcp_servers = load_mcp_servers(root_dir)
 
-        # 6. Dual delivery: env var + prompt prepend as fallback
+        #  Dual delivery: env var + prompt prepend as fallback
         initial_prompt = f"{system_prompt}\n\n# TASK\n{task_context}"
 
         return ProcessSpec(

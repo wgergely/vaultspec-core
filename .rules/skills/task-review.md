@@ -14,16 +14,16 @@ When to use this skill:
 
 ## Workflow
 
-### 1. Context Gathering
+### Context Gathering
 
 - Identify the `<Plan>` (`.docs/plan/...`) and the specific files modified.
 
-### 2. Dispatch Reviewer
+### Dispatch Reviewer
 
 Invoke the `task-subagent` skill with `code-reviewer`. Instruct it to:
 > "Perform a comprehensive code review of [feature/files]. Verify safety (no-crash policy), intent (alignment with [[...-plan.md]]), and code quality. Persist the report to .docs/exec/...-review.md."
 
-### 3. Analysis of Report
+### Analysis of Report
 
 - **Pass:** If the reviewer finds no critical issues, you may proceed.
 - **Fail:** If the reviewer flags issues, you **MUST** invoke `task-execute` (or dispatch an executor) to fix the issues, then re-run `task-review`.

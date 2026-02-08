@@ -36,9 +36,9 @@ def resolve_includes(
     """Recursively resolves @path/to/file.md includes within markdown content.
 
     Resolution strategy:
-      1. Try resolving relative to base_dir (directory of the including file)
-      2. Fall back to resolving relative to root_dir (workspace root)
-      3. Security: resolved path must be within root_dir
+       Try resolving relative to base_dir (directory of the including file)
+       Fall back to resolving relative to root_dir (workspace root)
+       Security: resolved path must be within root_dir
     """
     resolved_root = root_dir.resolve()
     lines = content.split("\n")
@@ -198,6 +198,7 @@ class AgentProvider(abc.ABC):
             model_override: Optional model override.
 
         Returns:
-            ProcessSpec containing command, args, env, cleanup paths, and session metadata.
+            ProcessSpec containing command, args, env, cleanup paths,
+            and session metadata.
         """
         pass

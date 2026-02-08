@@ -27,10 +27,10 @@ related:
 
 <!IMPORTANT: This document must be updated between execution runs to track progress.>
 
-1. <Phase 1>
+- <Phase 1>
     1 <Step 1.1>
     2 <Step 1.2>
-2. <Phase 2>
+- <Phase 2>
     1 <Step 2.1>
     2 <Step 2.2>
 

@@ -34,6 +34,12 @@ dev = [
 line-length = 88
 target-version = "py313"
 
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["orchestration", "protocol", "acp", "mcp_dispatch", "acp_dispatch"]
+
 [tool.ty.environment]
 python-version = "3.13"
 root = [".", ".rules/lib/src"]

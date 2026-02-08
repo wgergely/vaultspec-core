@@ -33,8 +33,8 @@ sg run --pattern '$A && $A()' --rewrite '$A?.()' --lang ts -U
 ### Temporal Filtering & Structural Sanitization (PowerShell)
 
 ```powershell
-# 1. SCOPE: Find files modified in the last 24h
-# 2. SURGERY: Use ast-grep to block 'eval' usage
+#  SCOPE: Find files modified in the last 24h
+#  SURGERY: Use ast-grep to block 'eval' usage
 # --stdin: tells ast-grep to read the file path from the pipe
 fd --changed-within 24h -e js | ForEach-Object { 
     sg run -p 'eval($CODE)' -r 'console.error("Blocked eval")' --stdin $_ -U 
@@ -44,16 +44,16 @@ fd --changed-within 24h -e js | ForEach-Object {
 ### High-Stakes Refactoring Pipeline (PowerShell)
 
 ```powershell
-# 1. SCOPE: Find files containing the target pattern quickly
+#  SCOPE: Find files containing the target pattern quickly
 $files = rg "legacyFunc" -l0 --type js
 
-# 2. SURGERY: Use ast-grep for context-aware rewriting
+#  SURGERY: Use ast-grep for context-aware rewriting
 $files | ForEach-Object {
     # Rewrite calls with 2+ arguments to use an object literal
     sg run -p 'legacyFunc($A, $B)' -r 'legacyFunc({a: $A, b: $B})' --stdin $_ -U
 }
 
-# 3. CLEANUP: Use sd for fixed-string comment updates across those same files
+#  CLEANUP: Use sd for fixed-string comment updates across those same files
 $files | ForEach-Object {
     sd "// TODO: update" "// DEPRECATED: updated via ast-grep" $_
 }
@@ -62,19 +62,19 @@ $files | ForEach-Object {
 ### Full Migration Pipeline (PowerShell)
 
 ```powershell
-# 1. SCOPE: Find files that use the specific library
+#  SCOPE: Find files that use the specific library
 $targets = fd -e tsx "LegacyComponent"
 
-# 2. ANALYSIS: Use rg to count occurrences and confirm scope
+#  ANALYSIS: Use rg to count occurrences and confirm scope
 $targets | xargs rg -c "LegacyComponent"
 
-# 3. SURGERY: Structural rewrite using ast-grep
+#  SURGERY: Structural rewrite using ast-grep
 # Changes <LegacyComponent prop={val} /> to <NewComponent data={val} />
 $targets | ForEach-Object {
     sg run -p '<LegacyComponent prop={$V} />' -r '<NewComponent data={$V} />' --stdin $_ -U
 }
 
-# 4. FINAL POLISH: Update comments using sd
+#  FINAL POLISH: Update comments using sd
 $targets | ForEach-Object {
     sd "// Legacy implementation" "// Migrated to NewComponent" $_
 }

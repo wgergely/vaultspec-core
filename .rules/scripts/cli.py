@@ -97,8 +97,8 @@ sys.path.insert(0, str(LIB_SRC_DIR))
 
 try:
     from protocol.providers.base import CapabilityLevel
-    from protocol.providers.gemini import GeminiProvider
     from protocol.providers.claude import ClaudeProvider
+    from protocol.providers.gemini import GeminiProvider
 
     PROVIDERS: Dict[str, Any] = {
         "claude": ClaudeProvider(),
@@ -337,45 +337,25 @@ def rules_sync(args: argparse.Namespace) -> None:
     sources = collect_rules()
     dry_run = getattr(args, "dry_run", False)
     prune = getattr(args, "prune", False)
-    target = getattr(args, "target", None)
 
     total = SyncResult()
-    if target:
-        dest = Path(target)
+    for tool_name, cfg in TOOL_CONFIGS.items():
+        if cfg.rules_dir is None:
+            continue
         result = sync_files(
             sources=sources,
-            dest_dir=dest,
-            transform_fn=lambda t, n, m, b: transform_rule("custom", n, m, b),
+            dest_dir=cfg.rules_dir,
+            transform_fn=lambda t, n, m, b, _t=tool_name: transform_rule(_t, n, m, b),
             dest_path_fn=lambda dest_dir, name: dest_dir / name,
             prune=prune,
             dry_run=dry_run,
-            label=f"rules -> {dest}",
+            label=f"rules -> {tool_name}",
         )
         total.added += result.added
         total.updated += result.updated
         total.pruned += result.pruned
         total.skipped += result.skipped
         total.errors.extend(result.errors)
-    else:
-        for tool_name, cfg in TOOL_CONFIGS.items():
-            if cfg.rules_dir is None:
-                continue
-            result = sync_files(
-                sources=sources,
-                dest_dir=cfg.rules_dir,
-                transform_fn=lambda t, n, m, b, _t=tool_name: transform_rule(
-                    _t, n, m, b
-                ),
-                dest_path_fn=lambda dest_dir, name: dest_dir / name,
-                prune=prune,
-                dry_run=dry_run,
-                label=f"rules -> {tool_name}",
-            )
-            total.added += result.added
-            total.updated += result.updated
-            total.pruned += result.pruned
-            total.skipped += result.skipped
-            total.errors.extend(result.errors)
 
     print_summary("Rules", total)
 
@@ -411,15 +391,11 @@ def transform_agent(tool: str, name: str, meta: dict, body: str) -> Optional[str
 
     model = resolve_model(tool, tier)
     if model is None:
-        if tool == "custom":
-            # Use a safe default for custom targets if no model is resolved
-            model = "gpt-4o"  # Placeholder for custom
-        else:
-            print(
-                f"  Warning: Cannot resolve model for {tool}/{tier}. Skipping {agent_name}.",
-                file=sys.stderr,
-            )
-            return None
+        msg = (
+            f"  Warning: Cannot resolve model for {tool}/{tier}. Skipping {agent_name}."
+        )
+        print(msg, file=sys.stderr)
+        return None
 
     fm = {
         "name": agent_name,
@@ -515,45 +491,25 @@ def agents_sync(args: argparse.Namespace) -> None:
     sources = collect_agents()
     dry_run = getattr(args, "dry_run", False)
     prune = getattr(args, "prune", False)
-    target = getattr(args, "target", None)
 
     total = SyncResult()
-    if target:
-        dest = Path(target)
+    for tool_name, cfg in TOOL_CONFIGS.items():
+        if cfg.agents_dir is None:
+            continue
         result = sync_files(
             sources=sources,
-            dest_dir=dest,
-            transform_fn=lambda t, n, m, b: transform_agent("custom", n, m, b),
+            dest_dir=cfg.agents_dir,
+            transform_fn=lambda t, n, m, b, _t=tool_name: transform_agent(_t, n, m, b),
             dest_path_fn=lambda dest_dir, name: dest_dir / name,
             prune=prune,
             dry_run=dry_run,
-            label=f"agents -> {dest}",
+            label=f"agents -> {tool_name}",
         )
         total.added += result.added
         total.updated += result.updated
         total.pruned += result.pruned
         total.skipped += result.skipped
         total.errors.extend(result.errors)
-    else:
-        for tool_name, cfg in TOOL_CONFIGS.items():
-            if cfg.agents_dir is None:
-                continue
-            result = sync_files(
-                sources=sources,
-                dest_dir=cfg.agents_dir,
-                transform_fn=lambda t, n, m, b, _t=tool_name: transform_agent(
-                    _t, n, m, b
-                ),
-                dest_path_fn=lambda dest_dir, name: dest_dir / name,
-                prune=prune,
-                dry_run=dry_run,
-                label=f"agents -> {tool_name}",
-            )
-            total.added += result.added
-            total.updated += result.updated
-            total.pruned += result.pruned
-            total.skipped += result.skipped
-            total.errors.extend(result.errors)
 
     print_summary("Agents", total)
 
@@ -640,43 +596,24 @@ def skills_sync(args: argparse.Namespace) -> None:
     sources = collect_skills()
     dry_run = getattr(args, "dry_run", False)
     prune = getattr(args, "prune", False)
-    target = getattr(args, "target", None)
 
     total = SyncResult()
-    if target:
-        dest = Path(target)
+    for tool_name, cfg in TOOL_CONFIGS.items():
+        if cfg.skills_dir is None:
+            continue
         result = sync_skills(
             sources=sources,
-            skills_dir=dest,
-            transform_fn=lambda t, n, m, b: transform_skill("custom", n, m, b),
+            skills_dir=cfg.skills_dir,
+            transform_fn=lambda t, n, m, b, _t=tool_name: transform_skill(_t, n, m, b),
             prune=prune,
             dry_run=dry_run,
-            label=f"skills -> {dest}",
+            label=f"skills -> {tool_name}",
         )
         total.added += result.added
         total.updated += result.updated
         total.pruned += result.pruned
         total.skipped += result.skipped
         total.errors.extend(result.errors)
-    else:
-        for tool_name, cfg in TOOL_CONFIGS.items():
-            if cfg.skills_dir is None:
-                continue
-            result = sync_skills(
-                sources=sources,
-                skills_dir=cfg.skills_dir,
-                transform_fn=lambda t, n, m, b, _t=tool_name: transform_skill(
-                    _t, n, m, b
-                ),
-                prune=prune,
-                dry_run=dry_run,
-                label=f"skills -> {tool_name}",
-            )
-            total.added += result.added
-            total.updated += result.updated
-            total.pruned += result.pruned
-            total.skipped += result.skipped
-            total.errors.extend(result.errors)
 
     print_summary("Skills", total)
 
@@ -884,7 +821,7 @@ def _generate_config(cfg: ToolConfig) -> Optional[str]:
 
 
 def _is_cli_managed(path: Path) -> bool:
-    """Check if a config file was generated by this CLI (has the auto-generated header)."""
+    """Check if a config file was generated by this CLI."""
     if not path.exists():
         return False
     try:
@@ -931,10 +868,9 @@ def config_show(args: argparse.Namespace) -> None:
 
 
 def config_sync(args: argparse.Namespace) -> None:
-    """Sync INTERNAL.md and CUSTOM.md to tool configs with auto-generated @ references."""
+    """Sync INTERNAL.md and CUSTOM.md to tool configs."""
     dry_run = getattr(args, "dry_run", False)
     force = getattr(args, "force", False)
-    target = getattr(args, "target", None)
 
     if not INTERNAL_CONFIG_SRC.exists():
         print("  Error: No internal config found at .rules/INTERNAL.md")
@@ -942,70 +878,44 @@ def config_sync(args: argparse.Namespace) -> None:
 
     result = SyncResult()
 
-    if target:
-        dest_file = Path(target)
-        # Create a temporary ToolConfig for the custom target
-        cfg = ToolConfig(
-            name="custom",
-            rules_dir=None,
-            agents_dir=None,
-            skills_dir=None,
-            config_file=dest_file,
-        )
+    for tool_name, cfg in TOOL_CONFIGS.items():
+        if cfg.config_file is None:
+            continue
+
         content = _generate_config(cfg)
-        if content:
-            rel = (
-                dest_file.relative_to(ROOT_DIR)
-                if dest_file.is_relative_to(ROOT_DIR)
-                else dest_file
+        if content is None:
+            result.skipped += 1
+            continue
+
+        rel = cfg.config_file.relative_to(ROOT_DIR)
+
+        # Safety guard: refuse to overwrite non-CLI-managed files without --force
+        if (
+            cfg.config_file.exists()
+            and not _is_cli_managed(cfg.config_file)
+            and not force
+        ):
+            print(f"    [SKIP] {rel} — file exists with custom content.")
+            msg = (
+                "           Migrate content to .rules/CUSTOM.md, "
+                "then re-run with --force."
             )
-            action = "[UPDATE]" if dest_file.exists() else "[ADD]"
-            if dry_run:
-                print(f"    {action} {rel}")
-            else:
-                ensure_dir(dest_file.parent)
-                atomic_write(dest_file, content)
-            if action == "[ADD]":
-                result.added += 1
-            else:
-                result.updated += 1
-    else:
-        for tool_name, cfg in TOOL_CONFIGS.items():
-            if cfg.config_file is None:
-                continue
+            print(msg)
+            result.skipped += 1
+            continue
 
-            content = _generate_config(cfg)
-            if content is None:
-                result.skipped += 1
-                continue
+        action = "[UPDATE]" if cfg.config_file.exists() else "[ADD]"
 
-            rel = cfg.config_file.relative_to(ROOT_DIR)
+        if dry_run:
+            print(f"    {action} {rel}")
+        else:
+            ensure_dir(cfg.config_file.parent)
+            atomic_write(cfg.config_file, content)
 
-            # Safety guard: refuse to overwrite non-CLI-managed files without --force
-            if (
-                cfg.config_file.exists()
-                and not _is_cli_managed(cfg.config_file)
-                and not force
-            ):
-                print(f"    [SKIP] {rel} — file exists with custom content.")
-                print(
-                    "           Migrate content to .rules/CUSTOM.md, then re-run with --force."
-                )
-                result.skipped += 1
-                continue
-
-            action = "[UPDATE]" if cfg.config_file.exists() else "[ADD]"
-
-            if dry_run:
-                print(f"    {action} {rel}")
-            else:
-                ensure_dir(cfg.config_file.parent)
-                atomic_write(cfg.config_file, content)
-
-            if action == "[ADD]":
-                result.added += 1
-            else:
-                result.updated += 1
+        if action == "[ADD]":
+            result.added += 1
+        else:
+            result.updated += 1
 
     print_summary("Config", result)
 
@@ -1038,7 +948,6 @@ def add_sync_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--dry-run", action="store_true", help="Preview changes without writing"
     )
-    parser.add_argument("--target", help="Override destination directory or file")
 
 
 def main() -> None:
@@ -1130,11 +1039,11 @@ def main() -> None:
     config_sub = config_parser.add_subparsers(dest="command")
 
     config_sub.add_parser(
-        "show", help="Display current AGENTS.md content and generated references"
+        "show", help="Display current internal/custom content and generated references"
     )
 
     config_sync_parser = config_sub.add_parser(
-        "sync", help="Sync AGENTS.md to CLAUDE.md, GEMINI.md"
+        "sync", help="Sync internal and custom configs to tool configs"
     )
     add_sync_flags(config_sync_parser)
     config_sync_parser.add_argument(

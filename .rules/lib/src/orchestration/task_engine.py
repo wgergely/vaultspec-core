@@ -1,7 +1,7 @@
 """Internal task engine for the dispatch framework.
 
 A standalone 5-state task lifecycle manager with no MCP or ACP dependencies.
-Tracks dispatch tasks through: working -> input_required | completed | failed | cancelled.
+Tracks: working -> input_required | completed | failed | cancelled.
 
 State machine per ADR dispatch-task-contract Decision 1:
 
@@ -432,9 +432,11 @@ class TaskEngine:
             if status != task.status:
                 allowed = _VALID_TRANSITIONS[task.status]
                 if status not in allowed:
-                    raise InvalidTransitionError(
-                        f"Cannot transition from '{task.status.value}' to '{status.value}'"
+                    msg = (
+                        f"Cannot transition from '{task.status.value}' "
+                        f"to '{status.value}'"
                     )
+                    raise InvalidTransitionError(msg)
 
             task.status = status
             task.updated_at = time.monotonic()

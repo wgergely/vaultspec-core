@@ -2,29 +2,23 @@ from __future__ import annotations
 
 import pathlib
 import sys
+import tempfile
 
-_SCRIPTS_DIR = pathlib.Path(__file__).resolve().parent.parent
-if str(_SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS_DIR))
+import pytest
 
-import tempfile  # noqa: E402
-
-import pytest  # noqa: E402
-
-from acp_dispatch import GeminiDispatchClient  # noqa: E402
-from acp.schema import (  # noqa: E402
+from acp.schema import (
     AgentMessageChunk,
     AgentPlanUpdate,
     AgentThoughtChunk,
-    PlanEntry,
     PermissionOption,
+    PlanEntry,
     SessionInfoUpdate,
     TextContentBlock,
     ToolCallProgress,
     ToolCallStart,
     ToolCallUpdate,
 )
-
+from protocol.acp.client import DispatchClient
 
 # ---------------------------------------------------------------------------
 # TestRequestPermission
@@ -34,7 +28,8 @@ from acp.schema import (  # noqa: E402
 class TestRequestPermission:
     @pytest.fixture
     def client(self):
-        return GeminiDispatchClient(debug=False)
+        # DispatchClient replaced GeminiDispatchClient
+        return DispatchClient(root_dir=pathlib.Path("."), debug=False)
 
     @pytest.mark.asyncio
     async def test_allow_once_selected(self, client):
@@ -46,8 +41,8 @@ class TestRequestPermission:
         result = await client.request_permission(
             options=options, session_id="s1", tool_call=tool_call
         )
-        assert result["outcome"]["outcome"] == "selected"
-        assert result["outcome"]["optionId"] == "allow"
+        assert result.outcome.outcome == "selected"
+        assert result.outcome.optionId == "allow"
 
     @pytest.mark.asyncio
     async def test_allow_always_selected(self, client):
@@ -61,8 +56,8 @@ class TestRequestPermission:
         result = await client.request_permission(
             options=options, session_id="s1", tool_call=tool_call
         )
-        assert result["outcome"]["outcome"] == "selected"
-        assert result["outcome"]["optionId"] == "allow-session"
+        assert result.outcome.outcome == "selected"
+        assert result.outcome.optionId == "allow-session"
 
     @pytest.mark.asyncio
     async def test_only_reject_options(self, client):
@@ -77,8 +72,8 @@ class TestRequestPermission:
             options=options, session_id="s1", tool_call=tool_call
         )
         # Falls through to first option when no allow found
-        assert result["outcome"]["outcome"] == "selected"
-        assert result["outcome"]["optionId"] == "reject-1"
+        assert result.outcome.outcome == "selected"
+        assert result.outcome.optionId == "reject-1"
 
     @pytest.mark.asyncio
     async def test_empty_options(self, client):
@@ -86,8 +81,8 @@ class TestRequestPermission:
         result = await client.request_permission(
             options=[], session_id="s1", tool_call=tool_call
         )
-        assert result["outcome"]["outcome"] == "selected"
-        assert result["outcome"]["optionId"] == "allow"  # Default fallback
+        assert result.outcome.outcome == "selected"
+        assert result.outcome.optionId == "allow"  # Default fallback
 
     @pytest.mark.asyncio
     async def test_none_options(self, client):
@@ -95,7 +90,7 @@ class TestRequestPermission:
         result = await client.request_permission(
             options=None, session_id="s1", tool_call=tool_call
         )
-        assert result["outcome"]["outcome"] == "selected"
+        assert result.outcome.outcome == "selected"
 
     @pytest.mark.asyncio
     async def test_validates_against_schema(self, client):
@@ -109,8 +104,8 @@ class TestRequestPermission:
         result = await client.request_permission(
             options=options, session_id="s1", tool_call=tool_call
         )
-        validated = RequestPermissionResponse.model_validate(result)
-        assert validated.outcome.outcome == "selected"
+        assert isinstance(result, RequestPermissionResponse)
+        assert result.outcome.outcome == "selected"
 
 
 # ---------------------------------------------------------------------------
@@ -120,8 +115,8 @@ class TestRequestPermission:
 
 class TestSessionUpdate:
     @pytest.fixture
-    def client(self):
-        return GeminiDispatchClient(debug=False)
+    def client(self, tmp_path):
+        return DispatchClient(root_dir=tmp_path, debug=False)
 
     @pytest.mark.asyncio
     async def test_agent_message_chunk(self, client, capsys):
@@ -182,8 +177,8 @@ class TestSessionUpdate:
         assert "Step 2" in captured.err
 
     @pytest.mark.asyncio
-    async def test_debug_mode_shows_info_updates(self, capsys):
-        client = GeminiDispatchClient(debug=True)
+    async def test_debug_mode_shows_info_updates(self, capsys, tmp_path):
+        client = DispatchClient(root_dir=tmp_path, debug=True)
         update = SessionInfoUpdate(session_update="session_info_update")
         await client.session_update(session_id="s1", update=update)
         captured = capsys.readouterr()
@@ -197,30 +192,34 @@ class TestSessionUpdate:
 
 class TestFileIO:
     @pytest.fixture
-    def client(self):
-        return GeminiDispatchClient(debug=False)
+    def client(self, tmp_path):
+        return DispatchClient(root_dir=tmp_path, debug=False)
 
     @pytest.mark.asyncio
     async def test_read_text_file(self, client, mock_root_dir):
+        # We need client.root_dir to be the same as where the file is
+        client.root_dir = mock_root_dir
         result = await client.read_text_file(
             path=str(mock_root_dir / "test.txt"),
             session_id="s1",
         )
-        assert "Hello from test workspace" in result["content"]
+        assert "Hello from test workspace" in result.content
 
     @pytest.mark.asyncio
     async def test_read_text_file_with_line_and_limit(self, client, mock_root_dir):
+        client.root_dir = mock_root_dir
         result = await client.read_text_file(
             path=str(mock_root_dir / "test.txt"),
             session_id="s1",
             line=2,
             limit=1,
         )
-        assert "Line 2" in result["content"]
-        assert "Line 3" not in result["content"]
+        assert "Line 2" in result.content
+        assert "Line 3" not in result.content
 
     @pytest.mark.asyncio
     async def test_read_text_file_outside_workspace(self, client, mock_root_dir):
+        client.root_dir = mock_root_dir
         with tempfile.TemporaryDirectory() as td:
             outside = pathlib.Path(td) / "secret.txt"
             outside.write_text("secret", encoding="utf-8")
@@ -229,6 +228,7 @@ class TestFileIO:
 
     @pytest.mark.asyncio
     async def test_read_text_file_nonexistent(self, client, mock_root_dir):
+        client.root_dir = mock_root_dir
         with pytest.raises(FileNotFoundError):
             await client.read_text_file(
                 path=str(mock_root_dir / "nonexistent.txt"),
@@ -237,6 +237,7 @@ class TestFileIO:
 
     @pytest.mark.asyncio
     async def test_write_text_file(self, client, mock_root_dir):
+        client.root_dir = mock_root_dir
         target = mock_root_dir / "output.txt"
         await client.write_text_file(
             content="Written by test",
@@ -248,6 +249,7 @@ class TestFileIO:
 
     @pytest.mark.asyncio
     async def test_write_text_file_nested(self, client, mock_root_dir):
+        client.root_dir = mock_root_dir
         target = mock_root_dir / "deep" / "nested" / "file.txt"
         await client.write_text_file(
             content="Nested content",
@@ -259,6 +261,7 @@ class TestFileIO:
 
     @pytest.mark.asyncio
     async def test_write_text_file_outside_workspace(self, client, mock_root_dir):
+        client.root_dir = mock_root_dir
         with tempfile.TemporaryDirectory() as td:
             outside = pathlib.Path(td) / "output.txt"
             with pytest.raises(ValueError, match="outside workspace"):
@@ -276,18 +279,19 @@ class TestFileIO:
 
 class TestTerminalLifecycle:
     @pytest.fixture
-    def client(self):
-        return GeminiDispatchClient(debug=False)
+    def client(self, tmp_path):
+        return DispatchClient(root_dir=tmp_path, debug=False)
 
     @pytest.mark.asyncio
     async def test_create_terminal(self, client, mock_root_dir):
+        client.root_dir = mock_root_dir
         result = await client.create_terminal(
             command=sys.executable,
             session_id="s1",
             args=["-c", "print('hello')"],
         )
-        assert "terminalId" in result
-        terminal_id = result["terminalId"]
+        assert result.terminalId is not None
+        terminal_id = result.terminalId
         assert terminal_id in client._terminals
 
         # Cleanup
@@ -295,61 +299,65 @@ class TestTerminalLifecycle:
 
     @pytest.mark.asyncio
     async def test_terminal_output(self, client, mock_root_dir):
+        client.root_dir = mock_root_dir
         result = await client.create_terminal(
             command=sys.executable,
             session_id="s1",
             args=["-c", "print('terminal_test_output')"],
         )
-        terminal_id = result["terminalId"]
+        terminal_id = result.terminalId
 
         # Wait for exit
         await client.wait_for_terminal_exit(session_id="s1", terminal_id=terminal_id)
 
         # Read output
         output = await client.terminal_output(session_id="s1", terminal_id=terminal_id)
-        assert "terminal_test_output" in output["output"]
+        assert "terminal_test_output" in output.output
 
         await client.release_terminal(session_id="s1", terminal_id=terminal_id)
 
     @pytest.mark.asyncio
     async def test_wait_for_exit_returns_code(self, client, mock_root_dir):
+        client.root_dir = mock_root_dir
         result = await client.create_terminal(
             command=sys.executable,
             session_id="s1",
             args=["-c", "exit(0)"],
         )
-        terminal_id = result["terminalId"]
+        terminal_id = result.terminalId
         exit_result = await client.wait_for_terminal_exit(
             session_id="s1", terminal_id=terminal_id
         )
-        assert exit_result["exitCode"] == 0
+        assert exit_result.exitCode == 0
         await client.release_terminal(session_id="s1", terminal_id=terminal_id)
 
     @pytest.mark.asyncio
     async def test_kill_terminal(self, client, mock_root_dir):
+        client.root_dir = mock_root_dir
         result = await client.create_terminal(
             command=sys.executable,
             session_id="s1",
             args=["-c", "import time; time.sleep(60)"],
         )
-        terminal_id = result["terminalId"]
+        terminal_id = result.terminalId
 
         await client.kill_terminal(session_id="s1", terminal_id=terminal_id)
         exit_result = await client.wait_for_terminal_exit(
             session_id="s1", terminal_id=terminal_id
         )
-        assert exit_result["exitCode"] is not None
+        assert exit_result.exitCode is not None
 
         await client.release_terminal(session_id="s1", terminal_id=terminal_id)
 
     @pytest.mark.asyncio
     async def test_release_terminal_removes_tracking(self, client, mock_root_dir):
+        client.root_dir = mock_root_dir
         result = await client.create_terminal(
             command=sys.executable,
             session_id="s1",
             args=["-c", "print('done')"],
         )
-        terminal_id = result["terminalId"]
+        terminal_id = result.terminalId
         await client.wait_for_terminal_exit(session_id="s1", terminal_id=terminal_id)
         await client.release_terminal(session_id="s1", terminal_id=terminal_id)
         assert terminal_id not in client._terminals
@@ -357,12 +365,12 @@ class TestTerminalLifecycle:
     @pytest.mark.asyncio
     async def test_terminal_output_unknown_id(self, client):
         output = await client.terminal_output(session_id="s1", terminal_id="unknown-id")
-        assert output["output"] == ""
-        assert output["truncated"] is False
+        assert output.output == ""
+        assert output.truncated is False
 
     @pytest.mark.asyncio
     async def test_wait_unknown_terminal(self, client):
-        result = await client.wait_for_terminal_exit(
+        exit_result = await client.wait_for_terminal_exit(
             session_id="s1", terminal_id="unknown-id"
         )
-        assert result["exitCode"] is None
+        assert exit_result.exitCode is None

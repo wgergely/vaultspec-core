@@ -29,9 +29,9 @@ description: "High-performance search tool (ripgrep). Use for finding patterns a
 ### PowerShell (High-Stakes Refactoring)
 
 ```powershell
-# 1. Identify files with specific language types
+#  Identify files with specific language types
 rg "DeprecatedAPI" -l0 --type ts | ForEach-Object { 
-    # 2. Perform atomic replacement
+    #  Perform atomic replacement
     sd 'DeprecatedAPI' 'NewAPI' $_ 
 }
 

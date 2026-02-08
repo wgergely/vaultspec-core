@@ -34,14 +34,14 @@ This skill MUST be called after `task-adr` concludes with architectural approval
 
 Every document MUST strictly adhere to the following schema:
 
-1. **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
-    - **Directory Tag**: Exactly `#plan`.
-    - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
-    - _Syntax:_ `tags: ["#plan", "#feature"]` (Must be quoted strings in a list).
-2. **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
-    - _Constraint:_ No relative paths (`../`), no bare strings, no `@ref`.
-3. **`date`**: MUST use `yyyy-mm-dd` format.
-4. **No `feature` key**: Use `tags:` exclusively for feature identification.
+- **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
+  - **Directory Tag**: Exactly `#plan`.
+  - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
+  - _Syntax:_ `tags: ["#plan", "#feature"]` (Must be quoted strings in a list).
+- **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
+  - _Constraint:_ No relative paths (`../`), no bare strings, no `@ref`.
+- **`date`**: MUST use `yyyy-mm-dd` format.
+- **No `feature` key**: Use `tags:` exclusively for feature identification.
 
 ## Workflow
 

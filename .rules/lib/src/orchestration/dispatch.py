@@ -17,13 +17,12 @@ from acp.schema import (
     Implementation,
     TextContentBlock,
 )
-
+from orchestration.utils import parse_frontmatter, safe_read_text
 from protocol.acp.client import DispatchClient, SessionLogger
 from protocol.acp.types import DispatchError, DispatchResult
-from protocol.providers.base import AgentProvider
+from protocol.providers.base import AgentProvider, CapabilityLevel
 from protocol.providers.claude import ClaudeProvider
 from protocol.providers.gemini import GeminiProvider
-from orchestration.utils import parse_frontmatter, safe_read_text
 
 logger = logging.getLogger(__name__)
 
@@ -42,12 +41,10 @@ class AgentNotFoundError(Exception):
 
 
 def load_agent(
-    agent_name: str,
-    root_dir: pathlib.Path,
-    provider_name: str | None = None,
-    extra_search_paths: List[pathlib.Path] | None = None,
+    agent_name: str, root_dir: pathlib.Path, provider_name: str | None = None
 ) -> Tuple[Dict[str, str], str]:
-    """Loads an agent definition, searching provider-specific then canonical directories."""
+    """Loads an agent definition, searching provider-specific then
+    canonical directories."""
 
     agent_dirs = {
         "gemini": root_dir / ".gemini" / "agents",
@@ -57,9 +54,6 @@ def load_agent(
     }
 
     search_order: list[pathlib.Path] = []
-    if extra_search_paths:
-        search_order.extend(extra_search_paths)
-
     if provider_name and provider_name in agent_dirs:
         search_order.append(agent_dirs[provider_name])
     search_order.append(agent_dirs["rules"])
@@ -168,7 +162,7 @@ async def _interactive_loop(
         try:
             # Send prompt and wait for response
             response = await conn.prompt(
-                prompt=[TextContentBlock(type="text", text=current_prompt)],
+                prompt=[TextContentBlock(type="text", text=current_prompt or "")],
                 session_id=session_id,
             )
         except Exception as e:
@@ -253,7 +247,7 @@ async def run_dispatch(
     client_ref: Optional[list] = None,
     resume_session_id: str | None = None,
     client_class: Type[DispatchClient] = DispatchClient,
-    agent_search_paths: List[pathlib.Path] | None = None,
+    provider_instance: Optional[AgentProvider] = None,
 ) -> DispatchResult:
     """Orchestrates the agent lifecycle with fallback support."""
 
@@ -267,14 +261,11 @@ async def run_dispatch(
         elif model_override.startswith("gemini"):
             initial_provider_hint = "gemini"
 
-    # 1. Load Agent Definition
+    # Load Agent Definition
     if debug:
         logger.debug(f"Loading sub-agent: {agent_name}...")
     meta, persona = load_agent(
-        agent_name,
-        root_dir,
-        provider_name=initial_provider_hint,
-        extra_search_paths=agent_search_paths,
+        agent_name, root_dir, provider_name=initial_provider_hint
     )
 
     # Determine initial model
@@ -287,8 +278,10 @@ async def run_dispatch(
     full_prompt = _build_task_prompt(initial_task, context_files, plan_file, root_dir)
 
     while True:
-        # 2. Select Provider
-        if provider_override:
+        #  Select Provider
+        if provider_instance:
+            provider = provider_instance
+        elif provider_override:
             if provider_override == "gemini":
                 provider = gemini
             elif provider_override == "claude":
@@ -303,14 +296,16 @@ async def run_dispatch(
 
             if is_mismatch:
                 if debug:
-                    logger.debug(
-                        f"Provider mismatch detected (Provider: {provider.name}, Model: {current_model}). resolving equivalent..."
+                    msg = (
+                        f"Provider mismatch ({provider.name}/{current_model}). "
+                        "resolving equivalent..."
                     )
+                    logger.debug(msg)
                 source_provider = get_provider_for_model(current_model)
                 try:
                     level = source_provider.get_model_capability(current_model)
                 except Exception:
-                    level = 2  # Default Medium
+                    level = CapabilityLevel.MEDIUM  # Default Medium
 
                 current_model = provider.get_best_model_for_capability(level)
                 if debug:
@@ -321,12 +316,11 @@ async def run_dispatch(
                 provider = get_provider_for_model(current_model)
             except ValueError:
                 provider = gemini
-
         if debug:
             logger.debug(f"Using provider: {provider.name} with model: {current_model}")
 
         try:
-            # 3. Prepare Process
+            #  Prepare Process
             spec = provider.prepare_process(
                 agent_name,
                 meta,
@@ -409,15 +403,14 @@ async def run_dispatch(
                     if _SESSION_RESUME_ENABLED and resume_session_id:
                         try:
                             session = await conn.load_session(
-                                session_id=resume_session_id
+                                cwd=str(root_dir), session_id=resume_session_id
                             )
                             if debug:
                                 logger.debug(f"Resumed session: {session.session_id}")
                         except Exception as exc:
                             if debug:
-                                logger.debug(
-                                    f"Session resume failed ({exc}), creating new session"
-                                )
+                                msg = f"Session resume failed ({exc}), new session"
+                                logger.debug(msg)
                             session = await conn.new_session(
                                 cwd=str(root_dir),
                                 mcp_servers=getattr(spec, "mcp_servers", []),
@@ -442,9 +435,10 @@ async def run_dispatch(
 
                     # Interactive Loop
                     # We pass the full_prompt as the initial task prompt.
-                    # If there's an override from the provider (e.g. for System Prompt injection), we prefer that,
-                    # but typically provider override includes the task.
-                    # Here we rely on provider.prepare_process to have incorporated full_prompt into initial_prompt_override if needed.
+                    # If there's a provider override (e.g. for System Prompt
+                    # injection), we prefer that, but typically it includes the task.
+                    # Here we rely on provider.prepare_process to have
+                    # incorporated full_prompt into initial_prompt_override if needed.
                     start_prompt = (
                         getattr(spec, "initial_prompt_override", None) or full_prompt
                     )
@@ -468,9 +462,11 @@ async def run_dispatch(
                     with contextlib.suppress(asyncio.CancelledError):
                         await stderr_task
 
-                    if hasattr(_proc, "_transport") and _proc._transport:
+                    # Use a more robust check for transport to satisfy ty
+                    transport = getattr(_proc, "_transport", None)
+                    if transport is not None:
                         with contextlib.suppress(Exception):
-                            _proc._transport.close()
+                            transport.close()
 
                     for stream_name in ["stdin", "stdout", "stderr"]:
                         stream = getattr(_proc, stream_name, None)
@@ -513,7 +509,7 @@ async def run_dispatch(
                 try:
                     level = provider.get_model_capability(current_model)
                 except Exception:
-                    level = 2
+                    level = CapabilityLevel.MEDIUM
 
                 fallback_provider = ClaudeProvider()
                 current_model = fallback_provider.get_best_model_for_capability(level)

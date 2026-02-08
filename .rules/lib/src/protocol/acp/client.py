@@ -9,19 +9,30 @@ import os
 import pathlib
 import sys
 import uuid
-from typing import Any, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from acp.interfaces import Client
 from acp.schema import (
     AgentMessageChunk,
     AgentPlanUpdate,
     AgentThoughtChunk,
+    CreateTerminalResponse,
+    KillTerminalCommandResponse,
+    ReadTextFileResponse,
+    ReleaseTerminalResponse,
+    RequestPermissionResponse,
+    TerminalExitStatus,
+    TerminalOutputResponse,
     TextContentBlock,
     ToolCallProgress,
     ToolCallStart,
     UserMessageChunk,
+    WaitForTerminalExitResponse,
+    WriteTextFileResponse,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +89,9 @@ class DispatchClient(Client):
         self._session_id: Optional[str] = None
 
         # Callbacks for UI/Output handling
-        self.on_message_chunk: Optional[callable] = None
-        self.on_thought_chunk: Optional[callable] = None
-        self.on_tool_update: Optional[callable] = None
+        self.on_message_chunk: Optional[Callable[[str], None]] = None
+        self.on_thought_chunk: Optional[Callable[[str], None]] = None
+        self.on_tool_update: Optional[Callable[[ToolCallStart], None]] = None
 
     def set_logger(self, logger_instance: SessionLogger) -> None:
         self.session_logger = logger_instance
@@ -91,7 +102,7 @@ class DispatchClient(Client):
 
     async def request_permission(
         self, options: Any, session_id: str, tool_call: Any, **kwargs: Any
-    ) -> Dict[str, Any]:
+    ) -> RequestPermissionResponse:
         """Auto-approves tool call permissions (Emulates YOLO mode).
 
         Selects the first 'allow' option per ACP AllowedOutcome schema.
@@ -120,7 +131,10 @@ class DispatchClient(Client):
                 # No explicit allow option; select the first option
                 selected_id = getattr(options[0], "option_id", selected_id)
 
-        return {"outcome": {"outcome": "selected", "optionId": selected_id}}
+        # Return typed response
+        return RequestPermissionResponse.model_validate(
+            {"outcome": {"outcome": "selected", "optionId": selected_id}}
+        )
 
     async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
         """Handles and displays protocol updates from the agent."""
@@ -191,7 +205,7 @@ class DispatchClient(Client):
         limit: int | None = None,
         line: int | None = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> ReadTextFileResponse:
         """Read a text file from the workspace."""
         file_path = pathlib.Path(path).resolve()
         if not file_path.is_relative_to(self.root_dir):
@@ -209,11 +223,11 @@ class DispatchClient(Client):
             content = "".join(lines[start:end])
 
         self._log("read_text_file", {"path": path})
-        return {"content": content}
+        return ReadTextFileResponse(content=content)
 
     async def write_text_file(
         self, content: str, path: str, session_id: str, **kwargs: Any
-    ) -> Dict[str, Any] | None:
+    ) -> WriteTextFileResponse | None:
         """Write a text file to the workspace.
 
         In read-only mode, only writes to `.docs/` are permitted.
@@ -238,7 +252,7 @@ class DispatchClient(Client):
 
         self._log("write_text_file", {"path": path, "size": len(content)})
         self.written_files.append(path)
-        return {}
+        return WriteTextFileResponse()
 
     # -- Terminal management --
 
@@ -251,7 +265,7 @@ class DispatchClient(Client):
         env: Any = None,
         output_byte_limit: int | None = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> CreateTerminalResponse:
         """Spawn a subprocess and track it as an ACP terminal."""
         terminal_id = str(uuid.uuid4())
 
@@ -289,71 +303,81 @@ class DispatchClient(Client):
         if self.debug:
             logger.debug(f"Terminal created: {terminal_id} ({command})")
         self._log("create_terminal", {"terminal_id": terminal_id, "command": command})
-        return {"terminalId": terminal_id}
+        return CreateTerminalResponse(terminal_id=terminal_id)
 
-    async def terminal_output(
-        self, session_id: str, terminal_id: str, **kwargs: Any
-    ) -> Dict[str, Any]:
-        """Return current output from a tracked terminal."""
-        terminal = self._terminals.get(terminal_id)
-        if terminal is None:
-            return {"output": "", "truncated": False}
+        async def terminal_output(
+            self, session_id: str, terminal_id: str, **kwargs: Any
+        ) -> TerminalOutputResponse:
+            """Return current output from a tracked terminal."""
 
-        raw = b"".join(terminal.output_chunks)
-        truncated = len(raw) > terminal.byte_limit
-        if truncated:
-            raw = raw[-terminal.byte_limit :]
+            terminal = self._terminals.get(terminal_id)
 
-        text = raw.decode("utf-8", errors="replace")
-        result: Dict[str, Any] = {"output": text, "truncated": truncated}
-        if terminal.proc.returncode is not None:
-            result["exitStatus"] = {"exitCode": terminal.proc.returncode}
-        return result
+            if terminal is None:
+                return TerminalOutputResponse(output="", truncated=False)
 
-    async def wait_for_terminal_exit(
-        self, session_id: str, terminal_id: str, **kwargs: Any
-    ) -> Dict[str, Any]:
-        """Wait for a terminal process to finish."""
-        terminal = self._terminals.get(terminal_id)
-        if terminal is None:
-            return {"exitCode": None}
+            raw = b"".join(terminal.output_chunks)
 
-        exit_code = await terminal.proc.wait()
-        if terminal.reader_task:
-            with contextlib.suppress(asyncio.CancelledError):
-                await terminal.reader_task
-        return {"exitCode": exit_code}
+            truncated = len(raw) > terminal.byte_limit
+
+            if truncated:
+                raw = raw[-terminal.byte_limit :]
+
+            text = raw.decode("utf-8", errors="replace")
+
+            exit_status = None
+
+            if terminal.proc.returncode is not None:
+                exit_status = TerminalExitStatus(exit_code=terminal.proc.returncode)
+
+            return TerminalOutputResponse(
+                output=text, truncated=truncated, exit_status=exit_status
+            )
+
+        async def wait_for_terminal_exit(
+            self, session_id: str, terminal_id: str, **kwargs: Any
+        ) -> WaitForTerminalExitResponse:
+            """Wait for a terminal process to finish."""
+
+            terminal = self._terminals.get(terminal_id)
+
+            if terminal is None:
+                return WaitForTerminalExitResponse(exit_code=None)
+
+            exit_code = await terminal.proc.wait()
+
+            if terminal.reader_task:
+                with contextlib.suppress(asyncio.CancelledError):
+                    await terminal.reader_task
+
+            return WaitForTerminalExitResponse(exit_code=exit_code)
 
     async def kill_terminal(
         self, session_id: str, terminal_id: str, **kwargs: Any
-    ) -> Dict[str, Any] | None:
+    ) -> KillTerminalCommandResponse:
         """Kill a tracked terminal process."""
         terminal = self._terminals.get(terminal_id)
-        if terminal is None:
-            return {}
-
-        with contextlib.suppress(ProcessLookupError):
-            terminal.proc.kill()
-        return {}
+        if terminal is not None:
+            with contextlib.suppress(ProcessLookupError):
+                terminal.proc.kill()
+        return KillTerminalCommandResponse()
 
     async def release_terminal(
         self, session_id: str, terminal_id: str, **kwargs: Any
-    ) -> Dict[str, Any] | None:
+    ) -> ReleaseTerminalResponse:
         """Release and clean up a tracked terminal."""
         terminal = self._terminals.pop(terminal_id, None)
-        if terminal is None:
-            return {}
+        if terminal is not None:
+            if terminal.reader_task and not terminal.reader_task.done():
+                terminal.reader_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await terminal.reader_task
 
-        if terminal.reader_task and not terminal.reader_task.done():
-            terminal.reader_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await terminal.reader_task
+            if terminal.proc.returncode is None:
+                with contextlib.suppress(ProcessLookupError):
+                    terminal.proc.kill()
+                await terminal.proc.wait()
 
-        if terminal.proc.returncode is None:
-            with contextlib.suppress(ProcessLookupError):
-                terminal.proc.kill()
-            await terminal.proc.wait()
-        return {}
+        return ReleaseTerminalResponse()
 
     # -- Extension methods --
 

@@ -6,7 +6,7 @@
 
 ---
 
-## 1. Protocol Overview
+## Protocol Overview
 
 A2A is an open standard created by Google (April 2025), donated to Linux Foundation (June 2025). Enables communication between AI agents built on diverse frameworks. Transport: HTTP(S), JSON-RPC 2.0, SSE, gRPC.
 
@@ -29,7 +29,7 @@ A2A is an open standard created by Google (April 2025), donated to Linux Foundat
 
 ---
 
-## 2. Core Actors
+## Core Actors
 
 ```
 User  --->  A2A Client (Client Agent)  --->  A2A Server (Remote Agent)
@@ -41,7 +41,7 @@ User  --->  A2A Client (Client Agent)  --->  A2A Server (Remote Agent)
 
 ---
 
-## 3. Service Definition (11 RPCs)
+## Service Definition (11 RPCs)
 
 ```protobuf
 service A2AService {
@@ -61,7 +61,7 @@ service A2AService {
 
 ---
 
-## 4. Task State Machine (9 States)
+## Task State Machine (9 States)
 
 ```
 submitted --> working --> input_required --> completed
@@ -84,7 +84,7 @@ submitted --> working --> input_required --> completed
 
 ---
 
-## 5. Core Data Types
+## Core Data Types
 
 ### Task
 
@@ -187,7 +187,7 @@ message SendMessageResponse {
 
 ---
 
-## 6. Agent Card (Discovery)
+## Agent Card (Discovery)
 
 Served at `/.well-known/agent-card.json`:
 
@@ -263,10 +263,10 @@ message AgentSkill {
 
 ### Discovery Methods
 
-1. **Well-Known URI** (recommended): `GET https://{domain}/.well-known/agent-card.json`
-2. **Curated Registries**: Central repositories queried by skill/tags/capabilities
-3. **Direct Configuration**: Hardcoded URLs for tightly coupled systems
-4. **Extended Agent Card**: Authenticated endpoint at `GET /extendedAgentCard`
+- **Well-Known URI** (recommended): `GET https://{domain}/.well-known/agent-card.json`
+- **Curated Registries**: Central repositories queried by skill/tags/capabilities
+- **Direct Configuration**: Hardcoded URLs for tightly coupled systems
+- **Extended Agent Card**: Authenticated endpoint at `GET /extendedAgentCard`
 
 ### Security Schemes
 
@@ -274,7 +274,7 @@ Supports: API keys, HTTP auth (Bearer/Basic), OAuth 2.0 (authorization code, cli
 
 ---
 
-## 7. Interaction Mechanisms
+## Interaction Mechanisms
 
 ### Request/Response (Polling)
 
@@ -290,7 +290,7 @@ Webhook-based. Server POSTs `StreamResponse` to client URL. Security: JWT + JWKS
 
 ---
 
-## 8. Agent Response Patterns
+## Agent Response Patterns
 
 - **Message-only**: Stateless, wrapping LLM calls
 - **Task-generating**: Always returns `Task` objects
@@ -298,7 +298,7 @@ Webhook-based. Server POSTs `StreamResponse` to client URL. Security: JWT + JWKS
 
 ---
 
-## 9. Request/Response Types
+## Request/Response Types
 
 ```protobuf
 message SendMessageRequest {
@@ -342,7 +342,7 @@ message PushNotificationConfig {
 
 ---
 
-## 10. Python SDK (`a2a-sdk`)
+## Python SDK (`a2a-sdk`)
 
 **Install**: `pip install a2a-sdk` (v0.3.22, Python >=3.10)
 **Extras**: encryption, grpc, http-server, mysql, postgres, signing, sql, sqlite, telemetry
@@ -406,9 +406,9 @@ response = await a2a_client.send_message(request)
 
 ---
 
-## 11. Complete Working Examples
+## Complete Working Examples
 
-### 11.1 HelloWorld Agent (Minimal)
+### HelloWorld Agent (Minimal)
 
 **Server:**
 
@@ -478,7 +478,7 @@ async def main():
         print(response.model_dump(mode='json', exclude_none=True))
 ```
 
-### 11.2 Currency Agent (Streaming + Multi-turn + Task State)
+### Currency Agent (Streaming + Multi-turn + Task State)
 
 **Executor with TaskUpdater:**
 
@@ -553,7 +553,7 @@ uvicorn.run(server.build(), host='localhost', port=10000)
 
 ---
 
-## 12. Multi-turn Flow
+## Multi-turn Flow
 
 ```
 Turn 1: Client sends ambiguous query
@@ -576,7 +576,7 @@ Multiple concurrent tasks within the same context:
 
 ---
 
-## 13. Streaming Sequence
+## Streaming Sequence
 
 ```
 Client                              Server
@@ -590,7 +590,7 @@ Client                              Server
 
 ---
 
-## 14. Request Lifecycle (with Auth)
+## Request Lifecycle (with Auth)
 
 ```
 Client                        A2A Server               Auth Server

@@ -42,10 +42,10 @@ Conduct broad and deep research to help make informed technical decisions in the
 
 ## Research Methodology (Autonomous)
 
-1. **Identity Phase**: Resolve exact library IDs and repository links using web and crate metadata tools.
-2. **Exploration Phase**: Conduct parallel searches across official documentation, technical blogs, and GitHub code.
-3. **Synthesis Phase**: Compare findings. Look for consensus in "frontier" practices. Identify tradeoffs between different approaches.
-4. **Integration Pass**: Verify how researched information maps to our specific codebase architecture and Design System.
+- **Identity Phase**: Resolve exact library IDs and repository links using web and crate metadata tools.
+- **Exploration Phase**: Conduct parallel searches across official documentation, technical blogs, and GitHub code.
+- **Synthesis Phase**: Compare findings. Look for consensus in "frontier" practices. Identify tradeoffs between different approaches.
+- **Integration Pass**: Verify how researched information maps to our specific codebase architecture and Design System.
 
 ## Research Report Format
 
@@ -55,14 +55,14 @@ Conduct broad and deep research to help make informed technical decisions in the
 
 Every document MUST strictly adhere to the following schema:
 
-1. **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
-    - **Directory Tag**: Exactly `#research` (based on `.docs/research/` location).
-    - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
-    - *Syntax:* `tags: ["#research", "#feature"]` (Must be quoted strings in a list).
-2. **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
-    - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
-3. **`date`**: MUST use `yyyy-mm-dd` format.
-4. **No `feature` key**: Use `tags:` exclusively for feature identification.
+- **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
+  - **Directory Tag**: Exactly `#research` (based on `.docs/research/` location).
+  - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
+  - *Syntax:* `tags: ["#research", "#feature"]` (Must be quoted strings in a list).
+- **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
+  - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
+- **`date`**: MUST use `yyyy-mm-dd` format.
+- **No `feature` key**: Use `tags:` exclusively for feature identification.
 
 ## Persistence
 

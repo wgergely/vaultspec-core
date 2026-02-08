@@ -10,6 +10,7 @@ import time
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.resources.types import FunctionResource
+from pydantic import AnyUrl
 
 from orchestration.dispatch import (
     AgentNotFoundError,
@@ -218,7 +219,7 @@ def _register_agent_resources() -> None:
             return lambda: json.dumps(meta, indent=2)
 
         resource = FunctionResource(
-            uri=f"agents://{name}",
+            uri=AnyUrl(f"agents://{name}"),
             name=name,
             description=str(metadata.get("description", "")),
             mime_type="application/json",
@@ -298,7 +299,7 @@ async def list_agents() -> str:
     return json.dumps(
         {
             "agents": agents,
-            "hint": "Use resources/read with URI 'agents://{name}' for detailed agent metadata",
+            "hint": "Use resources/read with agents://{name} for metadata",
         },
         indent=2,
     )
@@ -319,7 +320,9 @@ async def dispatch_agent(
             {
                 "status": "failed",
                 "agent": agent,
-                "error": f"Invalid mode '{effective_mode}'. Must be 'read-write' or 'read-only'.",
+                "error": (
+                    f"Invalid mode '{effective_mode}'. Use 'read-write' or 'read-only'."
+                ),
             }
         )
 

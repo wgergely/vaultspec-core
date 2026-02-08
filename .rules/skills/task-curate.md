@@ -17,13 +17,13 @@ This skill governs the autonomous auditing and maintenance of the `.docs/` docum
 
 ## Workflow
 
-### 1. Dispatch the Curator
+### Dispatch the Curator
 
 Invoke the `task-subagent` skill with `docs-curator`. Instruct it to "Perform a full vault audit of .docs/. Validate frontmatter, wiki-links, naming conventions, template compliance, and directory structure. Fix violations in-place and produce an audit report."
 
 For targeted audits, scope the task accordingly (e.g., "Audit only .docs/exec/...").
 
-### 2. Review the Audit Report
+### Review the Audit Report
 
 The curator persists its findings to:
 
@@ -34,7 +34,7 @@ Review the report for:
 - **Auto-fixed** items (renames, link corrections, frontmatter additions).
 - **Flagged** items requiring author input (missing template sections, ambiguous file placement).
 
-### 3. Act on Flagged Items
+### Act on Flagged Items
 
 Items the curator cannot auto-fix are listed under **Recommendations**. Address these manually or dispatch the appropriate agent (e.g., `simple-executor` for adding missing sections).
 
@@ -47,14 +47,14 @@ Items the curator cannot auto-fix are listed under **Recommendations**. Address 
 
 Every document MUST strictly adhere to the following schema:
 
-1. **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
-    - **Directory Tag**: Exactly one of `#adr`, `#exec`, `#plan`, `#reference`, or `#research` (based on file location).
-    - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
-    - *Syntax:* `tags: ["#doc-type", "#feature"]` (Must be quoted strings in a list).
-2. **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
-    - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
-3. **`date`**: MUST use `yyyy-mm-dd` format.
-4. **No `feature` key**: Use `tags:` exclusively for feature identification.
+- **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
+  - **Directory Tag**: Exactly one of `#adr`, `#exec`, `#plan`, `#reference`, or `#research` (based on file location).
+  - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
+  - *Syntax:* `tags: ["#doc-type", "#feature"]` (Must be quoted strings in a list).
+- **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
+  - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
+- **`date`**: MUST use `yyyy-mm-dd` format.
+- **No `feature` key**: Use `tags:` exclusively for feature identification.
 
 ## Requirements
 

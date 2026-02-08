@@ -5,7 +5,7 @@ import pathlib
 import shutil
 from typing import Dict, List, Optional
 
-from .base import AgentProvider, ProcessSpec, CapabilityLevel, resolve_includes
+from .base import AgentProvider, CapabilityLevel, ProcessSpec, resolve_includes
 
 
 class ClaudeProvider(AgentProvider):
@@ -78,14 +78,14 @@ class ClaudeProvider(AgentProvider):
         root_dir: pathlib.Path,
         model_override: Optional[str] = None,
     ) -> ProcessSpec:
-        # 1. Load and Mix Rules (Same as Gemini)
+        #  Load and Mix Rules (Same as Gemini)
         rules = self.load_rules(root_dir)
         system_prompt = self.construct_system_prompt(agent_persona, rules)
 
-        # 2. Prepare Environment
+        #  Prepare Environment
         env = os.environ.copy()
 
-        # 3. Construct Command
+        #  Construct Command
         # Use npx to run the adapter
         executable = shutil.which("npx")
         if not executable:
@@ -99,17 +99,18 @@ class ClaudeProvider(AgentProvider):
 
         cmd_args = ["-y", "@zed-industries/claude-code-acp"]
 
-        # Although model is selected via provider matching, we can pass it to the adapter
-        # if the adapter supported it via args, but looking at source, it reads settings.
+        # Although model is selected via provider matching, we can pass it to the
+        # adapter if the adapter supported it via args, but it reads settings.
         # However, ACP has setSessionModel support.
         # But wait, acp-agent.ts checks `params._meta?.claudeCode?.options`
         # and `settings.model`.
-        # We can pass model preference if we wanted, but acp_dispatch is responsible for
-        # selecting the provider. Inside the session, `claude-code` manages its own model config.
+        # We can pass model preference if we wanted, but acp_dispatch is
+        # responsible for selecting the provider. Inside the session,
+        # `claude-code` manages its own model config.
         # But we can try to hint it if we want.
         # For now, let's stick to just launching the adapter.
 
-        # 4. Session Metadata for System Prompt
+        #  Session Metadata for System Prompt
         # We also prepend to the first message to ensure adherence (fallback strategy)
         initial_prompt = f"{system_prompt}\n\n# TASK\n{task_context}"
 
