@@ -144,7 +144,7 @@ class GeminiProvider(AgentProvider):
             model = self.get_best_model_for_capability(CapabilityLevel[tier.upper()])
 
         #  Build Args
-        args = ["--system", str(temp_path), "mcp", "serve", "--model", model]
+        args = ["--experimental-acp", "--system", str(temp_path), "--model", model]
 
         return ProcessSpec(
             executable=executable,

@@ -32,7 +32,7 @@ description: "Simple, fast and user-friendly alternative to `find`. Use for disc
 ### PowerShell
 
 ```powershell
-# Find all python files and run a command
+# Find all python files in cwd and run a command
 fd -e py | ForEach-Object { <command> $_ }
 ```
 

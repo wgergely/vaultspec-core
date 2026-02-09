@@ -34,8 +34,8 @@ repos:
     hooks:
       - id: markdownlint
         name: markdownlint
-        args: ["--config", ".markdownlint.yaml", "--fix"]
-        # Now checking everything, including .docs/
+        args: ["--config", ".markdownlint.yaml", "--fix", ".rules/", ".docs/", "README.md"]
+        # Now checking .rules, .docs and README.md
 
   - repo: https://github.com/lycheeverse/lychee.git
     rev: v0.15.1

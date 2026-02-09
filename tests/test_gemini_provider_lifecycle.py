@@ -26,7 +26,7 @@ def mock_root(tmp_path: pathlib.Path) -> pathlib.Path:
 @pytest.mark.integration
 @pytest.mark.gemini
 @pytest.mark.asyncio
-async def test_gemini_provider_lifecycle_real(mock_root):
+async def test_gemini_provider_lifecycle(mock_root):
     """Verifies that run_dispatch works with the real GeminiProvider and real CLI."""
     # 1. Setup the agent
     (mock_root / ".rules" / "agents" / "tester.md").write_text(

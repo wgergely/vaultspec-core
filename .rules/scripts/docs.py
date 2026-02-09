@@ -83,7 +83,9 @@ def main():
     )
     index_parser.add_argument("--root", default=".", help="Root directory.")
     index_parser.add_argument("--force", action="store_true", help="Force re-indexing.")
-    index_parser.add_argument("--limit", type=int, help="Limit number of docs to index.")
+    index_parser.add_argument(
+        "--limit", type=int, help="Limit number of docs to index."
+    )
 
     # Search command
     search_parser = subparsers.add_parser("search", help="Semantic search in vault.")
@@ -103,9 +105,11 @@ def main():
         handle_audit(args, metrics_api, verification_api, graph_api, vault_models)
     elif args.command == "index":
         import asyncio
+
         asyncio.run(handle_index(args, vault_rag))
     elif args.command == "search":
         import asyncio
+
         asyncio.run(handle_search(args, vault_rag))
 
 
