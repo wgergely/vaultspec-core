@@ -186,8 +186,8 @@ class TestGeminiProvider:
                 model_override="gemini-2.0-flash-exp",
             )
         assert isinstance(spec, ProcessSpec)
-        assert "mcp" in spec.args
-        assert "serve" in spec.args
+        assert "--experimental-acp" in spec.args
+        assert "--system" in spec.args
         assert len(spec.cleanup_paths) == 1
 
         # Cleanup temp file

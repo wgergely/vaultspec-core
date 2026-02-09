@@ -148,10 +148,11 @@ class TestSessionUpdate:
         )
         await client.session_update("s1", update)
         captured = capsys.readouterr()
+        # DispatchClient prints [Tool] to stderr
         assert "read_file" in captured.err
 
     @pytest.mark.asyncio
-    async def test_tool_call_progress(self, client, _capsys):
+    async def test_tool_call_progress(self, client):
         update = ToolCallProgress(
             session_update="tool_call_update",
             tool_call_id="tc-1",
@@ -159,13 +160,11 @@ class TestSessionUpdate:
             status="in_progress",
         )
         await client.session_update("s1", update)
-        # Progress is not currently printed by default in the real implementation
-        # unless specialized. Let's adjust expectations or implementation.
-        # Actually, let's check what it DOES print.
+        # Progress currently does nothing
         pass
 
     @pytest.mark.asyncio
-    async def test_agent_plan_update(self, client, _capsys):
+    async def test_agent_plan_update(self, client):
         update = AgentPlanUpdate(
             session_update="plan",
             entries=[
@@ -174,16 +173,15 @@ class TestSessionUpdate:
             ],
         )
         await client.session_update("s1", update)
-        # Plan update currently does nothing in base DispatchClient.
+        # Plan update currently does nothing
         pass
 
     @pytest.mark.asyncio
-    async def test_debug_mode_shows_info_updates(self, _capsys, tmp_path):
+    async def test_debug_mode_shows_info_updates(self, tmp_path):
         client = DispatchClient(root_dir=tmp_path, debug=True)
         update = SessionInfoUpdate(session_update="session_info_update")
-        # In debug mode, it logs to logger.debug, which isn't capsys.err by default
-        # unless configured.
         await client.session_update("s1", update)
+        # Info update currently does nothing
         pass
 
 
@@ -292,8 +290,8 @@ class TestTerminalLifecycle:
             session_id="s1",
             args=["-c", "print('hello')"],
         )
-        assert result.terminalId is not None
-        terminal_id = result.terminalId
+        assert result.terminal_id is not None
+        terminal_id = result.terminal_id
         assert terminal_id in client._terminals
 
         # Cleanup
@@ -307,7 +305,7 @@ class TestTerminalLifecycle:
             session_id="s1",
             args=["-c", "print('terminal_test_output')"],
         )
-        terminal_id = result.terminalId
+        terminal_id = result.terminal_id
 
         # Wait for exit
         await client.wait_for_terminal_exit(session_id="s1", terminal_id=terminal_id)
@@ -326,11 +324,11 @@ class TestTerminalLifecycle:
             session_id="s1",
             args=["-c", "exit(0)"],
         )
-        terminal_id = result.terminalId
+        terminal_id = result.terminal_id
         exit_result = await client.wait_for_terminal_exit(
             session_id="s1", terminal_id=terminal_id
         )
-        assert exit_result.exitCode == 0
+        assert exit_result.exit_code == 0
         await client.release_terminal(session_id="s1", terminal_id=terminal_id)
 
     @pytest.mark.asyncio
@@ -341,13 +339,13 @@ class TestTerminalLifecycle:
             session_id="s1",
             args=["-c", "import time; time.sleep(60)"],
         )
-        terminal_id = result.terminalId
+        terminal_id = result.terminal_id
 
         await client.kill_terminal(session_id="s1", terminal_id=terminal_id)
         exit_result = await client.wait_for_terminal_exit(
             session_id="s1", terminal_id=terminal_id
         )
-        assert exit_result.exitCode is not None
+        assert exit_result.exit_code is not None
 
         await client.release_terminal(session_id="s1", terminal_id=terminal_id)
 
@@ -359,7 +357,7 @@ class TestTerminalLifecycle:
             session_id="s1",
             args=["-c", "print('done')"],
         )
-        terminal_id = result.terminalId
+        terminal_id = result.terminal_id
         await client.wait_for_terminal_exit(session_id="s1", terminal_id=terminal_id)
         await client.release_terminal(session_id="s1", terminal_id=terminal_id)
         assert terminal_id not in client._terminals
@@ -375,4 +373,4 @@ class TestTerminalLifecycle:
         exit_result = await client.wait_for_terminal_exit(
             session_id="s1", terminal_id="unknown-id"
         )
-        assert exit_result.exitCode is None
+        assert exit_result.exit_code is None

@@ -47,12 +47,11 @@ class TestInteractiveLoop:
         fake_stdin = io.StringIO("exit\n")
         monkeypatch.setattr(sys, "stdin", fake_stdin)
 
-        # Ensure isatty is true for the loop to continue to input
-        # Wait, if we use a stream, isatty is false.
-        # Let's check _interactive_loop logic.
-        # if not sys.stdin.isatty(): break
+        # input() reads from sys.stdin usually, but let's be explicit
+        # to avoid MagicMock contamination if something else patched it.
+        monkeypatch.setattr("builtins.input", lambda _: fake_stdin.readline().rstrip())
 
-        # We need to mock isatty to True but use real readline
+        # We need to mock isatty to True for the loop to continue to input
         monkeypatch.setattr(fake_stdin, "isatty", lambda: True)
 
         await _interactive_loop(

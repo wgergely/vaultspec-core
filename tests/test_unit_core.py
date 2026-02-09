@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pathlib
+import tempfile
 
 import pytest
 from vault.parser import parse_frontmatter
@@ -87,8 +88,6 @@ class TestSafeReadText:
             safe_read_text(missing, mock_root_dir)
 
     def test_path_outside_workspace_raises(self, mock_root_dir):
-        import tempfile
-
         with tempfile.TemporaryDirectory() as td:
             outside_file = pathlib.Path(td) / "secret.txt"
             outside_file.write_text("secret data", encoding="utf-8")
@@ -103,6 +102,7 @@ class TestSafeReadText:
 
 class TestLoadAgent:
     def test_loads_from_canonical(self, mock_root_dir, test_agent_md):
+        (mock_root_dir / ".rules" / "agents").mkdir(parents=True, exist_ok=True)
         (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(
             test_agent_md, encoding="utf-8"
         )
@@ -113,46 +113,45 @@ class TestLoadAgent:
 
     def test_provider_hint_claude(self, mock_root_dir, test_agent_md):
         # Write to both claude and rules dirs
-        (mock_root_dir / ".claude" / "agents").mkdir(parents=True, exist_ok=True)
-        (mock_root_dir / ".claude" / "agents" / "test-agent.md").write_text(
+        agents_dir = mock_root_dir / ".rules" / "agents"
+        (agents_dir / "claude").mkdir(parents=True, exist_ok=True)
+        (agents_dir / "claude" / "test-agent.md").write_text(
             "---\n"
             "tier: HIGH\n"
-            "model: claude-opus-4-6\n"
+            "model: claude-3-opus-20240229\n"
             "---\n"
             "# Claude Persona\n"
             "Claude specific.",
             encoding="utf-8",
         )
-        (mock_root_dir / ".rules" / "agents").mkdir(parents=True, exist_ok=True)
-        (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(
-            test_agent_md, encoding="utf-8"
-        )
+        agents_dir.mkdir(parents=True, exist_ok=True)
+        (agents_dir / "test-agent.md").write_text(test_agent_md, encoding="utf-8")
 
         meta, persona = load_agent("test-agent", mock_root_dir, provider_name="claude")
-        assert meta["model"] == "claude-opus-4-6"
+        assert meta["model"] == "claude-3-opus-20240229"
         assert "Claude Persona" in persona
 
     def test_provider_hint_gemini(self, mock_root_dir, test_agent_md):
-        (mock_root_dir / ".gemini" / "agents").mkdir(parents=True, exist_ok=True)
-        (mock_root_dir / ".gemini" / "agents" / "test-agent.md").write_text(
+        agents_dir = mock_root_dir / ".rules" / "agents"
+        (agents_dir / "gemini").mkdir(parents=True, exist_ok=True)
+        (agents_dir / "gemini" / "test-agent.md").write_text(
             "---\n"
             "tier: MEDIUM\n"
-            "model: gemini-3-flash-preview\n"
+            "model: gemini-2.0-pro-exp-02-05\n"
             "---\n"
             "# Gemini Persona\n"
             "Gemini specific.",
             encoding="utf-8",
         )
-        (mock_root_dir / ".rules" / "agents").mkdir(parents=True, exist_ok=True)
-        (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(
-            test_agent_md, encoding="utf-8"
-        )
+        agents_dir.mkdir(parents=True, exist_ok=True)
+        (agents_dir / "test-agent.md").write_text(test_agent_md, encoding="utf-8")
 
         meta, _persona = load_agent("test-agent", mock_root_dir, provider_name="gemini")
-        assert meta["model"] == "gemini-3-flash-preview"
+        assert meta["model"] == "gemini-2.0-pro-exp-02-05"
 
     def test_provider_hint_falls_back_to_canonical(self, mock_root_dir, test_agent_md):
         # Only canonical dir has the agent
+        (mock_root_dir / ".rules" / "agents").mkdir(parents=True, exist_ok=True)
         (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(
             test_agent_md, encoding="utf-8"
         )

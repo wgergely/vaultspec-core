@@ -16,8 +16,6 @@ from vault.parser import parse_frontmatter
 
 from acp import spawn_agent_process
 from acp.schema import (
-    ClientCapabilities,
-    Implementation,
     TextContentBlock,
 )
 from orchestration.utils import safe_read_text
@@ -231,16 +229,20 @@ async def run_dispatch(
                 t.add_done_callback(background_tasks.discard)
 
                 # Protocol Handshake
-                caps = ClientCapabilities(
-                    terminal=True,
-                )
-                impl = Implementation(name="gemini-dispatch", version="0.1.0")
+                # Note: Real CLIs (like Claude) may expect string protocolVersion
+                # and 'capabilities' instead of 'clientCapabilities'.
+                caps = {
+                    "terminal": True,
+                    "fs": {"readTextFile": True, "writeTextFile": True},
+                }
+                impl = {"name": "pp-dispatch", "version": "0.1.0"}
 
-                await conn.initialize(
-                    protocol_version=1,
-                    client_capabilities=caps,
-                    client_info=impl,
+                # Bypass library initialize to control exact JSON keys
+                init_res = await conn._conn.send_request(
+                    "initialize",
+                    {"protocolVersion": "1", "capabilities": caps, "clientInfo": impl},
                 )
+                print(f"Handshake Result: {init_res}")
 
                 # Session setup
                 # Note: We pass MCP servers if supported by the provider/spec
