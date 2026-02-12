@@ -72,6 +72,37 @@ def main():
         "--root", type=str, default=str(ROOT_DIR), help="Vault root directory."
     )
 
+    # Index command (RAG)
+    index_parser = subparsers.add_parser(
+        "index", help="Index vault documents for semantic search."
+    )
+    index_parser.add_argument(
+        "--root", type=str, default=str(ROOT_DIR), help="Vault root directory."
+    )
+    index_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Force full re-index (default: incremental).",
+    )
+    index_parser.add_argument(
+        "--json", action="store_true", help="Output result as JSON."
+    )
+
+    # Search command (RAG)
+    search_parser = subparsers.add_parser(
+        "search", help="Semantic search over vault documents."
+    )
+    search_parser.add_argument("query", type=str, help="Search query.")
+    search_parser.add_argument(
+        "--root", type=str, default=str(ROOT_DIR), help="Vault root directory."
+    )
+    search_parser.add_argument(
+        "--limit", type=int, default=5, help="Number of results."
+    )
+    search_parser.add_argument(
+        "--json", action="store_true", help="Output results as JSON."
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -82,6 +113,10 @@ def main():
         handle_create(args)
     elif args.command == "audit":
         handle_audit(args)
+    elif args.command == "index":
+        handle_index(args)
+    elif args.command == "search":
+        handle_search(args)
 
 
 def handle_create(args):
@@ -95,6 +130,7 @@ def handle_create(args):
         print(f"Error: No template found for type '{doc_type.value}'")
         sys.exit(1)
 
+    assert template_path is not None  # narrowing for type checker
     content = template_path.read_text(encoding="utf-8")
     hydrated = hydrate_template(content, feature, date_str, args.title)
 
@@ -211,6 +247,119 @@ def handle_audit(args):
 
     if args.json:
         print(json.dumps(results, indent=2))
+
+
+def handle_index(args):
+    try:
+        from rag.embeddings import EmbeddingModel, get_device_info
+        from rag.indexer import VaultIndexer
+        from rag.store import VaultStore
+    except ImportError:
+        print("Error: RAG dependencies not installed.")
+        print("Run: pip install -e '.[rag]'")
+        sys.exit(1)
+
+    root_dir = pathlib.Path(args.root)
+
+    # Report device info
+    device_info = get_device_info()
+    if not args.json:
+        device = device_info["device"]
+        gpu = device_info.get("gpu_name")
+        if gpu:
+            vram = device_info.get("vram_mb", 0)
+            print(f"Device: {device} ({gpu}, {vram}MB VRAM)")
+        else:
+            print(f"Device: {device}")
+        print()
+
+    model = EmbeddingModel()
+    store = VaultStore(root_dir)
+    indexer = VaultIndexer(root_dir, model, store)
+
+    if args.full:
+        if not args.json:
+            print("Running full index...")
+        result = indexer.full_index()
+    else:
+        if not args.json:
+            print("Running incremental index...")
+        result = indexer.incremental_index()
+
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "total": result.total,
+                    "added": result.added,
+                    "updated": result.updated,
+                    "removed": result.removed,
+                    "duration_ms": result.duration_ms,
+                    "device": result.device,
+                },
+                indent=2,
+            )
+        )
+    else:
+        print("Index complete:")
+        print(f"  Total documents: {result.total}")
+        print(f"  Added:           {result.added}")
+        print(f"  Updated:         {result.updated}")
+        print(f"  Removed:         {result.removed}")
+        print(f"  Duration:        {result.duration_ms}ms")
+        print(f"  Device:          {result.device}")
+
+
+def handle_search(args):
+    try:
+        from rag.embeddings import EmbeddingModel
+        from rag.search import VaultSearcher
+        from rag.store import VaultStore
+    except ImportError:
+        print("Error: RAG dependencies not installed.")
+        print("Run: pip install -e '.[rag]'")
+        sys.exit(1)
+
+    root_dir = pathlib.Path(args.root)
+    store = VaultStore(root_dir)
+
+    if store.count() == 0:
+        print("Error: No documents indexed. Run 'docs.py index' first.")
+        sys.exit(1)
+
+    model = EmbeddingModel()
+    searcher = VaultSearcher(root_dir, model, store)
+    results = searcher.search(args.query, top_k=args.limit)
+
+    if args.json:
+        print(
+            json.dumps(
+                [
+                    {
+                        "id": r.id,
+                        "path": r.path,
+                        "title": r.title,
+                        "doc_type": r.doc_type,
+                        "feature": r.feature,
+                        "date": r.date,
+                        "score": round(r.score, 4),
+                        "snippet": r.snippet,
+                    }
+                    for r in results
+                ],
+                indent=2,
+            )
+        )
+    else:
+        if not results:
+            print(f"No results found for '{args.query}'.")
+            print("Try broadening your query or removing filters.")
+            return
+
+        print(f"Search results for '{args.query}':")
+        for r in results:
+            print(f"  [{r.score:.2f}] {r.path} (#{r.feature})")
+            print(f"         {r.title}")
 
 
 if __name__ == "__main__":

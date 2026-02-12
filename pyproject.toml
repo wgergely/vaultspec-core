@@ -34,6 +34,15 @@ dev = [
     "identify>=2.0.0",
     "nodeenv>=1.0.0",
 ]
+rag = [
+    "torch>=2.5.0",
+    "sentence-transformers>=3.0.0",
+    "lancedb>=0.15.0",
+    "einops>=0.7.0",
+]
+dev-rag = [
+    "task-driven-development[dev,rag]",
+]
 
 [tool.ruff]
 line-length = 88
