@@ -1,6 +1,0 @@
-{
-  "tools": {
-    "discoveryCommand": "python Y:/code/task-worktrees/main/.gemini/tools/tools.py discovery",
-    "callCommand": "python Y:/code/task-worktrees/main/.gemini/tools/tools.py"
-  }
-}
