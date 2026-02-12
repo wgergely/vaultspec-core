@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     import pathlib
@@ -28,6 +28,18 @@ def _check_rag_deps() -> None:
         raise ImportError(
             "RAG dependencies not installed. Run: pip install -e '.[rag]'"
         ) from None
+
+
+def _sanitize_filter_value(value: str) -> str:
+    """Escape a filter value for safe inclusion in SQL WHERE clauses.
+
+    Escapes single quotes (SQL injection vector) and strips control
+    characters. LanceDB does not support parameterized queries, so
+    string escaping is the only defense.
+    """
+    sanitized = value.replace("'", "''")
+    sanitized = "".join(c for c in sanitized if c.isprintable())
+    return sanitized
 
 
 def _parse_json_list(value: str) -> list[str]:
@@ -109,6 +121,18 @@ class VaultStore:
         self.db = lancedb.connect(str(self.db_path))
         self._table = None
         self._fts_dirty = True  # track whether FTS index needs rebuild
+
+    def close(self) -> None:
+        """Release the LanceDB connection and table handle."""
+        self._table = None
+        self.db = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
 
     # ------------------------------------------------------------------
     # Table lifecycle
@@ -293,15 +317,21 @@ class VaultStore:
         escaped = ", ".join(f"'{i.replace(chr(39), '')}'" for i in ids)
         table.delete(f"id IN ({escaped})")
 
+    _FilterKey = Literal["doc_type", "feature", "date"]
+
     @staticmethod
     def _build_where(filters: dict[str, str] | None) -> str | None:
-        """Convert a filters dict into a LanceDB SQL WHERE clause."""
+        """Convert a filters dict into a LanceDB SQL WHERE clause.
+
+        Filter values are sanitized to prevent SQL injection.
+        """
         if not filters:
             return None
         parts: list[str] = []
         for key, value in filters.items():
+            safe_value = _sanitize_filter_value(value)
             if key == "date":
-                parts.append(f"date LIKE '{value}%'")
+                parts.append(f"date LIKE '{safe_value}%'")
             elif key in ("doc_type", "feature"):
-                parts.append(f"{key} = '{value}'")
+                parts.append(f"{key} = '{safe_value}'")
         return " AND ".join(parts) if parts else None
