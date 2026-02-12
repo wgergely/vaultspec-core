@@ -10,11 +10,15 @@ import contextlib
 import json
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import pathlib
+
+    from rag.embeddings import EmbeddingModel
+    from rag.store import VaultStore
 
 from rag.store import VaultDocument
 from vault.models import DocType, VaultConstants
@@ -102,14 +106,12 @@ def prepare_document(
 class VaultIndexer:
     """Orchestrates vault document indexing into the vector store."""
 
-    def __init__(self, vault_root, model, store) -> None:
-        """Initialize the indexer.
-
-        Args:
-            vault_root: Path to the project root containing .docs/.
-            model: EmbeddingModel instance.
-            store: VaultStore instance.
-        """
+    def __init__(
+        self,
+        vault_root: pathlib.Path,
+        model: EmbeddingModel,
+        store: VaultStore,
+    ) -> None:
         self.vault_root = vault_root
         self.model = model
         self.store = store
@@ -122,12 +124,14 @@ class VaultIndexer:
         """
         start = time.time()
 
-        # Scan and prepare all documents
+        # Scan and prepare all documents (concurrent I/O)
+        paths = list(scan_vault(self.vault_root))
         docs = []
-        for path in scan_vault(self.vault_root):
-            doc = prepare_document(path, self.vault_root)
-            if doc is not None:
-                docs.append(doc)
+        with ThreadPoolExecutor() as pool:
+            results = pool.map(lambda p: prepare_document(p, self.vault_root), paths)
+            for doc in results:
+                if doc is not None:
+                    docs.append(doc)
 
         if not docs:
             return IndexResult(
@@ -207,14 +211,19 @@ class VaultIndexer:
             if current_mtime > prev_mtime:
                 modified_ids.add(doc_id)
 
-        # Prepare documents that need (re-)embedding
+        # Prepare documents that need (re-)embedding (concurrent I/O)
         to_index_ids = new_ids | modified_ids
         docs_to_index = []
-        for doc_id in to_index_ids:
-            path = current_docs[doc_id]
-            doc = prepare_document(path, self.vault_root)
-            if doc is not None:
-                docs_to_index.append(doc)
+        if to_index_ids:
+            paths_to_index = [current_docs[doc_id] for doc_id in to_index_ids]
+            with ThreadPoolExecutor() as pool:
+                results = pool.map(
+                    lambda p: prepare_document(p, self.vault_root),
+                    paths_to_index,
+                )
+                for doc in results:
+                    if doc is not None:
+                        docs_to_index.append(doc)
 
         # Embed new/modified documents
         if docs_to_index:
@@ -248,7 +257,7 @@ class VaultIndexer:
         docs_dir = self.vault_root / VaultConstants.DOCS_DIR
         for doc in docs:
             path = docs_dir / doc.path
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(OSError):
                 meta[doc.id] = path.stat().st_mtime
         self._write_meta(meta)
 
@@ -259,7 +268,7 @@ class VaultIndexer:
         """
         meta = {}
         for doc_id, path in docs.items():
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(OSError):
                 meta[doc_id] = path.stat().st_mtime
         self._write_meta(meta)
 

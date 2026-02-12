@@ -7,12 +7,14 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import pathlib
 
+    from graph.api import VaultGraph
     from rag.embeddings import EmbeddingModel
     from rag.store import VaultStore
 
@@ -91,6 +93,7 @@ def rerank_with_graph(
     results: list[SearchResult],
     vault_root: pathlib.Path,
     query: ParsedQuery,
+    graph: VaultGraph | None = None,
 ) -> list[SearchResult]:
     """Apply graph-aware score boosts to search results.
 
@@ -98,14 +101,21 @@ def rerank_with_graph(
     - Authority boost: high in-link count documents get score multiplier
     - Neighborhood boost: docs sharing feature with query filter get boost
     - Recency boost: more recent documents get mild boost
-    """
-    from graph.api import VaultGraph
 
-    try:
-        graph = VaultGraph(vault_root)
-    except Exception as e:
-        logger.warning("Could not load vault graph for re-ranking: %s", e)
-        return results
+    Args:
+        results: Search results to re-rank.
+        vault_root: Path to vault root (used if graph is None).
+        query: Parsed query with filters.
+        graph: Optional pre-built VaultGraph. If None, one is constructed.
+    """
+    if graph is None:
+        from graph.api import VaultGraph as _VaultGraph
+
+        try:
+            graph = _VaultGraph(vault_root)
+        except Exception as e:
+            logger.warning("Could not load vault graph for re-ranking: %s", e)
+            return results
 
     for result in results:
         node = graph.nodes.get(result.id)
@@ -149,10 +159,29 @@ class VaultSearcher:
         vault_root: pathlib.Path,
         model: EmbeddingModel,
         store: VaultStore,
+        *,
+        graph_ttl_seconds: float = 300.0,
     ) -> None:
         self.vault_root = vault_root
         self.model = model
         self.store = store
+        self._graph_ttl = graph_ttl_seconds
+        self._cached_graph: VaultGraph | None = None
+        self._graph_built_at: float = 0.0
+
+    def _get_graph(self) -> VaultGraph | None:
+        """Return a cached VaultGraph, rebuilding if TTL expired."""
+        from graph.api import VaultGraph as _VaultGraph
+
+        now = time.monotonic()
+        if self._cached_graph is None or (now - self._graph_built_at) > self._graph_ttl:
+            try:
+                self._cached_graph = _VaultGraph(self.vault_root)
+                self._graph_built_at = now
+            except Exception as e:
+                logger.warning("Could not build vault graph: %s", e)
+                return None
+        return self._cached_graph
 
     def search(self, raw_query: str, top_k: int = 5) -> list[SearchResult]:
         """Execute a full search pipeline: parse, embed, search, re-rank.
@@ -209,7 +238,8 @@ class VaultSearcher:
                 )
             )
 
-        # Apply graph-aware re-ranking
-        results = rerank_with_graph(results, self.vault_root, parsed)
+        # Apply graph-aware re-ranking with cached graph
+        graph = self._get_graph()
+        results = rerank_with_graph(results, self.vault_root, parsed, graph=graph)
 
         return results[:top_k]
