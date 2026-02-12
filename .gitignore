@@ -161,6 +161,11 @@ cython_debug/
 # Gemini CLI
 .gemini/
 
+# LanceDB vector store
+.lance/
+**/.lance/
+vault_index.json
+
 # Mock project for testing
 mock-project/*
 !mock-project/README.md
