@@ -102,11 +102,17 @@ def _fast_index(indexer, model, store, root, stems):
     )
 
 
-def _build_rag_components(root: pathlib.Path, *, fast: bool) -> dict:
+def _build_rag_components(
+    root: pathlib.Path, *, fast: bool, lance_suffix: str = ""
+) -> dict:
     """Build real RAG components on CUDA GPU.
 
     When ``fast=True``, indexes a 13-doc subset covering all doc_types
     and key features.  When ``fast=False``, indexes the full corpus.
+
+    ``lance_suffix`` isolates the lance directory so that the fast and
+    full fixtures don't share the same ``.lance/`` path and corrupt each
+    other's data files.
 
     Raises:
         GPUNotAvailableError: If no CUDA GPU is available. CPU is not
@@ -116,14 +122,24 @@ def _build_rag_components(root: pathlib.Path, *, fast: bool) -> dict:
     from rag.indexer import VaultIndexer
     from rag.store import VaultStore
 
-    lance_dir = root / ".lance"
+    lance_name = f".lance{lance_suffix}"
+    lance_dir = root / lance_name
 
     # Clean up any previous test data
     if lance_dir.exists():
         shutil.rmtree(lance_dir)
 
     model = EmbeddingModel()  # Fails fast if no CUDA GPU
-    store = VaultStore(root)
+    store = VaultStore.__new__(VaultStore)
+    # Manually init with custom lance path to avoid sharing
+    import lancedb
+
+    store.root_dir = root
+    store.db_path = lance_dir
+    store.db = lancedb.connect(str(lance_dir))
+    store._table = None
+    store._fts_dirty = True
+
     indexer = VaultIndexer(root, model, store)
 
     if fast:
@@ -137,6 +153,7 @@ def _build_rag_components(root: pathlib.Path, *, fast: bool) -> dict:
         "indexer": indexer,
         "index_result": result,
         "root": root,
+        "lance_dir": lance_dir,
     }
 
 
@@ -146,14 +163,13 @@ def rag_components():
 
     Indexes a 13-doc subset covering all 5 doc_types and key features.
     Requires CUDA GPU — fails fast with GPUNotAvailableError otherwise.
-    The .lance/ directory is created inside mock-project and cleaned up after.
+    Uses .lance-fast/ to avoid colliding with the full-corpus fixture.
     """
-    components = _build_rag_components(MOCK_PROJECT, fast=True)
+    components = _build_rag_components(MOCK_PROJECT, fast=True, lance_suffix="-fast")
 
     yield components
 
-    # Cleanup
-    lance_dir = MOCK_PROJECT / ".lance"
+    lance_dir = components["lance_dir"]
     if lance_dir.exists():
         shutil.rmtree(lance_dir)
 
@@ -164,14 +180,13 @@ def rag_components_full():
 
     Only used by tests marked @pytest.mark.slow that need full-corpus
     coverage (quality precision tests, document count assertions, etc.).
-    GPU-only -- will be extremely slow on CPU.
+    Uses .lance-full/ to avoid colliding with the fast fixture.
     """
-    components = _build_rag_components(MOCK_PROJECT, fast=False)
+    components = _build_rag_components(MOCK_PROJECT, fast=False, lance_suffix="-full")
 
     yield components
 
-    # Cleanup
-    lance_dir = MOCK_PROJECT / ".lance"
+    lance_dir = components["lance_dir"]
     if lance_dir.exists():
         shutil.rmtree(lance_dir)
 
