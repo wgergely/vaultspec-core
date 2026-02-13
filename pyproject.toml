@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "task-driven-development"
+name = "vaultspec"
 version = "0.1.0"
-description = "Research, Design, Task Driven Development Framework"
+description = "A governed development framework for AI agents"
 readme = "README.md"
 requires-python = ">=3.13"
 license = {file = "LICENSE"}
@@ -41,7 +41,7 @@ rag = [
     "einops>=0.7.0",
 ]
 dev-rag = [
-    "task-driven-development[dev,rag]",
+    "vaultspec[dev,rag]",
 ]
 
 [tool.ruff]
@@ -70,4 +70,4 @@ known-first-party = ["orchestration", "protocol", "acp"]
 
 [tool.ty.environment]
 python-version = "3.13"
-root = [".", ".rules/lib/src", ".rules/scripts"]
+root = [".", ".vaultspec/lib/src", ".vaultspec/scripts"]

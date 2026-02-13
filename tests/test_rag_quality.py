@@ -8,7 +8,7 @@ import sys
 import pytest
 
 # Ensure vault lib is importable
-LIB_SRC = pathlib.Path(__file__).parent.parent / ".rules" / "lib" / "src"
+LIB_SRC = pathlib.Path(__file__).parent.parent / ".vaultspec" / "lib" / "src"
 if str(LIB_SRC) not in sys.path:
     sys.path.insert(0, str(LIB_SRC))
 
@@ -33,14 +33,15 @@ MOCK_PROJECT = pathlib.Path(__file__).parent.parent / "mock-project"
 class TestHelpfulness:
     """Search quality tests verifying the RAG pipeline returns relevant results.
 
-    Known-answer tests are grounded in actual mock-project/.docs/ content.
+    Known-answer tests are grounded in actual mock-project/.vault/ content.
     Filter tests verify metadata predicates are applied correctly.
     Ranking tests verify score ordering and graph boosts.
     """
 
     # -- Known-answer precision --
 
-    def test_search_finds_safety_audit(self, rag_components, _require_gpu_corpus):
+    @pytest.mark.usefixtures("require_gpu_corpus")
+    def test_search_finds_safety_audit(self, rag_components):
         """'safety audit' should surface the safety audit in reference/.
 
         The doc reference/2026-02-07-main-window-safety-audit.md contains
@@ -105,7 +106,8 @@ class TestHelpfulness:
             f"got: {[(r.id, r.feature) for r in results]}"
         )
 
-    def test_search_displaymap_keyword(self, rag_components, _require_gpu_corpus):
+    @pytest.mark.usefixtures("require_gpu_corpus")
+    def test_search_displaymap_keyword(self, rag_components):
         """'DisplayMap' exact keyword should surface displaymap docs in top 3.
 
         adr/2026-02-06-displaymap-architecture-design.md mentions DisplayMap
@@ -130,7 +132,7 @@ class TestHelpfulness:
     def test_search_finds_french_content(self, rag_components_full):
         """'croissant boulangerie' targets French stories which are NOT indexed.
 
-        Stories live in .docs/stories/ which has no valid DocType, so they
+        Stories live in .vault/stories/ which has no valid DocType, so they
         are skipped during indexing. This query should return empty or
         unrelated results.
         """
@@ -189,7 +191,8 @@ class TestHelpfulness:
                 f"Expected feature 'editor-demo', got '{r.feature}' for {r.id}"
             )
 
-    def test_date_filter_prefix(self, rag_components, _require_gpu_corpus):
+    @pytest.mark.usefixtures("require_gpu_corpus")
+    def test_date_filter_prefix(self, rag_components):
         """'date:2026-02-06 architecture' should return docs dated 2026-02-06.
 
         Requires GPU corpus (multiple docs with varying dates).
@@ -235,7 +238,8 @@ class TestHelpfulness:
 
     # -- Ranking quality --
 
-    def test_exact_keyword_ranks_high(self, rag_components, _require_gpu_corpus):
+    @pytest.mark.usefixtures("require_gpu_corpus")
+    def test_exact_keyword_ranks_high(self, rag_components):
         """Search for 'SetWindowCompositionAttribute' should surface the
         safety audit doc that contains this exact Win32 API identifier.
         Requires GPU corpus (multiple docs).

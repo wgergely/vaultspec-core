@@ -15,8 +15,8 @@ if TYPE_CHECKING:
 @pytest.fixture
 def mock_root(tmp_path: pathlib.Path) -> pathlib.Path:
     """Creates a minimal workspace structure."""
-    (tmp_path / ".docs").mkdir()
-    (tmp_path / ".rules" / "agents").mkdir(parents=True)
+    (tmp_path / ".vault").mkdir()
+    (tmp_path / ".vaultspec" / "agents").mkdir(parents=True)
     (tmp_path / ".gemini" / "rules").mkdir(parents=True)
     # Create a minimal settings file to avoid gemini CLI error
     (tmp_path / ".gemini" / "settings.json").write_text("{}", encoding="utf-8")
@@ -29,7 +29,7 @@ def mock_root(tmp_path: pathlib.Path) -> pathlib.Path:
 async def test_gemini_provider_lifecycle(mock_root):
     """Verifies that run_dispatch works with the real GeminiProvider and real CLI."""
     # 1. Setup the agent
-    (mock_root / ".rules" / "agents" / "tester.md").write_text(
+    (mock_root / ".vaultspec" / "agents" / "tester.md").write_text(
         """---
 tier: LOW
 ---

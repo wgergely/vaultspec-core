@@ -6,5 +6,5 @@ It is explicitly ignored by `.gitignore` in the repository root.
 You can use this to test the CLI synchronization and tool configuration by pointing to this directory as the workspace root:
 
 ```powershell
-python .rules/scripts/cli.py config sync --root ./mock-project --force
+python .vaultspec/scripts/cli.py config sync --root ./mock-project --force
 ```

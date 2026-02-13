@@ -16,7 +16,7 @@ import sys
 import time
 
 # Add lib to path
-LIB_SRC = pathlib.Path(__file__).parent.parent.parent / ".rules" / "lib" / "src"
+LIB_SRC = pathlib.Path(__file__).parent.parent.parent / ".vaultspec" / "lib" / "src"
 if str(LIB_SRC) not in sys.path:
     sys.path.insert(0, str(LIB_SRC))
 

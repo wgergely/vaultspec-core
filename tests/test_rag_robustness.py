@@ -8,7 +8,7 @@ import sys
 import pytest
 
 # Ensure vault lib is importable
-LIB_SRC = pathlib.Path(__file__).parent.parent / ".rules" / "lib" / "src"
+LIB_SRC = pathlib.Path(__file__).parent.parent / ".vaultspec" / "lib" / "src"
 if str(LIB_SRC) not in sys.path:
     sys.path.insert(0, str(LIB_SRC))
 
@@ -40,7 +40,7 @@ class TestRobustness:
     # -- Document edge cases --
 
     def test_stories_without_frontmatter_skipped(self, rag_components):
-        """Stories in .docs/stories/ have no YAML frontmatter and are French fiction.
+        """Stories in .vault/stories/ have no YAML frontmatter and are French fiction.
 
         Since DocType enum doesn't include 'stories', get_doc_type returns None
         and prepare_document returns None. Verify they are gracefully skipped.

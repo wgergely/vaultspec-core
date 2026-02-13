@@ -41,10 +41,10 @@ class TestArtifactExtraction:
         assert _extract_artifacts("") == []
 
     def test_docs_paths(self):
-        text = "I created .docs/plan/my-plan.md and .docs/adr/my-adr.md"
+        text = "I created .vault/plan/my-plan.md and .vault/adr/my-adr.md"
         result = _extract_artifacts(text)
-        assert ".docs/adr/my-adr.md" in result
-        assert ".docs/plan/my-plan.md" in result
+        assert ".vault/adr/my-adr.md" in result
+        assert ".vault/plan/my-plan.md" in result
 
     def test_src_paths(self):
         text = "Modified src/main.rs and src/lib.rs for the feature."
@@ -58,7 +58,7 @@ class TestArtifactExtraction:
         assert result.count("src/main.rs") == 1
 
     def test_sorted_output(self):
-        text = "Created src/z.rs then src/a.rs then .docs/b.md"
+        text = "Created src/z.rs then src/a.rs then .vault/b.md"
         result = _extract_artifacts(text)
         assert result == sorted(result)
 
@@ -77,15 +77,15 @@ class TestMergeArtifacts:
         assert result == ["src/main.rs"]
 
     def test_written_only(self):
-        result = _merge_artifacts([], [".docs/plan.md"])
-        assert result == [".docs/plan.md"]
+        result = _merge_artifacts([], [".vault/plan.md"])
+        assert result == [".vault/plan.md"]
 
     def test_deduplication(self):
         result = _merge_artifacts(
-            [".docs/plan.md", "src/main.rs"],
-            [".docs/plan.md", "src/lib.rs"],
+            [".vault/plan.md", "src/main.rs"],
+            [".vault/plan.md", "src/lib.rs"],
         )
-        assert result.count(".docs/plan.md") == 1
+        assert result.count(".vault/plan.md") == 1
         assert "src/main.rs" in result
         assert "src/lib.rs" in result
 
@@ -108,7 +108,7 @@ class TestTaskEngineIntegration:
         engine = TaskEngine(lock_manager=lm)
 
         task = engine.create_task("test-agent")
-        lm.acquire_lock(task.task_id, {".docs/test.md"}, "read-only")
+        lm.acquire_lock(task.task_id, {".vault/test.md"}, "read-only")
 
         assert task.task_id in lm._locks
 

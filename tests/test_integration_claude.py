@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 @pytest.fixture
 def mock_root(tmp_path: pathlib.Path) -> pathlib.Path:
     """Creates a minimal workspace structure."""
-    (tmp_path / ".docs").mkdir()
-    (tmp_path / ".rules" / "agents").mkdir(parents=True)
+    (tmp_path / ".vault").mkdir()
+    (tmp_path / ".vaultspec" / "agents").mkdir(parents=True)
     return tmp_path
 
 
@@ -24,7 +24,7 @@ def mock_root(tmp_path: pathlib.Path) -> pathlib.Path:
 @pytest.mark.asyncio
 async def test_claude_integration(mock_root):
     """Real integration test for Claude provider."""
-    (mock_root / ".rules" / "agents" / "tester.md").write_text(
+    (mock_root / ".vaultspec" / "agents" / "tester.md").write_text(
         """---
 tier: MEDIUM
 ---

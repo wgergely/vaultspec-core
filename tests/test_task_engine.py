@@ -18,19 +18,19 @@ from orchestration.task_engine import (
 class TestLockManager:
     def test_acquire_lock_basic(self):
         lm = LockManager()
-        assert lm.acquire_lock("t1", {".docs/adr"}, "read-only")[0] is not None
+        assert lm.acquire_lock("t1", {".vault/adr"}, "read-only")[0] is not None
         assert len(lm._locks) == 1
         assert "t1" in lm._locks
 
     def test_acquire_multiple_locks_same_task(self):
         lm = LockManager()
-        lm.acquire_lock("t1", {".docs/adr"}, "read-only")
+        lm.acquire_lock("t1", {".vault/adr"}, "read-only")
         with pytest.raises(ValueError):
             lm.acquire_lock("t1", {"src/"}, "read-write")
 
     def test_release_locks(self):
         lm = LockManager()
-        lm.acquire_lock("t1", {".docs/adr"}, "read-only")
+        lm.acquire_lock("t1", {".vault/adr"}, "read-only")
         lm.release_lock("t1")
         assert "t1" not in lm._locks
 
@@ -40,7 +40,7 @@ class TestLockManager:
 
     def test_get_all_locks_populated(self):
         lm = LockManager()
-        lm.acquire_lock("t1", {".docs/adr"}, "read-only")
+        lm.acquire_lock("t1", {".vault/adr"}, "read-only")
         locks = lm.get_locks()
         assert len(locks) == 1
         assert locks[0].task_id == "t1"
@@ -106,7 +106,7 @@ class TestTaskEngine:
 
     def test_locks_integrated(self, engine):
         engine.create_task("test-agent", mode="read-only")
-        # Assuming TaskEngine automatically acquires locks for .docs/ in read-only
+        # Assuming TaskEngine automatically acquires locks for .vault/ in read-only
         if engine._lock_manager:
             engine._lock_manager.get_locks()
         # If TaskEngine doesn't automatically acquire them (it should based on ADR),
