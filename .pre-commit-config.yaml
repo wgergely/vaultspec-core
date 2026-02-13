@@ -24,7 +24,7 @@ repos:
 
       - id: check-naming
         name: check docs naming
-        entry: .venv/Scripts/python.exe .rules/scripts/docs.py audit --verify
+        entry: .venv/Scripts/python.exe .vaultspec/scripts/docs.py audit --verify
         language: system
         types: [markdown]
         pass_filenames: false
@@ -34,8 +34,8 @@ repos:
     hooks:
       - id: markdownlint
         name: markdownlint
-        args: ["--config", ".markdownlint.yaml", "--fix", ".rules/", ".docs/", "README.md"]
-        # Now checking .rules, .docs and README.md
+        args: ["--config", ".markdownlint.yaml", "--fix", ".vaultspec/", ".vault/", "README.md"]
+        # Now checking .vaultspec, .vault and README.md
 
   - repo: https://github.com/lycheeverse/lychee.git
     rev: v0.15.1

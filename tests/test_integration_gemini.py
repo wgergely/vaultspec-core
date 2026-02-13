@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 @pytest.fixture
 def mock_root(tmp_path: pathlib.Path) -> pathlib.Path:
     """Creates a minimal workspace structure."""
-    (tmp_path / ".docs").mkdir()
-    (tmp_path / ".rules" / "agents").mkdir(parents=True)
+    (tmp_path / ".vault").mkdir()
+    (tmp_path / ".vaultspec" / "agents").mkdir(parents=True)
     (tmp_path / ".gemini").mkdir()
     (tmp_path / ".gemini" / "settings.json").write_text("{}", encoding="utf-8")
     return tmp_path
@@ -26,7 +26,7 @@ def mock_root(tmp_path: pathlib.Path) -> pathlib.Path:
 @pytest.mark.asyncio
 async def test_gemini_integration(mock_root):
     """Real integration test for Gemini provider."""
-    (mock_root / ".rules" / "agents" / "tester.md").write_text(
+    (mock_root / ".vaultspec" / "agents" / "tester.md").write_text(
         """---
 tier: LOW
 ---

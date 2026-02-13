@@ -102,8 +102,8 @@ class TestSafeReadText:
 
 class TestLoadAgent:
     def test_loads_from_canonical(self, mock_root_dir, test_agent_md):
-        (mock_root_dir / ".rules" / "agents").mkdir(parents=True, exist_ok=True)
-        (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(
+        (mock_root_dir / ".vaultspec" / "agents").mkdir(parents=True, exist_ok=True)
+        (mock_root_dir / ".vaultspec" / "agents" / "test-agent.md").write_text(
             test_agent_md, encoding="utf-8"
         )
         # load_agent now takes root_dir
@@ -113,7 +113,7 @@ class TestLoadAgent:
 
     def test_provider_hint_claude(self, mock_root_dir, test_agent_md):
         # Write to both claude and rules dirs
-        agents_dir = mock_root_dir / ".rules" / "agents"
+        agents_dir = mock_root_dir / ".vaultspec" / "agents"
         (agents_dir / "claude").mkdir(parents=True, exist_ok=True)
         (agents_dir / "claude" / "test-agent.md").write_text(
             "---\n"
@@ -132,7 +132,7 @@ class TestLoadAgent:
         assert "Claude Persona" in persona
 
     def test_provider_hint_gemini(self, mock_root_dir, test_agent_md):
-        agents_dir = mock_root_dir / ".rules" / "agents"
+        agents_dir = mock_root_dir / ".vaultspec" / "agents"
         (agents_dir / "gemini").mkdir(parents=True, exist_ok=True)
         (agents_dir / "gemini" / "test-agent.md").write_text(
             "---\n"
@@ -151,8 +151,8 @@ class TestLoadAgent:
 
     def test_provider_hint_falls_back_to_canonical(self, mock_root_dir, test_agent_md):
         # Only canonical dir has the agent
-        (mock_root_dir / ".rules" / "agents").mkdir(parents=True, exist_ok=True)
-        (mock_root_dir / ".rules" / "agents" / "test-agent.md").write_text(
+        (mock_root_dir / ".vaultspec" / "agents").mkdir(parents=True, exist_ok=True)
+        (mock_root_dir / ".vaultspec" / "agents" / "test-agent.md").write_text(
             test_agent_md, encoding="utf-8"
         )
         meta, _persona = load_agent("test-agent", mock_root_dir, provider_name="claude")

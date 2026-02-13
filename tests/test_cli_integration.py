@@ -6,7 +6,7 @@ import sys
 
 def test_cli_help():
     result = subprocess.run(
-        [sys.executable, ".rules/scripts/subagent.py", "--help"],
+        [sys.executable, ".vaultspec/scripts/subagent.py", "--help"],
         capture_output=True,
         text=True,
     )
@@ -16,7 +16,7 @@ def test_cli_help():
 
 def test_cli_list_agents():
     result = subprocess.run(
-        [sys.executable, ".rules/scripts/subagent.py", "list"],
+        [sys.executable, ".vaultspec/scripts/subagent.py", "list"],
         capture_output=True,
         text=True,
     )
