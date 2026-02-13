@@ -11,7 +11,9 @@ if TYPE_CHECKING:
 
 
 class VerificationError:
-    def __init__(self, path: pathlib.Path, message: str):
+    """A single vault verification failure tied to a file path."""
+
+    def __init__(self, path: pathlib.Path, message: str) -> None:
         self.path = path
         self.message = message
 
@@ -77,7 +79,7 @@ def list_features(root_dir: pathlib.Path) -> set[str]:
                 if not DocType.from_tag(tag):
                     # It's a feature tag
                     features.add(tag.lstrip("#"))
-        except Exception:
+        except (OSError, UnicodeDecodeError):
             continue
     return features
 
@@ -101,7 +103,7 @@ def verify_vertical_integrity(root_dir: pathlib.Path) -> list[VerificationError]
             doc_type = get_doc_type(path, root_dir)
             if doc_type == DocType.PLAN:
                 planned_features.update(doc_features)
-        except Exception:
+        except (OSError, UnicodeDecodeError):
             continue
 
     missing_plans = features_found - planned_features

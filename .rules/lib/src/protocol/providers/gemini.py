@@ -22,9 +22,9 @@ _MIN_VERSION_RECOMMENDED = (0, 27, 0)  # v0.27.0 has stable agent skills
 _cached_version: tuple[int, ...] | None = None
 
 SUPPORTED_MODELS = [
-    "gemini-2.0-pro-exp-02-05",
-    "gemini-2.0-flash-exp",
-    "gemini-2.0-flash-thinking-exp-01-21",
+    "gemini-3-pro-preview",
+    "gemini-3-flash-preview",
+    "gemini-2.5-flash",
 ]
 
 
@@ -42,12 +42,16 @@ class GeminiProvider(AgentProvider):
     def get_model_capability(self, model: str) -> CapabilityLevel:
         if "pro" in model:
             return CapabilityLevel.HIGH
+        if "3-flash" in model:
+            return CapabilityLevel.MEDIUM
         return CapabilityLevel.LOW
 
     def get_best_model_for_capability(self, level: CapabilityLevel) -> str:
         if level >= CapabilityLevel.HIGH:
-            return "gemini-2.0-pro-exp-02-05"
-        return "gemini-2.0-flash-exp"
+            return "gemini-3-pro-preview"
+        if level >= CapabilityLevel.MEDIUM:
+            return "gemini-3-flash-preview"
+        return "gemini-2.5-flash"
 
     def load_rules(self, root_dir: pathlib.Path) -> str:
         """Loads and resolves nested rules from .gemini/rules/."""

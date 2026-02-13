@@ -66,8 +66,8 @@ select = [
 unfixable = ["B"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["orchestration", "protocol", "acp", "mcp_dispatch", "acp_dispatch"]
+known-first-party = ["orchestration", "protocol", "acp"]
 
 [tool.ty.environment]
 python-version = "3.13"
-root = [".", ".rules/lib/src"]
+root = [".", ".rules/lib/src", ".rules/scripts"]

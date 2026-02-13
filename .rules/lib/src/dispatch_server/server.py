@@ -17,6 +17,9 @@ from mcp.server.fastmcp.resources.types import FunctionResource
 from pydantic import AnyUrl
 from vault.parser import parse_frontmatter
 
+from orchestration.constants import (
+    READONLY_PERMISSION_PROMPT as _READONLY_PERMISSION_PROMPT,
+)
 from orchestration.dispatch import (
     run_dispatch,
 )
@@ -36,7 +39,7 @@ logging.basicConfig(
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     stream=sys.stderr,
 )
-logger = logging.getLogger("pp-dispatch")
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Server initialization
@@ -71,12 +74,6 @@ _active_clients: dict[str, list] = {}
 # ---------------------------------------------------------------------------
 # Permission enforcement helpers
 # ---------------------------------------------------------------------------
-
-_READONLY_PERMISSION_PROMPT = (
-    "PERMISSION MODE: READ-ONLY\n"
-    "You MUST only write files within the `.docs/` directory. "
-    "Do not modify any source code files.\n\n"
-)
 
 
 def _resolve_effective_mode(agent: str, mode: str | None) -> str:
@@ -194,14 +191,14 @@ def _has_changes() -> bool:
 def _build_agent_cache() -> dict[str, dict[str, object]]:
     cache: dict[str, dict[str, object]] = {}
     if not AGENTS_DIR.is_dir():
-        logger.warning("Agents directory not found: %s", AGENTS_DIR)
+        logger.warning(f"Agents directory not found: {AGENTS_DIR}")
         return cache
     for agent_path in sorted(AGENTS_DIR.glob("*.md")):
         try:
             metadata = _parse_agent_metadata(agent_path)
             cache[str(metadata["name"])] = metadata
         except Exception as exc:
-            logger.warning("Failed to parse agent %s: %s", agent_path.name, exc)
+            logger.warning(f"Failed to parse agent {agent_path.name}: {exc}")
     return cache
 
 

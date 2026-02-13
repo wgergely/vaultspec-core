@@ -12,13 +12,7 @@ import pathlib
 import sys
 import warnings
 
-# Add library logic to path
-CURRENT_DIR = pathlib.Path(__file__).resolve().parent
-ROOT_DIR = CURRENT_DIR.parent.parent
-LIB_SRC_DIR = ROOT_DIR / ".rules" / "lib" / "src"
-
-if str(LIB_SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(LIB_SRC_DIR))
+from _paths import ROOT_DIR  # shared path bootstrap
 
 try:
     from dispatch_server.server import main as server_main
@@ -92,11 +86,9 @@ def command_run(args):
 
     # Permission prompt for read-only
     if args.mode == "read-only":
-        task_goal = (
-            "PERMISSION MODE: READ-ONLY\n"
-            "You MUST only write files within the `.docs/` directory. "
-            "Do not modify any source code files.\n\n" + task_goal
-        )
+        from orchestration.constants import READONLY_PERMISSION_PROMPT
+
+        task_goal = READONLY_PERMISSION_PROMPT + task_goal
 
     warnings.simplefilter("ignore", ResourceWarning)
 

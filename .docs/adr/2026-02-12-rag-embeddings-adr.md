@@ -19,13 +19,13 @@ related:
 
 ## Problem Statement
 
-The vault semantic search system requires a local embedding model to convert documents and queries into dense vector representations. The model must handle technical documentation well (ADRs, architecture decisions, implementation plans), run locally with GPU acceleration when available, and degrade gracefully to CPU-only inference. It must balance embedding quality, VRAM consumption, and inference throughput.
+The vault semantic search system requires a local embedding model to convert documents and queries into dense vector representations. The model must handle technical documentation well (ADRs, architecture decisions, implementation plans) and run locally on a CUDA-enabled GPU. CPU is NOT supported -- all operations require a CUDA GPU. If no GPU is available, the system fails fast with `GPUNotAvailableError`. The model must balance embedding quality, VRAM consumption, and inference throughput.
 
 ## Considerations
 
 - **Domain Fit**: The vault contains technical prose about software architecture, not source code. Models trained on diverse technical documentation outperform code-specific models (CodeBERT, StarEncoder) for this content.
 - **MTEB Retrieval Performance**: The model must rank highly on MTEB retrieval benchmarks, particularly on technical/scientific document subsets.
-- **GPU / CPU Flexibility**: Must leverage CUDA for batch embedding during indexing, but single-query encoding must be fast enough on CPU for interactive search.
+- **GPU Requirement**: Must leverage CUDA for all embedding operations. CPU is not supported -- the system requires a CUDA-enabled GPU and fails fast with `GPUNotAvailableError` if none is detected.
 - **Matryoshka Embeddings**: Variable-dimension output allows trading precision for speed at query time without re-indexing.
 - **Task Prefixes**: Models supporting `search_document:` and `search_query:` prefixes improve retrieval accuracy by distinguishing document encoding from query encoding.
 
@@ -42,7 +42,7 @@ Candidates evaluated:
 
 - Must run via `sentence-transformers` library (standard ecosystem, well-tested).
 - Must fit in <2GB VRAM at fp16 to leave headroom for other GPU workloads.
-- Must encode the full vault (<1000 docs) in under 60 seconds on GPU, under 10 minutes on CPU.
+- Must encode the full vault (<1000 docs) in under 60 seconds on GPU.
 - Must be pip-installable as part of the `[rag]` optional dependency group.
 - Must support Python 3.13+ (requires PyTorch >= 2.5.0 with CUDA 12.x).
 
@@ -56,20 +56,16 @@ The embedding model is loaded via `sentence-transformers` and wrapped in a thin 
 - **Queries**: Prepend `search_query:` prefix. Encode the user's natural language query as-is.
 - **Dimension**: Use 768-dim (full precision) for storage. Matryoshka truncation to 256-dim available as a future optimization lever if index size becomes a concern.
 
-**GPU / CPU Behavior:**
+**GPU Performance (CUDA required):**
 
-| Operation | GPU (CUDA) | CPU Fallback |
-|---|---|---|
-| Model loading | ~3s, ~1.5GB VRAM | ~5s, ~1.5GB RAM |
-| Batch embed (1000 docs) | ~20-30s | ~5-8 minutes |
-| Single query embed | <10ms | ~50-100ms |
-| Incremental re-embed (10 docs) | <1s | ~5-10s |
+| Operation | GPU (CUDA) |
+|---|---|
+| Model loading | ~3s, ~1.5GB VRAM |
+| Batch embed (1000 docs) | ~20-30s |
+| Single query embed | <10ms |
+| Incremental re-embed (10 docs) | <1s |
 
-When no GPU is detected, `sentence-transformers` automatically falls back to CPU inference via PyTorch. No code changes are required. The primary impact is on batch indexing speed -- initial full-vault indexing takes minutes instead of seconds on CPU. Single-query encoding remains fast enough for interactive use (~50-100ms).
-
-**ONNX Runtime Acceleration (CPU optimization):**
-
-For CPU-only deployments, the model can optionally be exported to ONNX format and run via `onnxruntime` for ~2-3x faster CPU inference. This is a future optimization, not required for the initial implementation.
+A CUDA-enabled GPU is required. If no GPU is detected, the system raises `GPUNotAvailableError` at initialization. CPU is NOT supported -- there is no fallback, no degraded mode.
 
 **Model Caching:**
 
@@ -87,4 +83,4 @@ Code-specific embedding models were rejected because the vault content is techni
 - **PyTorch on Windows**: PyTorch CUDA on Windows 11 requires explicit index URL targeting (`pip install torch --index-url https://download.pytorch.org/whl/cu124`). This must be documented in the install instructions.
 - **First-Run Latency**: Initial model download is ~550MB. Subsequent loads from cache are fast (~3-5s).
 - **Embedding Lock-in**: Changing the embedding model later requires full re-indexing of the vault. This is a low-cost operation (<60s on GPU) but must be considered when evaluating future model upgrades.
-- **CPU Viability**: The system is fully functional without a GPU. Batch indexing is slower but acceptable. Interactive search latency remains under 100ms for query encoding.
+- **GPU Requirement**: A CUDA-enabled GPU is mandatory. The system fails fast with `GPUNotAvailableError` if no GPU is available. CPU is not supported.

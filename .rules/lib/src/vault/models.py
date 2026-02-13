@@ -110,10 +110,12 @@ class VaultConstants:
 
     @classmethod
     def is_supported_directory(cls, dirname: str) -> bool:
+        """Return whether *dirname* is a recognized vault subdirectory."""
         return dirname in cls.SUPPORTED_DIRECTORIES
 
     @classmethod
     def get_tag_for_directory(cls, dirname: str) -> str | None:
+        """Return the ``#tag`` for a directory name, or ``None`` if unsupported."""
         try:
             return DocType(dirname).tag
         except ValueError:

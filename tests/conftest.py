@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import pathlib
+import shutil
 import sys
+import time
 
 import pytest
 
@@ -11,6 +13,177 @@ import pytest
 LIB_SRC = pathlib.Path(__file__).parent.parent / ".rules" / "lib" / "src"
 if str(LIB_SRC) not in sys.path:
     sys.path.insert(0, str(LIB_SRC))
+
+# Check if RAG deps are available
+try:
+    import lancedb  # noqa: F401
+    import sentence_transformers  # noqa: F401
+    import torch  # noqa: F401
+
+    HAS_RAG = True
+except ImportError:
+    HAS_RAG = False
+
+MOCK_PROJECT = pathlib.Path(__file__).parent.parent / "mock-project"
+
+# GPU fast corpus: 13 representative docs covering all 5 doc_types and
+# key features needed by the test suite.  Avoids embedding all 213 docs.
+GPU_FAST_CORPUS_STEMS: frozenset[str] = frozenset(
+    [
+        # adr (4) -- architecture, editor-demo, displaymap, dispatch
+        "2026-02-05-editor-demo-architecture",
+        "2026-02-06-displaymap-architecture-design",
+        "2026-02-06-main-window-architecture",
+        "2026-02-07-dispatch-architecture",
+        # plan (2) -- editor-demo feature, main-window
+        "2026-02-05-editor-demo-phase1-plan",
+        "2026-02-06-main-window-master-plan",
+        # exec (2) -- editor-demo feature, layout
+        "2026-02-05-turn-completion-summary",
+        "2026-02-06-layout-alignment-summary",
+        # reference (3) -- safety-audit, editor-demo, displaymap
+        "2026-02-07-main-window-safety-audit",
+        "2026-02-05-editor-demo-core-reference",
+        "2026-02-04-displaymap-reference",
+        # research (2) -- editor-demo, dispatch
+        "2026-02-05-editor-demo-research",
+        "2026-02-07-dispatch-protocol-alignment-audit",
+    ]
+)
+
+# CPU is NOT supported.  All tests require CUDA GPU.
+# If running without GPU, tests that need RAG components will be skipped.
+
+
+def _fast_index(indexer, model, store, root, stems):
+    """Index only the given subset of document stems."""
+    from rag.indexer import IndexResult, prepare_document
+    from vault.scanner import scan_vault
+
+    start = time.time()
+
+    paths = [p for p in scan_vault(root) if p.stem in stems]
+    docs = []
+    for p in paths:
+        doc = prepare_document(p, root)
+        if doc is not None:
+            docs.append(doc)
+
+    if not docs:
+        return IndexResult(
+            total=0,
+            added=0,
+            updated=0,
+            removed=0,
+            duration_ms=0,
+            device=model.device,
+        )
+
+    texts = [f"{d.title}\n\n{d.content}" for d in docs]
+    vectors = model.encode_documents(texts)
+
+    for doc, vec in zip(docs, vectors, strict=True):
+        doc.vector = vec.tolist()
+
+    store.ensure_table()
+    store.upsert_documents(docs)
+
+    # Save metadata for incremental indexing
+    indexer._save_meta(docs)
+
+    duration_ms = int((time.time() - start) * 1000)
+    return IndexResult(
+        total=len(docs),
+        added=len(docs),
+        updated=0,
+        removed=0,
+        duration_ms=duration_ms,
+        device=model.device,
+    )
+
+
+def _build_rag_components(root: pathlib.Path, *, fast: bool) -> dict:
+    """Build real RAG components on CUDA GPU.
+
+    When ``fast=True``, indexes a 13-doc subset covering all doc_types
+    and key features.  When ``fast=False``, indexes the full corpus.
+
+    Raises:
+        GPUNotAvailableError: If no CUDA GPU is available. CPU is not
+            supported — tests will fail fast with a clear error.
+    """
+    from rag.embeddings import EmbeddingModel
+    from rag.indexer import VaultIndexer
+    from rag.store import VaultStore
+
+    lance_dir = root / ".lance"
+
+    # Clean up any previous test data
+    if lance_dir.exists():
+        shutil.rmtree(lance_dir)
+
+    model = EmbeddingModel()  # Fails fast if no CUDA GPU
+    store = VaultStore(root)
+    indexer = VaultIndexer(root, model, store)
+
+    if fast:
+        result = _fast_index(indexer, model, store, root, GPU_FAST_CORPUS_STEMS)
+    else:
+        result = indexer.full_index()
+
+    return {
+        "model": model,
+        "store": store,
+        "indexer": indexer,
+        "index_result": result,
+        "root": root,
+    }
+
+
+@pytest.fixture(scope="session")
+def rag_components():
+    """Set up real RAG components once for the entire test session (GPU only).
+
+    Indexes a 13-doc subset covering all 5 doc_types and key features.
+    Requires CUDA GPU — fails fast with GPUNotAvailableError otherwise.
+    The .lance/ directory is created inside mock-project and cleaned up after.
+    """
+    components = _build_rag_components(MOCK_PROJECT, fast=True)
+
+    yield components
+
+    # Cleanup
+    lance_dir = MOCK_PROJECT / ".lance"
+    if lance_dir.exists():
+        shutil.rmtree(lance_dir)
+
+
+@pytest.fixture(scope="session")
+def rag_components_full():
+    """Set up real RAG components with the FULL 213-doc corpus.
+
+    Only used by tests marked @pytest.mark.slow that need full-corpus
+    coverage (quality precision tests, document count assertions, etc.).
+    GPU-only -- will be extremely slow on CPU.
+    """
+    components = _build_rag_components(MOCK_PROJECT, fast=False)
+
+    yield components
+
+    # Cleanup
+    lance_dir = MOCK_PROJECT / ".lance"
+    if lance_dir.exists():
+        shutil.rmtree(lance_dir)
+
+
+@pytest.fixture
+def require_gpu_corpus(rag_components):
+    """Assert GPU corpus is available (always true with GPU-only policy).
+
+    Kept for backward compatibility with test files that reference it.
+    Since CPU is no longer supported, this is effectively a no-op.
+    """
+    assert rag_components["model"].device == "cuda", "GPU required"
 
 
 @pytest.fixture

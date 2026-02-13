@@ -40,7 +40,7 @@ Patterns evaluated:
 
 ## Constraints
 
-- Must complete end-to-end search (filter + hybrid search + re-rank) in under 100ms on GPU, under 200ms on CPU.
+- Must complete end-to-end search (filter + hybrid search + re-rank) in under 100ms on GPU. CPU is not supported.
 - Must not introduce dependencies beyond those already required by LanceDB and sentence-transformers.
 - Must leverage the existing `VaultGraph` API for graph-aware boosting without duplicating graph logic.
 - Must support structured query syntax for metadata filtering alongside natural language queries.
@@ -80,18 +80,18 @@ Apply score boosts using the existing `VaultGraph` API:
 
 The re-ranking uses only the existing graph API -- no new graph construction or LLM calls.
 
-**GPU / CPU Behavior:**
+**GPU Performance (CUDA required):**
 
-| Stage | GPU (CUDA) | CPU Fallback |
-|---|---|---|
-| Metadata pre-filter | CPU-only (LanceDB predicate) | Same |
-| Query embedding | <10ms | ~50-100ms |
-| BM25 search | CPU-only (Tantivy) | Same |
-| ANN vector search | <5ms | ~20-50ms |
-| Graph re-ranking | CPU-only (in-memory graph) | Same |
-| **Total pipeline** | **<20ms** | **<200ms** |
+| Stage | Performance |
+|---|---|
+| Metadata pre-filter | <1ms (LanceDB predicate, CPU-side) |
+| Query embedding | <10ms (CUDA) |
+| BM25 search | <5ms (Tantivy, CPU-side) |
+| ANN vector search | <5ms (CUDA) |
+| Graph re-ranking | <1ms (in-memory graph, CPU-side) |
+| **Total pipeline** | **<20ms** |
 
-The retrieval pipeline is inherently CPU-friendly. Only the query embedding step benefits from GPU acceleration, and its CPU fallback (~100ms) is well within interactive latency budgets. The BM25 search, metadata filtering, and graph re-ranking are CPU operations regardless of GPU availability. The system performs identically on CPU-only machines for all practical purposes.
+A CUDA-enabled GPU is required. The system fails fast with `GPUNotAvailableError` at initialization if no GPU is detected. Some pipeline stages (BM25 search, metadata filtering, graph re-ranking) are inherently CPU operations, but the embedding model and ANN search require CUDA. CPU-only operation is NOT supported.
 
 ## Rationale
 

@@ -37,7 +37,7 @@ class IndexResult:
     updated: int  # re-indexed (modified)
     removed: int  # removed from index
     duration_ms: int  # wall-clock time
-    device: str  # "cuda" or "cpu"
+    device: str  # "cuda" (GPU required)
 
 
 def _extract_title(body: str) -> str:
@@ -68,7 +68,7 @@ def prepare_document(
     try:
         content = path.read_text(encoding="utf-8")
     except Exception as e:
-        logger.warning("Cannot read %s: %s", path, e)
+        logger.warning(f"Cannot read {path}: {e}")
         return None
 
     metadata, body = parse_vault_metadata(content)
@@ -108,14 +108,14 @@ class VaultIndexer:
 
     def __init__(
         self,
-        vault_root: pathlib.Path,
+        root_dir: pathlib.Path,
         model: EmbeddingModel,
         store: VaultStore,
     ) -> None:
-        self.vault_root = vault_root
+        self.root_dir = root_dir
         self.model = model
         self.store = store
-        self._meta_path = vault_root / ".lance" / "index_meta.json"
+        self._meta_path = root_dir / ".lance" / "index_meta.json"
 
     def full_index(self) -> IndexResult:
         """Full re-index of all vault documents.
@@ -125,10 +125,12 @@ class VaultIndexer:
         start = time.time()
 
         # Scan and prepare all documents (concurrent I/O)
-        paths = list(scan_vault(self.vault_root))
+        # Keep path mapping for mtime metadata (must use scan paths, not reconstructed)
+        paths = list(scan_vault(self.root_dir))
+        path_by_stem: dict[str, pathlib.Path] = {p.stem: p for p in paths}
         docs = []
         with ThreadPoolExecutor() as pool:
-            results = pool.map(lambda p: prepare_document(p, self.vault_root), paths)
+            results = pool.map(lambda p: prepare_document(p, self.root_dir), paths)
             for doc in results:
                 if doc is not None:
                     docs.append(doc)
@@ -158,13 +160,13 @@ class VaultIndexer:
             existing_ids = self.store.get_all_ids()
             if existing_ids:
                 self.store.delete_documents(list(existing_ids))
-        except Exception:
-            pass
+        except OSError:
+            logger.warning("Failed to delete existing documents during full re-index")
 
         self.store.upsert_documents(docs)
 
-        # Save metadata for incremental indexing
-        self._save_meta(docs)
+        # Save metadata using the original scan paths (not reconstructed paths)
+        self._save_meta_from_paths(path_by_stem)
 
         duration_ms = int((time.time() - start) * 1000)
         return IndexResult(
@@ -188,8 +190,8 @@ class VaultIndexer:
 
         # Scan current vault state
         current_docs: dict[str, pathlib.Path] = {}
-        for path in scan_vault(self.vault_root):
-            doc_type = get_doc_type(path, self.vault_root)
+        for path in scan_vault(self.root_dir):
+            doc_type = get_doc_type(path, self.root_dir)
             if doc_type is not None:
                 current_docs[path.stem] = path
 
@@ -218,7 +220,7 @@ class VaultIndexer:
             paths_to_index = [current_docs[doc_id] for doc_id in to_index_ids]
             with ThreadPoolExecutor() as pool:
                 results = pool.map(
-                    lambda p: prepare_document(p, self.vault_root),
+                    lambda p: prepare_document(p, self.root_dir),
                     paths_to_index,
                 )
                 for doc in results:
@@ -254,7 +256,7 @@ class VaultIndexer:
     def _save_meta(self, docs: list[VaultDocument]) -> None:
         """Save index metadata (file mtimes) from VaultDocument list."""
         meta = {}
-        docs_dir = self.vault_root / VaultConstants.DOCS_DIR
+        docs_dir = self.root_dir / VaultConstants.DOCS_DIR
         for doc in docs:
             path = docs_dir / doc.path
             with contextlib.suppress(OSError):
@@ -283,5 +285,5 @@ class VaultIndexer:
             return {}
         try:
             return json.loads(self._meta_path.read_text(encoding="utf-8"))
-        except Exception:
+        except (KeyError, ValueError, OSError):
             return {}

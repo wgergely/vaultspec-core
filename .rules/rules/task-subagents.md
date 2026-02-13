@@ -11,18 +11,18 @@ Sub-agents are the de facto standard for performing any meaningful work. They ar
 This is the **utility skill** that powers the project's agentic workflows.
 
 * **Primary Usage:** You will be instructed to use this skill by high-level workflow skills (e.g., `task-execute` will tell you to "Invoke `task-subagent` with `complex-executor`").
-* **Direct Usage:** You should only invoke this skill directly if the user explicitly requests a specific, isolated agent dispatch (e.g., "Dispatch the safety-auditor to check file X") that falls outside the standard Research -> Plan -> Execute workflow.
+* **Direct Usage:** You should only invoke this skill directly if the user explicitly requests a specific, isolated agent dispatch (e.g., "Dispatch the code-reviewer to check file X") that falls outside the standard Research -> Plan -> Execute workflow.
 
 ## Internal Dispatch Protocol
 
-Internally, the skill uses the `acp_dispatch.py`:
+Internally, the skill uses `subagent.py`:
 
 ```bash
-python .rules/scripts/acp_dispatch.py --agent <agent_name> --task "<task_description|plan_document>"
+python .rules/scripts/subagent.py run --agent <agent_name> --goal "<task_description|plan_document>"
 ```
 
 > `--agent`: The name of the agent to load
-> `--task`: A clear, natural language description of the task (or a `<Plan>` document path)
+> `--goal`: A clear, natural language description of the task (or a `<Plan>` document path)
 > `--model` (Optional): Override the model
 
 ## MCP Server (preferred)
