@@ -1,24 +1,52 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from vault.models import DocumentMetadata
 
+# ---------------------------------------------------------------------------
+# YAML parsing: prefer PyYAML, fall back to simple key-value parser
+# ---------------------------------------------------------------------------
+try:
+    import yaml
 
-def parse_frontmatter(content: str) -> tuple[dict[str, str], str]:
-    """Extracts simple key-value pairs from YAML-style frontmatter."""
-    frontmatter: dict[str, str] = {}
+    def _yaml_load(text: str) -> dict[str, Any]:
+        return yaml.safe_load(text) or {}
+
+except ImportError:
+    yaml = None  # type: ignore
+
+    def _yaml_load(text: str) -> dict[str, Any]:
+        """Minimal key-value YAML parser (fallback when PyYAML unavailable)."""
+        data: dict[str, Any] = {}
+        for line in text.split("\n"):
+            if ":" in line:
+                key, value = line.split(":", 1)
+                data[key.strip()] = value.strip()
+        return data
+
+
+def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
+    """Parse YAML frontmatter and return (metadata dict, body).
+
+    Uses PyYAML when available, falling back to a simple key-value
+    splitter otherwise.
+    """
+    content = content.lstrip()
+    frontmatter: dict[str, Any] = {}
     body = content
-    match = re.match(r"^---\s*\n(.*?)\n---\s*\n(.*)$", content, re.DOTALL)
+    if not content.startswith("---"):
+        return frontmatter, body
+    match = re.match(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", content, re.DOTALL)
     if not match:
         return frontmatter, body
 
-    yaml_content = match.group(1)
+    try:
+        frontmatter = _yaml_load(match.group(1))
+    except Exception:
+        frontmatter = {}
     body = match.group(2)
-    for line in yaml_content.split("\n"):
-        if ":" in line:
-            key, value = line.split(":", 1)
-            frontmatter[key.strip()] = value.strip()
     return frontmatter, body
 
 

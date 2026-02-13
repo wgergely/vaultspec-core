@@ -63,24 +63,28 @@ The system enforces a strict **Research → Decide → Plan → Execute** cycle.
 
 ## Context Management
 
-The system context (what the AI knows about the project and its goals) is managed through three primary files in `.rules/`:
+The system context (what the AI knows about the project and its goals) is managed through config sync and system prompt assembly in `.rules/`:
 
-* **`INTERNAL.md` (Immutable):** Contains the core system context, mission statement, and internal rules. This file should be considered "read-only" for general project work and only modified when the underlying development framework changes.
-* **`CUSTOM.md` (User-Editable):** A placeholder for project-specific instructions, extra context, or user preferences. This content is appended verbatim to the generated config files.
-* **`cli.py config sync`:** This command synchronizes `INTERNAL.md` and `CUSTOM.md` into the root `AGENTS.md` and tool-specific files (`CLAUDE.md`, `GEMINI.md`).
+* **`FRAMEWORK.md` (Immutable):** Contains the core system context, mission statement, and internal rules. This file should be considered "read-only" for general project work and only modified when the underlying development framework changes.
+* **`PROJECT.md` (User-Editable):** A placeholder for project-specific instructions, extra context, or user preferences. This content is appended verbatim to the generated config files.
+* **`cli.py config sync`:** This command synchronizes `FRAMEWORK.md` and `PROJECT.md` into the root `AGENTS.md` and tool-specific files (`CLAUDE.md`, `GEMINI.md`).
+* **`cli.py system show`:** Displays the composable system prompt parts and their generation targets.
+* **`cli.py system sync`:** Assembles parts from `system/` into `SYSTEM.md` and syncs it to tool destinations (e.g., `.gemini/SYSTEM.md`).
 
 **Syntactic Stability:**
-Internal context is stored in the **YAML frontmatter** (under the `system_internal` key) of the generated files to ensure it remains syntactically stable and separated from user-provided content.
+Framework context is stored in the **YAML frontmatter** (under the `system_framework` key) of the generated files to ensure it remains syntactically stable and separated from user-provided content.
 
 ### File Responsibilities
 
 | File | Location | Purpose | Managed By |
 | :--- | :--- | :--- | :--- |
-| `INTERNAL.md` | `.rules/INTERNAL.md` | Core framework & mission | Developer |
-| `CUSTOM.md` | `.rules/CUSTOM.md` | Project-specific context | User |
+| `FRAMEWORK.md` | `.rules/FRAMEWORK.md` | Core framework & mission | Developer |
+| `PROJECT.md` | `.rules/PROJECT.md` | Project-specific context | User |
 | `AGENTS.md` | `./AGENTS.md` | Root-level AI entry point | `cli.py` |
 | `CLAUDE.md` | `.claude/CLAUDE.md` | Claude Code config | `cli.py` |
 | `GEMINI.md` | `.gemini/GEMINI.md` | Gemini CLI config | `cli.py` |
+| `system/` | `.rules/system/` | Composable system prompt parts | Developer |
+| `SYSTEM.md` | `.gemini/SYSTEM.md` | Assembled Gemini system prompt | `cli.py` |
 
 ## Overview Diagram
 
@@ -129,7 +133,7 @@ flowchart TD
     
     %% Phase 1: Research
     SK_RES["Skill: task-research<br/>Announce"]
-    SK_SUB_RES["Skill: task-subagent<br/>Run Command: acp_dispatch.py"]
+    SK_SUB_RES["Skill: task-subagent<br/>Run Command: subagent.py"]
     SA_RES["Agent: adr-researcher<br/>Search<br/>Write Artifact"]
     PH1_END["Phase 1 Complete"]
     
@@ -139,22 +143,22 @@ flowchart TD
     
     %% Phase 3: Reference & Planning
     SK_REF["Skill: task-reference<br/>Announce"]
-    SK_SUB_REF["Skill: task-subagent<br/>Run Command: acp_dispatch.py"]
+    SK_SUB_REF["Skill: task-subagent<br/>Run Command: subagent.py"]
     SA_REF["Agent: reference-auditor<br/>Audit Ref<br/>Write Artifact"]
     
     SK_WRITE["Skill: task-write<br/>Announce"]
-    SK_SUB_WRITE["Skill: task-subagent<br/>Run Command: acp_dispatch.py"]
+    SK_SUB_WRITE["Skill: task-subagent<br/>Run Command: subagent.py"]
     SA_WRITER["Agent: task-writer<br/>Plan Codebase<br/>Write Artifact"]
     PH3_END["Phase 3 Complete"]
     
     %% Phase 4: Execution
     SK_EXEC["Skill: task-execute<br/>Announce"]
-    SK_SUB_EXEC["Skill: task-subagent<br/>Run Command: acp_dispatch.py"]
+    SK_SUB_EXEC["Skill: task-subagent<br/>Run Command: subagent.py"]
     SA_EXEC["Agent: complex-executor<br/>Edit Code<br/>Validate"]
     
     %% Review Phase (Gatekeeper)
     SK_REV["Skill: task-review<br/>Announce"]
-    SK_SUB_REV["Skill: task-subagent<br/>Run Command: acp_dispatch.py"]
+    SK_SUB_REV["Skill: task-subagent<br/>Run Command: subagent.py"]
     SA_REV["Agent: code-reviewer<br/>Audit Safety/Intent<br/>Report"]
     
     EXEC_RET["Execution Return"]
@@ -162,7 +166,7 @@ flowchart TD
     
     %% Phase 5: Revision (if needed)
     SK_FIX["Skill: task-execute (Fixes)<br/>Announce"]
-    SK_SUB_FIX["Skill: task-subagent<br/>Run Command: acp_dispatch.py"]
+    SK_SUB_FIX["Skill: task-subagent<br/>Run Command: subagent.py"]
     SA_FIX["Agent: standard-executor<br/>Fix Code<br/>Verify"]
     PH5_END["Phase 5 Complete"]
     

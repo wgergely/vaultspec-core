@@ -4,16 +4,12 @@ import pathlib
 import sys
 from datetime import datetime
 
-# Add lib/src to path
-SCRIPTS_DIR = pathlib.Path(__file__).parent
-ROOT_DIR = SCRIPTS_DIR.parent.parent
-sys.path.insert(0, str(ROOT_DIR / ".rules" / "lib" / "src"))
-
-from graph.api import VaultGraph  # noqa: E402
-from metrics.api import get_vault_metrics  # noqa: E402
-from vault.hydration import get_template_path, hydrate_template  # noqa: E402
-from vault.models import DocType  # noqa: E402
-from verification.api import (  # noqa: E402
+from _paths import ROOT_DIR  # shared path bootstrap
+from graph.api import VaultGraph
+from metrics.api import get_vault_metrics
+from vault.hydration import get_template_path, hydrate_template
+from vault.models import DocType
+from verification.api import (
     get_malformed,
     list_features,
     verify_vertical_integrity,
@@ -251,9 +247,8 @@ def handle_audit(args):
 
 def handle_index(args):
     try:
-        from rag.embeddings import EmbeddingModel, get_device_info
-        from rag.indexer import VaultIndexer
-        from rag.store import VaultStore
+        from rag.api import index
+        from rag.embeddings import get_device_info
     except ImportError:
         print("Error: RAG dependencies not installed.")
         print("Run: pip install -e '.[rag]'")
@@ -273,18 +268,10 @@ def handle_index(args):
             print(f"Device: {device}")
         print()
 
-    model = EmbeddingModel()
-    store = VaultStore(root_dir)
-    indexer = VaultIndexer(root_dir, model, store)
+    if not args.json:
+        print("Running full index..." if args.full else "Running incremental index...")
 
-    if args.full:
-        if not args.json:
-            print("Running full index...")
-        result = indexer.full_index()
-    else:
-        if not args.json:
-            print("Running incremental index...")
-        result = indexer.incremental_index()
+    result = index(root_dir, full=args.full)
 
     if args.json:
         print(
@@ -312,24 +299,14 @@ def handle_index(args):
 
 def handle_search(args):
     try:
-        from rag.embeddings import EmbeddingModel
-        from rag.search import VaultSearcher
-        from rag.store import VaultStore
+        from rag.api import search
     except ImportError:
         print("Error: RAG dependencies not installed.")
         print("Run: pip install -e '.[rag]'")
         sys.exit(1)
 
     root_dir = pathlib.Path(args.root)
-    store = VaultStore(root_dir)
-
-    if store.count() == 0:
-        print("Error: No documents indexed. Run 'docs.py index' first.")
-        sys.exit(1)
-
-    model = EmbeddingModel()
-    searcher = VaultSearcher(root_dir, model, store)
-    results = searcher.search(args.query, top_k=args.limit)
+    results = search(root_dir, args.query, limit=args.limit)
 
     if args.json:
         print(
@@ -355,7 +332,6 @@ def handle_search(args):
             print(f"No results found for '{args.query}'.")
             print("Try broadening your query or removing filters.")
             return
-
         print(f"Search results for '{args.query}':")
         for r in results:
             print(f"  [{r.score:.2f}] {r.path} (#{r.feature})")

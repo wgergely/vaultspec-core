@@ -21,9 +21,13 @@ from acp.schema import (
 from orchestration.utils import safe_read_text
 from protocol.acp.client import DispatchClient, SessionLogger
 from protocol.acp.types import DispatchResult
+from protocol.providers.claude import ClaudeProvider
 from protocol.providers.gemini import GeminiProvider
 
 logger = logging.getLogger(__name__)
+
+_CLAUDE_PATTERNS = ("claude-",)
+_GEMINI_PATTERNS = ("gemini-",)
 
 
 class AgentNotFoundError(Exception):
@@ -57,16 +61,17 @@ def load_agent(
 
 def get_provider_for_model(model_name: str | None) -> AgentProvider:
     """Selects the appropriate provider for the requested model."""
-    gemini = GeminiProvider()
-
     if not model_name:
-        return gemini
+        return GeminiProvider()
 
-    if any(m in model_name for m in gemini.supported_models):
-        return gemini
+    if any(p in model_name for p in _CLAUDE_PATTERNS):
+        return ClaudeProvider()
 
-    # Fallback/Default
-    return gemini
+    if any(p in model_name for p in _GEMINI_PATTERNS):
+        return GeminiProvider()
+
+    # Fallback: default to Gemini
+    return GeminiProvider()
 
 
 def _build_task_prompt(
@@ -158,7 +163,13 @@ async def run_dispatch(
     current_model = model_override
 
     # 1. Resolve Provider and Load Agent
-    provider = provider_instance or get_provider_for_model(current_model)
+    provider_map = {"gemini": GeminiProvider, "claude": ClaudeProvider}
+    if provider_instance:
+        provider = provider_instance
+    elif provider_override and provider_override in provider_map:
+        provider = provider_map[provider_override]()
+    else:
+        provider = get_provider_for_model(current_model)
     try:
         agent_meta, agent_persona = load_agent(
             agent_name, root_dir, provider_name=provider.name
@@ -242,7 +253,7 @@ async def run_dispatch(
                     "initialize",
                     {"protocolVersion": "1", "capabilities": caps, "clientInfo": impl},
                 )
-                print(f"Handshake Result: {init_res}")
+                logger.debug(f"Handshake Result: {init_res}")
 
                 # Session setup
                 # Note: We pass MCP servers if supported by the provider/spec

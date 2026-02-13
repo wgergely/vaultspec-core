@@ -27,6 +27,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from vault.models import VaultConstants
+
 logger = logging.getLogger(__name__)
 
 
@@ -123,7 +125,7 @@ class LockManager:
     """
 
     # Paths allowed for read-only mode (workspace-relative prefixes).
-    READONLY_ALLOWED_PREFIXES = (".docs/",)
+    READONLY_ALLOWED_PREFIXES = (f"{VaultConstants.DOCS_DIR}/",)
 
     def __init__(self) -> None:
         self._locks: dict[str, FileLock] = {}
@@ -212,7 +214,7 @@ class LockManager:
         """Validate paths are in the read-only zone."""
         violations: list[str] = []
         for path in paths:
-            normalized = path.replace("", "/")
+            normalized = path.replace("\\", "/")
             if not any(
                 normalized.startswith(prefix)
                 for prefix in LockManager.READONLY_ALLOWED_PREFIXES
@@ -247,7 +249,7 @@ class TaskEngine:
         if self._lock_manager is not None:
             released = self._lock_manager.release_lock(task_id)
             if released:
-                logger.debug("Released advisory lock for task %s", task_id)
+                logger.debug(f"Released advisory lock for task {task_id}")
 
     def _cleanup_expired(self) -> None:
         """Remove tasks that have exceeded their TTL."""

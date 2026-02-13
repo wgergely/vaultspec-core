@@ -1,6 +1,5 @@
+from vault.models import DocType, DocumentMetadata, VaultConstants
 from vault.parser import parse_vault_metadata
-
-from orchestration.types import DocType, DocumentMetadata, VaultConstants
 
 
 def test_doctype_enum():

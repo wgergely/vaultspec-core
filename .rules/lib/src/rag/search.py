@@ -91,7 +91,7 @@ def parse_query(raw_query: str) -> ParsedQuery:
 
 def rerank_with_graph(
     results: list[SearchResult],
-    vault_root: pathlib.Path,
+    root_dir: pathlib.Path,
     query: ParsedQuery,
     graph: VaultGraph | None = None,
 ) -> list[SearchResult]:
@@ -104,7 +104,7 @@ def rerank_with_graph(
 
     Args:
         results: Search results to re-rank.
-        vault_root: Path to vault root (used if graph is None).
+        root_dir: Path to vault root (used if graph is None).
         query: Parsed query with filters.
         graph: Optional pre-built VaultGraph. If None, one is constructed.
     """
@@ -112,9 +112,9 @@ def rerank_with_graph(
         from graph.api import VaultGraph as _VaultGraph
 
         try:
-            graph = _VaultGraph(vault_root)
+            graph = _VaultGraph(root_dir)
         except Exception as e:
-            logger.warning("Could not load vault graph for re-ranking: %s", e)
+            logger.warning(f"Could not load vault graph for re-ranking: {e}")
             return results
 
     for result in results:
@@ -156,13 +156,13 @@ class VaultSearcher:
 
     def __init__(
         self,
-        vault_root: pathlib.Path,
+        root_dir: pathlib.Path,
         model: EmbeddingModel,
         store: VaultStore,
         *,
         graph_ttl_seconds: float = 300.0,
     ) -> None:
-        self.vault_root = vault_root
+        self.root_dir = root_dir
         self.model = model
         self.store = store
         self._graph_ttl = graph_ttl_seconds
@@ -176,10 +176,10 @@ class VaultSearcher:
         now = time.monotonic()
         if self._cached_graph is None or (now - self._graph_built_at) > self._graph_ttl:
             try:
-                self._cached_graph = _VaultGraph(self.vault_root)
+                self._cached_graph = _VaultGraph(self.root_dir)
                 self._graph_built_at = now
             except Exception as e:
-                logger.warning("Could not build vault graph: %s", e)
+                logger.warning(f"Could not build vault graph: {e}")
                 return None
         return self._cached_graph
 
@@ -240,6 +240,6 @@ class VaultSearcher:
 
         # Apply graph-aware re-ranking with cached graph
         graph = self._get_graph()
-        results = rerank_with_graph(results, self.vault_root, parsed, graph=graph)
+        results = rerank_with_graph(results, self.root_dir, parsed, graph=graph)
 
         return results[:top_k]

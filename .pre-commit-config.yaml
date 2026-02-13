@@ -24,7 +24,7 @@ repos:
 
       - id: check-naming
         name: check docs naming
-        entry: .venv/Scripts/python.exe .rules/scripts/check_naming.py
+        entry: .venv/Scripts/python.exe .rules/scripts/docs.py audit --verify
         language: system
         types: [markdown]
         pass_filenames: false

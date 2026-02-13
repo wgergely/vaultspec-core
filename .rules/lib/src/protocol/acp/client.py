@@ -11,6 +11,8 @@ import sys
 import uuid
 from typing import TYPE_CHECKING, Any
 
+from vault.models import VaultConstants
+
 from acp.interfaces import Client
 from acp.schema import (
     AgentMessageChunk,
@@ -275,7 +277,11 @@ class DispatchClient(Client):
         # Enforce read-only mode: only .docs/ writes allowed.
         if self.mode == "read-only":
             rel_path = file_path.relative_to(self.root_dir).as_posix()
-            if not rel_path.startswith(".docs/") and not rel_path.startswith(".docs\\"):
+            docs_prefix = f"{VaultConstants.DOCS_DIR}/"
+            docs_prefix_win = f"{VaultConstants.DOCS_DIR}\\"
+            if not rel_path.startswith(docs_prefix) and not rel_path.startswith(
+                docs_prefix_win
+            ):
                 self._log("write_blocked", {"path": path, "reason": "read-only mode"})
                 raise ValueError(
                     f"Write rejected: read-only mode only allows writes to .docs/ "

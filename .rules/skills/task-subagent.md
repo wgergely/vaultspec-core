@@ -11,11 +11,11 @@ This skill is the de facto standard for performing any meaningful task. Use it t
 ## Usage
 
 ```bash
-python .rules/scripts/acp_dispatch.py --agent <agent_name> --task "<task_description|plan_document>"
+python .rules/scripts/subagent.py run --agent <agent_name> --goal "<task_description|plan_document>"
 ```
 
-> `--agent`: The name of the agent to load from `.gemini/agents/` (or `.claude/agents/`)
-> `--task`: A clear, natural language description of the task or a `<Plan>` path.
+> `--agent`: The name of the agent to load from `.rules/agents/`
+> `--goal`: A clear, natural language description of the task or a `<Plan>` path.
 > `--model` (Optional): Override the model defined in the agentfile.
 
 ### Tooling Strategy
@@ -32,13 +32,13 @@ Agents dispatched via this skill MUST prioritize the following tools for all rep
 **Dispatch a research task:**
 
 ```bash
-python .rules/scripts/acp_dispatch.py --agent adr-researcher --task "Analyze the trade-offs of using 'Pattern A' vs 'Pattern B' for library crates."
+python .rules/scripts/subagent.py run --agent adr-researcher --goal "Analyze the trade-offs of using 'Pattern A' vs 'Pattern B' for library crates."
 ```
 
-**Dispatch a safety audit:**
+**Dispatch a code review:**
 
 ```bash
-python .rules/scripts/acp_dispatch.py --agent safety-auditor --task "Audit the `unsafe` block in `src/utils.rs`."
+python .rules/scripts/subagent.py run --agent code-reviewer --goal "Review the `unsafe` block in `src/utils.rs`."
 ```
 
 ## Behavior

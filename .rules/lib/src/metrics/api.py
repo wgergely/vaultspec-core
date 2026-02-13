@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 
 @dataclass
 class VaultSummary:
+    """Aggregate statistics for the vault."""
+
     total_docs: int
     counts_by_type: dict[DocType, int]
     total_features: int

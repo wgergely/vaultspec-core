@@ -20,9 +20,9 @@ class ClaudeProvider(AgentProvider):
     @property
     def supported_models(self) -> list[str]:
         return [
-            "claude-3-5-sonnet-20241022",
-            "claude-3-5-haiku-20241022",
-            "claude-3-opus-20240229",
+            "claude-opus-4-6",
+            "claude-sonnet-4-5",
+            "claude-haiku-4-5",
         ]
 
     def get_model_capability(self, model: str) -> CapabilityLevel:
@@ -34,10 +34,10 @@ class ClaudeProvider(AgentProvider):
 
     def get_best_model_for_capability(self, level: CapabilityLevel) -> str:
         if level >= CapabilityLevel.HIGH:
-            return "claude-3-opus-20240229"
+            return "claude-opus-4-6"
         if level >= CapabilityLevel.MEDIUM:
-            return "claude-3-5-sonnet-20241022"
-        return "claude-3-5-haiku-20241022"
+            return "claude-sonnet-4-5"
+        return "claude-haiku-4-5"
 
     def load_rules(self, root_dir: pathlib.Path) -> str:
         """Loads and resolves nested rules from .claude/rules/."""

@@ -16,9 +16,11 @@ if TYPE_CHECKING:
 
     import numpy as np
 
+from rag.embeddings import EmbeddingModel
+
 logger = logging.getLogger(__name__)
 
-EMBEDDING_DIM = 768
+EMBEDDING_DIM = EmbeddingModel.DIMENSION
 
 
 def _check_rag_deps() -> None:
@@ -103,21 +105,21 @@ class VaultDocument:
 class VaultStore:
     """LanceDB-backed vector store for vault documents.
 
-    Storage lives at ``{vault_root}/.lance/``.  The table ``vault_docs``
+    Storage lives at ``{root_dir}/.lance/``.  The table ``vault_docs``
     holds one row per indexed document with a 768-dim embedding vector
     and full markdown content for Tantivy BM25 search.
     """
 
     TABLE_NAME = "vault_docs"
 
-    def __init__(self, vault_root: pathlib.Path | str) -> None:
+    def __init__(self, root_dir: pathlib.Path | str) -> None:
         _check_rag_deps()
         import pathlib as _pathlib
 
         import lancedb
 
-        self.vault_root = _pathlib.Path(vault_root)
-        self.db_path = self.vault_root / ".lance"
+        self.root_dir = _pathlib.Path(root_dir)
+        self.db_path = self.root_dir / ".lance"
         self.db = lancedb.connect(str(self.db_path))
         self._table = None
         self._fts_dirty = True  # track whether FTS index needs rebuild
@@ -127,10 +129,15 @@ class VaultStore:
         self._table = None
         self.db = None
 
-    def __enter__(self):
+    def __enter__(self) -> VaultStore:
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> bool:
         self.close()
         return False
 
@@ -138,7 +145,7 @@ class VaultStore:
     # Table lifecycle
     # ------------------------------------------------------------------
 
-    def ensure_table(self):
+    def ensure_table(self) -> Any:
         """Create the vault_docs table if it doesn't exist.
 
         Returns the LanceDB Table handle.
@@ -148,6 +155,7 @@ class VaultStore:
 
         import pyarrow as pa
 
+        assert self.db is not None, "VaultStore is closed"
         existing = self.db.list_tables()
         if self.TABLE_NAME in existing:
             self._table = self.db.open_table(self.TABLE_NAME)
@@ -174,7 +182,7 @@ class VaultStore:
                 schema=schema,
             )
             self._table = self.db.create_table(self.TABLE_NAME, empty, mode="overwrite")
-            logger.info("Created table '%s' at %s", self.TABLE_NAME, self.db_path)
+            logger.info(f"Created table '{self.TABLE_NAME}' at {self.db_path}")
 
         return self._table
 
@@ -238,6 +246,21 @@ class VaultStore:
         """Return total number of indexed documents."""
         table = self.ensure_table()
         return table.count_rows()
+
+    def get_by_id(self, doc_id: str) -> dict | None:
+        """Retrieve a single document by ID, or None if not found."""
+        table = self.ensure_table()
+        if table.count_rows() == 0:
+            return None
+        safe_id = _sanitize_filter_value(doc_id)
+        results = table.search().where(f"id = '{safe_id}'").limit(1).to_list()
+        if not results:
+            return None
+        row = results[0]
+        row["tags"] = _parse_json_list(row.get("tags", "[]"))
+        row["related"] = _parse_json_list(row.get("related", "[]"))
+        row.pop("vector", None)
+        return row
 
     def hybrid_search(
         self,

@@ -20,12 +20,12 @@ related:
 
 ## Problem Statement
 
-The `.docs/` vault requires a persistent vector store for semantic search over ADRs, plans, research, and exec documents. The previous Synthetic RAG approach (rejected) used LLM dispatch for both indexing and querying, introducing unacceptable latency, cost, and external service dependency. We need a vector database that runs locally, supports GPU acceleration when available, degrades gracefully to CPU, and fits the embedded CLI model of `docs.py`.
+The `.docs/` vault requires a persistent vector store for semantic search over ADRs, plans, research, and exec documents. The previous Synthetic RAG approach (rejected) used LLM dispatch for both indexing and querying, introducing unacceptable latency, cost, and external service dependency. We need a vector database that runs locally, leverages CUDA GPU acceleration, and fits the embedded CLI model of `docs.py`. CPU is NOT supported -- all RAG operations require a CUDA-enabled GPU.
 
 ## Considerations
 
 - **Embedded vs Server**: The `docs.py` CLI is a standalone script with no daemon processes. A server-based database (Milvus, Qdrant, Weaviate) would require Docker or a background service, violating the existing architectural model.
-- **GPU Acceleration**: Must leverage CUDA when a GPU is present for fast index building and ANN search, but must not require a GPU.
+- **GPU Requirement**: Must leverage CUDA for fast index building and ANN search. A CUDA-enabled GPU is required -- CPU is not supported.
 - **Hybrid Search**: The vault uses specific identifiers (e.g., "DisplayMap", "BlockMap") that pure vector search misses. Native BM25 + vector hybrid search is essential.
 - **Incremental Indexing**: Documents are added and modified over time. The store must support efficient upserts without full re-indexing.
 - **Windows 11 + Python 3.13+**: Must install cleanly via pip on the target platform.
@@ -43,7 +43,7 @@ Candidates evaluated:
 - Must be pip-installable as an optional dependency (`pip install .[rag]`).
 - Must not require Docker, background services, or system-level database installations.
 - Storage directory (`.lance/`) must coexist with `.docs/` at the vault root and be `.gitignore`-friendly.
-- Must function fully on CPU-only systems with degraded but acceptable performance.
+- Must require a CUDA-enabled GPU. CPU is not supported -- the system fails fast with `GPUNotAvailableError` if no GPU is detected.
 
 ## Implementation
 
@@ -64,16 +64,16 @@ content: str         # full body text (for BM25)
 vector: vector[768]  # embedding from nomic-embed-text-v1.5
 ```
 
-**GPU / CPU Behavior:**
+**GPU Performance (CUDA required):**
 
-| Operation | GPU (CUDA) | CPU Fallback |
-|---|---|---|
-| Index build (IVF-PQ) | Sub-second for <1000 docs | ~2-5 seconds |
-| ANN search | <5ms | ~20-50ms |
-| BM25 full-text search | CPU-only (Tantivy) | Same performance |
-| Hybrid search (BM25 + ANN) | <10ms total | ~50-70ms total |
+| Operation | GPU (CUDA) |
+|---|---|
+| Index build (IVF-PQ) | Sub-second for <1000 docs |
+| ANN search | <5ms |
+| BM25 full-text search | CPU (Tantivy -- this component is inherently CPU-based) |
+| Hybrid search (BM25 + ANN) | <10ms total |
 
-When no GPU is detected, LanceDB automatically falls back to CPU-based flat or IVF index construction. At the current vault scale (<1000 documents), CPU performance is fully acceptable for interactive use. No code changes are needed for CPU fallback -- LanceDB handles this transparently.
+A CUDA-enabled GPU is required. The system fails fast with `GPUNotAvailableError` at initialization if no GPU is detected. CPU-only operation is NOT supported.
 
 **Disk footprint:** ~10MB for 1000 documents at 768 dimensions.
 
@@ -88,4 +88,4 @@ FAISS was rejected because it is an index primitive, not a database -- we would 
 - **New Dependency**: `lancedb>=0.15.0` added as an optional dependency in the `[rag]` extras group. Core vault tools remain dependency-free.
 - **Storage Artifact**: `.lance/` directory at vault root must be added to `.gitignore`.
 - **Version Risk**: LanceDB is pre-1.0 (v0.x as of early 2026). The Lance columnar format itself is stable (Arrow-based), and the embedding layer is database-agnostic, so migrating to an alternative store (ChromaDB, flat numpy) is straightforward if needed.
-- **No GPU Lock-in**: The system works identically on CPU-only machines. GPU is a performance optimization, not a requirement.
+- **GPU Required**: A CUDA-enabled GPU is mandatory for all RAG operations. The system fails fast with `GPUNotAvailableError` if no GPU is available. CPU is not supported.

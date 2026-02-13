@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 
 @dataclass
 class DocNode:
+    """A node in the vault document graph representing a single document."""
+
     path: pathlib.Path
     name: str
     doc_type: DocType | None = None
@@ -23,12 +25,14 @@ class DocNode:
 
 
 class VaultGraph:
-    def __init__(self, root_dir: pathlib.Path):
+    """Directed graph of vault documents linked by wiki-links and related fields."""
+
+    def __init__(self, root_dir: pathlib.Path) -> None:
         self.root_dir = root_dir
         self.nodes: dict[str, DocNode] = {}
         self._build_graph()
 
-    def _build_graph(self):
+    def _build_graph(self) -> None:
         # First pass: Create nodes with metadata
         for path in scan_vault(self.root_dir):
             name = path.stem
@@ -40,7 +44,7 @@ class VaultGraph:
                 content = path.read_text(encoding="utf-8")
                 metadata, _body = parse_vault_metadata(content)
                 node.tags = set(metadata.tags)
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 pass
 
             self.nodes[name] = node
@@ -59,7 +63,7 @@ class VaultGraph:
                 for target in links:
                     if target in self.nodes:
                         self.nodes[target].in_links.add(name)
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 continue
 
     def get_hotspots(

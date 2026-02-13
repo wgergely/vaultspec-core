@@ -126,7 +126,7 @@ def load_mcp_servers(root_dir: pathlib.Path) -> list[dict[str, Any]]:
     try:
         data = json.loads(settings_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
-        logger.warning("Failed to read settings file %s: %s", settings_path, exc)
+        logger.warning(f"Failed to read settings file {settings_path}: {exc}")
         return []
 
     mcp_block = data.get("mcpServers")
@@ -136,7 +136,7 @@ def load_mcp_servers(root_dir: pathlib.Path) -> list[dict[str, Any]]:
     servers: list[dict[str, Any]] = []
     for name, cfg in mcp_block.items():
         if not isinstance(cfg, dict) or "command" not in cfg:
-            logger.warning("Skipping malformed MCP server entry: %s", name)
+            logger.warning(f"Skipping malformed MCP server entry: {name}")
             continue
         servers.append(
             {
