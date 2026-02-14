@@ -25,7 +25,7 @@ from protocol.providers.gemini import GeminiProvider
 
 _has_gemini_cli = shutil.which("gemini") is not None
 
-TEST_PROJECT = Path(__file__).parent.parent / "test-project"
+TEST_PROJECT = Path(__file__).resolve().parent.parent.parent.parent / "test-project"
 
 
 def _cleanup_test_project(root: Path) -> None:
@@ -56,6 +56,7 @@ def test_project_root() -> Iterator[Path]:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.unit
 def test_gemini_loads_rules(test_project_root):
     """Verify GeminiProvider.load_rules() reads .gemini/rules/ files."""
     (test_project_root / ".gemini" / "rules" / "test-rule.md").write_text(
@@ -69,6 +70,7 @@ def test_gemini_loads_rules(test_project_root):
     assert "Test Rule" in rules
 
 
+@pytest.mark.unit
 def test_gemini_system_prompt_includes_rules(test_project_root):
     """Verify Gemini system prompt combines persona + rules."""
     (test_project_root / ".gemini" / "rules" / "identity.md").write_text(
@@ -86,6 +88,7 @@ def test_gemini_system_prompt_includes_rules(test_project_root):
     assert "SYSTEM RULES" in prompt
 
 
+@pytest.mark.unit
 def test_gemini_process_spec_complete(test_project_root):
     """Verify Gemini ProcessSpec has system prompt with persona + rules."""
     (test_project_root / ".gemini" / "rules" / "identity.md").write_text(

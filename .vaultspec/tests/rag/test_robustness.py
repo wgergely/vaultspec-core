@@ -2,15 +2,7 @@
 
 from __future__ import annotations
 
-import pathlib
-import sys
-
 import pytest
-
-# Ensure vault lib is importable
-LIB_SRC = pathlib.Path(__file__).parent.parent / ".vaultspec" / "lib" / "src"
-if str(LIB_SRC) not in sys.path:
-    sys.path.insert(0, str(LIB_SRC))
 
 # Check if RAG deps are available
 try:
@@ -22,7 +14,10 @@ try:
 except ImportError:
     HAS_RAG = False
 
-pytestmark = pytest.mark.skipif(not HAS_RAG, reason="RAG dependencies not installed")
+pytestmark = [
+    pytest.mark.search,
+    pytest.mark.skipif(not HAS_RAG, reason="RAG dependencies not installed"),
+]
 
 
 # ---- Robustness Tests ----

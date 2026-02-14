@@ -16,11 +16,13 @@ import sys
 import time
 
 # Add lib to path
-LIB_SRC = pathlib.Path(__file__).parent.parent.parent / ".vaultspec" / "lib" / "src"
+LIB_SRC = pathlib.Path(__file__).resolve().parent.parent.parent / "lib" / "src"
 if str(LIB_SRC) not in sys.path:
     sys.path.insert(0, str(LIB_SRC))
 
-TEST_PROJECT = pathlib.Path(__file__).parent.parent.parent / "test-project"
+TEST_PROJECT = (
+    pathlib.Path(__file__).resolve().parent.parent.parent.parent / "test-project"
+)
 
 
 def _hr(char: str = "-", width: int = 72) -> str:

@@ -3,14 +3,8 @@
 from __future__ import annotations
 
 import pathlib
-import sys
 
 import pytest
-
-# Ensure vault lib is importable
-LIB_SRC = pathlib.Path(__file__).parent.parent / ".vaultspec" / "lib" / "src"
-if str(LIB_SRC) not in sys.path:
-    sys.path.insert(0, str(LIB_SRC))
 
 # Check if RAG deps are available
 try:
@@ -24,7 +18,9 @@ except ImportError:
 
 pytestmark = pytest.mark.skipif(not HAS_RAG, reason="RAG dependencies not installed")
 
-TEST_PROJECT = pathlib.Path(__file__).parent.parent / "test-project"
+TEST_PROJECT = (
+    pathlib.Path(__file__).resolve().parent.parent.parent.parent / "test-project"
+)
 
 
 # ---- Indexer Tests ----
@@ -33,6 +29,7 @@ TEST_PROJECT = pathlib.Path(__file__).parent.parent / "test-project"
 class TestVaultIndexer:
     """Tests for the indexing pipeline with real vault data."""
 
+    @pytest.mark.index
     def test_full_index_counts(self, rag_components):
         result = rag_components["index_result"]
         assert result.total > 0
@@ -40,12 +37,13 @@ class TestVaultIndexer:
         assert result.duration_ms >= 0
         assert result.device == "cuda"
 
+    @pytest.mark.index
     def test_index_matches_store_count(self, rag_components):
         result = rag_components["index_result"]
         store = rag_components["store"]
         assert result.total == store.count()
 
-    @pytest.mark.slow
+    @pytest.mark.quality
     def test_incremental_index_no_changes(self, rag_components_full):
         """Incremental index with no changes should report zero additions.
 
@@ -67,6 +65,7 @@ class TestVaultIndexer:
 class TestDocumentPreparation:
     """Tests for individual document preparation."""
 
+    @pytest.mark.index
     def test_prepare_real_document(self):
         from rag.indexer import prepare_document
 
@@ -83,7 +82,7 @@ class TestDocumentPreparation:
         assert doc.doc_type in ("adr", "exec", "plan", "reference", "research")
         assert doc.content
 
-    @pytest.mark.slow
+    @pytest.mark.quality
     def test_prepare_all_documents(self):
         from rag.indexer import prepare_document
         from vault.scanner import scan_vault
@@ -107,7 +106,7 @@ class TestDocumentPreparation:
 class TestIndexEdgeCases:
     """Edge cases for indexing operations."""
 
-    @pytest.mark.slow
+    @pytest.mark.quality
     def test_double_full_index_idempotent(self, rag_components_full):
         """Two full_index() calls should yield the same document count."""
         indexer = rag_components_full["indexer"]
@@ -124,7 +123,7 @@ class TestIndexEdgeCases:
         )
         assert result.total == second_count
 
-    @pytest.mark.slow
+    @pytest.mark.quality
     def test_incremental_after_full_stable(self, rag_components_full):
         """Incremental index after full should report zero changes."""
         indexer = rag_components_full["indexer"]
@@ -134,7 +133,7 @@ class TestIndexEdgeCases:
         assert result.removed == 0, f"Expected 0 removed, got {result.removed}"
         assert result.total == rag_components_full["index_result"].total
 
-    @pytest.mark.slow
+    @pytest.mark.quality
     def test_docs_without_frontmatter_counted(self):
         """Verify how many docs in the vault lack frontmatter entirely.
         These should all be in unsupported directories (stories) or have

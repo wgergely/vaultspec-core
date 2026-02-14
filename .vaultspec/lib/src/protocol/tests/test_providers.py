@@ -17,6 +17,8 @@ from protocol.providers.base import (
 from protocol.providers.claude import ClaudeProvider
 from protocol.providers.gemini import GeminiProvider
 
+pytestmark = [pytest.mark.unit]
+
 # ---------------------------------------------------------------------------
 # TestSharedResolveIncludes (base.py free function)
 # ---------------------------------------------------------------------------

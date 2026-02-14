@@ -7,9 +7,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from acp.client.connection import ClientSideConnection
-from acp.schema import PromptResponse
-from orchestration.dispatch import (
+pytestmark = [pytest.mark.unit]
+
+from acp.client.connection import ClientSideConnection  # noqa: E402
+from acp.schema import PromptResponse  # noqa: E402
+from orchestration.dispatch import (  # noqa: E402
     _interactive_loop,
 )
 

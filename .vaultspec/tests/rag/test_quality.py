@@ -2,15 +2,7 @@
 
 from __future__ import annotations
 
-import pathlib
-import sys
-
 import pytest
-
-# Ensure vault lib is importable
-LIB_SRC = pathlib.Path(__file__).parent.parent / ".vaultspec" / "lib" / "src"
-if str(LIB_SRC) not in sys.path:
-    sys.path.insert(0, str(LIB_SRC))
 
 # Check if RAG deps are available
 try:
@@ -22,7 +14,10 @@ try:
 except ImportError:
     HAS_RAG = False
 
-pytestmark = pytest.mark.skipif(not HAS_RAG, reason="RAG dependencies not installed")
+pytestmark = [
+    pytest.mark.quality,
+    pytest.mark.skipif(not HAS_RAG, reason="RAG dependencies not installed"),
+]
 
 
 # ---- Helpfulness / Search Quality Tests ----
@@ -126,7 +121,6 @@ class TestHelpfulness:
         found = any("displaymap" in rid.lower() for rid in result_ids)
         assert found, f"Expected a displaymap doc in top 3, got: {result_ids}"
 
-    @pytest.mark.slow
     def test_search_finds_french_content(self, rag_components_full):
         """'croissant boulangerie' targets French stories which are NOT indexed.
 
@@ -259,7 +253,6 @@ class TestHelpfulness:
             f"got: {[r.id for r in results]}"
         )
 
-    @pytest.mark.slow
     def test_authority_boost_measurable(self, rag_components_full):
         """Well-linked docs should have higher scores than orphan docs.
 

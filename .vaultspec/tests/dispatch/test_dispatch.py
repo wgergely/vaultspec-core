@@ -6,6 +6,10 @@ Unit tests for helpers, artifact extraction, and merge have been moved to:
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = [pytest.mark.api]
+
 # ---------------------------------------------------------------------------
 # TestTaskEngineIntegration
 # ---------------------------------------------------------------------------

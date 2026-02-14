@@ -1,5 +1,8 @@
+import pytest
 from vault.models import DocType, DocumentMetadata, VaultConstants
 from vault.parser import parse_vault_metadata
+
+pytestmark = [pytest.mark.unit]
 
 
 def test_doctype_enum():

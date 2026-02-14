@@ -1105,6 +1105,53 @@ def print_summary(resource: str, result: SyncResult) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Test runner
+# ---------------------------------------------------------------------------
+
+VALID_CATEGORIES = {"all", "unit", "api", "search", "index", "quality"}
+
+MODULE_PATHS = {
+    "cli": [".vaultspec/tests/cli"],
+    "rag": [".vaultspec/tests/rag", ".vaultspec/lib/src/rag/tests"],
+    "vault": [".vaultspec/lib/src/vault/tests"],
+    "protocol": [".vaultspec/lib/src/protocol/tests"],
+    "orchestration": [".vaultspec/lib/src/orchestration/tests"],
+    "dispatch": [
+        ".vaultspec/tests/dispatch",
+        ".vaultspec/lib/src/dispatch_server/tests",
+    ],
+}
+
+
+def test_run(args: argparse.Namespace) -> None:
+    category = getattr(args, "category", "all") or "all"
+    module = getattr(args, "module", None)
+    extra = getattr(args, "extra_args", []) or []
+
+    cmd = [sys.executable, "-m", "pytest"]
+
+    if category != "all":
+        cmd.extend(["-m", category])
+
+    if module:
+        if module not in MODULE_PATHS:
+            valid = ", ".join(sorted(MODULE_PATHS))
+            print(f"Error: Unknown module '{module}'. Valid: {valid}")
+            return
+        for p in MODULE_PATHS[module]:
+            cmd.append(str(ROOT_DIR / p))
+    else:
+        cmd.append(str(ROOT_DIR / ".vaultspec" / "tests"))
+        cmd.append(str(ROOT_DIR / ".vaultspec" / "lib" / "src"))
+
+    cmd.extend(extra)
+
+    print(f"Running: {' '.join(cmd)}")
+    result = subprocess.run(cmd, cwd=str(ROOT_DIR))
+    sys.exit(result.returncode)
+
+
+# ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
 
@@ -1213,6 +1260,23 @@ def main() -> None:
     add_sync_flags(sync_all_parser)
     sync_all_parser.add_argument("--force", action="store_true", help="Force overwrite")
 
+    # --- test ---
+    test_parser = resource_parsers.add_parser("test", help="Run tests")
+    test_parser.add_argument(
+        "category",
+        nargs="?",
+        default="all",
+        choices=["all", "unit", "api", "search", "index", "quality"],
+        help="Test category (default: all)",
+    )
+    test_parser.add_argument(
+        "--module",
+        "-m",
+        choices=["cli", "rag", "vault", "protocol", "orchestration", "dispatch"],
+        help="Filter by module",
+    )
+    test_parser.add_argument("extra_args", nargs="*", help="Extra pytest arguments")
+
     args = parser.parse_args()
 
     if args.root is not None:
@@ -1261,6 +1325,8 @@ def main() -> None:
             system_sync(args)
         else:
             system_parser.print_help()
+    elif args.resource == "test":
+        test_run(args)
     elif args.resource == "sync-all":
         print("Syncing all resources...")
         rules_sync(args)

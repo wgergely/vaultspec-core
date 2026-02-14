@@ -4,7 +4,9 @@ import time
 
 import pytest
 
-from orchestration.task_engine import (
+pytestmark = [pytest.mark.unit]
+
+from orchestration.task_engine import (  # noqa: E402
     LockManager,
     TaskEngine,
     TaskStatus,

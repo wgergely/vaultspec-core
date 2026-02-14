@@ -20,6 +20,8 @@ from acp.schema import (
 )
 from protocol.acp.client import DispatchClient
 
+pytestmark = [pytest.mark.unit]
+
 # ---------------------------------------------------------------------------
 # TestRequestPermission
 # ---------------------------------------------------------------------------
