@@ -12,6 +12,7 @@ from .base import (
     AgentProvider,
     CapabilityLevel,
     GeminiModels,
+    ModelRegistry,
     ProcessSpec,
     resolve_includes,
 )
@@ -31,22 +32,8 @@ class GeminiProvider(AgentProvider):
         return "gemini"
 
     @property
-    def supported_models(self) -> list[str]:
-        return GeminiModels.ALL
-
-    def get_model_capability(self, model: str) -> CapabilityLevel:
-        if "pro" in model:
-            return CapabilityLevel.HIGH
-        if "2.5-flash" in model:
-            return CapabilityLevel.LOW
-        return CapabilityLevel.MEDIUM
-
-    def get_best_model_for_capability(self, level: CapabilityLevel) -> str:
-        if level >= CapabilityLevel.HIGH:
-            return GeminiModels.HIGH
-        if level <= CapabilityLevel.LOW:
-            return GeminiModels.LOW
-        return GeminiModels.MEDIUM
+    def models(self) -> ModelRegistry:
+        return GeminiModels
 
     def load_rules(self, root_dir: pathlib.Path) -> str:
         """Loads and resolves nested rules from .gemini/rules/."""

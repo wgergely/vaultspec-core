@@ -28,6 +28,12 @@ class ClaudeModels:
 
     ALL: ClassVar[list[str]] = [HIGH, MEDIUM, LOW]
 
+    BY_LEVEL: ClassVar[dict[CapabilityLevel, str]] = {
+        CapabilityLevel.HIGH: HIGH,
+        CapabilityLevel.MEDIUM: MEDIUM,
+        CapabilityLevel.LOW: LOW,
+    }
+
 
 class GeminiModels:
     """Single source of truth for Gemini model identifiers."""
@@ -37,6 +43,16 @@ class GeminiModels:
     LOW = "gemini-2.5-flash"
 
     ALL: ClassVar[list[str]] = [HIGH, MEDIUM, LOW]
+
+    BY_LEVEL: ClassVar[dict[CapabilityLevel, str]] = {
+        CapabilityLevel.HIGH: HIGH,
+        CapabilityLevel.MEDIUM: MEDIUM,
+        CapabilityLevel.LOW: LOW,
+    }
+
+
+# Type alias for model registry classes
+ModelRegistry = type[ClaudeModels] | type[GeminiModels]
 
 
 @dataclass
@@ -177,27 +193,26 @@ class AgentProvider(abc.ABC):
     @abc.abstractmethod
     def name(self) -> str:
         """The name of the provider (e.g., 'gemini', 'claude')."""
-        pass
 
     @property
     @abc.abstractmethod
+    def models(self) -> ModelRegistry:
+        """The model registry class for this provider."""
+
+    @property
     def supported_models(self) -> list[str]:
-        """List of models supported by this provider."""
-        pass
+        return self.models.ALL
 
-    @abc.abstractmethod
     def get_model_capability(self, model: str) -> CapabilityLevel:
-        """Returns the capability level of a specific model.
+        """Look up capability level from the registry. Defaults to MEDIUM."""
+        for level, name in self.models.BY_LEVEL.items():
+            if name == model:
+                return level
+        return CapabilityLevel.MEDIUM
 
-        Raises:
-            ValueError: If model is not supported by this provider.
-        """
-        pass
-
-    @abc.abstractmethod
     def get_best_model_for_capability(self, level: CapabilityLevel) -> str:
-        """Returns the best matching model for the requested capability level."""
-        pass
+        """Look up best model from the registry. Defaults to MEDIUM."""
+        return self.models.BY_LEVEL.get(level, self.models.MEDIUM)
 
     @abc.abstractmethod
     def prepare_process(

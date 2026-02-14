@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 from .base import (
     AgentProvider,
-    CapabilityLevel,
     ClaudeModels,
+    ModelRegistry,
     ProcessSpec,
     resolve_includes,
 )
@@ -24,22 +24,8 @@ class ClaudeProvider(AgentProvider):
         return "claude"
 
     @property
-    def supported_models(self) -> list[str]:
-        return ClaudeModels.ALL
-
-    def get_model_capability(self, model: str) -> CapabilityLevel:
-        if "opus" in model:
-            return CapabilityLevel.HIGH
-        if "haiku" in model:
-            return CapabilityLevel.LOW
-        return CapabilityLevel.MEDIUM
-
-    def get_best_model_for_capability(self, level: CapabilityLevel) -> str:
-        if level >= CapabilityLevel.HIGH:
-            return ClaudeModels.HIGH
-        if level <= CapabilityLevel.LOW:
-            return ClaudeModels.LOW
-        return ClaudeModels.MEDIUM
+    def models(self) -> ModelRegistry:
+        return ClaudeModels
 
     def load_rules(self, root_dir: pathlib.Path) -> str:
         """Loads and resolves nested rules from .claude/rules/."""
