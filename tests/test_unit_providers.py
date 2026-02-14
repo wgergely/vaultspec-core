@@ -8,6 +8,8 @@ import pytest
 from orchestration.dispatch import get_provider_for_model
 from protocol.providers.base import (
     CapabilityLevel,
+    ClaudeModels,
+    GeminiModels,
     ProcessSpec,
     load_mcp_servers,
     resolve_includes,
@@ -141,28 +143,26 @@ class TestGeminiProvider:
 
     def test_supported_models(self, provider):
         models = provider.supported_models
-        assert "gemini-2.5-flash" in models
-        assert "gemini-3-pro-preview" in models
+        assert GeminiModels.FLASH_LEGACY in models
+        assert GeminiModels.PRO in models
 
     def test_capability_pro_is_high(self, provider):
-        assert (
-            provider.get_model_capability("gemini-3-pro-preview")
-            == CapabilityLevel.HIGH
-        )
+        assert provider.get_model_capability(GeminiModels.PRO) == CapabilityLevel.HIGH
 
     def test_capability_flash_is_low(self, provider):
-        assert provider.get_model_capability("gemini-2.5-flash") == CapabilityLevel.LOW
+        cap = provider.get_model_capability(GeminiModels.FLASH_LEGACY)
+        assert cap == CapabilityLevel.LOW
 
     def test_best_model_high(self, provider):
         assert (
             provider.get_best_model_for_capability(CapabilityLevel.HIGH)
-            == "gemini-3-pro-preview"
+            == GeminiModels.PRO
         )
 
     def test_best_model_low(self, provider):
         assert (
             provider.get_best_model_for_capability(CapabilityLevel.LOW)
-            == "gemini-2.5-flash"
+            == GeminiModels.FLASH_LEGACY
         )
 
     def test_no_circular_fallback(self, provider):
@@ -178,11 +178,11 @@ class TestGeminiProvider:
         ):
             spec = provider.prepare_process(
                 agent_name="test-agent",
-                agent_meta={"model": "gemini-2.5-flash"},
+                agent_meta={"model": GeminiModels.FLASH_LEGACY},
                 agent_persona="You are a test agent.",
                 task_context="Do something.",
                 root_dir=tmp_path,
-                model_override="gemini-2.5-flash",
+                model_override=GeminiModels.FLASH_LEGACY,
             )
         assert isinstance(spec, ProcessSpec)
         assert "--experimental-acp" in spec.args
@@ -260,43 +260,43 @@ class TestClaudeProvider:
 
     def test_supported_models(self, provider):
         models = provider.supported_models
-        assert "claude-sonnet-4-5" in models
-        assert "claude-opus-4-6" in models
+        assert ClaudeModels.SONNET in models
+        assert ClaudeModels.OPUS in models
 
     def test_capability_opus_is_high(self, provider):
-        assert provider.get_model_capability("claude-opus-4-6") == CapabilityLevel.HIGH
+        assert provider.get_model_capability(ClaudeModels.OPUS) == CapabilityLevel.HIGH
 
     def test_capability_sonnet_is_medium(self, provider):
         assert (
-            provider.get_model_capability("claude-sonnet-4-5") == CapabilityLevel.MEDIUM
+            provider.get_model_capability(ClaudeModels.SONNET) == CapabilityLevel.MEDIUM
         )
 
     def test_best_model_high(self, provider):
         assert (
             provider.get_best_model_for_capability(CapabilityLevel.HIGH)
-            == "claude-opus-4-6"
+            == ClaudeModels.OPUS
         )
 
     def test_best_model_medium(self, provider):
         assert (
             provider.get_best_model_for_capability(CapabilityLevel.MEDIUM)
-            == "claude-sonnet-4-5"
+            == ClaudeModels.SONNET
         )
 
     def test_best_model_low(self, provider):
         assert (
             provider.get_best_model_for_capability(CapabilityLevel.LOW)
-            == "claude-haiku-4-5"
+            == ClaudeModels.HAIKU
         )
 
     def test_prepare_process_returns_spec(self, provider, tmp_path):
         spec = provider.prepare_process(
             agent_name="test-agent",
-            agent_meta={"model": "claude-sonnet-4-5"},
+            agent_meta={"model": ClaudeModels.SONNET},
             agent_persona="You are a test agent.",
             task_context="Do something.",
             root_dir=tmp_path,
-            model_override="claude-sonnet-4-5",
+            model_override=ClaudeModels.SONNET,
         )
         assert isinstance(spec, ProcessSpec)
         assert "mcp" in spec.args
@@ -316,5 +316,5 @@ class TestGetProviderForModel:
     def test_gemini_model_returns_gemini(self):
         # The logic in get_provider_for_model currently defaults to gemini
         # for unknown or None models.
-        provider = get_provider_for_model("gemini-2.5-flash")
+        provider = get_provider_for_model(GeminiModels.FLASH_LEGACY)
         assert provider.name == "gemini"

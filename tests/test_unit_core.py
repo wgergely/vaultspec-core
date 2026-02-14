@@ -14,6 +14,7 @@ from orchestration.utils import (
     SecurityError,
     safe_read_text,
 )
+from protocol.providers.base import ClaudeModels, GeminiModels
 
 # ---------------------------------------------------------------------------
 # TestParseFrontmatter
@@ -23,11 +24,12 @@ from orchestration.utils import (
 class TestParseFrontmatter:
     def test_valid_frontmatter(self):
         content = (
-            "---\ntier: LOW\nmodel: gemini-2.5-flash\n---\n\n# Persona\nBody text here."
+            f"---\ntier: LOW\nmodel: {GeminiModels.FLASH_LEGACY}\n"
+            "---\n\n# Persona\nBody text here."
         )
         meta, body = parse_frontmatter(content)
         assert meta["tier"] == "LOW"
-        assert meta["model"] == "gemini-2.5-flash"
+        assert meta["model"] == GeminiModels.FLASH_LEGACY
         assert "# Persona" in body
 
     def test_no_frontmatter(self):
@@ -122,7 +124,7 @@ class TestLoadAgent:
         (agents_dir / "claude" / "test-agent.md").write_text(
             "---\n"
             "tier: HIGH\n"
-            "model: claude-3-opus-20240229\n"
+            f"model: {ClaudeModels.OPUS}\n"
             "---\n"
             "# Claude Persona\n"
             "Claude specific.",
@@ -132,7 +134,7 @@ class TestLoadAgent:
         (agents_dir / "test-agent.md").write_text(test_agent_md, encoding="utf-8")
 
         meta, persona = load_agent("test-agent", mock_root_dir, provider_name="claude")
-        assert meta["model"] == "claude-3-opus-20240229"
+        assert meta["model"] == ClaudeModels.OPUS
         assert "Claude Persona" in persona
 
     def test_provider_hint_gemini(self, mock_root_dir, test_agent_md):
@@ -141,7 +143,7 @@ class TestLoadAgent:
         (agents_dir / "gemini" / "test-agent.md").write_text(
             "---\n"
             "tier: MEDIUM\n"
-            "model: gemini-2.0-pro-exp-02-05\n"
+            f"model: {GeminiModels.PRO}\n"
             "---\n"
             "# Gemini Persona\n"
             "Gemini specific.",
@@ -151,7 +153,7 @@ class TestLoadAgent:
         (agents_dir / "test-agent.md").write_text(test_agent_md, encoding="utf-8")
 
         meta, _persona = load_agent("test-agent", mock_root_dir, provider_name="gemini")
-        assert meta["model"] == "gemini-2.0-pro-exp-02-05"
+        assert meta["model"] == GeminiModels.PRO
 
     def test_provider_hint_falls_back_to_canonical(self, mock_root_dir, test_agent_md):
         # Only canonical dir has the agent

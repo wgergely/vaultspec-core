@@ -11,6 +11,7 @@ import tempfile
 from .base import (
     AgentProvider,
     CapabilityLevel,
+    GeminiModels,
     ProcessSpec,
     resolve_includes,
 )
@@ -20,12 +21,6 @@ _MIN_VERSION_RECOMMENDED = (0, 27, 0)  # v0.27.0 has stable agent skills
 
 # Cache for version check result
 _cached_version: tuple[int, ...] | None = None
-
-SUPPORTED_MODELS = [
-    "gemini-3-pro-preview",
-    "gemini-3-flash-preview",
-    "gemini-2.5-flash",
-]
 
 
 class GeminiProvider(AgentProvider):
@@ -37,7 +32,7 @@ class GeminiProvider(AgentProvider):
 
     @property
     def supported_models(self) -> list[str]:
-        return SUPPORTED_MODELS
+        return GeminiModels.ALL
 
     def get_model_capability(self, model: str) -> CapabilityLevel:
         if "pro" in model:
@@ -48,10 +43,10 @@ class GeminiProvider(AgentProvider):
 
     def get_best_model_for_capability(self, level: CapabilityLevel) -> str:
         if level >= CapabilityLevel.HIGH:
-            return "gemini-3-pro-preview"
+            return GeminiModels.PRO
         if level >= CapabilityLevel.MEDIUM:
-            return "gemini-3-flash-preview"
-        return "gemini-2.5-flash"
+            return GeminiModels.FLASH
+        return GeminiModels.FLASH_LEGACY
 
     def load_rules(self, root_dir: pathlib.Path) -> str:
         """Loads and resolves nested rules from .gemini/rules/."""

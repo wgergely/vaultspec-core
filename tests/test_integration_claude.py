@@ -2,7 +2,7 @@
 
 Requires:
 - Claude CLI installed and on PATH
-- ANTHROPIC_API_KEY set in environment
+- Claude CLI authenticated (handles its own auth)
 - Network access to Anthropic API
 
 Skipped automatically if prerequisites are missing.
@@ -46,7 +46,9 @@ async def test_claude_dispatch_lifecycle(mock_root):
     """Verify run_dispatch with real Claude CLI returns a valid result."""
     (mock_root / ".vaultspec" / "agents" / "tester.md").write_text(
         "---\ntier: MEDIUM\n---\n\n# Persona\n"
-        "You are a helpful assistant. Keep your responses extremely short.\n",
+        "You are Jean-Claude, a helpful assistant.\n"
+        "Your name is Jean-Claude. Always introduce yourself by name.\n"
+        "Keep your responses extremely short.\n",
         encoding="utf-8",
     )
 
@@ -55,7 +57,7 @@ async def test_claude_dispatch_lifecycle(mock_root):
     result = await run_dispatch(
         agent_name="tester",
         root_dir=mock_root,
-        initial_task="Please say only the word 'ACK'.",
+        initial_task="What is your name? Reply with only your name.",
         provider_instance=provider,
         interactive=False,
         debug=True,
@@ -64,3 +66,4 @@ async def test_claude_dispatch_lifecycle(mock_root):
     assert isinstance(result, DispatchResult)
     assert result.session_id is not None
     assert len(result.response_text) > 0
+    assert "Jean-Claude" in result.response_text

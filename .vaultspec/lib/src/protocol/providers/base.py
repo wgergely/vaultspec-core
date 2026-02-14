@@ -5,7 +5,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
     import pathlib
@@ -17,6 +17,26 @@ class CapabilityLevel(IntEnum):
     LOW = 1
     MEDIUM = 2
     HIGH = 3
+
+
+class ClaudeModels:
+    """Single source of truth for Claude model identifiers."""
+
+    OPUS = "claude-opus-4-6"
+    SONNET = "claude-sonnet-4-5"
+    HAIKU = "claude-haiku-4-5"
+
+    ALL: ClassVar[list[str]] = [OPUS, SONNET, HAIKU]
+
+
+class GeminiModels:
+    """Single source of truth for Gemini model identifiers."""
+
+    PRO = "gemini-3-pro-preview"
+    FLASH = "gemini-3-flash-preview"
+    FLASH_LEGACY = "gemini-2.5-flash"
+
+    ALL: ClassVar[list[str]] = [PRO, FLASH, FLASH_LEGACY]
 
 
 @dataclass
