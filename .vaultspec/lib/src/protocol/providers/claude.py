@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from .base import (
     AgentProvider,
+    CapabilityLevel,
     ClaudeModels,
     ModelRegistry,
     ProcessSpec,
@@ -41,6 +42,15 @@ class ClaudeProvider(AgentProvider):
 
         return "\n\n".join(all_rules)
 
+    def _build_system_context(self, persona: str, rules: str) -> str:
+        """Combine persona and rules into system context for initial prompt."""
+        parts = []
+        if persona.strip():
+            parts.append(f"# AGENT PERSONA\n{persona}")
+        if rules.strip():
+            parts.append(f"# SYSTEM RULES & CONTEXT\n{rules}")
+        return "\n\n".join(parts)
+
     def prepare_process(
         self,
         agent_name: str,
@@ -51,24 +61,37 @@ class ClaudeProvider(AgentProvider):
         model_override: str | None = None,
     ) -> ProcessSpec:
         _ = agent_name
-        _ = agent_meta
-        _ = agent_persona
-        _ = task_context
-        _ = model_override
-        #  Load Rules (ensure they are loadable even if not used in CLI args)
-        _rules = self.load_rules(root_dir)
 
-        #  Locate executable
+        # Locate executable
         executable = shutil.which("claude") or "claude"
 
-        #  Prepare Environment
+        # Load rules
+        rules = self.load_rules(root_dir)
+
+        # Construct system context (persona + rules)
+        system_context = self._build_system_context(agent_persona, rules)
+
+        # Determine model
+        model = model_override or agent_meta.get("model")
+        if not model:
+            tier = agent_meta.get("tier", "MEDIUM")
+            model = self.get_best_model_for_capability(CapabilityLevel[tier.upper()])
+
+        # Prepare environment
         env = os.environ.copy()
-        # Claude CLI doesn't use a system prompt file the same way as Gemini
-        # It relies on the persona defined in its internal config.
+
+        # Build initial prompt with system context prepended to task
+        initial_prompt = (
+            f"{system_context}\n\n# TASK\n{task_context}"
+            if system_context
+            else task_context
+        )
 
         return ProcessSpec(
             executable=executable,
             args=["mcp", "serve"],
             env=env,
             cleanup_paths=[],
+            initial_prompt_override=initial_prompt,
+            session_meta={"model": model},
         )

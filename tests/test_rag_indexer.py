@@ -24,7 +24,7 @@ except ImportError:
 
 pytestmark = pytest.mark.skipif(not HAS_RAG, reason="RAG dependencies not installed")
 
-MOCK_PROJECT = pathlib.Path(__file__).parent.parent / "mock-project"
+TEST_PROJECT = pathlib.Path(__file__).parent.parent / "test-project"
 
 
 # ---- Indexer Tests ----
@@ -70,13 +70,13 @@ class TestDocumentPreparation:
     def test_prepare_real_document(self):
         from rag.indexer import prepare_document
 
-        # Find a real document in the mock-project
+        # Find a real document in the test-project
         from vault.scanner import scan_vault
 
-        docs = list(scan_vault(MOCK_PROJECT))
-        assert len(docs) > 0, "mock-project should have documents"
+        docs = list(scan_vault(TEST_PROJECT))
+        assert len(docs) > 0, "test-project should have documents"
 
-        doc = prepare_document(docs[0], MOCK_PROJECT)
+        doc = prepare_document(docs[0], TEST_PROJECT)
         assert doc is not None
         assert doc.id
         assert doc.path
@@ -90,8 +90,8 @@ class TestDocumentPreparation:
 
         prepared = 0
         skipped = 0
-        for path in scan_vault(MOCK_PROJECT):
-            doc = prepare_document(path, MOCK_PROJECT)
+        for path in scan_vault(TEST_PROJECT):
+            doc = prepare_document(path, TEST_PROJECT)
             if doc is not None:
                 prepared += 1
                 assert doc.id == path.stem
@@ -144,7 +144,7 @@ class TestIndexEdgeCases:
         from vault.scanner import scan_vault
 
         no_frontmatter = []
-        for path in scan_vault(MOCK_PROJECT):
+        for path in scan_vault(TEST_PROJECT):
             content = path.read_text(encoding="utf-8")
             metadata, _body = parse_vault_metadata(content)
             if not metadata.tags and metadata.date is None:

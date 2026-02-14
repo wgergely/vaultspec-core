@@ -166,6 +166,7 @@ cython_debug/
 **/.lance/
 vault_index.json
 
-# Mock project for testing
-mock-project/*
-!mock-project/README.md
+# Test project workspace
+test-project/*
+!test-project/.vault/
+!test-project/README.md

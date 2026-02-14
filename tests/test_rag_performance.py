@@ -24,8 +24,6 @@ except ImportError:
 
 pytestmark = pytest.mark.skipif(not HAS_RAG, reason="RAG dependencies not installed")
 
-MOCK_PROJECT = pathlib.Path(__file__).parent.parent / "mock-project"
-
 
 # ---- Performance Tests ----
 

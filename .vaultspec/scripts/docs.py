@@ -36,7 +36,7 @@ def main():
         "--graph", action="store_true", help="Show graph hotspots."
     )
     audit_parser.add_argument(
-        "--root", type=str, default=str(ROOT_DIR), help="Vault root directory."
+        "--root", type=pathlib.Path, default=None, help="Vault root directory."
     )
     audit_parser.add_argument(
         "--limit", type=int, default=10, help="Limit number of items in reports."
@@ -65,7 +65,7 @@ def main():
     )
     create_parser.add_argument("--title", type=str, help="Title of the document.")
     create_parser.add_argument(
-        "--root", type=str, default=str(ROOT_DIR), help="Vault root directory."
+        "--root", type=pathlib.Path, default=None, help="Vault root directory."
     )
 
     # Index command (RAG)
@@ -73,7 +73,7 @@ def main():
         "index", help="Index vault documents for semantic search."
     )
     index_parser.add_argument(
-        "--root", type=str, default=str(ROOT_DIR), help="Vault root directory."
+        "--root", type=pathlib.Path, default=None, help="Vault root directory."
     )
     index_parser.add_argument(
         "--full",
@@ -90,7 +90,7 @@ def main():
     )
     search_parser.add_argument("query", type=str, help="Search query.")
     search_parser.add_argument(
-        "--root", type=str, default=str(ROOT_DIR), help="Vault root directory."
+        "--root", type=pathlib.Path, default=None, help="Vault root directory."
     )
     search_parser.add_argument(
         "--limit", type=int, default=5, help="Number of results."
@@ -116,12 +116,12 @@ def main():
 
 
 def handle_create(args):
-    root_dir = pathlib.Path(args.root)
+    root_dir = args.root if args.root is not None else ROOT_DIR
     doc_type = DocType(args.type)
     feature = args.feature.strip("#")
     date_str = datetime.now().strftime("%Y-%m-%d")
 
-    template_path = get_template_path(ROOT_DIR, doc_type)
+    template_path = get_template_path(root_dir, doc_type)
     if template_path is None:
         print(f"Error: No template found for type '{doc_type.value}'")
         sys.exit(1)
@@ -145,7 +145,7 @@ def handle_create(args):
 
 
 def handle_audit(args):
-    root_dir = pathlib.Path(args.root)
+    root_dir = args.root if args.root is not None else ROOT_DIR
     results = {}
 
     if args.summary:
@@ -254,7 +254,7 @@ def handle_index(args):
         print("Run: pip install -e '.[rag]'")
         sys.exit(1)
 
-    root_dir = pathlib.Path(args.root)
+    root_dir = args.root if args.root is not None else ROOT_DIR
 
     # Report device info
     device_info = get_device_info()
@@ -305,7 +305,7 @@ def handle_search(args):
         print("Run: pip install -e '.[rag]'")
         sys.exit(1)
 
-    root_dir = pathlib.Path(args.root)
+    root_dir = args.root if args.root is not None else ROOT_DIR
     results = search(root_dir, args.query, limit=args.limit)
 
     if args.json:

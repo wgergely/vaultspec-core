@@ -20,7 +20,7 @@ LIB_SRC = pathlib.Path(__file__).parent.parent.parent / ".vaultspec" / "lib" / "
 if str(LIB_SRC) not in sys.path:
     sys.path.insert(0, str(LIB_SRC))
 
-MOCK_PROJECT = pathlib.Path(__file__).parent.parent.parent / "mock-project"
+TEST_PROJECT = pathlib.Path(__file__).parent.parent.parent / "test-project"
 
 
 def _hr(char: str = "-", width: int = 72) -> str:
@@ -182,7 +182,7 @@ def main():
     print(_hr())
     print("2. Full Index Throughput (all vault docs)")
     print(_hr())
-    idx_result = bench_full_index(MOCK_PROJECT, model, VaultStore, VaultIndexer)
+    idx_result = bench_full_index(TEST_PROJECT, model, VaultStore, VaultIndexer)
     print(
         f"  {idx_result['total_docs']} docs indexed in {idx_result['elapsed_s']:.2f}s "
         f"({idx_result['docs_per_sec']:.1f} docs/sec, device={idx_result['device']})"
@@ -190,9 +190,9 @@ def main():
     print()
 
     # Set up components for remaining benchmarks
-    store = VaultStore(MOCK_PROJECT)
-    indexer = VaultIndexer(MOCK_PROJECT, model, store)
-    searcher = VaultSearcher(MOCK_PROJECT, model, store)
+    store = VaultStore(TEST_PROJECT)
+    indexer = VaultIndexer(TEST_PROJECT, model, store)
+    searcher = VaultSearcher(TEST_PROJECT, model, store)
 
     # 3. Incremental no-op
     print(_hr())
@@ -222,7 +222,7 @@ def main():
     print(_hr())
     print("5. Resource Usage")
     print(_hr())
-    mem = bench_memory(MOCK_PROJECT)
+    mem = bench_memory(TEST_PROJECT)
     print(f"  GPU: {mem['gpu_name']}")
     print(f"  VRAM allocated: {mem['vram_allocated_mb']:.1f}MB")
     print(f"  VRAM reserved:  {mem['vram_reserved_mb']:.1f}MB")
@@ -230,7 +230,7 @@ def main():
     print()
 
     # Cleanup
-    lance_dir = MOCK_PROJECT / ".lance"
+    lance_dir = TEST_PROJECT / ".lance"
     if lance_dir.exists():
         shutil.rmtree(lance_dir)
 
