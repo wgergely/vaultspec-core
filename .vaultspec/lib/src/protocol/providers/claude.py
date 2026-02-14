@@ -4,7 +4,13 @@ import os
 import shutil
 from typing import TYPE_CHECKING
 
-from .base import AgentProvider, CapabilityLevel, ProcessSpec, resolve_includes
+from .base import (
+    AgentProvider,
+    CapabilityLevel,
+    ClaudeModels,
+    ProcessSpec,
+    resolve_includes,
+)
 
 if TYPE_CHECKING:
     import pathlib
@@ -19,11 +25,7 @@ class ClaudeProvider(AgentProvider):
 
     @property
     def supported_models(self) -> list[str]:
-        return [
-            "claude-opus-4-6",
-            "claude-sonnet-4-5",
-            "claude-haiku-4-5",
-        ]
+        return ClaudeModels.ALL
 
     def get_model_capability(self, model: str) -> CapabilityLevel:
         if "opus" in model:
@@ -34,10 +36,10 @@ class ClaudeProvider(AgentProvider):
 
     def get_best_model_for_capability(self, level: CapabilityLevel) -> str:
         if level >= CapabilityLevel.HIGH:
-            return "claude-opus-4-6"
+            return ClaudeModels.OPUS
         if level >= CapabilityLevel.MEDIUM:
-            return "claude-sonnet-4-5"
-        return "claude-haiku-4-5"
+            return ClaudeModels.SONNET
+        return ClaudeModels.HAIKU
 
     def load_rules(self, root_dir: pathlib.Path) -> str:
         """Loads and resolves nested rules from .claude/rules/."""

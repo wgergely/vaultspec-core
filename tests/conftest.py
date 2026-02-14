@@ -14,6 +14,8 @@ LIB_SRC = pathlib.Path(__file__).parent.parent / ".vaultspec" / "lib" / "src"
 if str(LIB_SRC) not in sys.path:
     sys.path.insert(0, str(LIB_SRC))
 
+from protocol.providers.base import GeminiModels  # noqa: E402
+
 # Check if RAG deps are available
 try:
     import lancedb  # noqa: F401
@@ -214,9 +216,9 @@ def mock_root_dir(tmp_path):
 
 @pytest.fixture
 def test_agent_md():
-    return """---
+    return f"""---
 tier: LOW
-model: gemini-2.5-flash
+model: {GeminiModels.FLASH_LEGACY}
 description: "A test agent"
 ---
 

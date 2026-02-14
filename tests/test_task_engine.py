@@ -58,6 +58,7 @@ class TestTaskEngine:
         return TaskEngine(ttl_seconds=60)
 
     def test_create_task(self, engine):
+        # Intentionally arbitrary string: TaskEngine stores model as opaque metadata
         task = engine.create_task("test-agent", model="gemini-3", mode="read-only")
         assert task.agent == "test-agent"
         assert task.model == "gemini-3"
