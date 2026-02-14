@@ -1,4 +1,4 @@
-"""Dispatch server unit test fixtures."""
+"""Subagent server unit test fixtures."""
 
 import sys
 from pathlib import Path

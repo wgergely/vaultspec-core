@@ -1,16 +1,12 @@
 from __future__ import annotations
 
 import abc
-import json
-import logging
 from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
     import pathlib
-
-logger = logging.getLogger(__name__)
 
 
 class CapabilityLevel(IntEnum):
@@ -133,57 +129,6 @@ def resolve_includes(
             resolved_lines.append(f"<!-- ERROR: Include failed: {e} -->")
 
     return "\n".join(resolved_lines)
-
-
-def load_mcp_servers(root_dir: pathlib.Path) -> list[dict[str, Any]]:
-    """Load MCP server configurations from settings.json.
-
-    Searches for settings.json in .gemini, .claude, or .agent directories.
-    Reads the mcpServers block and converts each entry into the ACP
-    McpServerConfig format.
-
-    Returns an empty list if no settings file is found or if it's malformed.
-    """
-    search_paths = [
-        root_dir / ".gemini" / "settings.json",
-        root_dir / ".claude" / "settings.json",
-        root_dir / ".agent" / "settings.json",
-    ]
-
-    settings_path = None
-    for path in search_paths:
-        if path.exists():
-            settings_path = path
-            break
-
-    if not settings_path:
-        return []
-
-    try:
-        data = json.loads(settings_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as exc:
-        logger.warning(f"Failed to read settings file {settings_path}: {exc}")
-        return []
-
-    mcp_block = data.get("mcpServers")
-    if not isinstance(mcp_block, dict):
-        return []
-
-    servers: list[dict[str, Any]] = []
-    for name, cfg in mcp_block.items():
-        if not isinstance(cfg, dict) or "command" not in cfg:
-            logger.warning(f"Skipping malformed MCP server entry: {name}")
-            continue
-        servers.append(
-            {
-                "name": name,
-                "command": cfg["command"],
-                "args": cfg.get("args", []),
-                "env": cfg.get("env", {}),
-            }
-        )
-
-    return servers
 
 
 class AgentProvider(abc.ABC):

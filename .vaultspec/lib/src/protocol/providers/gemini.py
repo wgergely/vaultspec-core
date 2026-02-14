@@ -44,7 +44,7 @@ class GeminiProvider(AgentProvider):
         all_rules = []
         for rule_file in sorted(rules_dir.glob("*.md")):
             content = rule_file.read_text(encoding="utf-8")
-            resolved = resolve_includes(content, root_dir, rules_dir)
+            resolved = resolve_includes(content, rules_dir, root_dir)
             all_rules.append(resolved)
 
         return "\n\n".join(all_rules)

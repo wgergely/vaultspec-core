@@ -27,7 +27,7 @@ python .vaultspec/scripts/subagent.py run --agent <agent_name> --goal "<task_des
 
 ## MCP Server (preferred)
 
-The dispatch system is also available as an MCP server (`vaultspec-mcp`) configured in `.mcp.json`. When available, prefer MCP tool calls over CLI invocation:
+The subagent system is also available as an MCP server (`vs-subagent-mcp`) configured in `.mcp.json`. When available, prefer MCP tool calls over CLI invocation:
 
 * **`list_agents`**: Discover available agents and their capabilities.
 * **`dispatch_agent`**: Dispatch a sub-agent with a task. Parameters: `agent` (required), `task` (required), `model` (optional), `mode` (optional: `read-write` or `read-only`).

@@ -8,7 +8,7 @@ from vault.parser import parse_frontmatter
 
 pytestmark = [pytest.mark.unit]
 
-from orchestration.dispatch import (  # noqa: E402
+from orchestration.subagent import (  # noqa: E402
     AgentNotFoundError,
     load_agent,
 )

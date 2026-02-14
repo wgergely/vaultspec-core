@@ -11,15 +11,12 @@ import sys
 import uuid
 from typing import TYPE_CHECKING, Any
 
-from vault.models import VaultConstants
-
 from acp.interfaces import Client
 from acp.schema import (
     AgentMessageChunk,
     AgentPlanUpdate,
     AgentThoughtChunk,
     AvailableCommandsUpdate,
-    ConfigOptionUpdate,
     CreateTerminalResponse,
     CurrentModeUpdate,
     EnvVariable,
@@ -35,14 +32,16 @@ from acp.schema import (
     ToolCallProgress,
     ToolCallStart,
     ToolCallUpdate,
-    UsageUpdate,
     UserMessageChunk,
     WaitForTerminalExitResponse,
     WriteTextFileResponse,
 )
+from vault.models import VaultConstants
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from acp.schema import ConfigOptionUpdate, UsageUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +74,7 @@ class _Terminal:
         self.reader_task: asyncio.Task | None = None
 
 
-class DispatchClient(Client):
+class SubagentClient(Client):
     """ACP Client implementation that handles protocol messages."""
 
     def __init__(

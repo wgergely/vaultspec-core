@@ -49,7 +49,7 @@ testpaths = [".vaultspec/tests", ".vaultspec/lib/src"]
 asyncio_mode = "auto"
 markers = [
     "unit: fast tests with no external dependencies",
-    "api: MCP dispatch and RAG API surface tests",
+    "api: MCP subagent and RAG API surface tests",
     "search: RAG search, filtering, and ranking tests",
     "index: embedding, indexing, and store operation tests",
     "quality: precision, recall, and full-corpus benchmark tests",
@@ -81,7 +81,8 @@ select = [
 unfixable = ["B"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["orchestration", "protocol", "acp"]
+known-first-party = ["orchestration", "protocol"]
+known-third-party = ["acp"]
 
 [tool.ty.environment]
 python-version = "3.13"

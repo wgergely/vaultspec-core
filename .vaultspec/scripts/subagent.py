@@ -2,7 +2,7 @@
 
 The authoritative entry point for all sub-agent operations:
 - run: Execute a sub-agent (ACP client mode)
-- serve: Run the dispatch server (MCP mode)
+- serve: Run the subagent MCP server
 - list: List available agents
 """
 
@@ -16,13 +16,13 @@ from pathlib import Path
 from _paths import ROOT_DIR  # shared path bootstrap
 
 try:
-    from dispatch_server.server import main as server_main
+    from subagent_server.server import main as server_main
 
-    from orchestration.dispatch import run_dispatch
+    from orchestration.subagent import run_subagent
     from orchestration.utils import find_project_root
-    from protocol.acp.client import DispatchClient
+    from protocol.acp.client import SubagentClient
 except ImportError as e:
-    print(f"Failed to import dispatch library: {e}", file=sys.stderr)
+    print(f"Failed to import subagent library: {e}", file=sys.stderr)
     sys.exit(1)
 
 
@@ -101,7 +101,7 @@ def command_run(args):
 
     try:
         result = loop.run_until_complete(
-            run_dispatch(
+            run_subagent(
                 agent_name=args.agent,
                 initial_task=task_goal,
                 context_files=context_files,
@@ -113,7 +113,7 @@ def command_run(args):
                 debug=args.debug,
                 mode=args.mode,
                 quiet=False,  # CLI should be noisy
-                client_class=DispatchClient,
+                client_class=SubagentClient,
             )
         )
         if result.response_text:
@@ -143,7 +143,7 @@ def command_list(args):
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Sub-agent Dispatch CLI")
+    parser = argparse.ArgumentParser(description="Sub-agent CLI")
     parser.add_argument(
         "--root", type=Path, default=None, help="Override workspace root"
     )
@@ -178,7 +178,7 @@ def main() -> None:
     run_parser.add_argument(
         "--provider",
         "-p",
-        choices=["gemini", "claude", "antigravity"],
+        choices=["gemini", "claude"],
         help="Explicitly force a provider",
     )
     run_parser.add_argument(
@@ -199,7 +199,7 @@ def main() -> None:
     run_parser.set_defaults(func=command_run)
 
     # --- SERVE ---
-    serve_parser = subparsers.add_parser("serve", help="Run the MCP dispatch server")
+    serve_parser = subparsers.add_parser("serve", help="Run the subagent MCP server")
     serve_parser.set_defaults(func=command_serve)
 
     # --- LIST ---

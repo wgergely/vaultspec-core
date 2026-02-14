@@ -1,4 +1,4 @@
-"""Internal task engine for the dispatch framework.
+"""Internal task engine for the subagent framework.
 
 A standalone 5-state task lifecycle manager.
 Tracks tasks: working -> input_required | completed | failed | cancelled.
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 class TaskStatus(StrEnum):
-    """Lifecycle states for a dispatch task."""
+    """Lifecycle states for a subagent task."""
 
     WORKING = "working"
     INPUT_REQUIRED = "input_required"
@@ -70,7 +70,7 @@ def is_terminal(status: TaskStatus) -> bool:
 
 
 @dataclass
-class DispatchTask:
+class SubagentTask:
     """In-memory representation of a background sub-agent execution."""
 
     task_id: str
@@ -237,7 +237,7 @@ class TaskEngine:
             ttl_seconds: Retention period.
             lock_manager: LockManager for automatic release.
         """
-        self._tasks: dict[str, DispatchTask] = {}
+        self._tasks: dict[str, SubagentTask] = {}
         self._lock = threading.Lock()
         self._ttl_seconds = ttl_seconds
         self._lock_manager = lock_manager
@@ -268,12 +268,12 @@ class TaskEngine:
         model: str | None = None,
         mode: str = "read-write",
         task_id: str | None = None,
-    ) -> DispatchTask:
+    ) -> SubagentTask:
         """Create a new task."""
         tid = task_id or generate_task_id()
         now = time.monotonic()
 
-        task = DispatchTask(
+        task = SubagentTask(
             task_id=tid,
             agent=agent,
             status=TaskStatus.WORKING,
@@ -291,7 +291,7 @@ class TaskEngine:
 
         return task
 
-    def get_task(self, task_id: str) -> DispatchTask | None:
+    def get_task(self, task_id: str) -> SubagentTask | None:
         """Get a task by ID."""
         with self._lock:
             self._cleanup_expired()
@@ -312,7 +312,7 @@ class TaskEngine:
         status: TaskStatus,
         *,
         status_message: str | None = None,
-    ) -> DispatchTask:
+    ) -> SubagentTask:
         """Transition a task to a new status."""
         with self._lock:
             task = self._tasks.get(task_id)
@@ -349,7 +349,7 @@ class TaskEngine:
         self,
         task_id: str,
         result: dict[str, Any],
-    ) -> DispatchTask:
+    ) -> SubagentTask:
         """Mark a task as completed."""
         with self._lock:
             task = self._tasks.get(task_id)
@@ -375,7 +375,7 @@ class TaskEngine:
         self,
         task_id: str,
         error: str,
-    ) -> DispatchTask:
+    ) -> SubagentTask:
         """Mark a task as failed."""
         with self._lock:
             task = self._tasks.get(task_id)
@@ -397,11 +397,11 @@ class TaskEngine:
         self._notify(task_id)
         return task
 
-    def cancel_task(self, task_id: str) -> DispatchTask:
+    def cancel_task(self, task_id: str) -> SubagentTask:
         """Cancel a task."""
         return self.update_status(task_id, TaskStatus.CANCELLED)
 
-    def list_tasks(self) -> list[DispatchTask]:
+    def list_tasks(self) -> list[SubagentTask]:
         """Return all non-expired tasks."""
         with self._lock:
             self._cleanup_expired()

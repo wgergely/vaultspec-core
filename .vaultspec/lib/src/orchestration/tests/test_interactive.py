@@ -11,7 +11,8 @@ pytestmark = [pytest.mark.unit]
 
 from acp.client.connection import ClientSideConnection  # noqa: E402
 from acp.schema import PromptResponse  # noqa: E402
-from orchestration.dispatch import (  # noqa: E402
+
+from orchestration.subagent import (  # noqa: E402
     _interactive_loop,
 )
 
