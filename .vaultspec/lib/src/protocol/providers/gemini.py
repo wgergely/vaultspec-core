@@ -37,16 +37,16 @@ class GeminiProvider(AgentProvider):
     def get_model_capability(self, model: str) -> CapabilityLevel:
         if "pro" in model:
             return CapabilityLevel.HIGH
-        if "3-flash" in model:
-            return CapabilityLevel.MEDIUM
-        return CapabilityLevel.LOW
+        if "2.5-flash" in model:
+            return CapabilityLevel.LOW
+        return CapabilityLevel.MEDIUM
 
     def get_best_model_for_capability(self, level: CapabilityLevel) -> str:
         if level >= CapabilityLevel.HIGH:
-            return GeminiModels.PRO
-        if level >= CapabilityLevel.MEDIUM:
-            return GeminiModels.FLASH
-        return GeminiModels.FLASH_LEGACY
+            return GeminiModels.HIGH
+        if level <= CapabilityLevel.LOW:
+            return GeminiModels.LOW
+        return GeminiModels.MEDIUM
 
     def load_rules(self, root_dir: pathlib.Path) -> str:
         """Loads and resolves nested rules from .gemini/rules/."""

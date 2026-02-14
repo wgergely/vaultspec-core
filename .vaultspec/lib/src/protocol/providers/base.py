@@ -22,21 +22,21 @@ class CapabilityLevel(IntEnum):
 class ClaudeModels:
     """Single source of truth for Claude model identifiers."""
 
-    OPUS = "claude-opus-4-6"
-    SONNET = "claude-sonnet-4-5"
-    HAIKU = "claude-haiku-4-5"
+    HIGH = "claude-opus-4-6"
+    MEDIUM = "claude-sonnet-4-5"
+    LOW = "claude-haiku-4-5"
 
-    ALL: ClassVar[list[str]] = [OPUS, SONNET, HAIKU]
+    ALL: ClassVar[list[str]] = [HIGH, MEDIUM, LOW]
 
 
 class GeminiModels:
     """Single source of truth for Gemini model identifiers."""
 
-    PRO = "gemini-3-pro-preview"
-    FLASH = "gemini-3-flash-preview"
-    FLASH_LEGACY = "gemini-2.5-flash"
+    HIGH = "gemini-3-pro-preview"
+    MEDIUM = "gemini-3-flash-preview"
+    LOW = "gemini-2.5-flash"
 
-    ALL: ClassVar[list[str]] = [PRO, FLASH, FLASH_LEGACY]
+    ALL: ClassVar[list[str]] = [HIGH, MEDIUM, LOW]
 
 
 @dataclass

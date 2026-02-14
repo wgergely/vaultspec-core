@@ -218,7 +218,7 @@ def mock_root_dir(tmp_path):
 def test_agent_md():
     return f"""---
 tier: LOW
-model: {GeminiModels.FLASH_LEGACY}
+model: {GeminiModels.LOW}
 description: "A test agent"
 ---
 

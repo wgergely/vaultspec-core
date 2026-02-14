@@ -30,16 +30,16 @@ class ClaudeProvider(AgentProvider):
     def get_model_capability(self, model: str) -> CapabilityLevel:
         if "opus" in model:
             return CapabilityLevel.HIGH
-        if "sonnet" in model:
-            return CapabilityLevel.MEDIUM
-        return CapabilityLevel.LOW
+        if "haiku" in model:
+            return CapabilityLevel.LOW
+        return CapabilityLevel.MEDIUM
 
     def get_best_model_for_capability(self, level: CapabilityLevel) -> str:
         if level >= CapabilityLevel.HIGH:
-            return ClaudeModels.OPUS
-        if level >= CapabilityLevel.MEDIUM:
-            return ClaudeModels.SONNET
-        return ClaudeModels.HAIKU
+            return ClaudeModels.HIGH
+        if level <= CapabilityLevel.LOW:
+            return ClaudeModels.LOW
+        return ClaudeModels.MEDIUM
 
     def load_rules(self, root_dir: pathlib.Path) -> str:
         """Loads and resolves nested rules from .claude/rules/."""
