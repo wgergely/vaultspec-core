@@ -29,7 +29,7 @@ from protocol.providers.gemini import GeminiProvider
 _has_claude_cli = shutil.which("claude") is not None
 _has_gemini_cli = shutil.which("gemini") is not None
 
-TEST_PROJECT = Path(__file__).parent.parent / "test-project"
+TEST_PROJECT = Path(__file__).resolve().parent.parent.parent.parent / "test-project"
 TODAY = date.today().isoformat()  # yyyy-mm-dd
 
 
@@ -275,6 +275,7 @@ async def test_full_cycle_claude(pipeline_root):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.unit
 def test_pipeline_root_has_vault_dirs(pipeline_root):
     """Verify pipeline fixture creates required vault subdirectories."""
     for doc_type in ("research", "adr", "plan"):
@@ -283,6 +284,7 @@ def test_pipeline_root_has_vault_dirs(pipeline_root):
         )
 
 
+@pytest.mark.unit
 def test_find_new_docs_returns_matching(tmp_path):
     """Verify _find_new_docs helper finds feature-tagged documents."""
     vault = tmp_path / ".vault"
@@ -296,6 +298,7 @@ def test_find_new_docs_returns_matching(tmp_path):
     assert len(docs) == 1
 
 
+@pytest.mark.unit
 def test_find_new_docs_ignores_unrelated(tmp_path):
     """Verify _find_new_docs does not return documents without the feature name."""
     vault = tmp_path / ".vault"
@@ -309,6 +312,7 @@ def test_find_new_docs_ignores_unrelated(tmp_path):
     assert len(docs) == 0
 
 
+@pytest.mark.unit
 def test_find_new_docs_empty_dir(tmp_path):
     """Verify _find_new_docs returns empty list for nonexistent subdirectory."""
     vault = tmp_path / ".vault"
@@ -317,6 +321,7 @@ def test_find_new_docs_empty_dir(tmp_path):
     assert docs == []
 
 
+@pytest.mark.unit
 def test_validate_frontmatter_passes_valid(tmp_path):
     """Verify _validate_frontmatter accepts properly structured documents."""
     target = tmp_path / "research"
@@ -332,6 +337,7 @@ def test_validate_frontmatter_passes_valid(tmp_path):
     _validate_frontmatter(doc)
 
 
+@pytest.mark.unit
 def test_validate_frontmatter_fails_missing_date(tmp_path):
     """Verify _validate_frontmatter rejects documents without a date field."""
     target = tmp_path / "research"
@@ -345,6 +351,7 @@ def test_validate_frontmatter_fails_missing_date(tmp_path):
         _validate_frontmatter(doc)
 
 
+@pytest.mark.unit
 def test_cleanup_preserves_vault(tmp_path):
     """Verify _cleanup_test_project keeps .vault/ and README.md."""
     root = tmp_path / "project"
@@ -368,6 +375,7 @@ def test_cleanup_preserves_vault(tmp_path):
     assert not transient_dir.exists(), "transient dir should be removed"
 
 
+@pytest.mark.unit
 def test_researcher_agent_written(tmp_path):
     """Verify _write_researcher_agent creates the agent definition file."""
     root = tmp_path / "project"

@@ -25,7 +25,7 @@ from protocol.providers.claude import ClaudeProvider
 
 _has_claude_cli = shutil.which("claude") is not None
 
-TEST_PROJECT = Path(__file__).parent.parent / "test-project"
+TEST_PROJECT = Path(__file__).resolve().parent.parent.parent.parent / "test-project"
 
 
 def _cleanup_test_project(root: Path) -> None:
@@ -54,6 +54,7 @@ def test_project_root() -> Iterator[Path]:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.unit
 def test_claude_loads_rules(test_project_root):
     """Verify ClaudeProvider.load_rules() reads .claude/rules/ files."""
     (test_project_root / ".claude" / "rules" / "test-rule.md").write_text(
@@ -67,6 +68,7 @@ def test_claude_loads_rules(test_project_root):
     assert "Test Rule" in rules
 
 
+@pytest.mark.unit
 def test_claude_process_spec_complete(test_project_root):
     """Verify Claude ProcessSpec has initial_prompt_override with all context."""
     (test_project_root / ".claude" / "rules" / "identity.md").write_text(

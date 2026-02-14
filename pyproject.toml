@@ -45,14 +45,18 @@ dev-rag = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", ".vaultspec/lib/src"]
+testpaths = [".vaultspec/tests", ".vaultspec/lib/src"]
 asyncio_mode = "auto"
 markers = [
-    "integration: requires CLI tools and network (deselect: -m 'not integration')",
+    "unit: fast tests with no external dependencies",
+    "api: MCP dispatch and RAG API surface tests",
+    "search: RAG search, filtering, and ranking tests",
+    "index: embedding, indexing, and store operation tests",
+    "quality: precision, recall, and full-corpus benchmark tests",
+    "integration: requires CLI tools and network",
     "gemini: requires Gemini CLI installed",
     "claude: requires Claude CLI installed",
-    "slow: tests requiring full 213-doc corpus (deselect: -m 'not slow')",
-    "timeout: timeout in seconds for individual tests (requires pytest-timeout)",
+    "timeout: timeout in seconds for individual tests",
 ]
 
 [tool.ruff]

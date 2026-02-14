@@ -5,7 +5,11 @@ Extracted from tests/test_mcp_dispatch.py.
 
 from __future__ import annotations
 
-from dispatch_server.server import (
+import pytest
+
+pytestmark = [pytest.mark.unit]
+
+from dispatch_server.server import (  # noqa: E402
     _extract_artifacts,
     _merge_artifacts,
     _resolve_effective_mode,

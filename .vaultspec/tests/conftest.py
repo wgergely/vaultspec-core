@@ -11,9 +11,12 @@ import pytest
 # Add the library to the path once at the top-level conftest.
 # This avoids doing it in every single test file.
 # Ideally, the user would run pytest with PYTHONPATH=.vaultspec/lib/src
-LIB_SRC = pathlib.Path(__file__).parent.parent / ".vaultspec" / "lib" / "src"
-if str(LIB_SRC) not in sys.path:
-    sys.path.insert(0, str(LIB_SRC))
+_VAULTSPEC = pathlib.Path(__file__).resolve().parent.parent
+LIB_SRC = _VAULTSPEC / "lib" / "src"
+SCRIPTS = _VAULTSPEC / "scripts"
+for _p in (LIB_SRC, SCRIPTS):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 from protocol.providers.base import GeminiModels  # noqa: E402
 
@@ -27,7 +30,7 @@ try:
 except ImportError:
     HAS_RAG = False
 
-TEST_PROJECT = pathlib.Path(__file__).parent.parent / "test-project"
+TEST_PROJECT = pathlib.Path(__file__).resolve().parent.parent.parent / "test-project"
 
 # GPU fast corpus: 13 representative docs covering all 5 doc_types and
 # key features needed by the test suite.  Avoids embedding all 213 docs.
@@ -181,7 +184,7 @@ def rag_components():
 def rag_components_full():
     """Set up real RAG components with the FULL 213-doc corpus.
 
-    Only used by tests marked @pytest.mark.slow that need full-corpus
+    Only used by tests marked @pytest.mark.quality that need full-corpus
     coverage (quality precision tests, document count assertions, etc.).
     Uses .lance-full/ to avoid colliding with the fast fixture.
     """
@@ -221,7 +224,7 @@ def _vault_snapshot_reset():
     yield
     subprocess.run(
         ["git", "checkout", "--", "test-project/.vault/"],
-        cwd=pathlib.Path(__file__).parent.parent,
+        cwd=pathlib.Path(__file__).resolve().parent.parent.parent,
         check=False,
     )
 

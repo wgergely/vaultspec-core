@@ -2,15 +2,7 @@
 
 from __future__ import annotations
 
-import pathlib
-import sys
-
 import pytest
-
-# Ensure vault lib is importable
-LIB_SRC = pathlib.Path(__file__).parent.parent / ".vaultspec" / "lib" / "src"
-if str(LIB_SRC) not in sys.path:
-    sys.path.insert(0, str(LIB_SRC))
 
 # Check if RAG deps are available
 try:
@@ -37,6 +29,7 @@ class TestRAGAPI:
     avoid conflicts with the session-scoped fixture.
     """
 
+    @pytest.mark.api
     def test_search_returns_results(self, rag_components):
         """rag.api.search returns SearchResult list.
 
@@ -57,6 +50,7 @@ class TestRAGAPI:
         assert hasattr(results[0], "id")
         assert hasattr(results[0], "score")
 
+    @pytest.mark.api
     def test_search_with_type_filter(self, rag_components):
         """rag.api.search filters by doc_type."""
         from rag.search import VaultSearcher
@@ -70,7 +64,7 @@ class TestRAGAPI:
         for r in results:
             assert r.doc_type == "adr"
 
-    @pytest.mark.slow
+    @pytest.mark.quality
     def test_index_incremental(self, rag_components_full):
         """rag.api.index returns IndexResult with correct counts.
 
@@ -84,7 +78,7 @@ class TestRAGAPI:
         assert result.total > 0
         assert result.duration_ms >= 0
 
-    @pytest.mark.slow
+    @pytest.mark.quality
     def test_index_full(self, rag_components_full):
         """rag.api.index with full=True rebuilds index."""
         from rag.api import index
@@ -94,6 +88,7 @@ class TestRAGAPI:
         assert result.total > 0
         assert result.added > 0
 
+    @pytest.mark.api
     def test_get_document_existing(self, rag_components):
         """Store.get_by_id returns dict for known doc.
 
@@ -113,12 +108,14 @@ class TestRAGAPI:
         assert "content" in result
         assert "doc_type" in result
 
+    @pytest.mark.api
     def test_get_document_nonexistent(self, rag_components):
         """Store.get_by_id returns None for unknown doc."""
         store = rag_components["store"]
         result = store.get_by_id("nonexistent-doc-that-does-not-exist")
         assert result is None
 
+    @pytest.mark.api
     def test_list_documents(self, rag_components):
         """rag.api.list_documents returns all docs."""
         from rag.api import list_documents
@@ -130,6 +127,7 @@ class TestRAGAPI:
         assert all("doc_type" in d for d in docs)
         assert all("title" in d for d in docs)
 
+    @pytest.mark.api
     def test_list_documents_type_filter(self, rag_components):
         """rag.api.list_documents filters by doc_type."""
         from rag.api import list_documents
@@ -140,6 +138,7 @@ class TestRAGAPI:
         for d in docs:
             assert d["doc_type"] == "adr"
 
+    @pytest.mark.api
     def test_get_related(self, rag_components):
         """rag.api.get_related returns graph relationships."""
         from rag.api import get_related, list_documents
@@ -154,6 +153,7 @@ class TestRAGAPI:
         assert "incoming" in result
         assert result["doc_id"] == doc_id
 
+    @pytest.mark.api
     def test_get_status(self, rag_components):
         """rag.api.get_status returns vault summary.
 
@@ -174,6 +174,7 @@ class TestRAGAPI:
         assert len(features) > 0
         assert store.count() > 0
 
+    @pytest.mark.api
     def test_engine_singleton(self, rag_components):
         """get_engine returns same instance for same root."""
         import rag.api as api_mod

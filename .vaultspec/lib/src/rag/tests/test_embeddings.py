@@ -14,7 +14,10 @@ try:
 except ImportError:
     HAS_RAG = False
 
-pytestmark = pytest.mark.skipif(not HAS_RAG, reason="RAG dependencies not installed")
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.skipif(not HAS_RAG, reason="RAG dependencies not installed"),
+]
 
 
 # ---- Embedding Model Tests ----

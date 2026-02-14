@@ -3,6 +3,10 @@ from __future__ import annotations
 import subprocess
 import sys
 
+import pytest
+
+pytestmark = [pytest.mark.unit]
+
 
 def test_cli_help():
     result = subprocess.run(
