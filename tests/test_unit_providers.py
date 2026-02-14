@@ -141,29 +141,28 @@ class TestGeminiProvider:
 
     def test_supported_models(self, provider):
         models = provider.supported_models
-        assert "gemini-2.0-flash-exp" in models
+        assert "gemini-2.5-flash" in models
+        assert "gemini-3-pro-preview" in models
 
     def test_capability_pro_is_high(self, provider):
         assert (
-            provider.get_model_capability("gemini-2.0-pro-exp-02-05")
+            provider.get_model_capability("gemini-3-pro-preview")
             == CapabilityLevel.HIGH
         )
 
     def test_capability_flash_is_low(self, provider):
-        assert (
-            provider.get_model_capability("gemini-2.0-flash-exp") == CapabilityLevel.LOW
-        )
+        assert provider.get_model_capability("gemini-2.5-flash") == CapabilityLevel.LOW
 
     def test_best_model_high(self, provider):
         assert (
             provider.get_best_model_for_capability(CapabilityLevel.HIGH)
-            == "gemini-2.0-pro-exp-02-05"
+            == "gemini-3-pro-preview"
         )
 
     def test_best_model_low(self, provider):
         assert (
             provider.get_best_model_for_capability(CapabilityLevel.LOW)
-            == "gemini-2.0-flash-exp"
+            == "gemini-2.5-flash"
         )
 
     def test_no_circular_fallback(self, provider):
@@ -179,11 +178,11 @@ class TestGeminiProvider:
         ):
             spec = provider.prepare_process(
                 agent_name="test-agent",
-                agent_meta={"model": "gemini-2.0-flash-exp"},
+                agent_meta={"model": "gemini-2.5-flash"},
                 agent_persona="You are a test agent.",
                 task_context="Do something.",
                 root_dir=tmp_path,
-                model_override="gemini-2.0-flash-exp",
+                model_override="gemini-2.5-flash",
             )
         assert isinstance(spec, ProcessSpec)
         assert "--experimental-acp" in spec.args
@@ -261,46 +260,43 @@ class TestClaudeProvider:
 
     def test_supported_models(self, provider):
         models = provider.supported_models
-        assert "claude-3-5-sonnet-20241022" in models
+        assert "claude-sonnet-4-5" in models
+        assert "claude-opus-4-6" in models
 
     def test_capability_opus_is_high(self, provider):
-        assert (
-            provider.get_model_capability("claude-3-opus-20240229")
-            == CapabilityLevel.HIGH
-        )
+        assert provider.get_model_capability("claude-opus-4-6") == CapabilityLevel.HIGH
 
     def test_capability_sonnet_is_medium(self, provider):
         assert (
-            provider.get_model_capability("claude-3-5-sonnet-20241022")
-            == CapabilityLevel.MEDIUM
+            provider.get_model_capability("claude-sonnet-4-5") == CapabilityLevel.MEDIUM
         )
 
     def test_best_model_high(self, provider):
         assert (
             provider.get_best_model_for_capability(CapabilityLevel.HIGH)
-            == "claude-3-opus-20240229"
+            == "claude-opus-4-6"
         )
 
     def test_best_model_medium(self, provider):
         assert (
             provider.get_best_model_for_capability(CapabilityLevel.MEDIUM)
-            == "claude-3-5-sonnet-20241022"
+            == "claude-sonnet-4-5"
         )
 
     def test_best_model_low(self, provider):
         assert (
             provider.get_best_model_for_capability(CapabilityLevel.LOW)
-            == "claude-3-5-haiku-20241022"
+            == "claude-haiku-4-5"
         )
 
     def test_prepare_process_returns_spec(self, provider, tmp_path):
         spec = provider.prepare_process(
             agent_name="test-agent",
-            agent_meta={"model": "claude-3-5-sonnet-20241022"},
+            agent_meta={"model": "claude-sonnet-4-5"},
             agent_persona="You are a test agent.",
             task_context="Do something.",
             root_dir=tmp_path,
-            model_override="claude-3-5-sonnet-20241022",
+            model_override="claude-sonnet-4-5",
         )
         assert isinstance(spec, ProcessSpec)
         assert "mcp" in spec.args
@@ -320,5 +316,5 @@ class TestGetProviderForModel:
     def test_gemini_model_returns_gemini(self):
         # The logic in get_provider_for_model currently defaults to gemini
         # for unknown or None models.
-        provider = get_provider_for_model("gemini-2.0-flash-exp")
+        provider = get_provider_for_model("gemini-2.5-flash")
         assert provider.name == "gemini"

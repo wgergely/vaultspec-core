@@ -1,30 +1,50 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from vault.models import DocumentMetadata
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 
 # ---------------------------------------------------------------------------
 # YAML parsing: prefer PyYAML, fall back to simple key-value parser
 # ---------------------------------------------------------------------------
+def _simple_yaml_load(text: str) -> dict[str, Any]:
+    """Minimal key-value YAML parser for simple frontmatter.
+
+    Handles ``key: value`` pairs, preserving colons in values.
+    Does NOT handle nested structures, multi-line values, or lists.
+    """
+    data: dict[str, Any] = {}
+    for line in text.split("\n"):
+        if ":" in line:
+            key, value = line.split(":", 1)
+            data[key.strip()] = value.strip()
+    return data
+
+
+_yaml_load: Callable[[str], dict[str, Any]]
+
 try:
     import yaml
 
-    def _yaml_load(text: str) -> dict[str, Any]:
-        return yaml.safe_load(text) or {}
+    def _yaml_load_impl(text: str) -> dict[str, Any]:
+        try:
+            return yaml.safe_load(text) or {}
+        except yaml.YAMLError:
+            # PyYAML chokes on unquoted colons in values (e.g.
+            # ``description: A test: with colons``).  Fall back to
+            # the simple key-value splitter which handles them fine.
+            return _simple_yaml_load(text)
+
+    _yaml_load = _yaml_load_impl
 
 except ImportError:
     yaml = None  # type: ignore
-
-    def _yaml_load(text: str) -> dict[str, Any]:
-        """Minimal key-value YAML parser (fallback when PyYAML unavailable)."""
-        data: dict[str, Any] = {}
-        for line in text.split("\n"):
-            if ":" in line:
-                key, value = line.split(":", 1)
-                data[key.strip()] = value.strip()
-        return data
+    _yaml_load = _simple_yaml_load
 
 
 def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
