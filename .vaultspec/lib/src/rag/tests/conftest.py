@@ -23,7 +23,8 @@ except ImportError:
     HAS_RAG = False
 
 TEST_PROJECT = (
-    pathlib.Path(__file__).resolve().parent.parent.parent.parent.parent / "test-project"
+    pathlib.Path(__file__).resolve().parent.parent.parent.parent.parent.parent
+    / "test-project"
 )
 
 # GPU fast corpus: 13 representative docs covering all 5 doc_types
