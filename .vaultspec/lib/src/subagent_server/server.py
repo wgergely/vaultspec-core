@@ -15,7 +15,9 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.fastmcp.resources.types import FunctionResource
+from mcp.types import ToolAnnotations
 from pydantic import AnyUrl
 from vault.parser import parse_frontmatter
 
@@ -229,7 +231,7 @@ def _register_agent_resources() -> None:
     # NOTE: FastMCP ResourceManager has no public remove_resource() API.
     # We access _resource_manager._resources (dict[str, Resource]) directly
     # to clear stale agent entries before re-registering.  Pinned to
-    # mcp>=0.1.0 in pyproject.toml; revisit if ResourceManager gains a
+    # mcp>=1.20.0 in pyproject.toml; revisit if ResourceManager gains a
     # public removal method.
     resources = mcp._resource_manager._resources
     stale_keys = [k for k in resources if k.startswith("agents://")]
@@ -282,7 +284,14 @@ async def _poll_agent_files() -> None:
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool()
+@mcp.tool(
+    title="List Available Agents",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
 async def list_agents() -> str:
     """Return a list of all available sub-agents and their tiers."""
     _refresh_if_changed()
@@ -305,7 +314,15 @@ async def list_agents() -> str:
     )
 
 
-@mcp.tool()
+@mcp.tool(
+    title="Dispatch Sub-Agent",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
 async def dispatch_agent(
     agent: str,
     task: str,
@@ -319,23 +336,19 @@ async def dispatch_agent(
     _refresh_if_changed()
 
     if agent not in _agent_cache:
-        return json.dumps({"status": "failed", "error": f"Agent '{agent}' not found."})
+        raise ToolError(f"Agent '{agent}' not found.")
 
     effective_mode = _resolve_effective_mode(agent, mode)
     if effective_mode not in ("read-write", "read-only"):
-        return json.dumps(
-            {
-                "status": "failed",
-                "agent": agent,
-                "error": f"Invalid mode '{effective_mode}'. Use 'read-write'.",
-            }
+        raise ToolError(
+            f"Invalid mode '{effective_mode}'. Use 'read-write' or 'read-only'."
         )
 
     # Pre-acquire advisory lock for .vault/ if read-only
     try:
         task_obj = task_engine.create_task(agent, model=model, mode=effective_mode)
     except ValueError as e:
-        return json.dumps({"status": "failed", "error": str(e)})
+        raise ToolError(str(e)) from e
 
     task_id = task_obj.task_id
 
@@ -419,12 +432,19 @@ async def dispatch_agent(
     )
 
 
-@mcp.tool()
+@mcp.tool(
+    title="Get Task Status",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
 async def get_task_status(task_id: str) -> str:
     """Check the status and result of a previously dispatched task."""
     task = task_engine.get_task(task_id)
     if not task:
-        return json.dumps({"error": f"Task '{task_id}' not found or expired."})
+        raise ToolError(f"Task '{task_id}' not found or expired.")
 
     res = {
         "taskId": task.task_id,
@@ -451,15 +471,23 @@ async def get_task_status(task_id: str) -> str:
     return json.dumps(res, indent=2)
 
 
-@mcp.tool()
+@mcp.tool(
+    title="Cancel Task",
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=True,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
 async def cancel_task(task_id: str) -> str:
     """Cancel a running task and its agent session."""
     task = task_engine.get_task(task_id)
     if not task:
-        return json.dumps({"error": f"Task '{task_id}' not found."})
+        raise ToolError(f"Task '{task_id}' not found.")
 
     if task.completed_at:
-        return json.dumps({"error": "Task already completed."})
+        raise ToolError("Task already completed.")
 
     # 1. Graceful ACP cancel if client is active
     client_ref = _active_clients.get(task_id)
@@ -478,7 +506,14 @@ async def cancel_task(task_id: str) -> str:
     return json.dumps({"status": "cancelled", "taskId": task_id, "agent": task.agent})
 
 
-@mcp.tool()
+@mcp.tool(
+    title="Get Active Locks",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
 async def get_locks() -> str:
     """List all active advisory file locks across the workspace."""
     locks = lock_manager.get_locks()
