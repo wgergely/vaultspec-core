@@ -10,17 +10,18 @@ if TYPE_CHECKING:
     import pathlib
 
     from acp.client.connection import ClientSideConnection
-    from protocol.providers.base import AgentProvider
 
-from vault.parser import parse_frontmatter
+    from protocol.providers.base import AgentProvider
 
 from acp import spawn_agent_process
 from acp.schema import (
     TextContentBlock,
 )
+from vault.parser import parse_frontmatter
+
 from orchestration.utils import safe_read_text
-from protocol.acp.client import DispatchClient, SessionLogger
-from protocol.acp.types import DispatchResult
+from protocol.acp.client import SessionLogger, SubagentClient
+from protocol.acp.types import SubagentResult
 from protocol.providers.claude import ClaudeProvider
 from protocol.providers.gemini import GeminiProvider
 
@@ -139,7 +140,7 @@ async def _interactive_loop(
             break
 
 
-async def run_dispatch(
+async def run_subagent(
     agent_name: str,
     root_dir: pathlib.Path,
     initial_task: str = "",
@@ -153,9 +154,9 @@ async def run_dispatch(
     mode: str = "read-write",
     client_ref: list | None = None,
     resume_session_id: str | None = None,
-    client_class: type[DispatchClient] = DispatchClient,
+    client_class: type[SubagentClient] = SubagentClient,
     provider_instance: AgentProvider | None = None,
-) -> DispatchResult:
+) -> SubagentResult:
     """Orchestrates the agent lifecycle with fallback support."""
     if context_files is None:
         context_files = []
@@ -246,7 +247,7 @@ async def run_dispatch(
                     "terminal": True,
                     "fs": {"readTextFile": True, "writeTextFile": True},
                 }
-                impl = {"name": "vaultspec-mcp", "version": "0.1.0"}
+                impl = {"name": "vs-subagent-mcp", "version": "0.1.0"}
 
                 # Bypass library initialize to control exact JSON keys
                 init_res = await conn._conn.send_request(
@@ -286,15 +287,15 @@ async def run_dispatch(
                 with contextlib.suppress(asyncio.CancelledError):
                     await t
 
-                return DispatchResult(
+                return SubagentResult(
                     session_id=session.session_id,
                     response_text=client.response_text,
                     written_files=client.written_files,
                 )
 
     except Exception:
-        logger.exception("Dispatch failed")
-        return DispatchResult(
+        logger.exception("Subagent execution failed")
+        return SubagentResult(
             session_id=session_id,
             response_text=client.response_text,
             written_files=client.written_files,

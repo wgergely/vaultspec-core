@@ -5,7 +5,6 @@ import sys
 import tempfile
 
 import pytest
-
 from acp.schema import (
     AgentMessageChunk,
     AgentPlanUpdate,
@@ -18,7 +17,8 @@ from acp.schema import (
     ToolCallStart,
     ToolCallUpdate,
 )
-from protocol.acp.client import DispatchClient
+
+from protocol.acp.client import SubagentClient
 
 pytestmark = [pytest.mark.unit]
 
@@ -30,8 +30,8 @@ pytestmark = [pytest.mark.unit]
 class TestRequestPermission:
     @pytest.fixture
     def client(self):
-        # DispatchClient replaced GeminiDispatchClient
-        return DispatchClient(root_dir=pathlib.Path("."), debug=False)
+        # SubagentClient is the unified ACP client
+        return SubagentClient(root_dir=pathlib.Path("."), debug=False)
 
     @pytest.mark.asyncio
     async def test_allow_once_selected(self, client):
@@ -118,7 +118,7 @@ class TestRequestPermission:
 class TestSessionUpdate:
     @pytest.fixture
     def client(self, tmp_path):
-        return DispatchClient(root_dir=tmp_path, debug=False)
+        return SubagentClient(root_dir=tmp_path, debug=False)
 
     @pytest.mark.asyncio
     async def test_agent_message_chunk(self, client, capsys):
@@ -150,7 +150,7 @@ class TestSessionUpdate:
         )
         await client.session_update("s1", update)
         captured = capsys.readouterr()
-        # DispatchClient prints [Tool] to stderr
+        # SubagentClient prints [Tool] to stderr
         assert "read_file" in captured.err
 
     @pytest.mark.asyncio
@@ -180,7 +180,7 @@ class TestSessionUpdate:
 
     @pytest.mark.asyncio
     async def test_debug_mode_shows_info_updates(self, tmp_path):
-        client = DispatchClient(root_dir=tmp_path, debug=True)
+        client = SubagentClient(root_dir=tmp_path, debug=True)
         update = SessionInfoUpdate(session_update="session_info_update")
         await client.session_update("s1", update)
         # Info update currently does nothing
@@ -195,7 +195,7 @@ class TestSessionUpdate:
 class TestFileIO:
     @pytest.fixture
     def client(self, tmp_path):
-        return DispatchClient(root_dir=tmp_path, debug=False)
+        return SubagentClient(root_dir=tmp_path, debug=False)
 
     @pytest.mark.asyncio
     async def test_read_text_file(self, client, mock_root_dir):
@@ -282,7 +282,7 @@ class TestFileIO:
 class TestTerminalLifecycle:
     @pytest.fixture
     def client(self, tmp_path):
-        return DispatchClient(root_dir=tmp_path, debug=False)
+        return SubagentClient(root_dir=tmp_path, debug=False)
 
     @pytest.mark.asyncio
     async def test_create_terminal(self, client, mock_root_dir):

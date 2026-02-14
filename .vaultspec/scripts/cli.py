@@ -1116,9 +1116,9 @@ MODULE_PATHS = {
     "vault": [".vaultspec/lib/src/vault/tests"],
     "protocol": [".vaultspec/lib/src/protocol/tests"],
     "orchestration": [".vaultspec/lib/src/orchestration/tests"],
-    "dispatch": [
-        ".vaultspec/tests/dispatch",
-        ".vaultspec/lib/src/dispatch_server/tests",
+    "subagent": [
+        ".vaultspec/tests/subagent",
+        ".vaultspec/lib/src/subagent_server/tests",
     ],
 }
 
@@ -1272,7 +1272,7 @@ def main() -> None:
     test_parser.add_argument(
         "--module",
         "-m",
-        choices=["cli", "rag", "vault", "protocol", "orchestration", "dispatch"],
+        choices=["cli", "rag", "vault", "protocol", "orchestration", "subagent"],
         help="Filter by module",
     )
     test_parser.add_argument("extra_args", nargs="*", help="Extra pytest arguments")

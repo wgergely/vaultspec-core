@@ -1,6 +1,6 @@
-"""Unit tests for dispatch server helper functions.
+"""Unit tests for subagent server helper functions.
 
-Extracted from tests/test_mcp_dispatch.py.
+Extracted from the original dispatch server tests.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ import pytest
 
 pytestmark = [pytest.mark.unit]
 
-from dispatch_server.server import (  # noqa: E402
+from subagent_server.server import (  # noqa: E402
     _extract_artifacts,
     _merge_artifacts,
     _resolve_effective_mode,

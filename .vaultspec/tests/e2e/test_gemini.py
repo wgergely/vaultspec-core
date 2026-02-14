@@ -1,4 +1,4 @@
-"""Integration test for Gemini provider dispatch.
+"""Integration test for Gemini provider subagent.
 
 Requires (for CLI tests):
 - Gemini CLI installed and on PATH
@@ -19,8 +19,8 @@ import pytest
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-from orchestration.dispatch import run_dispatch
-from protocol.acp.types import DispatchResult
+from orchestration.subagent import run_subagent
+from protocol.acp.types import SubagentResult
 from protocol.providers.gemini import GeminiProvider
 
 _has_gemini_cli = shutil.which("gemini") is not None
@@ -129,7 +129,7 @@ def test_gemini_process_spec_complete(test_project_root):
 @pytest.mark.asyncio
 @pytest.mark.timeout(60)
 async def test_gemini_dispatch_lifecycle(test_project_root):
-    """Verify run_dispatch with real Gemini CLI returns a valid result."""
+    """Verify run_subagent with real Gemini CLI returns a valid result."""
     (test_project_root / ".vaultspec" / "agents" / "tester.md").write_text(
         "---\ntier: LOW\n---\n\n# Persona\n"
         "You are Jean-Claude, a helpful assistant.\n"
@@ -140,7 +140,7 @@ async def test_gemini_dispatch_lifecycle(test_project_root):
 
     provider = GeminiProvider()
 
-    result = await run_dispatch(
+    result = await run_subagent(
         agent_name="tester",
         root_dir=test_project_root,
         initial_task="What is your name? Reply with only your name.",
@@ -149,7 +149,7 @@ async def test_gemini_dispatch_lifecycle(test_project_root):
         debug=True,
     )
 
-    assert isinstance(result, DispatchResult)
+    assert isinstance(result, SubagentResult)
     assert result.session_id is not None
     assert len(result.response_text) > 0
     assert "Jean-Claude" in result.response_text
@@ -176,7 +176,7 @@ async def test_gemini_rule_fingerprint(test_project_root):
     )
 
     provider = GeminiProvider()
-    result = await run_dispatch(
+    result = await run_subagent(
         agent_name="tester",
         root_dir=test_project_root,
         initial_task="What is your name? Reply with only your name.",
@@ -185,5 +185,5 @@ async def test_gemini_rule_fingerprint(test_project_root):
         debug=True,
     )
 
-    assert isinstance(result, DispatchResult)
+    assert isinstance(result, SubagentResult)
     assert "Jean-Claude" in result.response_text

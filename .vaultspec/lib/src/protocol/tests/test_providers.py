@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-import json
 from unittest import mock
 
 import pytest
 
-from orchestration.dispatch import get_provider_for_model
+from orchestration.subagent import get_provider_for_model
 from protocol.providers.base import (
     CapabilityLevel,
     ClaudeModels,
     GeminiModels,
     ProcessSpec,
-    load_mcp_servers,
     resolve_includes,
 )
 from protocol.providers.claude import ClaudeProvider
@@ -39,86 +37,6 @@ class TestSharedResolveIncludes:
     def test_url_passthrough(self, tmp_path):
         result = resolve_includes("@https://example.com/file.md", tmp_path, tmp_path)
         assert "@https://example.com/file.md" in result
-
-
-# ---------------------------------------------------------------------------
-# TestLoadMcpServers (base.py free function)
-# ---------------------------------------------------------------------------
-
-
-class TestLoadMcpServers:
-    def test_no_settings_file(self, tmp_path):
-        assert load_mcp_servers(tmp_path) == []
-
-    def test_valid_settings(self, tmp_path):
-        settings = {
-            "mcpServers": {
-                "rust": {
-                    "command": "rust-mcp-server",
-                    "args": [],
-                    "trust": True,
-                },
-                "dispatch": {"command": "python", "args": ["mcp.py"]},
-            }
-        }
-        (tmp_path / ".gemini").mkdir()
-        (tmp_path / ".gemini" / "settings.json").write_text(
-            json.dumps(settings), encoding="utf-8"
-        )
-        servers = load_mcp_servers(tmp_path)
-        assert len(servers) == 2
-        names = {s["name"] for s in servers}
-        assert names == {"rust", "dispatch"}
-        rust = next(s for s in servers if s["name"] == "rust")
-        assert rust["command"] == "rust-mcp-server"
-        assert rust["args"] == []
-
-    def test_malformed_json(self, tmp_path):
-        (tmp_path / ".gemini").mkdir()
-        (tmp_path / ".gemini" / "settings.json").write_text(
-            "not json", encoding="utf-8"
-        )
-        assert load_mcp_servers(tmp_path) == []
-
-    def test_no_mcp_block(self, tmp_path):
-        (tmp_path / ".gemini").mkdir()
-        (tmp_path / ".gemini" / "settings.json").write_text(
-            json.dumps({"tools": {}}), encoding="utf-8"
-        )
-        assert load_mcp_servers(tmp_path) == []
-
-    def test_malformed_entry_skipped(self, tmp_path):
-        settings = {
-            "mcpServers": {
-                "good": {"command": "cmd"},
-                "bad": "not a dict",
-                "missing_cmd": {"args": []},
-            }
-        }
-        (tmp_path / ".gemini").mkdir()
-        (tmp_path / ".gemini" / "settings.json").write_text(
-            json.dumps(settings), encoding="utf-8"
-        )
-        servers = load_mcp_servers(tmp_path)
-        assert len(servers) == 1
-        assert servers[0]["name"] == "good"
-
-    def test_env_passed_through(self, tmp_path):
-        settings = {
-            "mcpServers": {
-                "srv": {
-                    "command": "cmd",
-                    "args": ["-v"],
-                    "env": {"FOO": "bar"},
-                },
-            }
-        }
-        (tmp_path / ".gemini").mkdir()
-        (tmp_path / ".gemini" / "settings.json").write_text(
-            json.dumps(settings), encoding="utf-8"
-        )
-        servers = load_mcp_servers(tmp_path)
-        assert servers[0]["env"] == {"FOO": "bar"}
 
 
 # ---------------------------------------------------------------------------

@@ -21,8 +21,8 @@ from pathlib import Path
 import pytest
 from vault.parser import parse_frontmatter
 
-from orchestration.dispatch import run_dispatch
-from protocol.acp.types import DispatchResult
+from orchestration.subagent import run_subagent
+from protocol.acp.types import SubagentResult
 from protocol.providers.claude import ClaudeProvider
 from protocol.providers.gemini import GeminiProvider
 
@@ -109,11 +109,11 @@ def _write_researcher_agent(root: Path) -> None:
 
 async def _run_research_step(
     root: Path, provider, feature: str = "fairy-tales"
-) -> DispatchResult:
+) -> SubagentResult:
     """Step 1: Research French fairy tales."""
     _write_researcher_agent(root)
 
-    return await run_dispatch(
+    return await run_subagent(
         agent_name="researcher",
         root_dir=root,
         initial_task=(
@@ -136,9 +136,9 @@ async def _run_research_step(
 
 async def _run_adr_step(
     root: Path, provider, feature: str = "fairy-tales"
-) -> DispatchResult:
+) -> SubagentResult:
     """Step 2: Create ADR from research."""
-    return await run_dispatch(
+    return await run_subagent(
         agent_name="researcher",
         root_dir=root,
         initial_task=(
@@ -162,9 +162,9 @@ async def _run_adr_step(
 
 async def _run_plan_step(
     root: Path, provider, feature: str = "fairy-tales"
-) -> DispatchResult:
+) -> SubagentResult:
     """Step 3: Write implementation plan."""
-    return await run_dispatch(
+    return await run_subagent(
         agent_name="researcher",
         root_dir=root,
         initial_task=(
@@ -203,7 +203,7 @@ async def test_full_cycle_gemini(pipeline_root):
 
     # Step 1: Research
     result = await _run_research_step(pipeline_root, provider, feature)
-    assert isinstance(result, DispatchResult)
+    assert isinstance(result, SubagentResult)
     assert result.session_id is not None
 
     research_docs = _find_new_docs(pipeline_root / ".vault", "research", feature)
@@ -211,14 +211,14 @@ async def test_full_cycle_gemini(pipeline_root):
 
     # Step 2: ADR
     result = await _run_adr_step(pipeline_root, provider, feature)
-    assert isinstance(result, DispatchResult)
+    assert isinstance(result, SubagentResult)
 
     adr_docs = _find_new_docs(pipeline_root / ".vault", "adr", feature)
     assert len(adr_docs) >= 1, "ADR document not created in .vault/adr/"
 
     # Step 3: Plan
     result = await _run_plan_step(pipeline_root, provider, feature)
-    assert isinstance(result, DispatchResult)
+    assert isinstance(result, SubagentResult)
 
     plan_docs = _find_new_docs(pipeline_root / ".vault", "plan", feature)
     assert len(plan_docs) >= 1, "Plan document not created in .vault/plan/"
@@ -245,7 +245,7 @@ async def test_full_cycle_claude(pipeline_root):
 
     # Step 1: Research
     result = await _run_research_step(pipeline_root, provider, feature)
-    assert isinstance(result, DispatchResult)
+    assert isinstance(result, SubagentResult)
     assert result.session_id is not None
 
     research_docs = _find_new_docs(pipeline_root / ".vault", "research", feature)
@@ -253,14 +253,14 @@ async def test_full_cycle_claude(pipeline_root):
 
     # Step 2: ADR
     result = await _run_adr_step(pipeline_root, provider, feature)
-    assert isinstance(result, DispatchResult)
+    assert isinstance(result, SubagentResult)
 
     adr_docs = _find_new_docs(pipeline_root / ".vault", "adr", feature)
     assert len(adr_docs) >= 1, "ADR document not created in .vault/adr/"
 
     # Step 3: Plan
     result = await _run_plan_step(pipeline_root, provider, feature)
-    assert isinstance(result, DispatchResult)
+    assert isinstance(result, SubagentResult)
 
     plan_docs = _find_new_docs(pipeline_root / ".vault", "plan", feature)
     assert len(plan_docs) >= 1, "Plan document not created in .vault/plan/"

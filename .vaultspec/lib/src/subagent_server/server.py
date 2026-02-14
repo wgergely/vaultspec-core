@@ -7,10 +7,12 @@ import logging
 import re
 import sys
 import time
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import pathlib
+    from collections.abc import AsyncIterator
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.resources.types import FunctionResource
@@ -20,8 +22,8 @@ from vault.parser import parse_frontmatter
 from orchestration.constants import (
     READONLY_PERMISSION_PROMPT as _READONLY_PERMISSION_PROMPT,
 )
-from orchestration.dispatch import (
-    run_dispatch,
+from orchestration.subagent import (
+    run_subagent,
 )
 from orchestration.task_engine import (
     LockManager,
@@ -31,7 +33,7 @@ from orchestration.utils import (
     find_project_root,
     safe_read_text,
 )
-from protocol.acp.types import DispatchError
+from protocol.acp.types import SubagentError
 
 # Configure logging to stderr
 logging.basicConfig(
@@ -45,14 +47,31 @@ logger = logging.getLogger(__name__)
 # Server initialization
 # ---------------------------------------------------------------------------
 
+
+@asynccontextmanager
+async def _server_lifespan(_app: FastMCP) -> AsyncIterator[None]:
+    """Lifecycle hook: starts agent-file polling when the event loop is running."""
+    _register_agent_resources()
+    poller = asyncio.create_task(_poll_agent_files())
+    _background_tasks["agent_poller"] = poller
+    try:
+        yield None
+    finally:
+        poller.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await poller
+        _background_tasks.pop("agent_poller", None)
+
+
 mcp = FastMCP(
-    name="vaultspec-mcp",
-    instructions="MCP server for dispatching sub-agents via ACP. "
+    name="vs-subagent-mcp",
+    instructions="MCP server for running sub-agents via ACP. "
     "Use `list_agents` to discover available agents, "
     "`dispatch_agent` to run a sub-agent with a task, "
     "`get_task_status` to check on a running task, "
     "`cancel_task` to cancel a running task, "
     "and `get_locks` to view active advisory file locks.",
+    lifespan=_server_lifespan,
 )
 
 ROOT_DIR = find_project_root()
@@ -61,10 +80,10 @@ AGENTS_DIR = ROOT_DIR / ".vaultspec" / "agents"
 # Advisory lock manager for workspace coordination (Phase 4).
 lock_manager = LockManager()
 
-# Internal task engine (Layer 2) for tracking dispatch task lifecycle.
+# Internal task engine (Layer 2) for tracking subagent task lifecycle.
 task_engine = TaskEngine(ttl_seconds=3600.0, lock_manager=lock_manager)
 
-# Maps task_id -> asyncio.Task for background dispatch coroutines.
+# Maps task_id -> asyncio.Task for background subagent coroutines.
 _background_tasks: dict[str, asyncio.Task[None]] = {}
 
 # Maps task_id -> Client for graceful ACP cancellation.
@@ -77,7 +96,7 @@ _active_clients: dict[str, list] = {}
 
 
 def _resolve_effective_mode(agent: str, mode: str | None) -> str:
-    """Resolve the effective permission mode for a dispatch."""
+    """Resolve the effective permission mode for a subagent invocation."""
     if mode is not None:
         return mode
     agent_meta = _agent_cache.get(agent)
@@ -207,10 +226,15 @@ def _register_agent_resources() -> None:
     _agent_cache = _build_agent_cache()
     _agent_mtimes = _snapshot_mtimes()
 
-    rm = mcp._resource_manager
-    stale_keys = [k for k in rm._resources if k.startswith("agents://")]
+    # NOTE: FastMCP ResourceManager has no public remove_resource() API.
+    # We access _resource_manager._resources (dict[str, Resource]) directly
+    # to clear stale agent entries before re-registering.  Pinned to
+    # mcp>=0.1.0 in pyproject.toml; revisit if ResourceManager gains a
+    # public removal method.
+    resources = mcp._resource_manager._resources
+    stale_keys = [k for k in resources if k.startswith("agents://")]
     for k in stale_keys:
-        del rm._resources[k]
+        del resources[k]
 
     for name, metadata in _agent_cache.items():
 
@@ -224,7 +248,7 @@ def _register_agent_resources() -> None:
             mime_type="application/json",
             fn=_make_reader(metadata),
         )
-        rm.add_resource(resource)
+        mcp._resource_manager.add_resource(resource)
 
     logger.info("Registered %d agent resources", len(_agent_cache))
 
@@ -333,7 +357,7 @@ async def dispatch_agent(
 
             full_task = _inject_permission_prompt(task_content, effective_mode)
 
-            result = await run_dispatch(
+            result = await run_subagent(
                 agent_name=agent,
                 initial_task=full_task,
                 root_dir=ROOT_DIR,
@@ -371,10 +395,10 @@ async def dispatch_agent(
                     "artifacts": final_artifacts,
                 },
             )
-        except DispatchError as e:
+        except SubagentError as e:
             task_engine.fail_task(task_id, str(e))
         except Exception as e:
-            logger.exception("Unexpected error in background dispatch")
+            logger.exception("Unexpected error in background subagent")
             task_engine.fail_task(task_id, f"Unexpected error: {e}")
         finally:
             _background_tasks.pop(task_id, None)
@@ -475,10 +499,6 @@ async def get_locks() -> str:
 
 def main():
     """Start the MCP server."""
-    _register_agent_resources()
-    task = asyncio.create_task(_poll_agent_files())
-    # Keep a reference to the task to prevent garbage collection
-    _background_tasks["agent_poller"] = task
     mcp.run()
 
 
