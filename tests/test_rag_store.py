@@ -1,8 +1,13 @@
-"""Tests for VaultStore: CRUD, hybrid search, and store helper edge cases."""
+"""Integration tests for VaultStore: CRUD and hybrid search.
+
+Unit tests for store helpers (_parse_json_list, _build_where) have been moved to:
+.vaultspec/lib/src/rag/tests/test_store.py
+"""
 
 from __future__ import annotations
 
 import pathlib
+import shutil
 import sys
 
 import pytest
@@ -22,9 +27,9 @@ try:
 except ImportError:
     HAS_RAG = False
 
-pytestmark = pytest.mark.skipif(not HAS_RAG, reason="RAG dependencies not installed")
+TEST_PROJECT = pathlib.Path(__file__).parent.parent / "test-project"
 
-MOCK_PROJECT = pathlib.Path(__file__).parent.parent / "mock-project"
+pytestmark = pytest.mark.skipif(not HAS_RAG, reason="RAG dependencies not installed")
 
 
 # ---- Store Tests ----
@@ -47,15 +52,20 @@ class TestVaultStore:
             assert isinstance(doc_id, str)
             assert len(doc_id) > 0
 
-    def test_vault_store_context_manager(self, tmp_path):
+    def test_vault_store_context_manager(self):
         """VaultStore should support the context manager protocol."""
         from rag.store import VaultStore
 
-        with VaultStore(tmp_path) as store:
-            assert store.db is not None
-            store.ensure_table()
-        # After exiting context, db should be released
-        assert store.db is None
+        lance_dir = TEST_PROJECT / ".lance-test"
+        try:
+            with VaultStore(lance_dir) as store:
+                assert store.db is not None
+                store.ensure_table()
+            # After exiting context, db should be released
+            assert store.db is None
+        finally:
+            if lance_dir.exists():
+                shutil.rmtree(lance_dir, ignore_errors=True)
 
     def test_hybrid_search_returns_results(self, rag_components):
         model = rag_components["model"]
@@ -73,69 +83,28 @@ class TestVaultStore:
             assert "id" in r
             assert "path" in r
 
-
-# ---- Store helper edge cases ----
-
-
-class TestStoreHelpers:
-    """Tests for store utility functions and edge cases."""
-
-    def test_parse_json_list_valid_json(self):
-        """_parse_json_list should parse valid JSON arrays."""
-        from rag.store import _parse_json_list
-
-        assert _parse_json_list('["#adr", "#editor"]') == ["#adr", "#editor"]
-        assert _parse_json_list("[]") == []
-
-    def test_parse_json_list_empty_string(self):
-        """_parse_json_list should handle empty string gracefully."""
-        from rag.store import _parse_json_list
-
-        assert _parse_json_list("") == []
-
-    def test_parse_json_list_comma_separated_fallback(self):
-        """_parse_json_list should fall back to comma-splitting for non-JSON."""
-        from rag.store import _parse_json_list
-
-        result = _parse_json_list("#adr, #editor")
-        assert result == ["#adr", "#editor"]
-
-    def test_parse_json_list_non_array_json(self):
-        """_parse_json_list with valid JSON that is not an array should
-        fall back to comma splitting."""
-        from rag.store import _parse_json_list
-
-        result = _parse_json_list('"just a string"')
-        assert isinstance(result, list)
-
-    def test_build_where_escapes_quotes(self):
-        """_build_where should escape single quotes in filter values."""
-        from rag.store import VaultStore
-
-        result = VaultStore._build_where({"doc_type": "adr' OR 1=1 --"})
-        assert result is not None
-        # The single quote should be escaped (doubled)
-        assert "''" in result
-        # The unescaped injection should not be present
-        assert "adr' OR" not in result
-
-    def test_search_empty_store(self, tmp_path):
+    def test_search_empty_store(self):
         """Searching a fresh VaultStore with no indexed docs should return
         empty results without crashing.
         """
         from rag.embeddings import EmbeddingModel
         from rag.store import VaultStore
 
-        # Create a minimal vault structure so VaultStore can connect
-        store = VaultStore(tmp_path)
-        store.ensure_table()
+        lance_dir = TEST_PROJECT / ".lance-empty"
+        try:
+            # Create a minimal vault structure so VaultStore can connect
+            store = VaultStore(lance_dir)
+            store.ensure_table()
 
-        model = EmbeddingModel()
-        query_vec = model.encode_query("anything")
+            model = EmbeddingModel()
+            query_vec = model.encode_query("anything")
 
-        results = store.hybrid_search(
-            query_vector=query_vec,
-            query_text="anything",
-            limit=5,
-        )
-        assert results == []
+            results = store.hybrid_search(
+                query_vector=query_vec,
+                query_text="anything",
+                limit=5,
+            )
+            assert results == []
+        finally:
+            if lance_dir.exists():
+                shutil.rmtree(lance_dir, ignore_errors=True)

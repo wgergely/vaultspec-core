@@ -24,8 +24,6 @@ except ImportError:
 
 pytestmark = pytest.mark.skipif(not HAS_RAG, reason="RAG dependencies not installed")
 
-MOCK_PROJECT = pathlib.Path(__file__).parent.parent / "mock-project"
-
 
 # ---- Helpfulness / Search Quality Tests ----
 
@@ -33,7 +31,7 @@ MOCK_PROJECT = pathlib.Path(__file__).parent.parent / "mock-project"
 class TestHelpfulness:
     """Search quality tests verifying the RAG pipeline returns relevant results.
 
-    Known-answer tests are grounded in actual mock-project/.vault/ content.
+    Known-answer tests are grounded in actual test-project/.vault/ content.
     Filter tests verify metadata predicates are applied correctly.
     Ranking tests verify score ordering and graph boosts.
     """

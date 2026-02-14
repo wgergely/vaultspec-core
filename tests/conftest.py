@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pathlib
 import shutil
+import subprocess
 import sys
 import time
 
@@ -26,7 +27,7 @@ try:
 except ImportError:
     HAS_RAG = False
 
-MOCK_PROJECT = pathlib.Path(__file__).parent.parent / "mock-project"
+TEST_PROJECT = pathlib.Path(__file__).parent.parent / "test-project"
 
 # GPU fast corpus: 13 representative docs covering all 5 doc_types and
 # key features needed by the test suite.  Avoids embedding all 213 docs.
@@ -167,7 +168,7 @@ def rag_components():
     Requires CUDA GPU — fails fast with GPUNotAvailableError otherwise.
     Uses .lance-fast/ to avoid colliding with the full-corpus fixture.
     """
-    components = _build_rag_components(MOCK_PROJECT, fast=True, lance_suffix="-fast")
+    components = _build_rag_components(TEST_PROJECT, fast=True, lance_suffix="-fast")
 
     yield components
 
@@ -184,7 +185,7 @@ def rag_components_full():
     coverage (quality precision tests, document count assertions, etc.).
     Uses .lance-full/ to avoid colliding with the fast fixture.
     """
-    components = _build_rag_components(MOCK_PROJECT, fast=False, lance_suffix="-full")
+    components = _build_rag_components(TEST_PROJECT, fast=False, lance_suffix="-full")
 
     yield components
 
@@ -203,15 +204,26 @@ def require_gpu_corpus(rag_components):
     assert rag_components["model"].device == "cuda", "GPU required"
 
 
-@pytest.fixture
-def mock_root_dir(tmp_path):
-    """A temporary directory acting as the project root."""
-    (tmp_path / ".vaultspec" / "agents").mkdir(parents=True)
-    (tmp_path / ".vault" / "adr").mkdir(parents=True)
-    (tmp_path / "test.txt").write_text(
-        "Hello from test workspace\nLine 2\nLine 3", encoding="utf-8"
+def _cleanup_test_project(root: pathlib.Path) -> None:
+    """Remove transient artifacts, preserving .vault/ and README."""
+    for item in root.iterdir():
+        if item.name in (".vault", "README.md", ".gitignore"):
+            continue
+        if item.is_dir():
+            shutil.rmtree(item, ignore_errors=True)
+        else:
+            item.unlink(missing_ok=True)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _vault_snapshot_reset():
+    """Reset test-project/.vault/ to git HEAD after the full test session."""
+    yield
+    subprocess.run(
+        ["git", "checkout", "--", "test-project/.vault/"],
+        cwd=pathlib.Path(__file__).parent.parent,
+        check=False,
     )
-    return tmp_path
 
 
 @pytest.fixture

@@ -11,6 +11,7 @@ import asyncio
 import pathlib
 import sys
 import warnings
+from pathlib import Path
 
 from _paths import ROOT_DIR  # shared path bootstrap
 
@@ -25,9 +26,10 @@ except ImportError as e:
     sys.exit(1)
 
 
-def list_available_agents():
+def list_available_agents(root: Path | None = None):
     """List all agents found in the workspace."""
-    agents_dir = ROOT_DIR / ".vaultspec" / "agents"
+    root = root if root is not None else ROOT_DIR
+    agents_dir = root / ".vaultspec" / "agents"
     if not agents_dir.exists():
         print("No agents found.", file=sys.stderr)
         return
@@ -92,7 +94,7 @@ def command_run(args):
 
     warnings.simplefilter("ignore", ResourceWarning)
 
-    project_root = find_project_root()
+    project_root = args.root if args.root is not None else find_project_root()
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -135,13 +137,16 @@ def command_serve(_args):
     server_main()
 
 
-def command_list(_args):
+def command_list(args):
     """Handle 'list' subcommand."""
-    list_available_agents()
+    list_available_agents(args.root)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sub-agent Dispatch CLI")
+    parser.add_argument(
+        "--root", type=Path, default=None, help="Override workspace root"
+    )
     subparsers = parser.add_subparsers(
         dest="command", required=True, help="Command to execute"
     )

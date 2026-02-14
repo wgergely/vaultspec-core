@@ -44,6 +44,17 @@ dev-rag = [
     "vaultspec[dev,rag]",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests", ".vaultspec/lib/src"]
+asyncio_mode = "auto"
+markers = [
+    "integration: requires CLI tools and network (deselect: -m 'not integration')",
+    "gemini: requires Gemini CLI installed",
+    "claude: requires Claude CLI installed",
+    "slow: tests requiring full 213-doc corpus (deselect: -m 'not slow')",
+    "timeout: timeout in seconds for individual tests (requires pytest-timeout)",
+]
+
 [tool.ruff]
 line-length = 88
 target-version = "py313"
