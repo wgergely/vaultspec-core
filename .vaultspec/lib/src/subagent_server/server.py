@@ -182,7 +182,7 @@ def _parse_tools(raw: str) -> list[str]:
 def _parse_agent_metadata(agent_path: pathlib.Path) -> dict[str, object]:
     content = agent_path.read_text(encoding="utf-8")
     meta, _body = parse_frontmatter(content)
-    return {
+    result: dict[str, object] = {
         "name": agent_path.stem,
         "description": _strip_quotes(meta.get("description", "")),
         "tier": meta.get("tier", "UNKNOWN"),
@@ -190,6 +190,28 @@ def _parse_agent_metadata(agent_path: pathlib.Path) -> dict[str, object]:
         "default_mode": meta.get("mode") or None,
         "tools": _parse_tools(meta["tools"]) if "tools" in meta else [],
     }
+
+    # Extended agent configuration (all optional)
+    if "max_turns" in meta:
+        result["max_turns"] = int(meta["max_turns"])
+    if "budget" in meta:
+        result["budget"] = float(meta["budget"])
+    if "allowed_tools" in meta:
+        result["allowed_tools"] = _parse_tools(meta["allowed_tools"])
+    if "disallowed_tools" in meta:
+        result["disallowed_tools"] = _parse_tools(meta["disallowed_tools"])
+    if meta.get("effort"):
+        result["effort"] = meta["effort"]
+    if meta.get("output_format"):
+        result["output_format"] = meta["output_format"]
+    if meta.get("fallback_model"):
+        result["fallback_model"] = meta["fallback_model"]
+    if meta.get("approval_mode"):
+        result["approval_mode"] = meta["approval_mode"]
+    if "include_dirs" in meta:
+        result["include_dirs"] = _parse_tools(meta["include_dirs"])
+
+    return result
 
 
 def _snapshot_mtimes() -> dict[str, float]:
@@ -328,10 +350,17 @@ async def dispatch_agent(
     task: str,
     model: str | None = None,
     mode: str | None = None,
+    max_turns: int | None = None,
+    budget: float | None = None,
+    effort: str | None = None,
+    output_format: str | None = None,
 ) -> str:
     """
     Run a sub-agent asynchronously to perform a task.
     Returns immediately with a taskId.
+
+    Optional overrides (max_turns, budget, effort, output_format)
+    take precedence over agent YAML defaults.
     """
     _refresh_if_changed()
 
@@ -380,6 +409,10 @@ async def dispatch_agent(
                 quiet=True,
                 mode=effective_mode,
                 client_ref=client_ref,
+                max_turns=max_turns,
+                budget=budget,
+                effort=effort,
+                output_format=output_format,
             )
 
             # Record session ID for potential resume

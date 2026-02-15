@@ -159,6 +159,10 @@ async def run_subagent(
     resume_session_id: str | None = None,
     client_class: type[SubagentClient] = SubagentClient,
     provider_instance: AgentProvider | None = None,
+    max_turns: int | None = None,
+    budget: float | None = None,
+    effort: str | None = None,
+    output_format: str | None = None,
 ) -> SubagentResult:
     """Orchestrates the agent lifecycle with fallback support."""
     if context_files is None:
@@ -181,6 +185,16 @@ async def run_subagent(
     except AgentNotFoundError:
         # Fallback if provider-specific fails
         agent_meta, agent_persona = load_agent(agent_name, root_dir)
+
+    # 1b. Apply runtime overrides (take precedence over YAML defaults)
+    if max_turns is not None:
+        agent_meta["max_turns"] = str(max_turns)
+    if budget is not None:
+        agent_meta["budget"] = str(budget)
+    if effort is not None:
+        agent_meta["effort"] = effort
+    if output_format is not None:
+        agent_meta["output_format"] = output_format
 
     # 2. Build Task Context
     task_context = _build_task_prompt(initial_task, context_files, plan_file, root_dir)

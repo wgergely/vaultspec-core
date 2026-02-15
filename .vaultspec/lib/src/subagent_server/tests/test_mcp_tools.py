@@ -7,6 +7,7 @@ _parse_agent_metadata, _parse_tools, and _inject_permission_prompt.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -670,3 +671,252 @@ class TestPermissionHelpers:
     def test_strip_quotes_no_quotes(self):
         """Returns value unchanged when no surrounding quotes."""
         assert _strip_quotes("hello world") == "hello world"
+
+
+# ---------------------------------------------------------------------------
+# TestDispatchAgentOverrides — Phase 5: runtime overrides
+# ---------------------------------------------------------------------------
+
+
+class TestDispatchAgentOverrides:
+    """Verify dispatch_agent passes runtime overrides to run_subagent."""
+
+    @pytest.mark.asyncio
+    async def test_max_turns_override(self, baker_cache, fresh_task_engine):
+        """max_turns override is passed to run_subagent."""
+        bg_tasks: dict[str, asyncio.Task] = {}
+        with (
+            patch("subagent_server.server._agent_cache", baker_cache),
+            patch("subagent_server.server._refresh_if_changed", return_value=False),
+            patch("subagent_server.server.task_engine", fresh_task_engine),
+            patch("subagent_server.server._background_tasks", bg_tasks),
+            patch("subagent_server.server._active_clients", {}),
+            patch(
+                "subagent_server.server.run_subagent",
+                new_callable=AsyncMock,
+            ) as mock_run,
+        ):
+            mock_run.return_value = MagicMock(
+                response_text="Done.",
+                written_files=[],
+                session_id="sess-001",
+            )
+            await dispatch_agent(
+                agent="simple-executor",
+                task="Bake bread",
+                max_turns=10,
+            )
+
+            # Wait for background task to complete
+            if bg_tasks:
+                await asyncio.gather(*bg_tasks.values(), return_exceptions=True)
+
+            mock_run.assert_called_once()
+            call_kwargs = mock_run.call_args[1]
+            assert call_kwargs["max_turns"] == 10
+
+    @pytest.mark.asyncio
+    async def test_budget_override(self, baker_cache, fresh_task_engine):
+        """budget override is passed to run_subagent."""
+        bg_tasks: dict[str, asyncio.Task] = {}
+        with (
+            patch("subagent_server.server._agent_cache", baker_cache),
+            patch("subagent_server.server._refresh_if_changed", return_value=False),
+            patch("subagent_server.server.task_engine", fresh_task_engine),
+            patch("subagent_server.server._background_tasks", bg_tasks),
+            patch("subagent_server.server._active_clients", {}),
+            patch(
+                "subagent_server.server.run_subagent",
+                new_callable=AsyncMock,
+            ) as mock_run,
+        ):
+            mock_run.return_value = MagicMock(
+                response_text="Done.",
+                written_files=[],
+                session_id="sess-001",
+            )
+            await dispatch_agent(
+                agent="simple-executor",
+                task="Bake bread",
+                budget=2.5,
+            )
+
+            # Wait for background task to complete
+            if bg_tasks:
+                await asyncio.gather(*bg_tasks.values(), return_exceptions=True)
+
+            mock_run.assert_called_once()
+            call_kwargs = mock_run.call_args[1]
+            assert call_kwargs["budget"] == 2.5
+
+    @pytest.mark.asyncio
+    async def test_effort_override(self, baker_cache, fresh_task_engine):
+        """effort override is passed to run_subagent."""
+        bg_tasks: dict[str, asyncio.Task] = {}
+        with (
+            patch("subagent_server.server._agent_cache", baker_cache),
+            patch("subagent_server.server._refresh_if_changed", return_value=False),
+            patch("subagent_server.server.task_engine", fresh_task_engine),
+            patch("subagent_server.server._background_tasks", bg_tasks),
+            patch("subagent_server.server._active_clients", {}),
+            patch(
+                "subagent_server.server.run_subagent",
+                new_callable=AsyncMock,
+            ) as mock_run,
+        ):
+            mock_run.return_value = MagicMock(
+                response_text="Done.",
+                written_files=[],
+                session_id="sess-001",
+            )
+            await dispatch_agent(
+                agent="simple-executor",
+                task="Bake bread",
+                effort="high",
+            )
+
+            # Wait for background task to complete
+            if bg_tasks:
+                await asyncio.gather(*bg_tasks.values(), return_exceptions=True)
+
+            mock_run.assert_called_once()
+            call_kwargs = mock_run.call_args[1]
+            assert call_kwargs["effort"] == "high"
+
+    @pytest.mark.asyncio
+    async def test_output_format_override(self, baker_cache, fresh_task_engine):
+        """output_format override is passed to run_subagent."""
+        bg_tasks: dict[str, asyncio.Task] = {}
+        with (
+            patch("subagent_server.server._agent_cache", baker_cache),
+            patch("subagent_server.server._refresh_if_changed", return_value=False),
+            patch("subagent_server.server.task_engine", fresh_task_engine),
+            patch("subagent_server.server._background_tasks", bg_tasks),
+            patch("subagent_server.server._active_clients", {}),
+            patch(
+                "subagent_server.server.run_subagent",
+                new_callable=AsyncMock,
+            ) as mock_run,
+        ):
+            mock_run.return_value = MagicMock(
+                response_text="Done.",
+                written_files=[],
+                session_id="sess-001",
+            )
+            await dispatch_agent(
+                agent="simple-executor",
+                task="Bake bread",
+                output_format="json",
+            )
+
+            # Wait for background task to complete
+            if bg_tasks:
+                await asyncio.gather(*bg_tasks.values(), return_exceptions=True)
+
+            mock_run.assert_called_once()
+            call_kwargs = mock_run.call_args[1]
+            assert call_kwargs["output_format"] == "json"
+
+    @pytest.mark.asyncio
+    async def test_no_overrides_passes_none(self, baker_cache, fresh_task_engine):
+        """Without overrides, None values are passed to run_subagent."""
+        bg_tasks: dict[str, asyncio.Task] = {}
+        with (
+            patch("subagent_server.server._agent_cache", baker_cache),
+            patch("subagent_server.server._refresh_if_changed", return_value=False),
+            patch("subagent_server.server.task_engine", fresh_task_engine),
+            patch("subagent_server.server._background_tasks", bg_tasks),
+            patch("subagent_server.server._active_clients", {}),
+            patch(
+                "subagent_server.server.run_subagent",
+                new_callable=AsyncMock,
+            ) as mock_run,
+        ):
+            mock_run.return_value = MagicMock(
+                response_text="Done.",
+                written_files=[],
+                session_id="sess-001",
+            )
+            await dispatch_agent(
+                agent="simple-executor",
+                task="Bake bread",
+            )
+
+            # Wait for background task to complete
+            if bg_tasks:
+                await asyncio.gather(*bg_tasks.values(), return_exceptions=True)
+
+            mock_run.assert_called_once()
+            call_kwargs = mock_run.call_args[1]
+            assert call_kwargs["max_turns"] is None
+            assert call_kwargs["budget"] is None
+            assert call_kwargs["effort"] is None
+            assert call_kwargs["output_format"] is None
+
+
+# ---------------------------------------------------------------------------
+# TestParseAgentMetadataExtended — Phase 5: new metadata fields
+# ---------------------------------------------------------------------------
+
+
+class TestParseAgentMetadataExtended:
+    """Verify _parse_agent_metadata extracts new optional fields."""
+
+    def test_max_turns_parsed(self, tmp_path):
+        agent_file = tmp_path / "test.md"
+        agent_file.write_text(
+            "---\ndescription: test\nmax_turns: 25\n---\nBody",
+            encoding="utf-8",
+        )
+        meta = _parse_agent_metadata(agent_file)
+        assert meta["max_turns"] == 25
+
+    def test_budget_parsed(self, tmp_path):
+        agent_file = tmp_path / "test.md"
+        agent_file.write_text(
+            "---\ndescription: test\nbudget: 1.5\n---\nBody",
+            encoding="utf-8",
+        )
+        meta = _parse_agent_metadata(agent_file)
+        assert meta["budget"] == 1.5
+
+    def test_effort_parsed(self, tmp_path):
+        agent_file = tmp_path / "test.md"
+        agent_file.write_text(
+            "---\ndescription: test\neffort: high\n---\nBody",
+            encoding="utf-8",
+        )
+        meta = _parse_agent_metadata(agent_file)
+        assert meta["effort"] == "high"
+
+    def test_allowed_tools_parsed(self, tmp_path):
+        agent_file = tmp_path / "test.md"
+        agent_file.write_text(
+            "---\ndescription: test\nallowed_tools: Glob, Read\n---\nBody",
+            encoding="utf-8",
+        )
+        meta = _parse_agent_metadata(agent_file)
+        assert meta["allowed_tools"] == ["Glob", "Read"]
+
+    def test_fallback_model_parsed(self, tmp_path):
+        agent_file = tmp_path / "test.md"
+        agent_file.write_text(
+            "---\ndescription: test\nfallback_model: claude-haiku-4-5\n---\nBody",
+            encoding="utf-8",
+        )
+        meta = _parse_agent_metadata(agent_file)
+        assert meta["fallback_model"] == "claude-haiku-4-5"
+
+    def test_no_extended_fields_in_minimal(self, tmp_path):
+        """Minimal agent with no extended fields doesn't include them."""
+        agent_file = tmp_path / "test.md"
+        agent_file.write_text(
+            "---\ndescription: test\n---\nBody",
+            encoding="utf-8",
+        )
+        meta = _parse_agent_metadata(agent_file)
+        assert "max_turns" not in meta
+        assert "budget" not in meta
+        assert "effort" not in meta
+        assert "allowed_tools" not in meta
+        assert "fallback_model" not in meta

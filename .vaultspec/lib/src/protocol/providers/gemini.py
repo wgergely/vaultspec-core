@@ -163,6 +163,28 @@ class GeminiProvider(AgentProvider):
         if mode == "read-only":
             args.append("--sandbox")
 
+        # Tool control
+        allowed = agent_meta.get("allowed_tools", "")
+        if allowed:
+            for tool in (t.strip() for t in allowed.split(",") if t.strip()):
+                args.extend(["--allowed-tools", tool])
+
+        # Approval mode (Gemini-specific: default|auto_edit|yolo|plan)
+        approval = agent_meta.get("approval_mode")
+        if approval and approval != "default":
+            args.extend(["--approval-mode", approval])
+
+        # Output format (text|json|stream-json)
+        fmt = agent_meta.get("output_format")
+        if fmt and fmt != "text":
+            args.extend(["--output-format", fmt])
+
+        # Additional workspace directories
+        include_dirs = agent_meta.get("include_dirs", "")
+        if include_dirs:
+            for d in (x.strip() for x in include_dirs.split(",") if x.strip()):
+                args.extend(["--include-directories", d])
+
         return ProcessSpec(
             executable=executable,
             args=args,

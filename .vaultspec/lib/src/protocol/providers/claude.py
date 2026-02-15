@@ -83,6 +83,24 @@ class ClaudeProvider(AgentProvider):
         if system_context:
             env["VS_SYSTEM_PROMPT"] = system_context
 
+        # Safety & control features from agent YAML / runtime overrides
+        if agent_meta.get("max_turns"):
+            env["VS_MAX_TURNS"] = agent_meta["max_turns"]
+        if agent_meta.get("budget"):
+            env["VS_BUDGET_USD"] = agent_meta["budget"]
+        if agent_meta.get("allowed_tools"):
+            env["VS_ALLOWED_TOOLS"] = agent_meta["allowed_tools"]
+        if agent_meta.get("disallowed_tools"):
+            env["VS_DISALLOWED_TOOLS"] = agent_meta["disallowed_tools"]
+        if agent_meta.get("effort"):
+            env["VS_EFFORT"] = agent_meta["effort"]
+        if agent_meta.get("output_format"):
+            env["VS_OUTPUT_FORMAT"] = agent_meta["output_format"]
+        if agent_meta.get("fallback_model"):
+            env["VS_FALLBACK_MODEL"] = agent_meta["fallback_model"]
+        if agent_meta.get("include_dirs"):
+            env["VS_INCLUDE_DIRS"] = agent_meta["include_dirs"]
+
         return ProcessSpec(
             executable=sys.executable,
             args=[
