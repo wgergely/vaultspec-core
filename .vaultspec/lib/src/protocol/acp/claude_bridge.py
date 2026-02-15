@@ -87,6 +87,7 @@ logger = logging.getLogger(__name__)
 
 # Tools that perform file writes in Claude Code
 _WRITE_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
+_SHELL_TOOLS = frozenset({"Bash"})
 
 
 def _is_vault_path(file_path: str, root_dir: str) -> bool:
@@ -115,6 +116,15 @@ def _make_sandbox_callback(mode: str, root_dir: str) -> Any:
         tool_input: dict[str, Any],
         _context: ToolPermissionContext,
     ) -> PermissionResultAllow | PermissionResultDeny:
+        if tool_name in _SHELL_TOOLS:
+            return PermissionResultDeny(
+                behavior="deny",
+                message=(
+                    "Read-only mode: shell commands are not permitted. "
+                    "Use Read, Glob, or Grep tools instead."
+                ),
+                interrupt=False,
+            )
         if tool_name in _WRITE_TOOLS:
             path = tool_input.get("file_path", "")
             if not _is_vault_path(path, root_dir):

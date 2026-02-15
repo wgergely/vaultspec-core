@@ -121,6 +121,7 @@ class GeminiProvider(AgentProvider):
         task_context: str,
         root_dir: pathlib.Path,
         model_override: str | None = None,
+        mode: str = "read-write",
     ) -> ProcessSpec:
         _ = agent_name
 
@@ -150,6 +151,8 @@ class GeminiProvider(AgentProvider):
 
         #  Build Args (Gemini CLI has no --system flag)
         args = ["--experimental-acp", "--model", model]
+        if mode == "read-only":
+            args.append("--sandbox")
 
         # Prepend system prompt to initial task via initial_prompt_override
         initial_prompt = (

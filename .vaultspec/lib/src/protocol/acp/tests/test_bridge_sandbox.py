@@ -9,7 +9,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from protocol.acp.claude_bridge import _is_vault_path, _make_sandbox_callback
+from protocol.acp.claude_bridge import (
+    _SHELL_TOOLS,
+    _is_vault_path,
+    _make_sandbox_callback,
+)
 
 pytestmark = [pytest.mark.unit]
 
@@ -94,7 +98,7 @@ class TestSandboxCallback:
         """Read-only mode does not block non-write tools."""
         callback = _make_sandbox_callback(mode="read-only", root_dir=str(tmp_path))
 
-        for tool in ["Read", "Glob", "Grep", "Bash", "WebSearch"]:
+        for tool in ["Read", "Glob", "Grep", "WebSearch"]:
             result = await callback(
                 tool,
                 {"file_path": str(tmp_path / "src" / "main.py")},
@@ -183,3 +187,73 @@ class TestIsVaultPath:
 
     def test_outside_root(self, tmp_path):
         assert _is_vault_path("/completely/different/path", str(tmp_path)) is False
+
+
+# ---------------------------------------------------------------------------
+# TestShellToolsSandbox (Phase 1 terminal sandbox)
+# ---------------------------------------------------------------------------
+
+
+class TestShellToolsSandbox:
+    """Test that shell tools are blocked in read-only mode."""
+
+    def test_shell_tools_frozenset(self):
+        """_SHELL_TOOLS contains 'Bash'."""
+
+        assert isinstance(_SHELL_TOOLS, frozenset)
+        assert "Bash" in _SHELL_TOOLS
+
+    @pytest.mark.asyncio
+    async def test_bash_denied_in_readonly_mode(self, tmp_path):
+        """_make_sandbox_callback('read-only', ...) denies Bash tool."""
+        callback = _make_sandbox_callback(mode="read-only", root_dir=str(tmp_path))
+        assert callback is not None
+
+        result = await callback("Bash", {"command": "ls"}, MagicMock())
+        assert result.behavior == "deny"
+        assert (
+            "read-only" in result.message.lower() or "shell" in result.message.lower()
+        )
+
+    def test_bash_allowed_in_readwrite_mode(self):
+        """In read-write mode, callback is None (no restrictions, Bash allowed)."""
+        callback = _make_sandbox_callback(mode="read-write", root_dir="/workspace")
+        assert callback is None
+
+    @pytest.mark.asyncio
+    async def test_write_tools_still_checked_in_readonly(self, tmp_path):
+        """Write/Edit are still checked against .vault/ path in read-only mode."""
+        callback = _make_sandbox_callback(mode="read-only", root_dir=str(tmp_path))
+
+        # Write outside .vault/ denied
+        result = await callback(
+            "Write", {"file_path": str(tmp_path / "src" / "hack.py")}, MagicMock()
+        )
+        assert result.behavior == "deny"
+
+        # Write inside .vault/ allowed
+        result = await callback(
+            "Edit",
+            {"file_path": str(tmp_path / ".vault" / "adr" / "test.md")},
+            MagicMock(),
+        )
+        assert result.behavior == "allow"
+
+    @pytest.mark.asyncio
+    async def test_bash_deny_message_mentions_alternatives(self, tmp_path):
+        """Deny message for Bash suggests alternative tools."""
+        callback = _make_sandbox_callback(mode="read-only", root_dir=str(tmp_path))
+
+        result = await callback("Bash", {"command": "ls"}, MagicMock())
+        assert result.behavior == "deny"
+        # The message should mention Read, Glob, or Grep as alternatives
+        msg_lower = result.message.lower()
+        assert "read" in msg_lower or "glob" in msg_lower or "grep" in msg_lower
+
+    @pytest.mark.asyncio
+    async def test_bash_deny_has_interrupt_false(self, tmp_path):
+        """Bash denial includes interrupt=False (non-interrupting)."""
+        callback = _make_sandbox_callback(mode="read-only", root_dir=str(tmp_path))
+
+        result = await callback("Bash", {"command": "echo hi"}, MagicMock())
+        assert result.interrupt is False

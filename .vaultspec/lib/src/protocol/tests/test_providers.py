@@ -286,3 +286,110 @@ class TestGetProviderForModel:
         # for unknown or None models.
         provider = get_provider_for_model(GeminiModels.LOW)
         assert provider.name == "gemini"
+
+
+# ---------------------------------------------------------------------------
+# TestGeminiSandboxFlag — Phase 1: --sandbox flag in read-only mode
+# ---------------------------------------------------------------------------
+
+
+class TestGeminiSandboxFlag:
+    """Verify GeminiProvider passes --sandbox when mode='read-only'."""
+
+    @pytest.fixture
+    def provider(self):
+        return GeminiProvider()
+
+    @pytest.fixture(autouse=True)
+    def _clear_version_cache(self):
+        from protocol.providers import gemini as gmod
+
+        gmod._cached_version = None
+        yield
+        gmod._cached_version = None
+
+    def test_gemini_sandbox_flag_readonly(self, provider, tmp_path):
+        """prepare_process(..., mode='read-only') includes --sandbox in args."""
+        with mock.patch(
+            "protocol.providers.gemini.GeminiProvider.check_version",
+            return_value=(0, 27, 0),
+        ):
+            spec = provider.prepare_process(
+                agent_name="test-agent",
+                agent_meta={"model": GeminiModels.LOW},
+                agent_persona="You are a test agent.",
+                task_context="Analyze code.",
+                root_dir=tmp_path,
+                model_override=GeminiModels.LOW,
+                mode="read-only",
+            )
+        assert "--sandbox" in spec.args
+
+    def test_gemini_no_sandbox_flag_readwrite(self, provider, tmp_path):
+        """prepare_process(..., mode='read-write') does NOT include --sandbox."""
+        with mock.patch(
+            "protocol.providers.gemini.GeminiProvider.check_version",
+            return_value=(0, 27, 0),
+        ):
+            spec = provider.prepare_process(
+                agent_name="test-agent",
+                agent_meta={"model": GeminiModels.LOW},
+                agent_persona="You are a test agent.",
+                task_context="Build feature.",
+                root_dir=tmp_path,
+                model_override=GeminiModels.LOW,
+                mode="read-write",
+            )
+        assert "--sandbox" not in spec.args
+
+
+# ---------------------------------------------------------------------------
+# TestClaudeModePassthrough — Phase 1: mode doesn't change Claude args
+# ---------------------------------------------------------------------------
+
+
+class TestClaudeModePassthrough:
+    """Verify ClaudeProvider prepare_process handles mode parameter correctly."""
+
+    @pytest.fixture
+    def provider(self):
+        return ClaudeProvider()
+
+    def test_claude_mode_passthrough(self, provider, tmp_path):
+        """prepare_process(..., mode='read-only') doesn't change Claude args."""
+        spec_rw = provider.prepare_process(
+            agent_name="test-agent",
+            agent_meta={"model": ClaudeModels.MEDIUM},
+            agent_persona="You are a test agent.",
+            task_context="Do something.",
+            root_dir=tmp_path,
+            model_override=ClaudeModels.MEDIUM,
+            mode="read-write",
+        )
+        spec_ro = provider.prepare_process(
+            agent_name="test-agent",
+            agent_meta={"model": ClaudeModels.MEDIUM},
+            agent_persona="You are a test agent.",
+            task_context="Do something.",
+            root_dir=tmp_path,
+            model_override=ClaudeModels.MEDIUM,
+            mode="read-only",
+        )
+        # Claude bridge args should be identical regardless of mode
+        # (sandbox is handled in the bridge itself, not in CLI args)
+        assert spec_rw.args == spec_ro.args
+        assert "--sandbox" not in spec_ro.args
+
+    def test_prepare_process_mode_default(self, provider, tmp_path):
+        """Default mode is 'read-write' (no mode keyword)."""
+        spec = provider.prepare_process(
+            agent_name="test-agent",
+            agent_meta={"model": ClaudeModels.MEDIUM},
+            agent_persona="You are a test agent.",
+            task_context="Do something.",
+            root_dir=tmp_path,
+            model_override=ClaudeModels.MEDIUM,
+        )
+        # Should succeed without error and produce valid args
+        assert isinstance(spec, ProcessSpec)
+        assert "-m" in spec.args
