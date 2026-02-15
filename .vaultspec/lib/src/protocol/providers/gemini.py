@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 import sys
+import uuid
 from typing import TYPE_CHECKING
 
 from .base import (
@@ -140,8 +141,16 @@ class GeminiProvider(AgentProvider):
 
         #  Prepare Environment
         env = os.environ.copy()
-        # Ensure Gemini CLI uses the project's CWD for its internal MCP lookups
-        env["GEMINI_CWD"] = str(root_dir)
+        cleanup_paths: list[pathlib.Path] = []
+
+        # Write system prompt to temp file for GEMINI_SYSTEM_MD
+        if system_prompt:
+            tmp_dir = root_dir / ".vaultspec" / ".tmp"
+            tmp_dir.mkdir(parents=True, exist_ok=True)
+            system_file = tmp_dir / f"system-{uuid.uuid4().hex[:8]}.md"
+            system_file.write_text(system_prompt, encoding="utf-8")
+            env["GEMINI_SYSTEM_MD"] = str(system_file)
+            cleanup_paths.append(system_file)
 
         #  Determine Model
         model = model_override or agent_meta.get("model")
@@ -154,17 +163,10 @@ class GeminiProvider(AgentProvider):
         if mode == "read-only":
             args.append("--sandbox")
 
-        # Prepend system prompt to initial task via initial_prompt_override
-        initial_prompt = (
-            f"{system_prompt}\n\n# TASK\n{task_context}"
-            if system_prompt
-            else task_context
-        )
-
         return ProcessSpec(
             executable=executable,
             args=args,
             env=env,
-            cleanup_paths=[],
-            initial_prompt_override=initial_prompt,
+            cleanup_paths=cleanup_paths,
+            initial_prompt_override=task_context,
         )

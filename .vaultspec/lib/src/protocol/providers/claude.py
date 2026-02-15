@@ -80,19 +80,19 @@ class ClaudeProvider(AgentProvider):
         env = os.environ.copy()
         env.pop("CLAUDECODE", None)
         env["VS_ROOT_DIR"] = str(root_dir)
-
-        # Build initial prompt with system context prepended to task
-        initial_prompt = (
-            f"{system_context}\n\n# TASK\n{task_context}"
-            if system_context
-            else task_context
-        )
+        if system_context:
+            env["VS_SYSTEM_PROMPT"] = system_context
 
         return ProcessSpec(
             executable=sys.executable,
-            args=["-m", "protocol.acp.claude_bridge", "--model", model],
+            args=[
+                "-m",
+                "protocol.acp.claude_bridge",
+                "--model",
+                model,
+            ],
             env=env,
             cleanup_paths=[],
-            initial_prompt_override=initial_prompt,
+            initial_prompt_override=task_context,
             session_meta={"model": model},
         )

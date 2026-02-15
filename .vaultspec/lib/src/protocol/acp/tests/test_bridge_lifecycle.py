@@ -560,8 +560,8 @@ class TestBridgeLifecycleUnit:
         from protocol.providers.base import ProcessSpec
 
         assert isinstance(spec, ProcessSpec)
-        assert spec.initial_prompt_override is not None
-        assert "TASK" in spec.initial_prompt_override
+        assert spec.initial_prompt_override == "Do something."
+        assert spec.env.get("VS_SYSTEM_PROMPT")
 
 
 # ---------------------------------------------------------------------------
