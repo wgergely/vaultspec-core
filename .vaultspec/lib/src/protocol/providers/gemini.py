@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import os
-import pathlib
 import re
 import shutil
 import subprocess
 import sys
-import tempfile
+from typing import TYPE_CHECKING
 
 from .base import (
     AgentProvider,
@@ -16,6 +15,9 @@ from .base import (
     ProcessSpec,
     resolve_includes,
 )
+
+if TYPE_CHECKING:
+    import pathlib
 
 _MIN_VERSION_WINDOWS = (0, 9, 0)  # v0.9.0 fixes Windows ACP hang
 _MIN_VERSION_RECOMMENDED = (0, 27, 0)  # v0.27.0 has stable agent skills
@@ -35,6 +37,13 @@ class GeminiProvider(AgentProvider):
     def models(self) -> ModelRegistry:
         return GeminiModels
 
+    def load_system_prompt(self, root_dir: pathlib.Path) -> str:
+        """Loads .gemini/SYSTEM.md if it exists (deployed by CLI sync)."""
+        system_file = root_dir / ".gemini" / "SYSTEM.md"
+        if not system_file.exists():
+            return ""
+        return system_file.read_text(encoding="utf-8")
+
     def load_rules(self, root_dir: pathlib.Path) -> str:
         """Loads and resolves nested rules from .gemini/rules/."""
         rules_dir = root_dir / ".gemini" / "rules"
@@ -49,9 +58,21 @@ class GeminiProvider(AgentProvider):
 
         return "\n\n".join(all_rules)
 
-    def construct_system_prompt(self, persona: str, rules: str) -> str:
-        """Combines persona and rules into a single system prompt."""
-        return f"# AGENT PERSONA\n{persona}\n\n# SYSTEM RULES & CONTEXT\n{rules}"
+    def construct_system_prompt(
+        self,
+        persona: str,
+        rules: str,
+        system_instructions: str = "",
+    ) -> str:
+        """Combines system instructions, persona, and rules."""
+        parts = []
+        if system_instructions.strip():
+            parts.append(f"# SYSTEM INSTRUCTIONS\n{system_instructions}")
+        if persona.strip():
+            parts.append(f"# AGENT PERSONA\n{persona}")
+        if rules.strip():
+            parts.append(f"# SYSTEM RULES & CONTEXT\n{rules}")
+        return "\n\n".join(parts)
 
     @staticmethod
     def check_version(executable: str) -> tuple[int, ...] | None:
@@ -102,21 +123,19 @@ class GeminiProvider(AgentProvider):
         model_override: str | None = None,
     ) -> ProcessSpec:
         _ = agent_name
-        _ = task_context
+
         #  Locate executable and check version
         executable = shutil.which("gemini") or "gemini"
         self.check_version(executable)
 
-        #  Load and Mix Rules
+        #  Load system instructions, rules, and construct full prompt
+        system_instructions = self.load_system_prompt(root_dir)
         rules = self.load_rules(root_dir)
-        system_prompt = self.construct_system_prompt(agent_persona, rules)
-
-        #  Persist to temp file
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", delete=False, encoding="utf-8"
-        ) as tf:
-            tf.write(system_prompt)
-            temp_path = pathlib.Path(tf.name)
+        system_prompt = self.construct_system_prompt(
+            agent_persona,
+            rules,
+            system_instructions,
+        )
 
         #  Prepare Environment
         env = os.environ.copy()
@@ -129,12 +148,20 @@ class GeminiProvider(AgentProvider):
             tier = agent_meta.get("tier", "MEDIUM")
             model = self.get_best_model_for_capability(CapabilityLevel[tier.upper()])
 
-        #  Build Args
-        args = ["--experimental-acp", "--system", str(temp_path), "--model", model]
+        #  Build Args (Gemini CLI has no --system flag)
+        args = ["--experimental-acp", "--model", model]
+
+        # Prepend system prompt to initial task via initial_prompt_override
+        initial_prompt = (
+            f"{system_prompt}\n\n# TASK\n{task_context}"
+            if system_prompt
+            else task_context
+        )
 
         return ProcessSpec(
             executable=executable,
             args=args,
             env=env,
-            cleanup_paths=[temp_path],
+            cleanup_paths=[],
+            initial_prompt_override=initial_prompt,
         )
