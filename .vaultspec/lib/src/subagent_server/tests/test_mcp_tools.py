@@ -31,6 +31,8 @@ from orchestration.task_engine import (
     TaskStatus,
 )
 
+from .conftest import TEST_PROJECT
+
 pytestmark = [pytest.mark.unit]
 
 
@@ -734,56 +736,56 @@ class TestDispatchAgentOverrides:
     flow, which depends on server globals and background tasks.
     """
 
-    def test_max_turns_override(self, tmp_path):
+    def test_max_turns_override(self):
         """max_turns override is included in kwargs."""
         kwargs = _prepare_dispatch_kwargs(
             agent_name="simple-executor",
             task="Bake bread",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
             mode="read-write",
             max_turns=10,
         )
         assert kwargs["max_turns"] == 10
 
-    def test_budget_override(self, tmp_path):
+    def test_budget_override(self):
         """budget override is included in kwargs."""
         kwargs = _prepare_dispatch_kwargs(
             agent_name="simple-executor",
             task="Bake bread",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
             mode="read-write",
             budget=2.5,
         )
         assert kwargs["budget"] == 2.5
 
-    def test_effort_override(self, tmp_path):
+    def test_effort_override(self):
         """effort override is included in kwargs."""
         kwargs = _prepare_dispatch_kwargs(
             agent_name="simple-executor",
             task="Bake bread",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
             mode="read-write",
             effort="high",
         )
         assert kwargs["effort"] == "high"
 
-    def test_output_format_override(self, tmp_path):
+    def test_output_format_override(self):
         """output_format override is included in kwargs."""
         kwargs = _prepare_dispatch_kwargs(
             agent_name="simple-executor",
             task="Bake bread",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
             mode="read-write",
             output_format="json",
         )
         assert kwargs["output_format"] == "json"
 
-    def test_no_overrides_passes_none(self, tmp_path):
+    def test_no_overrides_passes_none(self):
         """Without overrides, None values are in kwargs."""
         kwargs = _prepare_dispatch_kwargs(
             agent_name="simple-executor",
             task="Bake bread",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
             mode="read-write",
         )
         assert kwargs["max_turns"] is None
@@ -791,12 +793,12 @@ class TestDispatchAgentOverrides:
         assert kwargs["effort"] is None
         assert kwargs["output_format"] is None
 
-    def test_all_overrides_combined(self, tmp_path):
+    def test_all_overrides_combined(self):
         """All overrides are passed together correctly."""
         kwargs = _prepare_dispatch_kwargs(
             agent_name="simple-executor",
             task="Bake bread",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
             mode="read-only",
             model="claude-opus-4-6",
             max_turns=5,
@@ -806,7 +808,7 @@ class TestDispatchAgentOverrides:
         )
         assert kwargs["agent_name"] == "simple-executor"
         assert kwargs["initial_task"] == "Bake bread"
-        assert kwargs["root_dir"] == tmp_path
+        assert kwargs["root_dir"] == TEST_PROJECT
         assert kwargs["mode"] == "read-only"
         assert kwargs["model_override"] == "claude-opus-4-6"
         assert kwargs["max_turns"] == 5

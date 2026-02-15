@@ -9,6 +9,9 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.tasks import TaskUpdater
 from a2a.types import Part, TextPart
@@ -28,6 +31,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _default_client_factory(options: Any) -> ClaudeSDKClient:
+    """Default factory: create a real ClaudeSDKClient."""
+    return ClaudeSDKClient(options)
+
+
+def _default_options_factory(**kwargs: Any) -> ClaudeAgentOptions:
+    """Default factory: create real ClaudeAgentOptions."""
+    return ClaudeAgentOptions(**kwargs)
+
+
 class ClaudeA2AExecutor(AgentExecutor):
     """Execute A2A tasks by delegating to Claude via ``claude-agent-sdk``.
 
@@ -43,6 +56,12 @@ class ClaudeA2AExecutor(AgentExecutor):
         Optional dict of MCP server configurations to pass to the SDK.
     system_prompt:
         Optional system prompt prepended to every conversation.
+    client_factory:
+        Callable ``(options) -> client``.  Defaults to real
+        ``ClaudeSDKClient``.  Override in tests to inject a fake.
+    options_factory:
+        Callable ``(**kwargs) -> options``.  Defaults to real
+        ``ClaudeAgentOptions``.  Override in tests to record kwargs.
     """
 
     def __init__(
@@ -53,13 +72,17 @@ class ClaudeA2AExecutor(AgentExecutor):
         mode: str = "read-only",
         mcp_servers: dict[str, Any] | None = None,
         system_prompt: str | None = None,
+        client_factory: Callable[..., Any] | None = None,
+        options_factory: Callable[..., Any] | None = None,
     ) -> None:
         self._model = model
         self._root_dir = root_dir
         self._mode = mode
         self._mcp_servers = mcp_servers or {}
         self._system_prompt = system_prompt
-        self._active_clients: dict[str, ClaudeSDKClient] = {}
+        self._client_factory = client_factory or _default_client_factory
+        self._options_factory = options_factory or _default_options_factory
+        self._active_clients: dict[str, Any] = {}
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         task_id = context.task_id or ""
@@ -70,16 +93,15 @@ class ClaudeA2AExecutor(AgentExecutor):
         await updater.start_work()
 
         sandbox_cb = _make_sandbox_callback(self._mode, self._root_dir)
-        sdk_client = ClaudeSDKClient(
-            ClaudeAgentOptions(
-                model=self._model,
-                cwd=self._root_dir,
-                mcp_servers=self._mcp_servers,
-                can_use_tool=sandbox_cb,
-                permission_mode="bypassPermissions",
-                system_prompt=self._system_prompt,
-            )
+        options = self._options_factory(
+            model=self._model,
+            cwd=self._root_dir,
+            mcp_servers=self._mcp_servers,
+            can_use_tool=sandbox_cb,
+            permission_mode="bypassPermissions",
+            system_prompt=self._system_prompt,
         )
+        sdk_client = self._client_factory(options)
         self._active_clients[task_id] = sdk_client
 
         try:

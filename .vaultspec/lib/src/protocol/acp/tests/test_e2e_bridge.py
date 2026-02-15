@@ -332,11 +332,13 @@ class TestSandboxEnforcement:
         assert result.behavior == "deny"
 
     @pytest.mark.asyncio
-    async def test_read_write_mode_no_restrictions(self, tmp_path):
+    async def test_read_write_mode_no_restrictions(self):
         """In read-write mode, no sandbox callback is created."""
         from protocol.acp.claude_bridge import _make_sandbox_callback
 
-        callback = _make_sandbox_callback(mode="read-write", root_dir=str(tmp_path))
+        callback = _make_sandbox_callback(
+            mode="read-write", root_dir=str(_TEST_PROJECT)
+        )
         assert callback is None
 
 

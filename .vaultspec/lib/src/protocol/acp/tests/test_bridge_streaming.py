@@ -11,6 +11,7 @@ import pytest
 from protocol.acp.claude_bridge import ClaudeACPBridge
 
 from .conftest import (
+    TEST_PROJECT,
     AsyncIteratorMock,
     FakeAssistantMessage,
     FakeResultMessage,
@@ -116,16 +117,14 @@ class TestPrompt:
             await bridge.prompt(prompt=prompt_blocks, session_id="none")
 
     @pytest.mark.asyncio
-    async def test_returns_prompt_response(
-        self, connected_bridge, tmp_path, monkeypatch
-    ):
+    async def test_returns_prompt_response(self, connected_bridge, monkeypatch):
         """prompt() returns PromptResponse with stop_reason."""
         from acp.schema import PromptResponse, TextContentBlock
 
         _patch_sdk(monkeypatch)
         _patch_sdk_types(monkeypatch)
 
-        await connected_bridge.new_session(cwd=str(tmp_path))
+        await connected_bridge.new_session(cwd=str(TEST_PROJECT))
 
         prompt_blocks = [TextContentBlock(type="text", text="hello")]
         result = await connected_bridge.prompt(prompt=prompt_blocks, session_id="test")
@@ -133,9 +132,7 @@ class TestPrompt:
         assert result.stop_reason == "end_turn"
 
     @pytest.mark.asyncio
-    async def test_calls_query_with_prompt_text(
-        self, connected_bridge, tmp_path, monkeypatch
-    ):
+    async def test_calls_query_with_prompt_text(self, connected_bridge, monkeypatch):
         """prompt() calls sdk_client.query() with extracted prompt text."""
         from acp.schema import TextContentBlock
 
@@ -143,7 +140,7 @@ class TestPrompt:
         _patch_sdk(monkeypatch, mock_client=mock_client)
         _patch_sdk_types(monkeypatch)
 
-        await connected_bridge.new_session(cwd=str(tmp_path))
+        await connected_bridge.new_session(cwd=str(TEST_PROJECT))
 
         prompt_blocks = [TextContentBlock(type="text", text="Write a story")]
         await connected_bridge.prompt(prompt=prompt_blocks, session_id="s1")
@@ -151,21 +148,17 @@ class TestPrompt:
         mock_client.query.assert_called_once_with("Write a story")
 
     @pytest.mark.asyncio
-    async def test_connects_in_new_session(
-        self, connected_bridge, tmp_path, monkeypatch
-    ):
+    async def test_connects_in_new_session(self, connected_bridge, monkeypatch):
         """new_session() calls connect() to open the SDK connection."""
         mock_client = make_sdk_mock()
         _patch_sdk(monkeypatch, mock_client=mock_client)
 
-        await connected_bridge.new_session(cwd=str(tmp_path))
+        await connected_bridge.new_session(cwd=str(TEST_PROJECT))
 
         mock_client.connect.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_error_result_sets_refusal(
-        self, connected_bridge, tmp_path, monkeypatch
-    ):
+    async def test_error_result_sets_refusal(self, connected_bridge, monkeypatch):
         """If ResultMessage.is_error is True, stop_reason is 'refusal'."""
         from acp.schema import TextContentBlock
 
@@ -174,16 +167,14 @@ class TestPrompt:
         _patch_sdk(monkeypatch, mock_client=make_sdk_mock(messages=[error_msg]))
         _patch_sdk_types(monkeypatch)
 
-        await connected_bridge.new_session(cwd=str(tmp_path))
+        await connected_bridge.new_session(cwd=str(TEST_PROJECT))
 
         prompt_blocks = [TextContentBlock(type="text", text="test")]
         result = await connected_bridge.prompt(prompt=prompt_blocks, session_id="s1")
         assert result.stop_reason == "refusal"
 
     @pytest.mark.asyncio
-    async def test_exception_sets_refusal(
-        self, connected_bridge, tmp_path, monkeypatch
-    ):
+    async def test_exception_sets_refusal(self, connected_bridge, monkeypatch):
         """If streaming raises an exception, stop_reason is 'refusal'."""
         from acp.schema import TextContentBlock
 
@@ -194,7 +185,7 @@ class TestPrompt:
         _patch_sdk(monkeypatch, mock_client=mock_client)
         _patch_sdk_types(monkeypatch)
 
-        await connected_bridge.new_session(cwd=str(tmp_path))
+        await connected_bridge.new_session(cwd=str(TEST_PROJECT))
 
         prompt_blocks = [TextContentBlock(type="text", text="test")]
         result = await connected_bridge.prompt(prompt=prompt_blocks, session_id="s1")

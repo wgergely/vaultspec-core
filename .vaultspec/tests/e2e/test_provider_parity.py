@@ -20,6 +20,8 @@ from protocol.providers.base import (
 from protocol.providers.claude import ClaudeProvider
 from protocol.providers.gemini import GeminiProvider
 
+TEST_PROJECT = Path(__file__).resolve().parent.parent.parent.parent / "test-project"
+
 pytestmark = [pytest.mark.unit]
 
 # Common fixtures ---------------------------------------------------
@@ -48,7 +50,6 @@ def _seed_gemini_version_cache(monkeypatch):
 
 def _gemini_spec(
     provider: GeminiProvider,
-    tmp_path: Path,
     *,
     persona: str = "You are a helper.",
     task: str = "Do the thing.",
@@ -60,7 +61,7 @@ def _gemini_spec(
         agent_meta={"tier": "LOW"},
         agent_persona=persona,
         task_context=task,
-        root_dir=tmp_path,
+        root_dir=TEST_PROJECT,
         model_override=GeminiModels.LOW,
         mode=mode,
     )
@@ -68,7 +69,6 @@ def _gemini_spec(
 
 def _claude_spec(
     provider: ClaudeProvider,
-    tmp_path: Path,
     *,
     persona: str = "You are a helper.",
     task: str = "Do the thing.",
@@ -80,7 +80,7 @@ def _claude_spec(
         agent_meta={"tier": "MEDIUM"},
         agent_persona=persona,
         task_context=task,
-        root_dir=tmp_path,
+        root_dir=TEST_PROJECT,
         model_override=ClaudeModels.MEDIUM,
         mode=mode,
     )
@@ -92,15 +92,15 @@ def _claude_spec(
 class TestBothProvidersProduceValidProcessSpec:
     """Both providers return ProcessSpec with required fields."""
 
-    def test_claude_spec_valid(self, claude, tmp_path):
-        spec = _claude_spec(claude, tmp_path)
+    def test_claude_spec_valid(self, claude):
+        spec = _claude_spec(claude)
         assert isinstance(spec, ProcessSpec)
         assert spec.executable
         assert isinstance(spec.args, list)
         assert isinstance(spec.env, dict)
 
-    def test_gemini_spec_valid(self, gemini, tmp_path):
-        spec = _gemini_spec(gemini, tmp_path)
+    def test_gemini_spec_valid(self, gemini):
+        spec = _gemini_spec(gemini)
         assert isinstance(spec, ProcessSpec)
         assert spec.executable
         assert isinstance(spec.args, list)
@@ -110,13 +110,13 @@ class TestBothProvidersProduceValidProcessSpec:
 class TestBothProvidersDeliverSystemPrompt:
     """Claude uses VS_SYSTEM_PROMPT env; Gemini uses GEMINI_SYSTEM_MD."""
 
-    def test_claude_sets_vs_system_prompt(self, claude, tmp_path):
-        spec = _claude_spec(claude, tmp_path, persona="You are Jean-Claude.")
+    def test_claude_sets_vs_system_prompt(self, claude):
+        spec = _claude_spec(claude, persona="You are Jean-Claude.")
         assert "VS_SYSTEM_PROMPT" in spec.env
         assert "Jean-Claude" in spec.env["VS_SYSTEM_PROMPT"]
 
-    def test_gemini_sets_gemini_system_md(self, gemini, tmp_path):
-        spec = _gemini_spec(gemini, tmp_path, persona="You are Jean-Claude.")
+    def test_gemini_sets_gemini_system_md(self, gemini):
+        spec = _gemini_spec(gemini, persona="You are Jean-Claude.")
         assert "GEMINI_SYSTEM_MD" in spec.env
         sys_file = Path(spec.env["GEMINI_SYSTEM_MD"])
         assert sys_file.exists()
@@ -128,38 +128,38 @@ class TestBothProvidersDeliverSystemPrompt:
 class TestBothProvidersSetInitialPromptTaskOnly:
     """initial_prompt_override equals task_context only."""
 
-    def test_claude_initial_prompt_is_task(self, claude, tmp_path):
-        spec = _claude_spec(claude, tmp_path, task="Bake croissants.")
+    def test_claude_initial_prompt_is_task(self, claude):
+        spec = _claude_spec(claude, task="Bake croissants.")
         assert spec.initial_prompt_override == "Bake croissants."
 
-    def test_gemini_initial_prompt_is_task(self, gemini, tmp_path):
-        spec = _gemini_spec(gemini, tmp_path, task="Bake croissants.")
+    def test_gemini_initial_prompt_is_task(self, gemini):
+        spec = _gemini_spec(gemini, task="Bake croissants.")
         assert spec.initial_prompt_override == "Bake croissants."
 
 
 class TestBothProvidersAcceptModeParameter:
     """prepare_process accepts mode='read-only' without error."""
 
-    def test_claude_accepts_readonly(self, claude, tmp_path):
-        spec = _claude_spec(claude, tmp_path, mode="read-only")
+    def test_claude_accepts_readonly(self, claude):
+        spec = _claude_spec(claude, mode="read-only")
         assert isinstance(spec, ProcessSpec)
 
-    def test_gemini_accepts_readonly(self, gemini, tmp_path):
-        spec = _gemini_spec(gemini, tmp_path, mode="read-only")
+    def test_gemini_accepts_readonly(self, gemini):
+        spec = _gemini_spec(gemini, mode="read-only")
         assert isinstance(spec, ProcessSpec)
 
 
 class TestReadonlySandboxBothProviders:
     """Gemini args include --sandbox; Claude does not change args."""
 
-    def test_gemini_readonly_has_sandbox(self, gemini, tmp_path):
-        spec = _gemini_spec(gemini, tmp_path, mode="read-only")
+    def test_gemini_readonly_has_sandbox(self, gemini):
+        spec = _gemini_spec(gemini, mode="read-only")
         assert "--sandbox" in spec.args
 
-    def test_gemini_readwrite_no_sandbox(self, gemini, tmp_path):
-        spec = _gemini_spec(gemini, tmp_path, mode="read-write")
+    def test_gemini_readwrite_no_sandbox(self, gemini):
+        spec = _gemini_spec(gemini, mode="read-write")
         assert "--sandbox" not in spec.args
 
-    def test_claude_readonly_no_sandbox_in_args(self, claude, tmp_path):
-        spec = _claude_spec(claude, tmp_path, mode="read-only")
+    def test_claude_readonly_no_sandbox_in_args(self, claude):
+        spec = _claude_spec(claude, mode="read-only")
         assert "--sandbox" not in spec.args

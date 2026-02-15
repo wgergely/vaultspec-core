@@ -20,6 +20,8 @@ from acp.schema import (
 
 from protocol.acp.client import SubagentClient
 
+from .conftest import TEST_PROJECT
+
 pytestmark = [pytest.mark.unit]
 
 # ---------------------------------------------------------------------------
@@ -117,8 +119,8 @@ class TestRequestPermission:
 
 class TestSessionUpdate:
     @pytest.fixture
-    def client(self, tmp_path):
-        return SubagentClient(root_dir=tmp_path, debug=False)
+    def client(self):
+        return SubagentClient(root_dir=TEST_PROJECT, debug=False)
 
     @pytest.mark.asyncio
     async def test_agent_message_chunk(self, client, capsys):
@@ -179,8 +181,8 @@ class TestSessionUpdate:
         pass
 
     @pytest.mark.asyncio
-    async def test_debug_mode_shows_info_updates(self, tmp_path):
-        client = SubagentClient(root_dir=tmp_path, debug=True)
+    async def test_debug_mode_shows_info_updates(self):
+        client = SubagentClient(root_dir=TEST_PROJECT, debug=True)
         update = SessionInfoUpdate(session_update="session_info_update")
         await client.session_update("s1", update)
         # Info update currently does nothing
@@ -194,8 +196,8 @@ class TestSessionUpdate:
 
 class TestFileIO:
     @pytest.fixture
-    def client(self, tmp_path):
-        return SubagentClient(root_dir=tmp_path, debug=False)
+    def client(self):
+        return SubagentClient(root_dir=TEST_PROJECT, debug=False)
 
     @pytest.mark.asyncio
     async def test_read_text_file(self, client, mock_root_dir):
@@ -281,8 +283,8 @@ class TestFileIO:
 
 class TestTerminalLifecycle:
     @pytest.fixture
-    def client(self, tmp_path):
-        return SubagentClient(root_dir=tmp_path, debug=False)
+    def client(self):
+        return SubagentClient(root_dir=TEST_PROJECT, debug=False)
 
     @pytest.mark.asyncio
     async def test_create_terminal(self, client, mock_root_dir):

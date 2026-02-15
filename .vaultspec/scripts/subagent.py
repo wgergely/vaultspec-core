@@ -137,6 +137,53 @@ def command_serve(_args):
     server_main()
 
 
+def command_a2a_serve(args):
+    """Handle 'a2a-serve' subcommand — start an A2A HTTP server."""
+    import uvicorn
+
+    from protocol.a2a.agent_card import agent_card_from_definition
+    from protocol.a2a.server import create_app
+
+    root = args.root if args.root is not None else find_project_root()
+    agent_name = args.agent or "researcher"
+    port = args.port or 10010
+
+    # Load agent metadata (minimal — just name + description)
+    agents_dir = root / ".vaultspec" / "agents"
+    agent_file = agents_dir / f"{agent_name}.md"
+    agent_meta = {"name": agent_name, "description": f"Vaultspec agent: {agent_name}"}
+    if agent_file.exists():
+        agent_meta["description"] = f"Vaultspec {agent_name} agent via A2A"
+
+    # Create executor based on --executor flag
+    executor_type = args.executor or "claude"
+    if executor_type == "claude":
+        from protocol.a2a.executors.claude_executor import ClaudeA2AExecutor
+
+        executor = ClaudeA2AExecutor(
+            model=args.model or "claude-sonnet-4-5-20250929",
+            root_dir=str(root),
+            mode=args.mode or "read-only",
+        )
+    elif executor_type == "gemini":
+        from protocol.a2a.executors.gemini_executor import GeminiA2AExecutor
+
+        executor = GeminiA2AExecutor(
+            root_dir=root,
+            model=args.model or "gemini-2.5-flash",
+            agent_name=agent_name,
+        )
+    else:
+        print(f"Unknown executor: {executor_type}", file=sys.stderr)
+        sys.exit(1)
+
+    card = agent_card_from_definition(agent_name, agent_meta, port=port)
+    app = create_app(executor, card)
+
+    print(f"Starting A2A server: {agent_name} ({executor_type}) on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
+
 def command_list(args):
     """Handle 'list' subcommand."""
     list_available_agents(args.root)
@@ -201,6 +248,39 @@ def main() -> None:
     # --- SERVE ---
     serve_parser = subparsers.add_parser("serve", help="Run the subagent MCP server")
     serve_parser.set_defaults(func=command_serve)
+
+    # --- A2A-SERVE ---
+    a2a_serve_parser = subparsers.add_parser(
+        "a2a-serve",
+        help="Start an A2A HTTP server for agent-to-agent communication",
+    )
+    a2a_serve_parser.add_argument(
+        "--executor",
+        "-e",
+        choices=["claude", "gemini"],
+        default="claude",
+        help="Executor type (default: claude)",
+    )
+    a2a_serve_parser.add_argument(
+        "--port",
+        type=int,
+        default=10010,
+        help="Port to listen on (default: 10010)",
+    )
+    a2a_serve_parser.add_argument(
+        "--agent",
+        "-a",
+        default="researcher",
+        help="Agent name (default: researcher)",
+    )
+    a2a_serve_parser.add_argument("--model", "-m", help="Override default model")
+    a2a_serve_parser.add_argument(
+        "--mode",
+        choices=["read-write", "read-only"],
+        default="read-only",
+        help="Permission mode (default: read-only)",
+    )
+    a2a_serve_parser.set_defaults(func=command_a2a_serve)
 
     # --- LIST ---
     list_parser = subparsers.add_parser("list", help="List available agents")
