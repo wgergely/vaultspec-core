@@ -15,6 +15,9 @@ if TYPE_CHECKING:
 
 from acp import spawn_agent_process
 from acp.schema import (
+    ClientCapabilities,
+    FileSystemCapability,
+    Implementation,
     TextContentBlock,
 )
 from vault.parser import parse_frontmatter
@@ -191,6 +194,7 @@ async def run_subagent(
         root_dir,
         model_override=current_model,
     )
+    spec.env["VS_AGENT_MODE"] = mode
 
     # 4. Spawn and Connect
     session_id = resume_session_id or str(asyncio.get_event_loop().time())
@@ -240,19 +244,20 @@ async def run_subagent(
                 background_tasks.add(t)
                 t.add_done_callback(background_tasks.discard)
 
-                # Protocol Handshake
-                # Note: Real CLIs (like Claude) may expect string protocolVersion
-                # and 'capabilities' instead of 'clientCapabilities'.
-                caps = {
-                    "terminal": True,
-                    "fs": {"readTextFile": True, "writeTextFile": True},
-                }
-                impl = {"name": "vs-subagent-mcp", "version": "0.1.0"}
-
-                # Bypass library initialize to control exact JSON keys
-                init_res = await conn._conn.send_request(
-                    "initialize",
-                    {"protocolVersion": "1", "capabilities": caps, "clientInfo": impl},
+                # Protocol Handshake (ACP spec: protocolVersion=1, uint16)
+                init_res = await conn.initialize(
+                    protocol_version=1,
+                    client_capabilities=ClientCapabilities(
+                        terminal=True,
+                        fs=FileSystemCapability(
+                            read_text_file=True,
+                            write_text_file=True,
+                        ),
+                    ),
+                    client_info=Implementation(
+                        name="vs-subagent-mcp",
+                        version="0.1.0",
+                    ),
                 )
                 logger.debug(f"Handshake Result: {init_res}")
 
