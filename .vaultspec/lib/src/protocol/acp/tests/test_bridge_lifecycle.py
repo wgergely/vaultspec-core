@@ -1292,3 +1292,111 @@ class TestSessionTracking:
         assert id2 in bridge._sessions
         assert bridge._sessions[id1].cwd == "/ws1"
         assert bridge._sessions[id2].cwd == "/ws2"
+
+
+# ---------------------------------------------------------------------------
+# TestBridgeFeatureConfig — Phase 5: env var config passthrough
+# ---------------------------------------------------------------------------
+
+
+class TestBridgeFeatureConfig:
+    """Verify bridge reads VS_* env vars and wires them to ClaudeAgentOptions."""
+
+    def test_max_turns_from_env(self):
+        with patch.dict("os.environ", {"VS_MAX_TURNS": "10"}):
+            bridge = ClaudeACPBridge()
+        assert bridge._max_turns == 10
+
+    def test_budget_from_env(self):
+        with patch.dict("os.environ", {"VS_BUDGET_USD": "2.5"}):
+            bridge = ClaudeACPBridge()
+        assert bridge._budget_usd == 2.5
+
+    def test_allowed_tools_from_env(self):
+        with patch.dict("os.environ", {"VS_ALLOWED_TOOLS": "Glob, Read, Grep"}):
+            bridge = ClaudeACPBridge()
+        assert bridge._allowed_tools == ["Glob", "Read", "Grep"]
+
+    def test_disallowed_tools_from_env(self):
+        with patch.dict("os.environ", {"VS_DISALLOWED_TOOLS": "Bash, Write"}):
+            bridge = ClaudeACPBridge()
+        assert bridge._disallowed_tools == ["Bash", "Write"]
+
+    def test_effort_from_env(self):
+        with patch.dict("os.environ", {"VS_EFFORT": "high"}):
+            bridge = ClaudeACPBridge()
+        assert bridge._effort == "high"
+
+    def test_fallback_model_from_env(self):
+        with patch.dict("os.environ", {"VS_FALLBACK_MODEL": "claude-haiku-4-5"}):
+            bridge = ClaudeACPBridge()
+        assert bridge._fallback_model == "claude-haiku-4-5"
+
+    def test_include_dirs_from_env(self):
+        with patch.dict("os.environ", {"VS_INCLUDE_DIRS": ".vault, src"}):
+            bridge = ClaudeACPBridge()
+        assert bridge._include_dirs == [".vault", "src"]
+
+    def test_output_format_from_env(self):
+        with patch.dict("os.environ", {"VS_OUTPUT_FORMAT": "json"}):
+            bridge = ClaudeACPBridge()
+        assert bridge._output_format_str == "json"
+
+    def test_defaults_when_no_env(self):
+        """Without VS_* env vars, all feature fields default to None/empty."""
+        bridge = ClaudeACPBridge()
+        assert bridge._max_turns is None
+        assert bridge._budget_usd is None
+        assert bridge._allowed_tools == []
+        assert bridge._disallowed_tools == []
+        assert bridge._effort is None
+        assert bridge._fallback_model is None
+        assert bridge._include_dirs == []
+        assert bridge._output_format_str is None
+
+    def test_build_options_includes_features(self):
+        """_build_options() passes features to ClaudeAgentOptions kwargs."""
+        with patch.dict(
+            "os.environ",
+            {
+                "VS_MAX_TURNS": "15",
+                "VS_BUDGET_USD": "3.0",
+                "VS_EFFORT": "max",
+                "VS_FALLBACK_MODEL": "claude-haiku-4-5",
+                "VS_ALLOWED_TOOLS": "Glob, Read",
+                "VS_DISALLOWED_TOOLS": "Bash",
+                "VS_INCLUDE_DIRS": ".vault",
+            },
+        ):
+            bridge = ClaudeACPBridge()
+
+        # Mock ClaudeAgentOptions to capture kwargs
+        with patch("protocol.acp.claude_bridge.ClaudeAgentOptions") as mock_opts:
+            mock_opts.return_value = MagicMock()
+            bridge._build_options("/tmp", {}, None)
+
+        call_kwargs = mock_opts.call_args[1]
+        assert call_kwargs["max_turns"] == 15
+        assert call_kwargs["max_budget_usd"] == 3.0
+        assert call_kwargs["effort"] == "max"
+        assert call_kwargs["fallback_model"] == "claude-haiku-4-5"
+        assert call_kwargs["allowed_tools"] == ["Glob", "Read"]
+        assert call_kwargs["disallowed_tools"] == ["Bash"]
+        assert call_kwargs["add_dirs"] == [".vault"]
+
+    def test_build_options_omits_none_features(self):
+        """_build_options() omits features that are None/empty."""
+        bridge = ClaudeACPBridge()
+
+        with patch("protocol.acp.claude_bridge.ClaudeAgentOptions") as mock_opts:
+            mock_opts.return_value = MagicMock()
+            bridge._build_options("/tmp", {}, None)
+
+        call_kwargs = mock_opts.call_args[1]
+        assert "max_turns" not in call_kwargs
+        assert "max_budget_usd" not in call_kwargs
+        assert "effort" not in call_kwargs
+        assert "fallback_model" not in call_kwargs
+        assert "allowed_tools" not in call_kwargs
+        assert "disallowed_tools" not in call_kwargs
+        assert "add_dirs" not in call_kwargs

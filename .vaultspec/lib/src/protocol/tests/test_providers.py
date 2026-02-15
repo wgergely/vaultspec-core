@@ -402,3 +402,214 @@ class TestClaudeModePassthrough:
         # Should succeed without error and produce valid args
         assert isinstance(spec, ProcessSpec)
         assert "-m" in spec.args
+
+
+# ---------------------------------------------------------------------------
+# TestClaudeFeaturePassthrough — Phase 5: env vars from agent_meta
+# ---------------------------------------------------------------------------
+
+
+class TestClaudeFeaturePassthrough:
+    """Verify ClaudeProvider sets VS_* env vars from agent_meta fields."""
+
+    @pytest.fixture
+    def provider(self):
+        return ClaudeProvider()
+
+    def test_max_turns_env(self, provider, tmp_path):
+        spec = provider.prepare_process(
+            agent_name="test",
+            agent_meta={"model": ClaudeModels.MEDIUM, "max_turns": "25"},
+            agent_persona="",
+            task_context="Do it.",
+            root_dir=tmp_path,
+        )
+        assert spec.env["VS_MAX_TURNS"] == "25"
+
+    def test_budget_env(self, provider, tmp_path):
+        spec = provider.prepare_process(
+            agent_name="test",
+            agent_meta={"model": ClaudeModels.MEDIUM, "budget": "1.5"},
+            agent_persona="",
+            task_context="Do it.",
+            root_dir=tmp_path,
+        )
+        assert spec.env["VS_BUDGET_USD"] == "1.5"
+
+    def test_allowed_tools_env(self, provider, tmp_path):
+        spec = provider.prepare_process(
+            agent_name="test",
+            agent_meta={
+                "model": ClaudeModels.MEDIUM,
+                "allowed_tools": "Glob, Read",
+            },
+            agent_persona="",
+            task_context="Do it.",
+            root_dir=tmp_path,
+        )
+        assert spec.env["VS_ALLOWED_TOOLS"] == "Glob, Read"
+
+    def test_disallowed_tools_env(self, provider, tmp_path):
+        spec = provider.prepare_process(
+            agent_name="test",
+            agent_meta={
+                "model": ClaudeModels.MEDIUM,
+                "disallowed_tools": "Bash",
+            },
+            agent_persona="",
+            task_context="Do it.",
+            root_dir=tmp_path,
+        )
+        assert spec.env["VS_DISALLOWED_TOOLS"] == "Bash"
+
+    def test_effort_env(self, provider, tmp_path):
+        spec = provider.prepare_process(
+            agent_name="test",
+            agent_meta={"model": ClaudeModels.MEDIUM, "effort": "high"},
+            agent_persona="",
+            task_context="Do it.",
+            root_dir=tmp_path,
+        )
+        assert spec.env["VS_EFFORT"] == "high"
+
+    def test_fallback_model_env(self, provider, tmp_path):
+        spec = provider.prepare_process(
+            agent_name="test",
+            agent_meta={
+                "model": ClaudeModels.MEDIUM,
+                "fallback_model": "claude-haiku-4-5",
+            },
+            agent_persona="",
+            task_context="Do it.",
+            root_dir=tmp_path,
+        )
+        assert spec.env["VS_FALLBACK_MODEL"] == "claude-haiku-4-5"
+
+    def test_include_dirs_env(self, provider, tmp_path):
+        spec = provider.prepare_process(
+            agent_name="test",
+            agent_meta={
+                "model": ClaudeModels.MEDIUM,
+                "include_dirs": ".vault, src",
+            },
+            agent_persona="",
+            task_context="Do it.",
+            root_dir=tmp_path,
+        )
+        assert spec.env["VS_INCLUDE_DIRS"] == ".vault, src"
+
+    def test_output_format_env(self, provider, tmp_path):
+        spec = provider.prepare_process(
+            agent_name="test",
+            agent_meta={
+                "model": ClaudeModels.MEDIUM,
+                "output_format": "json",
+            },
+            agent_persona="",
+            task_context="Do it.",
+            root_dir=tmp_path,
+        )
+        assert spec.env["VS_OUTPUT_FORMAT"] == "json"
+
+    def test_empty_meta_no_env_vars(self, provider, tmp_path):
+        """Empty agent_meta should not set any VS_* feature env vars."""
+        spec = provider.prepare_process(
+            agent_name="test",
+            agent_meta={"model": ClaudeModels.MEDIUM},
+            agent_persona="",
+            task_context="Do it.",
+            root_dir=tmp_path,
+        )
+        for key in (
+            "VS_MAX_TURNS",
+            "VS_BUDGET_USD",
+            "VS_ALLOWED_TOOLS",
+            "VS_DISALLOWED_TOOLS",
+            "VS_EFFORT",
+            "VS_OUTPUT_FORMAT",
+            "VS_FALLBACK_MODEL",
+            "VS_INCLUDE_DIRS",
+        ):
+            assert key not in spec.env
+
+
+# ---------------------------------------------------------------------------
+# TestGeminiFeaturePassthrough — Phase 5: CLI flags from agent_meta
+# ---------------------------------------------------------------------------
+
+
+class TestGeminiFeaturePassthrough:
+    """Verify GeminiProvider adds CLI flags from agent_meta fields."""
+
+    @pytest.fixture
+    def provider(self):
+        return GeminiProvider()
+
+    @pytest.fixture(autouse=True)
+    def _clear_version_cache(self):
+        from protocol.providers import gemini as gmod
+
+        gmod._cached_version = None
+        yield
+        gmod._cached_version = None
+
+    def _make_spec(self, provider, tmp_path, **extra_meta):
+        meta = {"model": GeminiModels.LOW, **extra_meta}
+        with mock.patch(
+            "protocol.providers.gemini.GeminiProvider.check_version",
+            return_value=(0, 27, 0),
+        ):
+            return provider.prepare_process(
+                agent_name="test",
+                agent_meta=meta,
+                agent_persona="",
+                task_context="Do it.",
+                root_dir=tmp_path,
+            )
+
+    def test_allowed_tools_flags(self, provider, tmp_path):
+        spec = self._make_spec(provider, tmp_path, allowed_tools="Glob, Read")
+        assert "--allowed-tools" in spec.args
+        idx = spec.args.index("--allowed-tools")
+        assert spec.args[idx + 1] == "Glob"
+        # Second occurrence
+        remaining = spec.args[idx + 2 :]
+        assert "--allowed-tools" in remaining
+        idx2 = remaining.index("--allowed-tools")
+        assert remaining[idx2 + 1] == "Read"
+
+    def test_approval_mode_flag(self, provider, tmp_path):
+        spec = self._make_spec(provider, tmp_path, approval_mode="yolo")
+        assert "--approval-mode" in spec.args
+        idx = spec.args.index("--approval-mode")
+        assert spec.args[idx + 1] == "yolo"
+
+    def test_approval_mode_default_not_added(self, provider, tmp_path):
+        spec = self._make_spec(provider, tmp_path, approval_mode="default")
+        assert "--approval-mode" not in spec.args
+
+    def test_output_format_flag(self, provider, tmp_path):
+        spec = self._make_spec(provider, tmp_path, output_format="json")
+        assert "--output-format" in spec.args
+        idx = spec.args.index("--output-format")
+        assert spec.args[idx + 1] == "json"
+
+    def test_output_format_text_not_added(self, provider, tmp_path):
+        spec = self._make_spec(provider, tmp_path, output_format="text")
+        assert "--output-format" not in spec.args
+
+    def test_include_directories_flags(self, provider, tmp_path):
+        spec = self._make_spec(provider, tmp_path, include_dirs=".vault, src")
+        assert "--include-directories" in spec.args
+        idx = spec.args.index("--include-directories")
+        assert spec.args[idx + 1] == ".vault"
+
+    def test_empty_meta_no_extra_flags(self, provider, tmp_path):
+        spec = self._make_spec(provider, tmp_path)
+        for flag in (
+            "--allowed-tools",
+            "--approval-mode",
+            "--output-format",
+            "--include-directories",
+        ):
+            assert flag not in spec.args

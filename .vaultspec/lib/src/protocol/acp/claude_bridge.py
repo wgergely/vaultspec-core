@@ -271,6 +271,34 @@ class ClaudeACPBridge:
         self._mode: str = os.environ.get("VS_AGENT_MODE", "read-write")
         self._system_prompt: str | None = os.environ.get("VS_SYSTEM_PROMPT")
 
+        # Extended agent configuration from VS_* env vars
+        self._max_turns: int | None = (
+            int(os.environ["VS_MAX_TURNS"]) if "VS_MAX_TURNS" in os.environ else None
+        )
+        self._budget_usd: float | None = (
+            float(os.environ["VS_BUDGET_USD"])
+            if "VS_BUDGET_USD" in os.environ
+            else None
+        )
+        self._allowed_tools: list[str] = (
+            [t.strip() for t in os.environ["VS_ALLOWED_TOOLS"].split(",")]
+            if "VS_ALLOWED_TOOLS" in os.environ
+            else []
+        )
+        self._disallowed_tools: list[str] = (
+            [t.strip() for t in os.environ["VS_DISALLOWED_TOOLS"].split(",")]
+            if "VS_DISALLOWED_TOOLS" in os.environ
+            else []
+        )
+        self._effort: str | None = os.environ.get("VS_EFFORT")
+        self._output_format_str: str | None = os.environ.get("VS_OUTPUT_FORMAT")
+        self._fallback_model: str | None = os.environ.get("VS_FALLBACK_MODEL")
+        self._include_dirs: list[str] = (
+            [d.strip() for d in os.environ["VS_INCLUDE_DIRS"].split(",")]
+            if "VS_INCLUDE_DIRS" in os.environ
+            else []
+        )
+
         # All sessions tracked by this bridge instance
         self._sessions: dict[str, _SessionState] = {}
 
@@ -331,6 +359,52 @@ class ClaudeACPBridge:
         )
 
     # ------------------------------------------------------------------
+    # Internal: build SDK options
+    # ------------------------------------------------------------------
+
+    def _build_options(
+        self,
+        cwd: str,
+        sdk_mcp: dict[str, Any],
+        sandbox_cb: Any,
+    ) -> ClaudeAgentOptions:
+        """Build ``ClaudeAgentOptions`` with all configured features.
+
+        Centralises option construction so that ``new_session``,
+        ``load_session``, ``resume_session``, and ``fork_session`` all
+        use the same set of features.
+        """
+        kwargs: dict[str, Any] = {
+            "model": self._model,
+            "cwd": cwd,
+            "mcp_servers": sdk_mcp,
+            "can_use_tool": sandbox_cb,
+            "permission_mode": "bypassPermissions",
+            "system_prompt": self._system_prompt,
+            "include_partial_messages": True,
+        }
+
+        # Safety & control
+        if self._max_turns is not None:
+            kwargs["max_turns"] = self._max_turns
+        if self._budget_usd is not None:
+            kwargs["max_budget_usd"] = self._budget_usd
+        if self._allowed_tools:
+            kwargs["allowed_tools"] = self._allowed_tools
+        if self._disallowed_tools:
+            kwargs["disallowed_tools"] = self._disallowed_tools
+
+        # Quality & behavior
+        if self._effort:
+            kwargs["effort"] = self._effort
+        if self._fallback_model:
+            kwargs["fallback_model"] = self._fallback_model
+        if self._include_dirs:
+            kwargs["add_dirs"] = self._include_dirs
+
+        return ClaudeAgentOptions(**kwargs)
+
+    # ------------------------------------------------------------------
     # Agent protocol: new_session
     # ------------------------------------------------------------------
 
@@ -352,15 +426,7 @@ class ClaudeACPBridge:
         sandbox_cb = _make_sandbox_callback(self._mode, self._root_dir)
 
         # Create SDK client
-        options = ClaudeAgentOptions(
-            model=self._model,
-            cwd=cwd,
-            mcp_servers=sdk_mcp,
-            can_use_tool=sandbox_cb,
-            permission_mode="bypassPermissions",
-            system_prompt=self._system_prompt,
-            include_partial_messages=True,
-        )
+        options = self._build_options(cwd, sdk_mcp, sandbox_cb)
         self._sdk_client = ClaudeSDKClient(options)
 
         # Open the SDK connection without a prompt (streaming mode).
@@ -523,22 +589,14 @@ class ClaudeACPBridge:
         sdk_mcp = _convert_mcp_servers(effective_mcp)
         sandbox_cb = _make_sandbox_callback(state.mode, cwd)
 
-        options = ClaudeAgentOptions(
-            model=state.model,
-            cwd=cwd,
-            mcp_servers=sdk_mcp,
-            can_use_tool=sandbox_cb,
-            permission_mode="bypassPermissions",
-            system_prompt=self._system_prompt,
-            include_partial_messages=True,
-        )
+        self._model = state.model
+        self._mode = state.mode
+        options = self._build_options(cwd, sdk_mcp, sandbox_cb)
         self._sdk_client = ClaudeSDKClient(options)
         await self._sdk_client.connect()
 
         self._session_id = session_id
         self._root_dir = cwd
-        self._model = state.model
-        self._mode = state.mode
         state.connected = True
 
         if self._debug:
@@ -585,22 +643,14 @@ class ClaudeACPBridge:
         sdk_mcp = _convert_mcp_servers(effective_mcp)
         sandbox_cb = _make_sandbox_callback(state.mode, cwd)
 
-        options = ClaudeAgentOptions(
-            model=state.model,
-            cwd=cwd,
-            mcp_servers=sdk_mcp,
-            can_use_tool=sandbox_cb,
-            permission_mode="bypassPermissions",
-            system_prompt=self._system_prompt,
-            include_partial_messages=True,
-        )
+        self._model = state.model
+        self._mode = state.mode
+        options = self._build_options(cwd, sdk_mcp, sandbox_cb)
         self._sdk_client = ClaudeSDKClient(options)
         await self._sdk_client.connect()
 
         self._session_id = session_id
         self._root_dir = cwd
-        self._model = state.model
-        self._mode = state.mode
         state.connected = True
 
         if self._debug:
@@ -641,22 +691,14 @@ class ClaudeACPBridge:
         sdk_mcp = _convert_mcp_servers(effective_mcp)
         sandbox_cb = _make_sandbox_callback(source.mode, cwd)
 
-        options = ClaudeAgentOptions(
-            model=source.model,
-            cwd=cwd,
-            mcp_servers=sdk_mcp,
-            can_use_tool=sandbox_cb,
-            permission_mode="bypassPermissions",
-            system_prompt=self._system_prompt,
-            include_partial_messages=True,
-        )
+        self._model = source.model
+        self._mode = source.mode
+        options = self._build_options(cwd, sdk_mcp, sandbox_cb)
         self._sdk_client = ClaudeSDKClient(options)
         await self._sdk_client.connect()
 
         self._session_id = new_id
         self._root_dir = cwd
-        self._model = source.model
-        self._mode = source.mode
 
         self._sessions[new_id] = _SessionState(
             session_id=new_id,
