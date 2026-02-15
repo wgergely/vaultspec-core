@@ -1,6 +1,6 @@
 """Unit tests for GeminiA2AExecutor.
 
-Mocks run_subagent() so no Gemini CLI is needed.
+Injects a fake run_subagent via constructor DI so no Gemini CLI is needed.
 Validates the executor correctly maps SubagentResult to A2A events.
 """
 
@@ -11,10 +11,8 @@ from a2a.server.events import EventQueue
 from a2a.types import TaskState, TaskStatusUpdateEvent
 
 from protocol.a2a.executors.gemini_executor import GeminiA2AExecutor
-from protocol.a2a.tests.conftest import make_request_context
+from protocol.a2a.tests.conftest import TEST_PROJECT, make_request_context
 from protocol.acp.types import SubagentResult
-
-_PATCH_TARGET = "protocol.a2a.executors.gemini_executor.run_subagent"
 
 
 def _drain_events(queue: EventQueue) -> list:
@@ -40,7 +38,7 @@ class _RunSubagentRecorder:
             raise self.error
         return self.result
 
-    def assert_awaited_once_with(self, **expected):
+    def assert_called_once_with(self, **expected):
         assert len(self.calls) == 1, f"Expected 1 call, got {len(self.calls)}"
         assert self.calls[0] == expected
 
@@ -48,29 +46,29 @@ class _RunSubagentRecorder:
 @pytest.mark.unit
 class TestGeminiA2AExecutor:
     @pytest.mark.asyncio
-    async def test_gemini_executor_completes_successfully(self, tmp_path, monkeypatch):
-        """Mock run_subagent returns response -> executor completes."""
+    async def test_gemini_executor_completes_successfully(self):
+        """Fake run_subagent returns response -> executor completes."""
         mock_result = SubagentResult(
             session_id="test-session",
             response_text="Test response from Gemini",
             written_files=[],
         )
         recorder = _RunSubagentRecorder(result=mock_result)
-        monkeypatch.setattr(_PATCH_TARGET, recorder)
 
         executor = GeminiA2AExecutor(
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
             model="gemini-2.5-flash",
             agent_name="researcher",
+            run_subagent=recorder,
         )
         queue = EventQueue()
         context = make_request_context("Summarize the codebase")
 
         await executor.execute(context, queue)
 
-        recorder.assert_awaited_once_with(
+        recorder.assert_called_once_with(
             agent_name="researcher",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
             initial_task="Summarize the codebase",
             model_override="gemini-2.5-flash",
         )
@@ -93,13 +91,13 @@ class TestGeminiA2AExecutor:
         assert msg.parts[0].root.text == "Test response from Gemini"
 
     @pytest.mark.asyncio
-    async def test_gemini_executor_handles_error(self, tmp_path, monkeypatch):
-        """Mock run_subagent raises -> executor fails gracefully."""
+    async def test_gemini_executor_handles_error(self):
+        """Fake run_subagent raises -> executor fails gracefully."""
         recorder = _RunSubagentRecorder(error=RuntimeError("Gemini CLI not found"))
-        monkeypatch.setattr(_PATCH_TARGET, recorder)
 
         executor = GeminiA2AExecutor(
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
+            run_subagent=recorder,
         )
         queue = EventQueue()
         context = make_request_context("Do something")
@@ -120,10 +118,11 @@ class TestGeminiA2AExecutor:
         assert "Gemini CLI not found" in msg.parts[0].root.text
 
     @pytest.mark.asyncio
-    async def test_gemini_executor_cancel(self, tmp_path):
+    async def test_gemini_executor_cancel(self):
         """Cancel flow emits canceled status."""
         executor = GeminiA2AExecutor(
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
+            run_subagent=_RunSubagentRecorder(),
         )
         queue = EventQueue()
         context = make_request_context("Cancel me")
@@ -138,7 +137,7 @@ class TestGeminiA2AExecutor:
         assert events[0].final is True
 
     @pytest.mark.asyncio
-    async def test_gemini_executor_empty_response(self, tmp_path, monkeypatch):
+    async def test_gemini_executor_empty_response(self):
         """Empty response_text results in 'Done' fallback message."""
         mock_result = SubagentResult(
             session_id="test-session",
@@ -146,10 +145,10 @@ class TestGeminiA2AExecutor:
             written_files=[],
         )
         recorder = _RunSubagentRecorder(result=mock_result)
-        monkeypatch.setattr(_PATCH_TARGET, recorder)
 
         executor = GeminiA2AExecutor(
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
+            run_subagent=recorder,
         )
         queue = EventQueue()
         context = make_request_context("Empty task")
@@ -171,7 +170,7 @@ class TestGeminiA2AExecutor:
         assert msg.parts[0].root.text == "Done"
 
     @pytest.mark.asyncio
-    async def test_gemini_executor_custom_params(self, tmp_path, monkeypatch):
+    async def test_gemini_executor_custom_params(self):
         """Constructor params are forwarded to run_subagent correctly."""
         mock_result = SubagentResult(
             session_id="s1",
@@ -180,22 +179,20 @@ class TestGeminiA2AExecutor:
         )
         recorder = _RunSubagentRecorder(result=mock_result)
 
-        custom_dir = tmp_path / "custom"
-        custom_dir.mkdir()
-
-        monkeypatch.setattr(_PATCH_TARGET, recorder)
+        custom_dir = TEST_PROJECT / "custom"
 
         executor = GeminiA2AExecutor(
             root_dir=custom_dir,
             model="gemini-2.0-flash",
             agent_name="writer",
+            run_subagent=recorder,
         )
         queue = EventQueue()
         context = make_request_context("Write docs")
 
         await executor.execute(context, queue)
 
-        recorder.assert_awaited_once_with(
+        recorder.assert_called_once_with(
             agent_name="writer",
             root_dir=custom_dir,
             initial_task="Write docs",

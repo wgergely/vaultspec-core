@@ -9,6 +9,8 @@ import pytest
 
 from protocol.acp.client import SubagentClient
 
+from .conftest import TEST_PROJECT
+
 pytestmark = [pytest.mark.unit]
 
 
@@ -32,9 +34,9 @@ class TestCreateTerminalReadOnly:
     """Verify that create_terminal is blocked in read-only mode."""
 
     @pytest.mark.asyncio
-    async def test_create_terminal_denied_readonly(self, tmp_path):
+    async def test_create_terminal_denied_readonly(self):
         """SubagentClient(mode='read-only').create_terminal() raises ValueError."""
-        client = SubagentClient(root_dir=tmp_path, mode="read-only")
+        client = SubagentClient(root_dir=TEST_PROJECT, mode="read-only")
         with pytest.raises(ValueError):
             await client.create_terminal(
                 command="bash",
@@ -42,9 +44,9 @@ class TestCreateTerminalReadOnly:
             )
 
     @pytest.mark.asyncio
-    async def test_create_terminal_allowed_readwrite(self, tmp_path, monkeypatch):
+    async def test_create_terminal_allowed_readwrite(self, monkeypatch):
         """Terminal creation succeeds in read-write mode (subprocess faked)."""
-        client = SubagentClient(root_dir=tmp_path, mode="read-write")
+        client = SubagentClient(root_dir=TEST_PROJECT, mode="read-write")
 
         async def _fake_create_subprocess_exec(*_args, **_kwargs):
             return _FakeProcess()
@@ -63,9 +65,9 @@ class TestCreateTerminalReadOnly:
         assert len(response.terminal_id) > 0
 
     @pytest.mark.asyncio
-    async def test_create_terminal_denied_message_mentions_readonly(self, tmp_path):
+    async def test_create_terminal_denied_message_mentions_readonly(self):
         """Error message from denied terminal creation mentions 'read-only'."""
-        client = SubagentClient(root_dir=tmp_path, mode="read-only")
+        client = SubagentClient(root_dir=TEST_PROJECT, mode="read-only")
         with pytest.raises(ValueError, match="read-only"):
             await client.create_terminal(
                 command="ls",
@@ -73,7 +75,7 @@ class TestCreateTerminalReadOnly:
             )
 
     @pytest.mark.asyncio
-    async def test_default_mode_is_readwrite(self, tmp_path):
+    async def test_default_mode_is_readwrite(self):
         """SubagentClient defaults to read-write mode."""
-        client = SubagentClient(root_dir=tmp_path)
+        client = SubagentClient(root_dir=TEST_PROJECT)
         assert client.mode == "read-write"

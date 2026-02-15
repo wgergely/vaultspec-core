@@ -12,6 +12,7 @@ import pytest
 from protocol.acp.claude_bridge import ClaudeACPBridge
 
 from .conftest import (
+    TEST_PROJECT,
     FakeAssistantMessage,
     FakeTextBlock,
     FakeUserMessage,
@@ -79,12 +80,12 @@ class TestCancel:
     """Test session cancellation."""
 
     @pytest.mark.asyncio
-    async def test_cancel_interrupts_sdk(self, bridge, tmp_path, monkeypatch):
+    async def test_cancel_interrupts_sdk(self, bridge, monkeypatch):
         """cancel() calls interrupt() on the SDK client."""
         mock_instance = make_sdk_mock()
         _patch_sdk(monkeypatch, mock_client=mock_instance)
 
-        await bridge.new_session(cwd=str(tmp_path))
+        await bridge.new_session(cwd=str(TEST_PROJECT))
         await bridge.cancel(session_id="s1")
 
         mock_instance.interrupt.assert_called_once()
@@ -95,22 +96,22 @@ class TestCancel:
         await bridge.cancel(session_id="nonexistent")
 
     @pytest.mark.asyncio
-    async def test_cancel_returns_none(self, bridge, tmp_path, monkeypatch):
+    async def test_cancel_returns_none(self, bridge, monkeypatch):
         """cancel() returns None."""
         _patch_sdk(monkeypatch)
 
-        await bridge.new_session(cwd=str(tmp_path))
+        await bridge.new_session(cwd=str(TEST_PROJECT))
         result = await bridge.cancel(session_id="s1")
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_cancel_handles_interrupt_error(self, bridge, tmp_path, monkeypatch):
+    async def test_cancel_handles_interrupt_error(self, bridge, monkeypatch):
         """cancel() catches exceptions from interrupt()."""
         mock_instance = make_sdk_mock()
         mock_instance.interrupt.side_effect = RuntimeError("interrupt failed")
         _patch_sdk(monkeypatch, mock_client=mock_instance)
 
-        await bridge.new_session(cwd=str(tmp_path))
+        await bridge.new_session(cwd=str(TEST_PROJECT))
         # Should not raise
         await bridge.cancel(session_id="s1")
 
@@ -131,18 +132,16 @@ class TestCancelTracking:
         assert bridge._cancelled is True
 
     @pytest.mark.asyncio
-    async def test_cancel_sets_flag_with_session(self, bridge, tmp_path, monkeypatch):
+    async def test_cancel_sets_flag_with_session(self, bridge, monkeypatch):
         """cancel() sets _cancelled to True when an SDK client exists."""
         _patch_sdk(monkeypatch)
-        await bridge.new_session(cwd=str(tmp_path))
+        await bridge.new_session(cwd=str(TEST_PROJECT))
 
         await bridge.cancel(session_id="s1")
         assert bridge._cancelled is True
 
     @pytest.mark.asyncio
-    async def test_cancel_flag_set_before_interrupt(
-        self, bridge, tmp_path, monkeypatch
-    ):
+    async def test_cancel_flag_set_before_interrupt(self, bridge, monkeypatch):
         """cancel() sets _cancelled before calling interrupt().
 
         Verifies the flag is already True when interrupt() is invoked so that
@@ -157,20 +156,18 @@ class TestCancelTracking:
         mock_instance.interrupt.side_effect = capture_flag
         _patch_sdk(monkeypatch, mock_client=mock_instance)
 
-        await bridge.new_session(cwd=str(tmp_path))
+        await bridge.new_session(cwd=str(TEST_PROJECT))
         await bridge.cancel(session_id="s1")
 
         assert observed_cancelled == [True]
 
     @pytest.mark.asyncio
-    async def test_prompt_resets_cancelled_flag(
-        self, connected_bridge, tmp_path, monkeypatch
-    ):
+    async def test_prompt_resets_cancelled_flag(self, connected_bridge, monkeypatch):
         """prompt() resets _cancelled to False at the start."""
         from acp.schema import TextContentBlock
 
         _patch_sdk(monkeypatch)
-        await connected_bridge.new_session(cwd=str(tmp_path))
+        await connected_bridge.new_session(cwd=str(TEST_PROJECT))
 
         # Simulate a prior cancel
         connected_bridge._cancelled = True
@@ -186,7 +183,6 @@ class TestCancelTracking:
         self,
         connected_bridge,
         mock_conn,  # noqa: ARG002
-        tmp_path,
         monkeypatch,
     ):
         """When _cancelled is set during streaming, stop_reason is 'cancelled'.
@@ -209,7 +205,7 @@ class TestCancelTracking:
         mock_client.query.side_effect = _set_cancelled
         _patch_sdk(monkeypatch, mock_client=mock_client)
 
-        await connected_bridge.new_session(cwd=str(tmp_path))
+        await connected_bridge.new_session(cwd=str(TEST_PROJECT))
 
         prompt_blocks = [TextContentBlock(type="text", text="test")]
         result = await connected_bridge.prompt(prompt=prompt_blocks, session_id="s1")
@@ -217,7 +213,7 @@ class TestCancelTracking:
 
     @pytest.mark.asyncio
     async def test_cancelled_skips_emit_for_remaining_messages(
-        self, connected_bridge, mock_conn, tmp_path, monkeypatch
+        self, connected_bridge, mock_conn, monkeypatch
     ):
         """When cancelled, remaining messages are NOT emitted via session_update.
 
@@ -240,7 +236,7 @@ class TestCancelTracking:
         mock_client.query.side_effect = _set_cancelled
         _patch_sdk(monkeypatch, mock_client=mock_client)
 
-        await connected_bridge.new_session(cwd=str(tmp_path))
+        await connected_bridge.new_session(cwd=str(TEST_PROJECT))
 
         prompt_blocks = [TextContentBlock(type="text", text="test")]
         await connected_bridge.prompt(prompt=prompt_blocks, session_id="s1")
@@ -251,13 +247,13 @@ class TestCancelTracking:
 
     @pytest.mark.asyncio
     async def test_cancel_then_new_prompt_works_normally(
-        self, connected_bridge, tmp_path, monkeypatch
+        self, connected_bridge, monkeypatch
     ):
         """After cancel, a subsequent prompt() resets and works normally."""
         from acp.schema import TextContentBlock
 
         _patch_sdk(monkeypatch)
-        await connected_bridge.new_session(cwd=str(tmp_path))
+        await connected_bridge.new_session(cwd=str(TEST_PROJECT))
 
         # Cancel first
         await connected_bridge.cancel(session_id="s1")

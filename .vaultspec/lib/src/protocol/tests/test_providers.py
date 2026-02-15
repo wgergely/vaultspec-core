@@ -15,6 +15,8 @@ from protocol.providers.base import (
 from protocol.providers.claude import ClaudeProvider
 from protocol.providers.gemini import GeminiProvider
 
+from .conftest import TEST_PROJECT
+
 pytestmark = [pytest.mark.unit]
 
 # ---------------------------------------------------------------------------
@@ -91,13 +93,13 @@ class TestGeminiProvider:
         high_model = provider.get_best_model_for_capability(CapabilityLevel.HIGH)
         assert provider.get_model_capability(high_model) == CapabilityLevel.HIGH
 
-    def test_prepare_process_returns_spec(self, provider, tmp_path):
+    def test_prepare_process_returns_spec(self, provider):
         spec = provider.prepare_process(
             agent_name="test-agent",
             agent_meta={"model": GeminiModels.LOW},
             agent_persona="You are a test agent.",
             task_context="Do something.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
             model_override=GeminiModels.LOW,
         )
         assert isinstance(spec, ProcessSpec)
@@ -139,14 +141,14 @@ class TestGeminiProvider:
         assert "Jean-Claude" in content
         assert content.index("SYSTEM INSTRUCTIONS") < content.index("AGENT PERSONA")
 
-    def test_prepare_process_no_system_md(self, provider, tmp_path):
+    def test_prepare_process_no_system_md(self, provider):
         """Without SYSTEM.md, system file has persona but no system instructions."""
         spec = provider.prepare_process(
             agent_name="test-agent",
             agent_meta={"model": GeminiModels.LOW},
             agent_persona="You are Jean-Claude.",
             task_context="Bake croissants.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
             model_override=GeminiModels.LOW,
         )
         assert spec.initial_prompt_override == "Bake croissants."
@@ -267,13 +269,13 @@ class TestClaudeProvider:
             == ClaudeModels.LOW
         )
 
-    def test_prepare_process_returns_spec(self, provider, tmp_path):
+    def test_prepare_process_returns_spec(self, provider):
         spec = provider.prepare_process(
             agent_name="test-agent",
             agent_meta={"model": ClaudeModels.MEDIUM},
             agent_persona="You are a test agent.",
             task_context="Do something.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
             model_override=ClaudeModels.MEDIUM,
         )
         assert isinstance(spec, ProcessSpec)
@@ -318,27 +320,27 @@ class TestGeminiSandboxFlag:
         yield
         gmod._cached_version = None
 
-    def test_gemini_sandbox_flag_readonly(self, provider, tmp_path):
+    def test_gemini_sandbox_flag_readonly(self, provider):
         """prepare_process(..., mode='read-only') includes --sandbox in args."""
         spec = provider.prepare_process(
             agent_name="test-agent",
             agent_meta={"model": GeminiModels.LOW},
             agent_persona="You are a test agent.",
             task_context="Analyze code.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
             model_override=GeminiModels.LOW,
             mode="read-only",
         )
         assert "--sandbox" in spec.args
 
-    def test_gemini_no_sandbox_flag_readwrite(self, provider, tmp_path):
+    def test_gemini_no_sandbox_flag_readwrite(self, provider):
         """prepare_process(..., mode='read-write') does NOT include --sandbox."""
         spec = provider.prepare_process(
             agent_name="test-agent",
             agent_meta={"model": GeminiModels.LOW},
             agent_persona="You are a test agent.",
             task_context="Build feature.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
             model_override=GeminiModels.LOW,
             mode="read-write",
         )
@@ -357,14 +359,14 @@ class TestClaudeModePassthrough:
     def provider(self):
         return ClaudeProvider()
 
-    def test_claude_mode_passthrough(self, provider, tmp_path):
+    def test_claude_mode_passthrough(self, provider):
         """prepare_process(..., mode='read-only') doesn't change Claude args."""
         spec_rw = provider.prepare_process(
             agent_name="test-agent",
             agent_meta={"model": ClaudeModels.MEDIUM},
             agent_persona="You are a test agent.",
             task_context="Do something.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
             model_override=ClaudeModels.MEDIUM,
             mode="read-write",
         )
@@ -373,7 +375,7 @@ class TestClaudeModePassthrough:
             agent_meta={"model": ClaudeModels.MEDIUM},
             agent_persona="You are a test agent.",
             task_context="Do something.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
             model_override=ClaudeModels.MEDIUM,
             mode="read-only",
         )
@@ -382,14 +384,14 @@ class TestClaudeModePassthrough:
         assert spec_rw.args == spec_ro.args
         assert "--sandbox" not in spec_ro.args
 
-    def test_prepare_process_mode_default(self, provider, tmp_path):
+    def test_prepare_process_mode_default(self, provider):
         """Default mode is 'read-write' (no mode keyword)."""
         spec = provider.prepare_process(
             agent_name="test-agent",
             agent_meta={"model": ClaudeModels.MEDIUM},
             agent_persona="You are a test agent.",
             task_context="Do something.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
             model_override=ClaudeModels.MEDIUM,
         )
         # Should succeed without error and produce valid args
@@ -409,27 +411,27 @@ class TestClaudeFeaturePassthrough:
     def provider(self):
         return ClaudeProvider()
 
-    def test_max_turns_env(self, provider, tmp_path):
+    def test_max_turns_env(self, provider):
         spec = provider.prepare_process(
             agent_name="test",
             agent_meta={"model": ClaudeModels.MEDIUM, "max_turns": "25"},
             agent_persona="",
             task_context="Do it.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
         )
         assert spec.env["VS_MAX_TURNS"] == "25"
 
-    def test_budget_env(self, provider, tmp_path):
+    def test_budget_env(self, provider):
         spec = provider.prepare_process(
             agent_name="test",
             agent_meta={"model": ClaudeModels.MEDIUM, "budget": "1.5"},
             agent_persona="",
             task_context="Do it.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
         )
         assert spec.env["VS_BUDGET_USD"] == "1.5"
 
-    def test_allowed_tools_env(self, provider, tmp_path):
+    def test_allowed_tools_env(self, provider):
         spec = provider.prepare_process(
             agent_name="test",
             agent_meta={
@@ -438,11 +440,11 @@ class TestClaudeFeaturePassthrough:
             },
             agent_persona="",
             task_context="Do it.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
         )
         assert spec.env["VS_ALLOWED_TOOLS"] == "Glob, Read"
 
-    def test_disallowed_tools_env(self, provider, tmp_path):
+    def test_disallowed_tools_env(self, provider):
         spec = provider.prepare_process(
             agent_name="test",
             agent_meta={
@@ -451,21 +453,21 @@ class TestClaudeFeaturePassthrough:
             },
             agent_persona="",
             task_context="Do it.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
         )
         assert spec.env["VS_DISALLOWED_TOOLS"] == "Bash"
 
-    def test_effort_env(self, provider, tmp_path):
+    def test_effort_env(self, provider):
         spec = provider.prepare_process(
             agent_name="test",
             agent_meta={"model": ClaudeModels.MEDIUM, "effort": "high"},
             agent_persona="",
             task_context="Do it.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
         )
         assert spec.env["VS_EFFORT"] == "high"
 
-    def test_fallback_model_env(self, provider, tmp_path):
+    def test_fallback_model_env(self, provider):
         spec = provider.prepare_process(
             agent_name="test",
             agent_meta={
@@ -474,11 +476,11 @@ class TestClaudeFeaturePassthrough:
             },
             agent_persona="",
             task_context="Do it.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
         )
         assert spec.env["VS_FALLBACK_MODEL"] == "claude-haiku-4-5"
 
-    def test_include_dirs_env(self, provider, tmp_path):
+    def test_include_dirs_env(self, provider):
         spec = provider.prepare_process(
             agent_name="test",
             agent_meta={
@@ -487,12 +489,12 @@ class TestClaudeFeaturePassthrough:
             },
             agent_persona="",
             task_context="Do it.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
         )
         # Production code splits on comma, validates, and re-joins with ","
         assert spec.env["VS_INCLUDE_DIRS"] == ".vault,src"
 
-    def test_output_format_env(self, provider, tmp_path):
+    def test_output_format_env(self, provider):
         spec = provider.prepare_process(
             agent_name="test",
             agent_meta={
@@ -501,18 +503,18 @@ class TestClaudeFeaturePassthrough:
             },
             agent_persona="",
             task_context="Do it.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
         )
         assert spec.env["VS_OUTPUT_FORMAT"] == "json"
 
-    def test_empty_meta_no_env_vars(self, provider, tmp_path):
+    def test_empty_meta_no_env_vars(self, provider):
         """Empty agent_meta should not set any VS_* feature env vars."""
         spec = provider.prepare_process(
             agent_name="test",
             agent_meta={"model": ClaudeModels.MEDIUM},
             agent_persona="",
             task_context="Do it.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
         )
         for key in (
             "VS_MAX_TURNS",
@@ -547,18 +549,18 @@ class TestGeminiFeaturePassthrough:
         yield
         gmod._cached_version = None
 
-    def _make_spec(self, provider, tmp_path, **extra_meta):
+    def _make_spec(self, provider, **extra_meta):
         meta = {"model": GeminiModels.LOW, **extra_meta}
         return provider.prepare_process(
             agent_name="test",
             agent_meta=meta,
             agent_persona="",
             task_context="Do it.",
-            root_dir=tmp_path,
+            root_dir=TEST_PROJECT,
         )
 
-    def test_allowed_tools_flags(self, provider, tmp_path):
-        spec = self._make_spec(provider, tmp_path, allowed_tools="Glob, Read")
+    def test_allowed_tools_flags(self, provider):
+        spec = self._make_spec(provider, allowed_tools="Glob, Read")
         assert "--allowed-tools" in spec.args
         idx = spec.args.index("--allowed-tools")
         assert spec.args[idx + 1] == "Glob"
@@ -568,34 +570,34 @@ class TestGeminiFeaturePassthrough:
         idx2 = remaining.index("--allowed-tools")
         assert remaining[idx2 + 1] == "Read"
 
-    def test_approval_mode_flag(self, provider, tmp_path):
-        spec = self._make_spec(provider, tmp_path, approval_mode="yolo")
+    def test_approval_mode_flag(self, provider):
+        spec = self._make_spec(provider, approval_mode="yolo")
         assert "--approval-mode" in spec.args
         idx = spec.args.index("--approval-mode")
         assert spec.args[idx + 1] == "yolo"
 
-    def test_approval_mode_default_not_added(self, provider, tmp_path):
-        spec = self._make_spec(provider, tmp_path, approval_mode="default")
+    def test_approval_mode_default_not_added(self, provider):
+        spec = self._make_spec(provider, approval_mode="default")
         assert "--approval-mode" not in spec.args
 
-    def test_output_format_flag(self, provider, tmp_path):
-        spec = self._make_spec(provider, tmp_path, output_format="json")
+    def test_output_format_flag(self, provider):
+        spec = self._make_spec(provider, output_format="json")
         assert "--output-format" in spec.args
         idx = spec.args.index("--output-format")
         assert spec.args[idx + 1] == "json"
 
-    def test_output_format_text_not_added(self, provider, tmp_path):
-        spec = self._make_spec(provider, tmp_path, output_format="text")
+    def test_output_format_text_not_added(self, provider):
+        spec = self._make_spec(provider, output_format="text")
         assert "--output-format" not in spec.args
 
-    def test_include_directories_flags(self, provider, tmp_path):
-        spec = self._make_spec(provider, tmp_path, include_dirs=".vault, src")
+    def test_include_directories_flags(self, provider):
+        spec = self._make_spec(provider, include_dirs=".vault, src")
         assert "--include-directories" in spec.args
         idx = spec.args.index("--include-directories")
         assert spec.args[idx + 1] == ".vault"
 
-    def test_empty_meta_no_extra_flags(self, provider, tmp_path):
-        spec = self._make_spec(provider, tmp_path)
+    def test_empty_meta_no_extra_flags(self, provider):
+        spec = self._make_spec(provider)
         for flag in (
             "--allowed-tools",
             "--approval-mode",

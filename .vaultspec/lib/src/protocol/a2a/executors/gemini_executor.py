@@ -6,13 +6,16 @@ mapping results back to A2A events.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.tasks import TaskUpdater
 from a2a.types import Part, TextPart
 
-from orchestration.subagent import run_subagent
+from orchestration.subagent import run_subagent as _default_run_subagent
 
 if TYPE_CHECKING:
     import pathlib
@@ -25,6 +28,19 @@ class GeminiA2AExecutor(AgentExecutor):
 
     Wraps ``run_subagent()`` from ``orchestration.subagent``, mapping the
     ``SubagentResult`` back to A2A task lifecycle events.
+
+    Parameters
+    ----------
+    root_dir:
+        Workspace root for the agent subprocess.
+    model:
+        Gemini model identifier.
+    agent_name:
+        Name of the agent definition to load.
+    run_subagent:
+        Callable to spawn the subagent.  Defaults to the real
+        ``orchestration.subagent.run_subagent``.  Override in tests to
+        inject a fake without mocking.
     """
 
     def __init__(
@@ -33,10 +49,12 @@ class GeminiA2AExecutor(AgentExecutor):
         root_dir: pathlib.Path,
         model: str = "gemini-2.5-flash",
         agent_name: str = "researcher",
+        run_subagent: Callable[..., Any] | None = None,
     ) -> None:
         self._root_dir = root_dir
         self._model = model
         self._agent_name = agent_name
+        self._run_subagent = run_subagent or _default_run_subagent
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         task_id = context.task_id or ""
@@ -47,7 +65,7 @@ class GeminiA2AExecutor(AgentExecutor):
         await updater.start_work()
 
         try:
-            result = await run_subagent(
+            result = await self._run_subagent(
                 agent_name=self._agent_name,
                 root_dir=self._root_dir,
                 initial_task=prompt,
