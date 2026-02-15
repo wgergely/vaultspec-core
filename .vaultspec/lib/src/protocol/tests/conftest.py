@@ -18,7 +18,7 @@ from protocol.providers.base import GeminiModels  # noqa: E402
 
 
 @pytest.fixture
-def mock_root_dir(tmp_path):
+def test_root_dir(tmp_path):
     """A temporary directory acting as the project root."""
     (tmp_path / ".vaultspec" / "agents").mkdir(parents=True)
     (tmp_path / ".vault" / "adr").mkdir(parents=True)

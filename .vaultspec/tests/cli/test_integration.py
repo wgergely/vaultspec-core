@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-pytestmark = [pytest.mark.unit]
+pytestmark = [pytest.mark.integration]
 
 
 def test_cli_help():

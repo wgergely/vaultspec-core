@@ -16,16 +16,9 @@ import pytest
 from .conftest import (  # type: ignore[unresolved-import]
     TEST_PROJECT,
     make_ns,
-    mock_resolve_model,
 )
 
 pytestmark = [pytest.mark.unit]
-
-
-@pytest.fixture(autouse=True)
-def _patch_resolve_model(monkeypatch):
-    """All tests in this module need resolve_model patched."""
-    monkeypatch.setattr(cli, "resolve_model", mock_resolve_model)
 
 
 # ---------------------------------------------------------------------------

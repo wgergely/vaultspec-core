@@ -186,24 +186,22 @@ class TestGeminiVersionCheck:
         yield
         gmod._cached_version = None
 
-    def test_parse_version_output(self, monkeypatch):
+    def test_parse_version_output(self):
         result = subprocess.CompletedProcess(
             args=["gemini", "--version"],
             returncode=0,
             stdout="gemini v0.27.0",
             stderr="",
         )
-        monkeypatch.setattr(
-            "protocol.providers.gemini.subprocess.run",
-            lambda *_a, **_kw: result,
+        version = GeminiProvider.check_version(
+            "gemini", run_fn=lambda *_a, **_kw: result
         )
-        version = GeminiProvider.check_version("gemini")
         assert version == (0, 27, 0)
 
-    def test_version_cached(self, monkeypatch):
+    def test_version_cached(self):
         call_count = 0
 
-        def fake_run(*_args, **_kwargs):
+        def counting_run(*_args, **_kwargs):
             nonlocal call_count
             call_count += 1
             return subprocess.CompletedProcess(
@@ -213,18 +211,16 @@ class TestGeminiVersionCheck:
                 stderr="",
             )
 
-        monkeypatch.setattr("protocol.providers.gemini.subprocess.run", fake_run)
-        v1 = GeminiProvider.check_version("gemini")
-        v2 = GeminiProvider.check_version("gemini")
+        v1 = GeminiProvider.check_version("gemini", run_fn=counting_run)
+        v2 = GeminiProvider.check_version("gemini", run_fn=counting_run)
         assert v1 == v2
         assert call_count == 1
 
-    def test_executable_not_found(self, monkeypatch):
+    def test_executable_not_found(self):
         def raise_fnf(*_args, **_kwargs):
             raise FileNotFoundError
 
-        monkeypatch.setattr("protocol.providers.gemini.subprocess.run", raise_fnf)
-        version = GeminiProvider.check_version("gemini")
+        version = GeminiProvider.check_version("gemini", run_fn=raise_fnf)
         assert version is None
 
 
@@ -475,13 +471,13 @@ class TestClaudeFeaturePassthrough:
             agent_name="test",
             agent_meta={
                 "model": ClaudeModels.MEDIUM,
-                "fallback_model": "claude-haiku-4-5",
+                "fallback_model": ClaudeModels.LOW,
             },
             agent_persona="",
             task_context="Do it.",
             root_dir=TEST_PROJECT,
         )
-        assert spec.env["VS_FALLBACK_MODEL"] == "claude-haiku-4-5"
+        assert spec.env["VS_FALLBACK_MODEL"] == ClaudeModels.LOW
 
     def test_include_dirs_env(self, provider):
         spec = provider.prepare_process(

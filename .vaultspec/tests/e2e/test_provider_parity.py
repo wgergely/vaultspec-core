@@ -38,14 +38,18 @@ def gemini():
 
 
 @pytest.fixture(autouse=True)
-def _seed_gemini_version_cache(monkeypatch):
+def _seed_gemini_version_cache():
     """Pre-seed the Gemini version cache so check_version() is a no-op."""
     from protocol.providers import gemini as gmod
 
-    monkeypatch.setattr(gmod, "_cached_version", (0, 27, 0))
-    monkeypatch.setattr(
-        "protocol.providers.gemini.shutil.which", lambda _name: "/usr/bin/gemini"
-    )
+    orig_cached = gmod._cached_version
+    orig_which = gmod._which_fn
+
+    gmod._cached_version = (0, 27, 0)
+    gmod._which_fn = lambda _name: "/usr/bin/gemini"
+    yield
+    gmod._cached_version = orig_cached
+    gmod._which_fn = orig_which
 
 
 def _gemini_spec(

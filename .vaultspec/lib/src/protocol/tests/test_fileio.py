@@ -22,19 +22,19 @@ class TestReadOnlyModeEnforcement:
     """Tests that read-only mode restricts writes to .vault/ only."""
 
     @pytest.fixture
-    def readonly_client(self, mock_root_dir):
+    def readonly_client(self, test_root_dir):
         """SubagentClient in read-only mode."""
-        return SubagentClient(root_dir=mock_root_dir, debug=False, mode="read-only")
+        return SubagentClient(root_dir=test_root_dir, debug=False, mode="read-only")
 
     @pytest.fixture
-    def readwrite_client(self, mock_root_dir):
+    def readwrite_client(self, test_root_dir):
         """SubagentClient in default read-write mode."""
-        return SubagentClient(root_dir=mock_root_dir, debug=False, mode="read-write")
+        return SubagentClient(root_dir=test_root_dir, debug=False, mode="read-write")
 
     @pytest.mark.asyncio
-    async def test_readonly_allows_vault_writes(self, readonly_client, mock_root_dir):
+    async def test_readonly_allows_vault_writes(self, readonly_client, test_root_dir):
         """Read-only mode permits writes to .vault/ directory."""
-        target = mock_root_dir / ".vault" / "adr" / "test-output.md"
+        target = test_root_dir / ".vault" / "adr" / "test-output.md"
         await readonly_client.write_text_file(
             content="# ADR Output",
             path=str(target),
@@ -44,9 +44,9 @@ class TestReadOnlyModeEnforcement:
         assert target.read_text(encoding="utf-8") == "# ADR Output"
 
     @pytest.mark.asyncio
-    async def test_readonly_blocks_source_writes(self, readonly_client, mock_root_dir):
+    async def test_readonly_blocks_source_writes(self, readonly_client, test_root_dir):
         """Read-only mode rejects writes outside .vault/ directory."""
-        target = mock_root_dir / "src" / "main.py"
+        target = test_root_dir / "src" / "main.py"
         with pytest.raises(ValueError, match="read-only mode"):
             await readonly_client.write_text_file(
                 content="# Should not be written",
@@ -55,9 +55,9 @@ class TestReadOnlyModeEnforcement:
             )
 
     @pytest.mark.asyncio
-    async def test_readonly_blocks_root_writes(self, readonly_client, mock_root_dir):
+    async def test_readonly_blocks_root_writes(self, readonly_client, test_root_dir):
         """Read-only mode rejects writes to the project root."""
-        target = mock_root_dir / "config.toml"
+        target = test_root_dir / "config.toml"
         with pytest.raises(ValueError, match="read-only mode"):
             await readonly_client.write_text_file(
                 content="[settings]",
@@ -66,9 +66,9 @@ class TestReadOnlyModeEnforcement:
             )
 
     @pytest.mark.asyncio
-    async def test_readwrite_allows_any_writes(self, readwrite_client, mock_root_dir):
+    async def test_readwrite_allows_any_writes(self, readwrite_client, test_root_dir):
         """Read-write mode permits writes to any path in workspace."""
-        target = mock_root_dir / "src" / "main.py"
+        target = test_root_dir / "src" / "main.py"
         await readwrite_client.write_text_file(
             content="fn main() {}",
             path=str(target),
@@ -78,9 +78,9 @@ class TestReadOnlyModeEnforcement:
         assert target.read_text(encoding="utf-8") == "fn main() {}"
 
     @pytest.mark.asyncio
-    async def test_readonly_tracks_vault_writes(self, readonly_client, mock_root_dir):
+    async def test_readonly_tracks_vault_writes(self, readonly_client, test_root_dir):
         """Read-only client tracks .vault/ writes in written_files list."""
-        target = mock_root_dir / ".vault" / "plan" / "output.md"
+        target = test_root_dir / ".vault" / "plan" / "output.md"
         await readonly_client.write_text_file(
             content="# Plan",
             path=str(target),
@@ -90,10 +90,10 @@ class TestReadOnlyModeEnforcement:
 
     @pytest.mark.asyncio
     async def test_readonly_blocks_vaultspec_writes(
-        self, readonly_client, mock_root_dir
+        self, readonly_client, test_root_dir
     ):
         """Read-only mode rejects writes to .vaultspec/ (not .vault/)."""
-        target = mock_root_dir / ".vaultspec" / "agents" / "rogue.md"
+        target = test_root_dir / ".vaultspec" / "agents" / "rogue.md"
         with pytest.raises(ValueError, match="read-only mode"):
             await readonly_client.write_text_file(
                 content="# Rogue agent",

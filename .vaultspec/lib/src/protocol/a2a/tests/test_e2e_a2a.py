@@ -1,14 +1,16 @@
-"""E2E and integration tests for A2A protocol.
+"""A2A protocol tests.
 
 E2E tests require real LLM backends (authenticated via their CLIs):
 - Claude CLI (``claude``) on PATH for Claude tests
 - Gemini CLI (``gemini``) on PATH for Gemini tests
 
-Integration tests use mock executors and run in-process (no LLM, no network).
+Protocol infrastructure tests exercise the real A2A server stack (JSON-RPC,
+task lifecycle, message routing, Starlette app wiring) using simple
+AgentExecutor implementations (EchoExecutor, PrefixExecutor).
 
 Markers:
-- @pytest.mark.e2e, @pytest.mark.a2a — end-to-end with real LLMs
-- @pytest.mark.integration, @pytest.mark.a2a — in-process with mocks
+- @pytest.mark.integration + @pytest.mark.claude/@pytest.mark.gemini — real LLM E2E
+- @pytest.mark.integration — protocol infrastructure (real server, no LLM)
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ from a2a.types import AgentCard
 from protocol.a2a.agent_card import agent_card_from_definition
 from protocol.a2a.server import create_app
 from protocol.a2a.tests.conftest import EchoExecutor, PrefixExecutor, _make_card
+from protocol.providers.base import ClaudeModels, GeminiModels
 
 # ---------------------------------------------------------------------------
 # Skip markers for E2E tests
@@ -84,9 +87,8 @@ def _build_client(executor, name: str = "test", port: int = 10099) -> httpx.Asyn
 
 
 @pytest.mark.integration
-@pytest.mark.a2a
 class TestA2AServeWiring:
-    """Verify create_app produces a working Starlette app with mock executor."""
+    """Verify create_app produces a working Starlette app with test executor."""
 
     @pytest.mark.asyncio
     async def test_create_app_with_echo_executor(self):
@@ -133,7 +135,6 @@ class TestA2AServeWiring:
 
 
 @pytest.mark.integration
-@pytest.mark.a2a
 class TestAgentCardFromCLIArgs:
     """Verify agent_card_from_definition with CLI-like parameters."""
 
@@ -175,31 +176,30 @@ class TestAgentCardFromCLIArgs:
 
 
 # ===================================================================
-# Mock bidirectional integration tests (no real LLM)
+# In-process bidirectional integration tests (no real LLM)
 # ===================================================================
 
 
 @pytest.mark.integration
-@pytest.mark.a2a
-class TestMockBidirectional:
-    """Bidirectional A2A communication with mock executors.
+class TestInProcessBidirectional:
+    """Bidirectional A2A communication with in-process test executors.
 
     Validates the full A2A stack (JSON-RPC, task lifecycle, message
     routing) without requiring real LLM backends.
     """
 
     @pytest.mark.asyncio
-    async def test_claude_gemini_mock_bidirectional(self):
+    async def test_claude_gemini_bidirectional(self):
         """Two A2A servers exchange messages in both directions.
 
-        Mock Claude ([Claude] prefix) and mock Gemini ([Gemini] prefix)
+        In-process Claude ([Claude] prefix) and Gemini ([Gemini] prefix)
         each send a message to the other and both complete successfully.
         """
         claude_client = _build_client(
-            PrefixExecutor("[Claude] "), name="mock-claude", port=10090
+            PrefixExecutor("[Claude] "), name="test-claude", port=10090
         )
         gemini_client = _build_client(
-            PrefixExecutor("[Gemini] "), name="mock-gemini", port=10091
+            PrefixExecutor("[Gemini] "), name="test-gemini", port=10091
         )
 
         async with claude_client, gemini_client:
@@ -231,8 +231,8 @@ class TestMockBidirectional:
             assert cross_text == "[Claude] [Gemini] analyze the results"
 
     @pytest.mark.asyncio
-    async def test_mock_claude_to_gemini_delegation(self):
-        """Mock Claude executor receives task, forwards to mock Gemini via A2A.
+    async def test_claude_to_gemini_delegation(self):
+        """Claude executor receives task, forwards to Gemini via A2A.
 
         Simulates the delegation pattern:
         1. Client sends task to Claude A2A server
@@ -285,8 +285,7 @@ class TestMockBidirectional:
 # ===================================================================
 
 
-@pytest.mark.e2e
-@pytest.mark.a2a
+@pytest.mark.integration
 @pytest.mark.claude
 @pytest.mark.timeout(180)
 @requires_anthropic
@@ -297,7 +296,7 @@ class TestClaudeE2E:
         from protocol.a2a.executors.claude_executor import ClaudeA2AExecutor
 
         executor = ClaudeA2AExecutor(
-            model="claude-sonnet-4-5-20250929",
+            model=ClaudeModels.MEDIUM,
             root_dir=str(_TEST_ROOT),
             mode="read-only",
         )
@@ -325,8 +324,7 @@ class TestClaudeE2E:
             print(f"Claude A2A round-trip: {elapsed:.2f}s")
 
 
-@pytest.mark.e2e
-@pytest.mark.a2a
+@pytest.mark.integration
 @pytest.mark.gemini
 @pytest.mark.timeout(180)
 @requires_gemini
@@ -338,7 +336,7 @@ class TestGeminiE2E:
 
         executor = GeminiA2AExecutor(
             root_dir=_TEST_ROOT,
-            model="gemini-2.5-flash",
+            model=GeminiModels.LOW,
             agent_name="researcher",
         )
         client = _build_client(executor, name="gemini-e2e", port=10061)
@@ -371,8 +369,7 @@ class TestGeminiE2E:
             print(f"Gemini A2A round-trip: {elapsed:.2f}s")
 
 
-@pytest.mark.e2e
-@pytest.mark.a2a
+@pytest.mark.integration
 @pytest.mark.claude
 @pytest.mark.gemini
 @pytest.mark.timeout(300)
@@ -407,7 +404,7 @@ class TestGoldStandardBidirectional:
         # Set up Gemini A2A server
         gemini_executor = GeminiA2AExecutor(
             root_dir=_TEST_ROOT,
-            model="gemini-2.5-flash",
+            model=GeminiModels.LOW,
             agent_name="researcher",
         )
         gemini_card = agent_card_from_definition(
@@ -423,7 +420,7 @@ class TestGoldStandardBidirectional:
 
         # Set up Claude A2A server
         claude_executor = ClaudeA2AExecutor(
-            model="claude-sonnet-4-5-20250929",
+            model=ClaudeModels.MEDIUM,
             root_dir=str(_TEST_ROOT),
             mode="read-only",
         )
@@ -500,7 +497,7 @@ class TestGoldStandardBidirectional:
 
         # Set up Claude A2A server
         claude_executor = ClaudeA2AExecutor(
-            model="claude-sonnet-4-5-20250929",
+            model=ClaudeModels.MEDIUM,
             root_dir=str(_TEST_ROOT),
             mode="read-only",
         )
@@ -518,7 +515,7 @@ class TestGoldStandardBidirectional:
         # Set up Gemini A2A server
         gemini_executor = GeminiA2AExecutor(
             root_dir=_TEST_ROOT,
-            model="gemini-2.5-flash",
+            model=GeminiModels.LOW,
             agent_name="researcher",
         )
         gemini_card = agent_card_from_definition(

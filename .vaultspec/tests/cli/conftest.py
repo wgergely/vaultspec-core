@@ -55,20 +55,6 @@ def make_ns(**kwargs) -> argparse.Namespace:
     return argparse.Namespace(**defaults)
 
 
-# Patch PROVIDERS so tests never depend on actual model resolution
-MOCK_PROVIDERS: dict[str, dict[str, str]] = {
-    "claude": {"LOW": "claude-haiku", "MEDIUM": "claude-sonnet", "HIGH": "claude-opus"},
-    "gemini": {"LOW": "gemini-flash", "MEDIUM": "gemini-pro", "HIGH": "gemini-ultra"},
-}
-
-
-def mock_resolve_model(tool: str, tier: str) -> str | None:
-    provider = MOCK_PROVIDERS.get(tool)
-    if provider is None:
-        return None
-    return provider.get(tier.upper())
-
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

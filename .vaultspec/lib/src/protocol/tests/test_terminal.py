@@ -6,6 +6,6 @@ pytestmark = [pytest.mark.unit]
 
 
 @pytest.mark.asyncio
-async def test_terminal_interaction(mock_root_dir, test_agent_md):
-    # Setup mock for terminal creation and output
+async def test_terminal_interaction(test_root_dir, test_agent_md):
+    # TODO: implement terminal interaction test
     pass

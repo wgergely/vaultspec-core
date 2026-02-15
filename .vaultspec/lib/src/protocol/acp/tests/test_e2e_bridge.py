@@ -25,6 +25,8 @@ import sys
 
 import pytest
 
+from protocol.providers.base import ClaudeModels
+
 pytestmark = [pytest.mark.integration, pytest.mark.claude]
 
 # ---------------------------------------------------------------------------
@@ -140,7 +142,7 @@ def croissant_epilogue():
 
 
 async def _spawn_bridge(
-    model: str = "claude-sonnet-4-5",
+    model: str = ClaudeModels.MEDIUM,
     env: dict | None = None,
     debug: bool = False,
     test_mode: bool = False,

@@ -47,7 +47,7 @@ class ClaudeA2AExecutor(AgentExecutor):
     Parameters
     ----------
     model:
-        Claude model identifier (e.g. ``"claude-sonnet-4-5"``).
+        Claude model identifier (e.g. ``ClaudeModels.MEDIUM``).
     root_dir:
         Workspace root directory for the agent.
     mode:
@@ -58,7 +58,7 @@ class ClaudeA2AExecutor(AgentExecutor):
         Optional system prompt prepended to every conversation.
     client_factory:
         Callable ``(options) -> client``.  Defaults to real
-        ``ClaudeSDKClient``.  Override in tests to inject a fake.
+        ``ClaudeSDKClient``.  Override in tests to inject a test double.
     options_factory:
         Callable ``(**kwargs) -> options``.  Defaults to real
         ``ClaudeAgentOptions``.  Override in tests to record kwargs.

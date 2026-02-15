@@ -200,20 +200,20 @@ class TestFileIO:
         return SubagentClient(root_dir=TEST_PROJECT, debug=False)
 
     @pytest.mark.asyncio
-    async def test_read_text_file(self, client, mock_root_dir):
+    async def test_read_text_file(self, client, test_root_dir):
         # We need client.root_dir to be the same as where the file is
-        client.root_dir = mock_root_dir
+        client.root_dir = test_root_dir
         result = await client.read_text_file(
-            path=str(mock_root_dir / "test.txt"),
+            path=str(test_root_dir / "test.txt"),
             session_id="s1",
         )
         assert "Hello from test workspace" in result.content
 
     @pytest.mark.asyncio
-    async def test_read_text_file_with_line_and_limit(self, client, mock_root_dir):
-        client.root_dir = mock_root_dir
+    async def test_read_text_file_with_line_and_limit(self, client, test_root_dir):
+        client.root_dir = test_root_dir
         result = await client.read_text_file(
-            path=str(mock_root_dir / "test.txt"),
+            path=str(test_root_dir / "test.txt"),
             session_id="s1",
             line=2,
             limit=1,
@@ -222,8 +222,8 @@ class TestFileIO:
         assert "Line 3" not in result.content
 
     @pytest.mark.asyncio
-    async def test_read_text_file_outside_workspace(self, client, mock_root_dir):
-        client.root_dir = mock_root_dir
+    async def test_read_text_file_outside_workspace(self, client, test_root_dir):
+        client.root_dir = test_root_dir
         with tempfile.TemporaryDirectory() as td:
             outside = pathlib.Path(td) / "secret.txt"
             outside.write_text("secret", encoding="utf-8")
@@ -231,18 +231,18 @@ class TestFileIO:
                 await client.read_text_file(path=str(outside), session_id="s1")
 
     @pytest.mark.asyncio
-    async def test_read_text_file_nonexistent(self, client, mock_root_dir):
-        client.root_dir = mock_root_dir
+    async def test_read_text_file_nonexistent(self, client, test_root_dir):
+        client.root_dir = test_root_dir
         with pytest.raises(FileNotFoundError):
             await client.read_text_file(
-                path=str(mock_root_dir / "nonexistent.txt"),
+                path=str(test_root_dir / "nonexistent.txt"),
                 session_id="s1",
             )
 
     @pytest.mark.asyncio
-    async def test_write_text_file(self, client, mock_root_dir):
-        client.root_dir = mock_root_dir
-        target = mock_root_dir / "output.txt"
+    async def test_write_text_file(self, client, test_root_dir):
+        client.root_dir = test_root_dir
+        target = test_root_dir / "output.txt"
         await client.write_text_file(
             content="Written by test",
             path=str(target),
@@ -252,9 +252,9 @@ class TestFileIO:
         assert target.read_text(encoding="utf-8") == "Written by test"
 
     @pytest.mark.asyncio
-    async def test_write_text_file_nested(self, client, mock_root_dir):
-        client.root_dir = mock_root_dir
-        target = mock_root_dir / "deep" / "nested" / "file.txt"
+    async def test_write_text_file_nested(self, client, test_root_dir):
+        client.root_dir = test_root_dir
+        target = test_root_dir / "deep" / "nested" / "file.txt"
         await client.write_text_file(
             content="Nested content",
             path=str(target),
@@ -264,8 +264,8 @@ class TestFileIO:
         assert target.read_text(encoding="utf-8") == "Nested content"
 
     @pytest.mark.asyncio
-    async def test_write_text_file_outside_workspace(self, client, mock_root_dir):
-        client.root_dir = mock_root_dir
+    async def test_write_text_file_outside_workspace(self, client, test_root_dir):
+        client.root_dir = test_root_dir
         with tempfile.TemporaryDirectory() as td:
             outside = pathlib.Path(td) / "output.txt"
             with pytest.raises(ValueError, match="outside workspace"):
@@ -287,8 +287,8 @@ class TestTerminalLifecycle:
         return SubagentClient(root_dir=TEST_PROJECT, debug=False)
 
     @pytest.mark.asyncio
-    async def test_create_terminal(self, client, mock_root_dir):
-        client.root_dir = mock_root_dir
+    async def test_create_terminal(self, client, test_root_dir):
+        client.root_dir = test_root_dir
         result = await client.create_terminal(
             command=sys.executable,
             session_id="s1",
@@ -302,8 +302,8 @@ class TestTerminalLifecycle:
         await client.release_terminal(session_id="s1", terminal_id=terminal_id)
 
     @pytest.mark.asyncio
-    async def test_terminal_output(self, client, mock_root_dir):
-        client.root_dir = mock_root_dir
+    async def test_terminal_output(self, client, test_root_dir):
+        client.root_dir = test_root_dir
         result = await client.create_terminal(
             command=sys.executable,
             session_id="s1",
@@ -321,8 +321,8 @@ class TestTerminalLifecycle:
         await client.release_terminal(session_id="s1", terminal_id=terminal_id)
 
     @pytest.mark.asyncio
-    async def test_wait_for_exit_returns_code(self, client, mock_root_dir):
-        client.root_dir = mock_root_dir
+    async def test_wait_for_exit_returns_code(self, client, test_root_dir):
+        client.root_dir = test_root_dir
         result = await client.create_terminal(
             command=sys.executable,
             session_id="s1",
@@ -336,8 +336,8 @@ class TestTerminalLifecycle:
         await client.release_terminal(session_id="s1", terminal_id=terminal_id)
 
     @pytest.mark.asyncio
-    async def test_kill_terminal(self, client, mock_root_dir):
-        client.root_dir = mock_root_dir
+    async def test_kill_terminal(self, client, test_root_dir):
+        client.root_dir = test_root_dir
         result = await client.create_terminal(
             command=sys.executable,
             session_id="s1",
@@ -354,8 +354,8 @@ class TestTerminalLifecycle:
         await client.release_terminal(session_id="s1", terminal_id=terminal_id)
 
     @pytest.mark.asyncio
-    async def test_release_terminal_removes_tracking(self, client, mock_root_dir):
-        client.root_dir = mock_root_dir
+    async def test_release_terminal_removes_tracking(self, client, test_root_dir):
+        client.root_dir = test_root_dir
         result = await client.create_terminal(
             command=sys.executable,
             session_id="s1",

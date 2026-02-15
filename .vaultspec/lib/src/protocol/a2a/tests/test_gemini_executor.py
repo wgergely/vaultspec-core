@@ -1,6 +1,6 @@
 """Unit tests for GeminiA2AExecutor.
 
-Injects a fake run_subagent via constructor DI so no Gemini CLI is needed.
+Injects a test run_subagent via constructor DI so no Gemini CLI is needed.
 Validates the executor correctly maps SubagentResult to A2A events.
 """
 
@@ -13,6 +13,7 @@ from a2a.types import TaskState, TaskStatusUpdateEvent
 from protocol.a2a.executors.gemini_executor import GeminiA2AExecutor
 from protocol.a2a.tests.conftest import TEST_PROJECT, make_request_context
 from protocol.acp.types import SubagentResult
+from protocol.providers.base import GeminiModels
 
 
 def _drain_events(queue: EventQueue) -> list:
@@ -38,26 +39,22 @@ class _RunSubagentRecorder:
             raise self.error
         return self.result
 
-    def assert_called_once_with(self, **expected):
-        assert len(self.calls) == 1, f"Expected 1 call, got {len(self.calls)}"
-        assert self.calls[0] == expected
-
 
 @pytest.mark.unit
 class TestGeminiA2AExecutor:
     @pytest.mark.asyncio
     async def test_gemini_executor_completes_successfully(self):
-        """Fake run_subagent returns response -> executor completes."""
-        mock_result = SubagentResult(
+        """Injected run_subagent returns response -> executor completes."""
+        expected_result = SubagentResult(
             session_id="test-session",
             response_text="Test response from Gemini",
             written_files=[],
         )
-        recorder = _RunSubagentRecorder(result=mock_result)
+        recorder = _RunSubagentRecorder(result=expected_result)
 
         executor = GeminiA2AExecutor(
             root_dir=TEST_PROJECT,
-            model="gemini-2.5-flash",
+            model=GeminiModels.LOW,
             agent_name="researcher",
             run_subagent=recorder,
         )
@@ -66,12 +63,13 @@ class TestGeminiA2AExecutor:
 
         await executor.execute(context, queue)
 
-        recorder.assert_called_once_with(
-            agent_name="researcher",
-            root_dir=TEST_PROJECT,
-            initial_task="Summarize the codebase",
-            model_override="gemini-2.5-flash",
-        )
+        assert len(recorder.calls) == 1
+        assert recorder.calls[0] == {
+            "agent_name": "researcher",
+            "root_dir": TEST_PROJECT,
+            "initial_task": "Summarize the codebase",
+            "model_override": GeminiModels.LOW,
+        }
 
         events = _drain_events(queue)
         await queue.close()
@@ -92,7 +90,7 @@ class TestGeminiA2AExecutor:
 
     @pytest.mark.asyncio
     async def test_gemini_executor_handles_error(self):
-        """Fake run_subagent raises -> executor fails gracefully."""
+        """Injected run_subagent raises -> executor fails gracefully."""
         recorder = _RunSubagentRecorder(error=RuntimeError("Gemini CLI not found"))
 
         executor = GeminiA2AExecutor(
@@ -139,12 +137,12 @@ class TestGeminiA2AExecutor:
     @pytest.mark.asyncio
     async def test_gemini_executor_empty_response(self):
         """Empty response_text results in 'Done' fallback message."""
-        mock_result = SubagentResult(
+        expected_result = SubagentResult(
             session_id="test-session",
             response_text="",
             written_files=[],
         )
-        recorder = _RunSubagentRecorder(result=mock_result)
+        recorder = _RunSubagentRecorder(result=expected_result)
 
         executor = GeminiA2AExecutor(
             root_dir=TEST_PROJECT,
@@ -172,18 +170,18 @@ class TestGeminiA2AExecutor:
     @pytest.mark.asyncio
     async def test_gemini_executor_custom_params(self):
         """Constructor params are forwarded to run_subagent correctly."""
-        mock_result = SubagentResult(
+        expected_result = SubagentResult(
             session_id="s1",
             response_text="OK",
             written_files=[],
         )
-        recorder = _RunSubagentRecorder(result=mock_result)
+        recorder = _RunSubagentRecorder(result=expected_result)
 
         custom_dir = TEST_PROJECT / "custom"
 
         executor = GeminiA2AExecutor(
             root_dir=custom_dir,
-            model="gemini-2.0-flash",
+            model=GeminiModels.MEDIUM,
             agent_name="writer",
             run_subagent=recorder,
         )
@@ -192,12 +190,13 @@ class TestGeminiA2AExecutor:
 
         await executor.execute(context, queue)
 
-        recorder.assert_called_once_with(
-            agent_name="writer",
-            root_dir=custom_dir,
-            initial_task="Write docs",
-            model_override="gemini-2.0-flash",
-        )
+        assert len(recorder.calls) == 1
+        assert recorder.calls[0] == {
+            "agent_name": "writer",
+            "root_dir": custom_dir,
+            "initial_task": "Write docs",
+            "model_override": GeminiModels.MEDIUM,
+        }
 
         events = _drain_events(queue)
         await queue.close()

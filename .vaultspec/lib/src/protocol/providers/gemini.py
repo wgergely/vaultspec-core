@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .base import (
     AgentProvider,
@@ -20,6 +20,7 @@ from .base import (
 
 if TYPE_CHECKING:
     import pathlib
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,9 @@ _MIN_VERSION_RECOMMENDED = (0, 27, 0)  # v0.27.0 has stable agent skills
 
 # Cache for version check result
 _cached_version: tuple[int, ...] | None = None
+
+# Overridable which function for testing
+_which_fn: Callable[[str], str | None] = shutil.which
 
 
 class GeminiProvider(AgentProvider):
@@ -88,17 +92,21 @@ class GeminiProvider(AgentProvider):
         return "\n\n".join(parts)
 
     @staticmethod
-    def check_version(executable: str) -> tuple[int, ...] | None:
+    def check_version(
+        executable: str, *, run_fn: Callable[..., Any] | None = None
+    ) -> tuple[int, ...] | None:
         """Check Gemini CLI version and warn/fail based on known-good baselines.
 
         Returns the parsed version tuple or None if version could not be determined.
+        Pass ``run_fn`` to inject a replacement for ``subprocess.run`` (testing).
         """
         global _cached_version
         if _cached_version:
             return _cached_version
 
+        _run = run_fn or subprocess.run
         try:
-            res = subprocess.run(
+            res = _run(
                 [executable, "--version"],
                 capture_output=True,
                 text=True,
@@ -148,7 +156,7 @@ class GeminiProvider(AgentProvider):
                 )
 
         #  Locate executable and check version
-        executable = shutil.which("gemini") or "gemini"
+        executable = _which_fn("gemini") or "gemini"
         self.check_version(executable)
 
         #  Load system instructions, rules, and construct full prompt

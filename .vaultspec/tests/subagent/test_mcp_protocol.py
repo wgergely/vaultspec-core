@@ -21,6 +21,7 @@ _LIB_SRC = Path(__file__).resolve().parent.parent.parent / "lib" / "src"
 if str(_LIB_SRC) not in sys.path:
     sys.path.insert(0, str(_LIB_SRC))
 
+import subagent_server.server as srv  # noqa: E402
 from mcp.server.fastmcp.exceptions import ToolError  # noqa: E402
 from subagent_server.server import mcp  # noqa: E402
 
@@ -32,6 +33,26 @@ pytestmark = [pytest.mark.api]
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _restore_server_globals():
+    """Save and restore subagent_server.server globals after each test."""
+    originals = {}
+    for attr in (
+        "_agent_cache",
+        "_refresh_if_changed",
+        "task_engine",
+        "lock_manager",
+        "_background_tasks",
+        "_active_clients",
+        "run_subagent",
+    ):
+        if hasattr(srv, attr):
+            originals[attr] = getattr(srv, attr)
+    yield
+    for attr, val in originals.items():
+        setattr(srv, attr, val)
 
 
 @pytest.fixture
@@ -54,6 +75,21 @@ def baker_cache():
             "tools": ["Read", "Write", "Bash"],
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _set_server(**overrides):
+    """Set subagent_server.server globals directly."""
+    for attr, value in overrides.items():
+        setattr(srv, attr, value)
+
+
+async def _noop_run_subagent(**_kwargs):
+    """No-op async stand-in for run_subagent."""
 
 
 # ---------------------------------------------------------------------------
@@ -136,26 +172,13 @@ class TestToolRegistration:
 # ---------------------------------------------------------------------------
 
 
-def _patch_server(monkeypatch, **overrides):
-    """Patch subagent_server.server globals via monkeypatch."""
-    import subagent_server.server as srv
-
-    for attr, value in overrides.items():
-        monkeypatch.setattr(srv, attr, value)
-
-
-async def _noop_run_subagent(**_kwargs):
-    """No-op async stand-in for run_subagent."""
-
-
 class TestProtocolCallTool:
     """Test tools via FastMCP's call_tool (exercises full tool pipeline)."""
 
     @pytest.mark.asyncio
-    async def test_list_agents_via_call_tool(self, baker_cache, monkeypatch):
+    async def test_list_agents_via_call_tool(self, baker_cache):
         """call_tool('list_agents') returns valid JSON with agents."""
-        _patch_server(
-            monkeypatch,
+        _set_server(
             _agent_cache=baker_cache,
             _refresh_if_changed=lambda: False,
         )
@@ -165,12 +188,9 @@ class TestProtocolCallTool:
         assert data["agents"][0]["name"] == "simple-executor"
 
     @pytest.mark.asyncio
-    async def test_dispatch_agent_via_call_tool(
-        self, baker_cache, fresh_engine, monkeypatch
-    ):
+    async def test_dispatch_agent_via_call_tool(self, baker_cache, fresh_engine):
         """call_tool('dispatch_agent') creates a task and returns taskId."""
-        _patch_server(
-            monkeypatch,
+        _set_server(
             _agent_cache=baker_cache,
             _refresh_if_changed=lambda: False,
             task_engine=fresh_engine,
@@ -188,10 +208,9 @@ class TestProtocolCallTool:
         assert "taskId" in data
 
     @pytest.mark.asyncio
-    async def test_dispatch_unknown_agent_raises_error(self, baker_cache, monkeypatch):
+    async def test_dispatch_unknown_agent_raises_error(self, baker_cache):
         """call_tool('dispatch_agent') with unknown agent raises ToolError."""
-        _patch_server(
-            monkeypatch,
+        _set_server(
             _agent_cache=baker_cache,
             _refresh_if_changed=lambda: False,
         )
@@ -202,11 +221,10 @@ class TestProtocolCallTool:
             )
 
     @pytest.mark.asyncio
-    async def test_get_task_status_via_call_tool(self, fresh_engine, monkeypatch):
+    async def test_get_task_status_via_call_tool(self, fresh_engine):
         """call_tool('get_task_status') returns task state."""
         fresh_engine.create_task("simple-executor", task_id="proto-001")
-        _patch_server(
-            monkeypatch,
+        _set_server(
             task_engine=fresh_engine,
             lock_manager=fresh_engine._lock_manager,
         )
@@ -216,18 +234,17 @@ class TestProtocolCallTool:
         assert data["taskId"] == "proto-001"
 
     @pytest.mark.asyncio
-    async def test_get_task_status_not_found(self, fresh_engine, monkeypatch):
+    async def test_get_task_status_not_found(self, fresh_engine):
         """call_tool('get_task_status') for missing task raises ToolError."""
-        _patch_server(monkeypatch, task_engine=fresh_engine)
+        _set_server(task_engine=fresh_engine)
         with pytest.raises(ToolError, match="not found"):
             await mcp.call_tool("get_task_status", {"task_id": "nonexistent"})
 
     @pytest.mark.asyncio
-    async def test_cancel_task_via_call_tool(self, fresh_engine, monkeypatch):
+    async def test_cancel_task_via_call_tool(self, fresh_engine):
         """call_tool('cancel_task') cancels a working task."""
         fresh_engine.create_task("simple-executor", task_id="proto-002")
-        _patch_server(
-            monkeypatch,
+        _set_server(
             task_engine=fresh_engine,
             _active_clients={},
             _background_tasks={},
@@ -237,10 +254,9 @@ class TestProtocolCallTool:
         assert data["status"] == "cancelled"
 
     @pytest.mark.asyncio
-    async def test_get_locks_via_call_tool(self, fresh_engine, monkeypatch):
+    async def test_get_locks_via_call_tool(self, fresh_engine):
         """call_tool('get_locks') returns empty list when no locks."""
-        _patch_server(
-            monkeypatch,
+        _set_server(
             lock_manager=fresh_engine._lock_manager,
             task_engine=fresh_engine,
         )
@@ -250,14 +266,13 @@ class TestProtocolCallTool:
         assert data["count"] == 0
 
     @pytest.mark.asyncio
-    async def test_get_locks_with_active_lock(self, fresh_engine, monkeypatch):
+    async def test_get_locks_with_active_lock(self, fresh_engine):
         """call_tool('get_locks') returns lock details."""
         fresh_engine.create_task("simple-executor", task_id="proto-003")
         fresh_engine._lock_manager.acquire_lock(
             "proto-003", {".vault/plan.md"}, "read-only"
         )
-        _patch_server(
-            monkeypatch,
+        _set_server(
             lock_manager=fresh_engine._lock_manager,
             task_engine=fresh_engine,
         )
@@ -272,39 +287,30 @@ class TestProtocolCallTool:
 # ---------------------------------------------------------------------------
 
 
-class _FakeSubagentResult:
-    """Fake result from run_subagent."""
-
-    def __init__(self, session_id, response_text, written_files=None):
-        self.session_id = session_id
-        self.response_text = response_text
-        self.written_files = written_files or []
-
-
 class TestProtocolRoundTrip:
     """Test a full dispatch → poll → complete lifecycle via call_tool."""
 
     @pytest.mark.asyncio
-    async def test_dispatch_poll_complete_cycle(
-        self, baker_cache, fresh_engine, monkeypatch
-    ):
+    async def test_dispatch_poll_complete_cycle(self, baker_cache, fresh_engine):
         """Dispatch an agent, poll for completion, verify result."""
-        mock_result = _FakeSubagentResult(
+        import types
+
+        canned_result = types.SimpleNamespace(
             session_id="sess-001",
             response_text="Bonjour! I am Jean-Claude, your French Baker.",
+            written_files=[],
         )
 
-        async def _fake_run(**_kw):
-            return mock_result
+        async def _test_run(**_kw):
+            return canned_result
 
-        _patch_server(
-            monkeypatch,
+        _set_server(
             _agent_cache=baker_cache,
             _refresh_if_changed=lambda: False,
             task_engine=fresh_engine,
             _background_tasks={},
             _active_clients={},
-            run_subagent=_fake_run,
+            run_subagent=_test_run,
             lock_manager=fresh_engine._lock_manager,
         )
 

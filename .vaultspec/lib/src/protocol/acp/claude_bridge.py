@@ -8,7 +8,7 @@ stdin/stdout.  Internally it drives Claude via ``claude-agent-sdk``'s
 
 Usage::
 
-    python -m protocol.acp.claude_bridge --model claude-sonnet-4-5
+    python -m protocol.acp.claude_bridge --model ClaudeModels.MEDIUM
 
 The bridge reads ``VS_AGENT_MODE`` from the environment to decide sandboxing
 policy and ``VS_ROOT_DIR`` for the workspace root.
@@ -25,6 +25,9 @@ import os
 import sys
 import uuid
 from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from acp import PROTOCOL_VERSION, run_agent
 from acp.schema import (
@@ -67,6 +70,7 @@ from claude_agent_sdk.types import (
     StreamEvent,
 )
 
+from protocol.providers.base import ClaudeModels
 from protocol.sandbox import (
     _make_sandbox_callback,
 )
@@ -196,39 +200,72 @@ class ClaudeACPBridge:
     def __init__(
         self,
         *,
-        model: str = "claude-sonnet-4-5",
+        model: str = ClaudeModels.MEDIUM,
         debug: bool = False,
+        # DI: override env-var config (None = read from env)
+        mode: str | None = None,
+        max_turns: int | None = None,
+        budget_usd: float | None = None,
+        allowed_tools: list[str] | None = None,
+        disallowed_tools: list[str] | None = None,
+        effort: str | None = None,
+        output_format: str | None = None,
+        fallback_model: str | None = None,
+        include_dirs: list[str] | None = None,
+        system_prompt: str | None = None,
+        # DI: SDK factories (None = use real SDK)
+        client_factory: Callable[..., Any] | None = None,
+        options_factory: Callable[..., Any] | None = None,
     ) -> None:
         self._model = model
         self._debug = debug
+
+        # SDK factories — DI or real
+        self._client_factory = client_factory or ClaudeSDKClient
+        self._options_factory = options_factory or ClaudeAgentOptions
 
         # Set by on_connect — the client-side connection for sending notifications
         self._conn: Any = None
 
         # Session state
-        self._sdk_client: ClaudeSDKClient | None = None
+        self._sdk_client: Any = None
         self._session_id: str | None = None
         self._root_dir: str = os.environ.get("VS_ROOT_DIR", os.getcwd())
-        self._mode: str = os.environ.get("VS_AGENT_MODE", "read-write")
-        self._system_prompt: str | None = os.environ.get("VS_SYSTEM_PROMPT")
 
-        # Extended agent configuration from VS_* env vars
-        try:
-            self._max_turns: int | None = (
-                int(os.environ["VS_MAX_TURNS"])
-                if "VS_MAX_TURNS" in os.environ
-                else None
-            )
-        except ValueError:
-            self._max_turns = None
-        try:
-            self._budget_usd: float | None = (
-                float(os.environ["VS_BUDGET_USD"])
-                if "VS_BUDGET_USD" in os.environ
-                else None
-            )
-        except ValueError:
-            self._budget_usd = None
+        # Config: DI param takes precedence, else env var, else default
+        self._mode: str = (
+            mode if mode is not None else os.environ.get("VS_AGENT_MODE", "read-write")
+        )
+        self._system_prompt: str | None = (
+            system_prompt
+            if system_prompt is not None
+            else os.environ.get("VS_SYSTEM_PROMPT")
+        )
+
+        # Extended agent configuration: DI params or env vars
+        if max_turns is not None:
+            self._max_turns: int | None = max_turns
+        else:
+            try:
+                self._max_turns = (
+                    int(os.environ["VS_MAX_TURNS"])
+                    if "VS_MAX_TURNS" in os.environ
+                    else None
+                )
+            except ValueError:
+                self._max_turns = None
+
+        if budget_usd is not None:
+            self._budget_usd: float | None = budget_usd
+        else:
+            try:
+                self._budget_usd = (
+                    float(os.environ["VS_BUDGET_USD"])
+                    if "VS_BUDGET_USD" in os.environ
+                    else None
+                )
+            except ValueError:
+                self._budget_usd = None
 
         # Range validation: ignore invalid values
         if self._max_turns is not None and self._max_turns <= 0:
@@ -237,26 +274,56 @@ class ClaudeACPBridge:
             self._budget_usd = None
 
         self._allowed_tools: list[str] = (
-            [t.strip() for t in os.environ["VS_ALLOWED_TOOLS"].split(",") if t.strip()]
-            if "VS_ALLOWED_TOOLS" in os.environ
-            else []
+            allowed_tools
+            if allowed_tools is not None
+            else (
+                [
+                    t.strip()
+                    for t in os.environ["VS_ALLOWED_TOOLS"].split(",")
+                    if t.strip()
+                ]
+                if "VS_ALLOWED_TOOLS" in os.environ
+                else []
+            )
         )
         self._disallowed_tools: list[str] = (
-            [
-                t.strip()
-                for t in os.environ["VS_DISALLOWED_TOOLS"].split(",")
-                if t.strip()
-            ]
-            if "VS_DISALLOWED_TOOLS" in os.environ
-            else []
+            disallowed_tools
+            if disallowed_tools is not None
+            else (
+                [
+                    t.strip()
+                    for t in os.environ["VS_DISALLOWED_TOOLS"].split(",")
+                    if t.strip()
+                ]
+                if "VS_DISALLOWED_TOOLS" in os.environ
+                else []
+            )
         )
-        self._effort: str | None = os.environ.get("VS_EFFORT")
-        self._output_format: str | None = os.environ.get("VS_OUTPUT_FORMAT")
-        self._fallback_model: str | None = os.environ.get("VS_FALLBACK_MODEL")
+        self._effort: str | None = (
+            effort if effort is not None else os.environ.get("VS_EFFORT")
+        )
+        self._output_format: str | None = (
+            output_format
+            if output_format is not None
+            else os.environ.get("VS_OUTPUT_FORMAT")
+        )
+        self._fallback_model: str | None = (
+            fallback_model
+            if fallback_model is not None
+            else os.environ.get("VS_FALLBACK_MODEL")
+        )
         self._include_dirs: list[str] = (
-            [d.strip() for d in os.environ["VS_INCLUDE_DIRS"].split(",") if d.strip()]
-            if "VS_INCLUDE_DIRS" in os.environ
-            else []
+            include_dirs
+            if include_dirs is not None
+            else (
+                [
+                    d.strip()
+                    for d in os.environ["VS_INCLUDE_DIRS"].split(",")
+                    if d.strip()
+                ]
+                if "VS_INCLUDE_DIRS" in os.environ
+                else []
+            )
         )
 
         # All sessions tracked by this bridge instance
@@ -364,7 +431,7 @@ class ClaudeACPBridge:
         if self._include_dirs:
             kwargs["add_dirs"] = self._include_dirs
 
-        return ClaudeAgentOptions(**kwargs)
+        return self._options_factory(**kwargs)
 
     # ------------------------------------------------------------------
     # Agent protocol: new_session
@@ -389,7 +456,7 @@ class ClaudeACPBridge:
 
         # Create SDK client
         options = self._build_options(cwd, sdk_mcp, sandbox_cb)
-        self._sdk_client = ClaudeSDKClient(options)
+        self._sdk_client = self._client_factory(options)
 
         # Open the SDK connection without a prompt (streaming mode).
         # This ensures can_use_tool callbacks are active.  The actual
@@ -553,7 +620,7 @@ class ClaudeACPBridge:
         self._model = state.model
         self._mode = state.mode
         options = self._build_options(cwd, sdk_mcp, sandbox_cb)
-        self._sdk_client = ClaudeSDKClient(options)
+        self._sdk_client = self._client_factory(options)
         await self._sdk_client.connect()
 
         self._session_id = session_id
@@ -607,7 +674,7 @@ class ClaudeACPBridge:
         self._model = state.model
         self._mode = state.mode
         options = self._build_options(cwd, sdk_mcp, sandbox_cb)
-        self._sdk_client = ClaudeSDKClient(options)
+        self._sdk_client = self._client_factory(options)
         await self._sdk_client.connect()
 
         self._session_id = session_id
@@ -655,7 +722,7 @@ class ClaudeACPBridge:
         self._model = source.model
         self._mode = source.mode
         options = self._build_options(cwd, sdk_mcp, sandbox_cb)
-        self._sdk_client = ClaudeSDKClient(options)
+        self._sdk_client = self._client_factory(options)
         await self._sdk_client.connect()
 
         self._session_id = new_id
@@ -967,20 +1034,20 @@ class ClaudeACPBridge:
 
 
 # ---------------------------------------------------------------------------
-# Test mode: mock SDK for subprocess e2e tests without API key
+# Test mode: stub SDK for subprocess e2e tests without API key
 # ---------------------------------------------------------------------------
 
 
-def _install_test_mode_mocks() -> None:
-    """Replace ``ClaudeSDKClient`` and ``ClaudeAgentOptions`` with mocks.
+def _install_test_mode_stubs() -> None:
+    """Replace ``ClaudeSDKClient`` and ``ClaudeAgentOptions`` with no-op stubs.
 
     This allows the bridge to run as a real subprocess and respond to
-    ACP JSON-RPC messages without needing a Claude API key.  The mock
+    ACP JSON-RPC messages without needing a Claude API key.  The stub
     client's ``connect()`` and ``query()`` are no-ops, and
     ``receive_messages()`` yields an empty iterator.
     """
 
-    class _MockSDKClient:
+    class _StubSDKClient:
         """Minimal stand-in for ``ClaudeSDKClient``."""
 
         def __init__(self, options: Any) -> None:
@@ -1008,19 +1075,19 @@ def _install_test_mode_mocks() -> None:
         async def __anext__(self) -> Any:
             raise StopAsyncIteration
 
-    class _MockOptions:
+    class _StubOptions:
         """Minimal stand-in for ``ClaudeAgentOptions``."""
 
         def __init__(self, **kwargs: Any) -> None:
             for k, v in kwargs.items():
                 setattr(self, k, v)
 
-    # Monkey-patch module globals so ClaudeACPBridge.__init__ and
-    # new_session() pick up the mocks.
+    # Patch module globals so ClaudeACPBridge.__init__ and
+    # new_session() pick up the stubs.
     import protocol.acp.claude_bridge as _mod
 
-    _mod.ClaudeSDKClient = _MockSDKClient  # type: ignore[misc,assignment]
-    _mod.ClaudeAgentOptions = _MockOptions  # type: ignore[misc,assignment]
+    _mod.ClaudeSDKClient = _StubSDKClient  # type: ignore[misc,assignment]
+    _mod.ClaudeAgentOptions = _StubOptions  # type: ignore[misc,assignment]
 
 
 # ---------------------------------------------------------------------------
@@ -1034,8 +1101,8 @@ async def main() -> None:
     )
     parser.add_argument(
         "--model",
-        default="claude-sonnet-4-5",
-        help="Claude model to use (default: claude-sonnet-4-5)",
+        default=ClaudeModels.MEDIUM,
+        help=f"Claude model to use (default: {ClaudeModels.MEDIUM})",
     )
     parser.add_argument(
         "--debug",
@@ -1045,7 +1112,7 @@ async def main() -> None:
     parser.add_argument(
         "--test-mode",
         action="store_true",
-        help="Use mock SDK client (for e2e testing without API key)",
+        help="Use stub SDK client (for e2e testing without API key)",
     )
     args = parser.parse_args()
 
@@ -1057,7 +1124,7 @@ async def main() -> None:
         )
 
     if args.test_mode:
-        _install_test_mode_mocks()
+        _install_test_mode_stubs()
 
     bridge = ClaudeACPBridge(model=args.model, debug=args.debug)
     await run_agent(bridge)  # type: ignore[arg-type]  # structural Agent protocol
