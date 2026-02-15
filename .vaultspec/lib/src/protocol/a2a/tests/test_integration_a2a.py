@@ -68,7 +68,6 @@ def _build_client(executor, name="test", port=10099) -> httpx.AsyncClient:
 
 
 @pytest.mark.integration
-@pytest.mark.a2a
 class TestAgentCardServed:
     @pytest.mark.asyncio
     async def test_agent_card_at_well_known(self):
@@ -100,7 +99,6 @@ class TestAgentCardServed:
 
 
 @pytest.mark.integration
-@pytest.mark.a2a
 class TestMessageSend:
     @pytest.mark.asyncio
     async def test_send_message_returns_completed_task(self):
@@ -157,7 +155,6 @@ class TestMessageSend:
 
 
 @pytest.mark.integration
-@pytest.mark.a2a
 class TestBidirectional:
     @pytest.mark.asyncio
     async def test_two_agents_independent(self):
@@ -193,7 +190,6 @@ class TestBidirectional:
 
 
 @pytest.mark.integration
-@pytest.mark.a2a
 class TestTaskLifecycle:
     @pytest.mark.asyncio
     async def test_task_has_status_history(self):
@@ -269,7 +265,6 @@ class TestTaskLifecycle:
 
 
 @pytest.mark.integration
-@pytest.mark.a2a
 class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_invalid_json_returns_parse_error(self):

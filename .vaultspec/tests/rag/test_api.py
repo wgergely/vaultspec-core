@@ -14,7 +14,10 @@ try:
 except ImportError:
     HAS_RAG = False
 
-pytestmark = pytest.mark.skipif(not HAS_RAG, reason="RAG dependencies not installed")
+pytestmark = [
+    pytest.mark.api,
+    pytest.mark.skipif(not HAS_RAG, reason="RAG dependencies not installed"),
+]
 
 
 # ---- Public API Facade Tests ----

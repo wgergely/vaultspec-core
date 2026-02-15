@@ -27,8 +27,8 @@ class TestPermissionDenial:
     """Tests for permission denial scenarios in SubagentClient."""
 
     @pytest.fixture
-    def client(self, mock_root_dir):
-        return SubagentClient(root_dir=mock_root_dir, debug=False)
+    def client(self, test_root_dir):
+        return SubagentClient(root_dir=test_root_dir, debug=False)
 
     @pytest.mark.asyncio
     async def test_permission_request_denied_when_only_reject_options(self, client):

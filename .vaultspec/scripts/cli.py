@@ -17,7 +17,10 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # ---------------------------------------------------------------------------
 # YAML parsing: prefer PyYAML, fall back to simple parser
@@ -382,7 +385,12 @@ def collect_agents() -> dict[str, tuple[Path, dict[str, Any], str]]:
 
 
 def transform_agent(
-    tool: str, name: str, meta: dict[str, Any], body: str
+    tool: str,
+    name: str,
+    meta: dict[str, Any],
+    body: str,
+    *,
+    resolve_fn: Callable[..., str | None] | None = None,
 ) -> str | None:
     """Transform an agent for a specific tool destination."""
     agent_name = Path(name).stem
@@ -393,7 +401,8 @@ def transform_agent(
         print(f"  Warning: Agent '{agent_name}' missing tier.", file=sys.stderr)
         return None
 
-    model = resolve_model(tool, tier)
+    _resolve = resolve_fn or resolve_model
+    model = _resolve(tool, tier)
     if model is None:
         msg = f"  Warning: No model for {tool}/{tier}. Skipping {agent_name}."
         print(msg, file=sys.stderr)
@@ -490,7 +499,11 @@ def agents_set_tier(args: argparse.Namespace) -> None:
     print("Run 'agents sync' to propagate changes.")
 
 
-def agents_sync(args: argparse.Namespace) -> None:
+def agents_sync(
+    args: argparse.Namespace,
+    *,
+    resolve_fn: Callable[..., str | None] | None = None,
+) -> None:
     sources = collect_agents()
     dry_run = getattr(args, "dry_run", False)
     prune = getattr(args, "prune", False)
@@ -503,7 +516,7 @@ def agents_sync(args: argparse.Namespace) -> None:
             sources=sources,
             dest_dir=cfg.agents_dir,
             transform_fn=lambda _t, n, m, b, _tn=tool_name: transform_agent(
-                _tn, n, m, b
+                _tn, n, m, b, resolve_fn=resolve_fn
             ),
             dest_path_fn=lambda dest_dir, name: dest_dir / name,
             prune=prune,

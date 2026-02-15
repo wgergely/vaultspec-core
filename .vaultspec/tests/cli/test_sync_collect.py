@@ -12,10 +12,9 @@ import shutil
 import cli
 import pytest
 
-from .conftest import (  # type: ignore[unresolved-import]
-    TEST_PROJECT,
-    mock_resolve_model,
-)
+from protocol.providers.base import ClaudeModels
+
+from .conftest import TEST_PROJECT  # type: ignore[unresolved-import]
 
 pytestmark = [pytest.mark.unit]
 
@@ -160,21 +159,26 @@ class TestTransformRule:
 
 
 class TestTransformAgent:
-    def test_valid_tier(self, monkeypatch):
-        monkeypatch.setattr(cli, "resolve_model", mock_resolve_model)
+    def test_valid_tier(self):
         result = cli.transform_agent(
-            "claude", "coder.md", {"description": "A coder", "tier": "HIGH"}, "Body"
+            "claude",
+            "coder.md",
+            {"description": "A coder", "tier": "HIGH"},
+            "Body",
         )
         assert result is not None
         meta, body = cli.parse_frontmatter(result)
-        assert meta["model"] == "claude-opus"
+        assert meta["model"] == ClaudeModels.HIGH
         assert meta["name"] == "coder"
         assert "Body" in body
 
-    def test_missing_model_returns_none(self, monkeypatch):
-        monkeypatch.setattr(cli, "resolve_model", lambda *_args, **_kw: None)
+    def test_missing_model_returns_none(self):
         result = cli.transform_agent(
-            "claude", "agent.md", {"description": "x", "tier": "HIGH"}, "Body"
+            "claude",
+            "agent.md",
+            {"description": "x", "tier": "HIGH"},
+            "Body",
+            resolve_fn=lambda *_args, **_kw: None,
         )
         assert result is None
 

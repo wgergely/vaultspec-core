@@ -21,6 +21,7 @@ try:
     from orchestration.subagent import run_subagent
     from orchestration.utils import find_project_root
     from protocol.acp.client import SubagentClient
+    from protocol.providers.base import ClaudeModels, GeminiModels
 except ImportError as e:
     print(f"Failed to import subagent library: {e}", file=sys.stderr)
     sys.exit(1)
@@ -161,7 +162,7 @@ def command_a2a_serve(args):
         from protocol.a2a.executors.claude_executor import ClaudeA2AExecutor
 
         executor = ClaudeA2AExecutor(
-            model=args.model or "claude-sonnet-4-5-20250929",
+            model=args.model or ClaudeModels.MEDIUM,
             root_dir=str(root),
             mode=args.mode or "read-only",
         )
@@ -170,7 +171,7 @@ def command_a2a_serve(args):
 
         executor = GeminiA2AExecutor(
             root_dir=root,
-            model=args.model or "gemini-2.5-flash",
+            model=args.model or GeminiModels.LOW,
             agent_name=agent_name,
         )
     else:

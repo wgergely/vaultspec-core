@@ -16,7 +16,10 @@ try:
 except ImportError:
     HAS_RAG = False
 
-pytestmark = pytest.mark.skipif(not HAS_RAG, reason="RAG dependencies not installed")
+pytestmark = [
+    pytest.mark.index,
+    pytest.mark.skipif(not HAS_RAG, reason="RAG dependencies not installed"),
+]
 
 TEST_PROJECT = (
     pathlib.Path(__file__).resolve().parent.parent.parent.parent / "test-project"

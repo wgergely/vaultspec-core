@@ -16,6 +16,7 @@ from a2a.server.tasks import TaskUpdater
 from a2a.types import Part, TextPart
 
 from orchestration.subagent import run_subagent as _default_run_subagent
+from protocol.providers.base import GeminiModels
 
 if TYPE_CHECKING:
     import pathlib
@@ -40,14 +41,14 @@ class GeminiA2AExecutor(AgentExecutor):
     run_subagent:
         Callable to spawn the subagent.  Defaults to the real
         ``orchestration.subagent.run_subagent``.  Override in tests to
-        inject a fake without mocking.
+        inject a test implementation via constructor DI.
     """
 
     def __init__(
         self,
         *,
         root_dir: pathlib.Path,
-        model: str = "gemini-2.5-flash",
+        model: str = GeminiModels.LOW,
         agent_name: str = "researcher",
         run_subagent: Callable[..., Any] | None = None,
     ) -> None:

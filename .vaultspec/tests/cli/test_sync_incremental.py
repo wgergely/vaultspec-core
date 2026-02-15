@@ -8,19 +8,14 @@ from __future__ import annotations
 import cli
 import pytest
 
+from protocol.providers.base import ClaudeModels
+
 from .conftest import (  # type: ignore[unresolved-import]
     TEST_PROJECT,
     make_ns,
-    mock_resolve_model,
 )
 
 pytestmark = [pytest.mark.unit]
-
-
-@pytest.fixture(autouse=True)
-def _patch_resolve_model(monkeypatch):
-    """All tests in this module need resolve_model patched."""
-    monkeypatch.setattr(cli, "resolve_model", mock_resolve_model)
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +204,7 @@ class TestIncrementalAgents:
         c1 = (TEST_PROJECT / ".claude" / "agents" / "flex.md").read_text(
             encoding="utf-8"
         )
-        assert "claude-haiku" in c1
+        assert ClaudeModels.LOW in c1
 
         (agents_dir / "flex.md").write_text(
             "---\ndescription: Flexible\ntier: HIGH\n---\n\n# Flex upgraded",
@@ -219,7 +214,7 @@ class TestIncrementalAgents:
         c2 = (TEST_PROJECT / ".claude" / "agents" / "flex.md").read_text(
             encoding="utf-8"
         )
-        assert "claude-opus" in c2
+        assert ClaudeModels.HIGH in c2
         assert "Flex upgraded" in c2
 
 

@@ -1,9 +1,9 @@
-"""Unit tests for ClaudeA2AExecutor.
+"""Integration tests for ClaudeA2AExecutor.
 
-Uses constructor DI (client_factory, options_factory) so no SDK patching is
-needed.  Fake SDK client controls the message stream; real SDK types are used
-for AssistantMessage, ResultMessage, and TextBlock so isinstance checks in
-the executor work without any monkeypatching.
+Uses constructor DI (client_factory, options_factory) to inject an
+in-process SDK client.  Real SDK types (AssistantMessage, ResultMessage,
+TextBlock) are used so isinstance checks in the executor work without
+any monkeypatching.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock
 
 from protocol.a2a.executors.claude_executor import ClaudeA2AExecutor
 from protocol.a2a.tests.conftest import TEST_PROJECT, make_request_context
+from protocol.providers.base import ClaudeModels
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -62,8 +63,13 @@ class _AwaitableNone:
         return iter([])
 
 
-class _FakeSDKClient:
-    """Fake ClaudeSDKClient for tests.
+class _InProcessSDKClient:
+    """In-process implementation of the ClaudeSDKClient interface for DI.
+
+    Injected via ClaudeA2AExecutor's client_factory constructor parameter.
+    Yields pre-built real SDK messages (AssistantMessage, ResultMessage)
+    so the executor's message-to-event mapping logic is exercised with
+    real types.
 
     disconnect() is callable both sync and async: it returns an awaitable
     so ``await client.disconnect()`` works, but also increments the counter
@@ -112,12 +118,12 @@ class _OptionsRecorder:
 
 def _make_executor(
     *,
-    client: _FakeSDKClient,
-    model: str = "claude-sonnet-4-5",
+    client: _InProcessSDKClient,
+    model: str = ClaudeModels.MEDIUM,
     mode: str = "read-only",
     root_dir: str | None = None,
 ) -> ClaudeA2AExecutor:
-    """Build a ClaudeA2AExecutor with DI'd fakes."""
+    """Build a ClaudeA2AExecutor with DI'd in-process implementations."""
     _OptionsRecorder.reset()
     return ClaudeA2AExecutor(
         model=model,
@@ -133,22 +139,23 @@ def _make_executor(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.unit
+@pytest.mark.integration
+@pytest.mark.claude
 class TestClaudeA2AExecutor:
     @pytest.mark.asyncio
     async def test_claude_executor_completes_successfully(self):
         """SDK returns text -> executor completes with artifact."""
-        fake_client = _FakeSDKClient(
+        test_client = _InProcessSDKClient(
             messages=[
                 AssistantMessage(
                     content=[TextBlock(text="Hello "), TextBlock(text="world")],
-                    model="claude-sonnet-4-5",
+                    model=ClaudeModels.MEDIUM,
                 ),
                 _make_result(result=None, is_error=False),
             ]
         )
 
-        executor = _make_executor(client=fake_client)
+        executor = _make_executor(client=test_client)
 
         queue = EventQueue()
         context = make_request_context("Say hello")
@@ -177,16 +184,18 @@ class TestClaudeA2AExecutor:
         assert msg.parts[0].root.text == "Hello world"
 
         # Verify SDK lifecycle
-        assert len(fake_client.connect_calls) == 1
-        assert fake_client.query_calls == ["Say hello"]
-        assert fake_client.disconnect_calls == 1
+        assert len(test_client.connect_calls) == 1
+        assert test_client.query_calls == ["Say hello"]
+        assert test_client.disconnect_calls == 1
 
     @pytest.mark.asyncio
     async def test_claude_executor_handles_error(self):
         """SDK raises -> executor fails gracefully."""
-        fake_client = _FakeSDKClient(connect_error=RuntimeError("connection failed"))
+        test_client = _InProcessSDKClient(
+            connect_error=RuntimeError("connection failed")
+        )
 
-        executor = _make_executor(client=fake_client)
+        executor = _make_executor(client=test_client)
 
         queue = EventQueue()
         context = make_request_context("Trigger error")
@@ -211,22 +220,22 @@ class TestClaudeA2AExecutor:
         assert "connection failed" in msg.parts[0].root.text
 
         # disconnect should still be called (finally block)
-        assert fake_client.disconnect_calls == 1
+        assert test_client.disconnect_calls == 1
 
     @pytest.mark.asyncio
     async def test_claude_executor_handles_sdk_error_result(self):
         """SDK returns a ResultMessage with is_error=True -> executor fails."""
-        fake_client = _FakeSDKClient(
+        test_client = _InProcessSDKClient(
             messages=[
                 AssistantMessage(
                     content=[TextBlock(text="partial output")],
-                    model="claude-sonnet-4-5",
+                    model=ClaudeModels.MEDIUM,
                 ),
                 _make_result(result=None, is_error=True),
             ]
         )
 
-        executor = _make_executor(client=fake_client)
+        executor = _make_executor(client=test_client)
 
         queue = EventQueue()
         context = make_request_context("Cause SDK error")
@@ -244,12 +253,12 @@ class TestClaudeA2AExecutor:
     @pytest.mark.asyncio
     async def test_claude_executor_cancel(self):
         """Cancel flow interrupts and disconnects the client."""
-        fake_client = _FakeSDKClient()
+        test_client = _InProcessSDKClient()
 
-        executor = _make_executor(client=fake_client)
+        executor = _make_executor(client=test_client)
 
         # Manually inject a client as if execute() were in progress
-        executor._active_clients["test-task-1"] = fake_client
+        executor._active_clients["test-task-1"] = test_client
 
         queue = EventQueue()
         context = make_request_context("cancel me")
@@ -265,8 +274,8 @@ class TestClaudeA2AExecutor:
         assert status_events[0].status.state == TaskState.canceled
 
         # Client should have been interrupted and disconnected
-        assert fake_client.interrupt_calls == 1
-        assert fake_client.disconnect_calls == 1
+        assert test_client.interrupt_calls == 1
+        assert test_client.disconnect_calls == 1
 
         # Client should be removed from active clients
         assert "test-task-1" not in executor._active_clients
@@ -274,9 +283,9 @@ class TestClaudeA2AExecutor:
     @pytest.mark.asyncio
     async def test_claude_executor_cancel_no_active_client(self):
         """Cancel when no active client just sends canceled status."""
-        fake_client = _FakeSDKClient()
+        test_client = _InProcessSDKClient()
 
-        executor = _make_executor(client=fake_client)
+        executor = _make_executor(client=test_client)
 
         queue = EventQueue()
         context = make_request_context("cancel nothing")
@@ -293,11 +302,11 @@ class TestClaudeA2AExecutor:
     @pytest.mark.asyncio
     async def test_claude_executor_sandbox_callback(self):
         """Read-only mode applies sandbox callback via _make_sandbox_callback."""
-        fake_client = _FakeSDKClient(
+        test_client = _InProcessSDKClient(
             messages=[_make_result(result="done", is_error=False)]
         )
 
-        executor = _make_executor(client=fake_client, mode="read-only")
+        executor = _make_executor(client=test_client, mode="read-only")
 
         queue = EventQueue()
         context = make_request_context("read only test")
@@ -317,11 +326,11 @@ class TestClaudeA2AExecutor:
     @pytest.mark.asyncio
     async def test_claude_executor_readwrite_no_sandbox(self):
         """Read-write mode passes None for can_use_tool."""
-        fake_client = _FakeSDKClient(
+        test_client = _InProcessSDKClient(
             messages=[_make_result(result="done", is_error=False)]
         )
 
-        executor = _make_executor(client=fake_client, mode="read-write")
+        executor = _make_executor(client=test_client, mode="read-write")
 
         queue = EventQueue()
         context = make_request_context("readwrite test")

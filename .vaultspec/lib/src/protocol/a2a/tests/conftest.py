@@ -89,12 +89,12 @@ def echo_executor():
 
 
 @pytest.fixture
-def mock_claude_executor():
+def claude_test_executor():
     return PrefixExecutor("[Claude] ")
 
 
 @pytest.fixture
-def mock_gemini_executor():
+def gemini_test_executor():
     return PrefixExecutor("[Gemini] ")
 
 
