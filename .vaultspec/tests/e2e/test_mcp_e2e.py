@@ -17,7 +17,6 @@ import shutil
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import patch
 
 import pytest
 
@@ -88,7 +87,9 @@ async def _mcp_dispatch_and_wait(
     timeout: float = 120.0,
 ) -> dict:
     """Dispatch an agent via MCP call_tool and poll until completion."""
-    agent_cache = {}
+    import subagent_server.server as _srv
+
+    agent_cache: dict = {}
     # Build cache from agent files on disk
     agents_dir = root / ".vaultspec" / "agents"
     if agents_dir.is_dir():
@@ -102,22 +103,30 @@ async def _mcp_dispatch_and_wait(
                 "tools": [],
             }
 
-    with (
-        patch("subagent_server.server._agent_cache", agent_cache),
-        patch(
-            "subagent_server.server._refresh_if_changed",
-            return_value=False,
-        ),
-        patch("subagent_server.server.task_engine", engine),
-        patch("subagent_server.server._background_tasks", {}),
-        patch("subagent_server.server._active_clients", {}),
-        patch("subagent_server.server.ROOT_DIR", root),
-        patch("subagent_server.server.AGENTS_DIR", agents_dir),
-        patch(
-            "subagent_server.server.lock_manager",
-            engine._lock_manager,
-        ),
-    ):
+    # Save originals
+    originals = {
+        attr: getattr(_srv, attr)
+        for attr in (
+            "_agent_cache",
+            "_refresh_if_changed",
+            "task_engine",
+            "_background_tasks",
+            "_active_clients",
+            "ROOT_DIR",
+            "AGENTS_DIR",
+            "lock_manager",
+        )
+    }
+    try:
+        _srv._agent_cache = agent_cache
+        _srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+        _srv.task_engine = engine
+        _srv._background_tasks = {}
+        _srv._active_clients = {}
+        _srv.ROOT_DIR = root
+        _srv.AGENTS_DIR = agents_dir
+        _srv.lock_manager = engine._lock_manager  # type: ignore[assignment]
+
         # Dispatch
         _, dispatch_result = await mcp.call_tool(
             "dispatch_agent",
@@ -139,6 +148,9 @@ async def _mcp_dispatch_and_wait(
 
         msg = f"Task {task_id} did not complete within {timeout}s"
         raise TimeoutError(msg)
+    finally:
+        for attr, val in originals.items():
+            setattr(_srv, attr, val)
 
 
 # ---------------------------------------------------------------------------

@@ -5,15 +5,69 @@ Covers: cancel, cancel tracking, granular error handling (warning logs).
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+import logging
 
 import pytest
 
 from protocol.acp.claude_bridge import ClaudeACPBridge
 
-from .conftest import make_sdk_mock
+from .conftest import (
+    FakeAssistantMessage,
+    FakeTextBlock,
+    FakeUserMessage,
+    make_sdk_mock,
+)
 
 pytestmark = [pytest.mark.unit]
+
+
+# ---------------------------------------------------------------------------
+# Module-level helpers
+# ---------------------------------------------------------------------------
+
+
+class _OptionsRecorder:
+    """Records kwargs passed to ClaudeAgentOptions constructor."""
+
+    last_call = None
+
+    def __init__(self, **kwargs):
+        _OptionsRecorder.last_call = kwargs
+
+    @classmethod
+    def reset(cls):
+        cls.last_call = None
+
+
+class _SDKFactory:
+    """Mutable factory so tests can swap the client mid-test."""
+
+    def __init__(self, client=None):
+        self.client = client or make_sdk_mock()
+
+    def __call__(self, *_args, **_kwargs):
+        return self.client
+
+
+def _patch_sdk(monkeypatch, mock_client=None):
+    """Patch ClaudeSDKClient and ClaudeAgentOptions via monkeypatch."""
+    factory = _SDKFactory(mock_client)
+    monkeypatch.setattr(
+        "protocol.acp.claude_bridge.ClaudeSDKClient",
+        factory,
+    )
+    _OptionsRecorder.reset()
+    monkeypatch.setattr(
+        "protocol.acp.claude_bridge.ClaudeAgentOptions",
+        _OptionsRecorder,
+    )
+    return factory
+
+
+class _UnknownBlock:
+    """A block type the bridge does not recognise."""
+
+    pass
 
 
 # ---------------------------------------------------------------------------
@@ -25,14 +79,12 @@ class TestCancel:
     """Test session cancellation."""
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_cancel_interrupts_sdk(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_cancel_interrupts_sdk(self, bridge, tmp_path, monkeypatch):
         """cancel() calls interrupt() on the SDK client."""
         mock_instance = make_sdk_mock()
-        mock_sdk_cls.return_value = mock_instance
+        _patch_sdk(monkeypatch, mock_client=mock_instance)
 
-        await bridge.new_session(cwd="/workspace")
+        await bridge.new_session(cwd=str(tmp_path))
         await bridge.cancel(session_id="s1")
 
         mock_instance.interrupt.assert_called_once()
@@ -43,28 +95,22 @@ class TestCancel:
         await bridge.cancel(session_id="nonexistent")
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_cancel_returns_none(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_cancel_returns_none(self, bridge, tmp_path, monkeypatch):
         """cancel() returns None."""
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
-        await bridge.new_session(cwd="/workspace")
+        await bridge.new_session(cwd=str(tmp_path))
         result = await bridge.cancel(session_id="s1")
         assert result is None
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_cancel_handles_interrupt_error(
-        self, _mock_options_cls, mock_sdk_cls, bridge
-    ):
+    async def test_cancel_handles_interrupt_error(self, bridge, tmp_path, monkeypatch):
         """cancel() catches exceptions from interrupt()."""
         mock_instance = make_sdk_mock()
         mock_instance.interrupt.side_effect = RuntimeError("interrupt failed")
-        mock_sdk_cls.return_value = mock_instance
+        _patch_sdk(monkeypatch, mock_client=mock_instance)
 
-        await bridge.new_session(cwd="/workspace")
+        await bridge.new_session(cwd=str(tmp_path))
         # Should not raise
         await bridge.cancel(session_id="s1")
 
@@ -85,23 +131,17 @@ class TestCancelTracking:
         assert bridge._cancelled is True
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_cancel_sets_flag_with_session(
-        self, _mock_options_cls, mock_sdk_cls, bridge
-    ):
+    async def test_cancel_sets_flag_with_session(self, bridge, tmp_path, monkeypatch):
         """cancel() sets _cancelled to True when an SDK client exists."""
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await bridge.new_session(cwd="/workspace")
+        _patch_sdk(monkeypatch)
+        await bridge.new_session(cwd=str(tmp_path))
 
         await bridge.cancel(session_id="s1")
         assert bridge._cancelled is True
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
     async def test_cancel_flag_set_before_interrupt(
-        self, _mock_options_cls, mock_sdk_cls, bridge
+        self, bridge, tmp_path, monkeypatch
     ):
         """cancel() sets _cancelled before calling interrupt().
 
@@ -114,25 +154,23 @@ class TestCancelTracking:
         def capture_flag():
             observed_cancelled.append(bridge._cancelled)
 
-        mock_instance.interrupt = MagicMock(side_effect=capture_flag)
-        mock_sdk_cls.return_value = mock_instance
+        mock_instance.interrupt.side_effect = capture_flag
+        _patch_sdk(monkeypatch, mock_client=mock_instance)
 
-        await bridge.new_session(cwd="/workspace")
+        await bridge.new_session(cwd=str(tmp_path))
         await bridge.cancel(session_id="s1")
 
         assert observed_cancelled == [True]
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
     async def test_prompt_resets_cancelled_flag(
-        self, _mock_options_cls, mock_sdk_cls, connected_bridge
+        self, connected_bridge, tmp_path, monkeypatch
     ):
         """prompt() resets _cancelled to False at the start."""
         from acp.schema import TextContentBlock
 
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await connected_bridge.new_session(cwd="/workspace")
+        _patch_sdk(monkeypatch)
+        await connected_bridge.new_session(cwd=str(tmp_path))
 
         # Simulate a prior cancel
         connected_bridge._cancelled = True
@@ -144,14 +182,12 @@ class TestCancelTracking:
         assert result.stop_reason == "end_turn"
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
     async def test_cancelled_during_streaming_returns_cancelled(
         self,
-        _mock_options_cls,
-        mock_sdk_cls,
         connected_bridge,
         mock_conn,  # noqa: ARG002
+        tmp_path,
+        monkeypatch,
     ):
         """When _cancelled is set during streaming, stop_reason is 'cancelled'.
 
@@ -159,35 +195,29 @@ class TestCancelTracking:
         is True when the streaming loop starts (after prompt() resets it).
         """
         from acp.schema import TextContentBlock
-        from claude_agent_sdk import AssistantMessage, TextBlock
 
-        text_block = MagicMock(spec=TextBlock)
-        text_block.text = "partial response"
-
-        msg = MagicMock(spec=AssistantMessage)
-        msg.content = [text_block]
+        text_block = FakeTextBlock(text="partial response")
+        msg = FakeAssistantMessage(content=[text_block])
 
         mock_client = make_sdk_mock(messages=[msg])
 
         # Set _cancelled DURING query() -- after prompt() resets it but before
         # the streaming loop reads it.
-        async def _set_cancelled(*_args, **_kwargs):
+        def _set_cancelled(*_args, **_kwargs):
             connected_bridge._cancelled = True
 
-        mock_client.query = AsyncMock(side_effect=_set_cancelled)
-        mock_sdk_cls.return_value = mock_client
+        mock_client.query.side_effect = _set_cancelled
+        _patch_sdk(monkeypatch, mock_client=mock_client)
 
-        await connected_bridge.new_session(cwd="/workspace")
+        await connected_bridge.new_session(cwd=str(tmp_path))
 
         prompt_blocks = [TextContentBlock(type="text", text="test")]
         result = await connected_bridge.prompt(prompt=prompt_blocks, session_id="s1")
         assert result.stop_reason == "cancelled"
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
     async def test_cancelled_skips_emit_for_remaining_messages(
-        self, _mock_options_cls, mock_sdk_cls, connected_bridge, mock_conn
+        self, connected_bridge, mock_conn, tmp_path, monkeypatch
     ):
         """When cancelled, remaining messages are NOT emitted via session_update.
 
@@ -195,27 +225,22 @@ class TestCancelTracking:
         messages after the cancelled check.
         """
         from acp.schema import TextContentBlock
-        from claude_agent_sdk import AssistantMessage, TextBlock
 
-        text_block = MagicMock(spec=TextBlock)
-        text_block.text = "should not be emitted"
+        text_block = FakeTextBlock(text="should not be emitted")
 
-        msg1 = MagicMock(spec=AssistantMessage)
-        msg1.content = [text_block]
-
-        msg2 = MagicMock(spec=AssistantMessage)
-        msg2.content = [text_block]
+        msg1 = FakeAssistantMessage(content=[text_block])
+        msg2 = FakeAssistantMessage(content=[text_block])
 
         mock_client = make_sdk_mock(messages=[msg1, msg2])
 
         # Set _cancelled DURING query() so the streaming loop sees it
-        async def _set_cancelled(*_args, **_kwargs):
+        def _set_cancelled(*_args, **_kwargs):
             connected_bridge._cancelled = True
 
-        mock_client.query = AsyncMock(side_effect=_set_cancelled)
-        mock_sdk_cls.return_value = mock_client
+        mock_client.query.side_effect = _set_cancelled
+        _patch_sdk(monkeypatch, mock_client=mock_client)
 
-        await connected_bridge.new_session(cwd="/workspace")
+        await connected_bridge.new_session(cwd=str(tmp_path))
 
         prompt_blocks = [TextContentBlock(type="text", text="test")]
         await connected_bridge.prompt(prompt=prompt_blocks, session_id="s1")
@@ -225,16 +250,14 @@ class TestCancelTracking:
         mock_conn.session_update.assert_not_called()
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
     async def test_cancel_then_new_prompt_works_normally(
-        self, _mock_options_cls, mock_sdk_cls, connected_bridge
+        self, connected_bridge, tmp_path, monkeypatch
     ):
         """After cancel, a subsequent prompt() resets and works normally."""
         from acp.schema import TextContentBlock
 
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await connected_bridge.new_session(cwd="/workspace")
+        _patch_sdk(monkeypatch)
+        await connected_bridge.new_session(cwd=str(tmp_path))
 
         # Cancel first
         await connected_bridge.cancel(session_id="s1")
@@ -263,13 +286,7 @@ class TestGranularErrorHandling:
         caplog,
     ):
         """UserMessage with tool_use_id not in _pending_tools triggers warning."""
-        import logging
-
-        from claude_agent_sdk import UserMessage
-
-        msg = MagicMock(spec=UserMessage)
-        msg.parent_tool_use_id = "toolu_orphan"
-        msg.content = []
+        msg = FakeUserMessage(parent_tool_use_id="toolu_orphan", content=[])
 
         with caplog.at_level(logging.WARNING, logger="protocol.acp.claude_bridge"):
             await connected_bridge._emit_user_message(msg, "s1")
@@ -283,11 +300,8 @@ class TestGranularErrorHandling:
     ):
         """Even with an untracked tool_use_id, a ToolCallProgress is still emitted."""
         from acp.schema import ToolCallProgress
-        from claude_agent_sdk import UserMessage
 
-        msg = MagicMock(spec=UserMessage)
-        msg.parent_tool_use_id = "toolu_untracked"
-        msg.content = []
+        msg = FakeUserMessage(parent_tool_use_id="toolu_untracked", content=[])
 
         await connected_bridge._emit_user_message(msg, "s1")
 
@@ -306,15 +320,9 @@ class TestGranularErrorHandling:
         caplog,
     ):
         """UserMessage with a tracked tool_use_id does NOT trigger warning."""
-        import logging
-
-        from claude_agent_sdk import UserMessage
-
         connected_bridge._pending_tools["toolu_tracked"] = "Read"
 
-        msg = MagicMock(spec=UserMessage)
-        msg.parent_tool_use_id = "toolu_tracked"
-        msg.content = []
+        msg = FakeUserMessage(parent_tool_use_id="toolu_tracked", content=[])
 
         with caplog.at_level(logging.WARNING, logger="protocol.acp.claude_bridge"):
             await connected_bridge._emit_user_message(msg, "s1")
@@ -331,14 +339,9 @@ class TestGranularErrorHandling:
         caplog,
     ):
         """Unsupported content block type in AssistantMessage triggers warning."""
-        import logging
+        unknown_block = _UnknownBlock()
 
-        from claude_agent_sdk import AssistantMessage
-
-        unknown_block = MagicMock()  # Not TextBlock, ThinkingBlock, or ToolUseBlock
-
-        msg = MagicMock(spec=AssistantMessage)
-        msg.content = [unknown_block]
+        msg = FakeAssistantMessage(content=[unknown_block])
 
         with caplog.at_level(logging.WARNING, logger="protocol.acp.claude_bridge"):
             await connected_bridge._emit_assistant(msg, "s1")
@@ -348,12 +351,9 @@ class TestGranularErrorHandling:
     @pytest.mark.asyncio
     async def test_unknown_block_type_not_emitted(self, connected_bridge, mock_conn):
         """Unsupported content block type does not emit a session_update."""
-        from claude_agent_sdk import AssistantMessage
+        unknown_block = _UnknownBlock()
 
-        unknown_block = MagicMock()
-
-        msg = MagicMock(spec=AssistantMessage)
-        msg.content = [unknown_block]
+        msg = FakeAssistantMessage(content=[unknown_block])
 
         await connected_bridge._emit_assistant(msg, "s1")
 
@@ -362,17 +362,12 @@ class TestGranularErrorHandling:
     @pytest.mark.asyncio
     async def test_unknown_block_type_debug_extra_detail(self, mock_conn, caplog):
         """In debug mode, unknown block type also logs block details at DEBUG."""
-        import logging
-
         bridge_dbg = ClaudeACPBridge(model="test", debug=True)
         bridge_dbg.on_connect(mock_conn)
 
-        from claude_agent_sdk import AssistantMessage
+        unknown_block = _UnknownBlock()
 
-        unknown_block = MagicMock()
-
-        msg = MagicMock(spec=AssistantMessage)
-        msg.content = [unknown_block]
+        msg = FakeAssistantMessage(content=[unknown_block])
 
         with caplog.at_level(logging.DEBUG, logger="protocol.acp.claude_bridge"):
             await bridge_dbg._emit_assistant(msg, "s1")
@@ -395,14 +390,9 @@ class TestGranularErrorHandling:
         caplog,
     ):
         """In non-debug mode, unknown block type logs warning but not debug detail."""
-        import logging
+        unknown_block = _UnknownBlock()
 
-        from claude_agent_sdk import AssistantMessage
-
-        unknown_block = MagicMock()
-
-        msg = MagicMock(spec=AssistantMessage)
-        msg.content = [unknown_block]
+        msg = FakeAssistantMessage(content=[unknown_block])
 
         with caplog.at_level(logging.DEBUG, logger="protocol.acp.claude_bridge"):
             await connected_bridge._emit_assistant(msg, "s1")
@@ -421,37 +411,26 @@ class TestGranularErrorHandling:
         caplog,
     ):
         """Warning log for unsupported block includes the block's class name."""
-        import logging
+        unknown_block = _UnknownBlock()
 
-        from claude_agent_sdk import AssistantMessage
-
-        unknown_block = MagicMock()
-
-        msg = MagicMock(spec=AssistantMessage)
-        msg.content = [unknown_block]
+        msg = FakeAssistantMessage(content=[unknown_block])
 
         with caplog.at_level(logging.WARNING, logger="protocol.acp.claude_bridge"):
             await connected_bridge._emit_assistant(msg, "s1")
 
-        # The warning should contain "MagicMock" (the class name)
-        assert any("MagicMock" in record.message for record in caplog.records)
+        # The warning should contain "_UnknownBlock" (the class name)
+        assert any("_UnknownBlock" in record.message for record in caplog.records)
 
     @pytest.mark.asyncio
     async def test_mixed_known_and_unknown_blocks(
         self, connected_bridge, mock_conn, caplog
     ):
         """Known blocks are emitted normally; unknown blocks trigger warning only."""
-        import logging
+        text_block = FakeTextBlock(text="valid text")
 
-        from claude_agent_sdk import AssistantMessage, TextBlock
+        unknown_block = _UnknownBlock()
 
-        text_block = MagicMock(spec=TextBlock)
-        text_block.text = "valid text"
-
-        unknown_block = MagicMock()  # Unknown
-
-        msg = MagicMock(spec=AssistantMessage)
-        msg.content = [text_block, unknown_block]
+        msg = FakeAssistantMessage(content=[text_block, unknown_block])
 
         with caplog.at_level(logging.WARNING, logger="protocol.acp.claude_bridge"):
             await connected_bridge._emit_assistant(msg, "s1")

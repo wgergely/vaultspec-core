@@ -7,8 +7,9 @@ and full lifecycle unit tests (mocked SDK).
 
 from __future__ import annotations
 
+import logging
 import sys
-from unittest.mock import MagicMock, patch
+from typing import ClassVar
 
 import pytest
 
@@ -18,9 +19,61 @@ from protocol.acp.claude_bridge import (
     _extract_prompt_text,
 )
 
-from .conftest import make_sdk_mock
+from .conftest import FakeNamespace, make_sdk_mock
 
 pytestmark = [pytest.mark.unit]
+
+
+# ---------------------------------------------------------------------------
+# Module-level helpers for patching SDK classes
+# ---------------------------------------------------------------------------
+
+
+class _OptionsRecorder:
+    """Records kwargs passed to ClaudeAgentOptions constructor."""
+
+    last_call: ClassVar[dict[str, object]] = {}
+
+    def __init__(self, **kwargs: object) -> None:
+        _OptionsRecorder.last_call = kwargs
+
+    @classmethod
+    def reset(cls) -> None:
+        cls.last_call = {}
+
+
+class _SDKFactory:
+    """Mutable factory for FakeSDKClient instances.
+
+    Tests that need to swap the SDK client mid-test can set
+    ``factory.client = new_mock`` between calls.
+    """
+
+    def __init__(self, client=None):
+        self.client = client or make_sdk_mock()
+
+    def __call__(self, *_args, **_kwargs):
+        return self.client
+
+
+def _patch_sdk(monkeypatch, mock_client=None):
+    """Patch ClaudeSDKClient and ClaudeAgentOptions via monkeypatch.
+
+    Returns a ``_SDKFactory`` whose ``.client`` attribute is the current
+    FakeSDKClient.  For simple cases use ``factory.client`` to access the
+    mock; to swap the client mid-test just assign ``factory.client = new_mock``.
+    """
+    factory = _SDKFactory(mock_client)
+    monkeypatch.setattr(
+        "protocol.acp.claude_bridge.ClaudeSDKClient",
+        factory,
+    )
+    _OptionsRecorder.reset()
+    monkeypatch.setattr(
+        "protocol.acp.claude_bridge.ClaudeAgentOptions",
+        _OptionsRecorder,
+    )
+    return factory
 
 
 # ---------------------------------------------------------------------------
@@ -60,17 +113,17 @@ class TestConstructor:
         assert bridge._pending_tools == {}
         assert bridge._cancelled is False
 
-    def test_reads_env_mode(self):
+    def test_reads_env_mode(self, monkeypatch):
         """Constructor reads VS_AGENT_MODE from environment."""
-        with patch.dict("os.environ", {"VS_AGENT_MODE": "read-only"}):
-            bridge = ClaudeACPBridge()
-            assert bridge._mode == "read-only"
+        monkeypatch.setenv("VS_AGENT_MODE", "read-only")
+        bridge = ClaudeACPBridge()
+        assert bridge._mode == "read-only"
 
-    def test_default_mode_read_write(self):
+    def test_default_mode_read_write(self, monkeypatch):
         """Default mode is read-write when env var not set."""
-        with patch.dict("os.environ", {}, clear=True):
-            bridge = ClaudeACPBridge()
-            assert bridge._mode == "read-write"
+        monkeypatch.delenv("VS_AGENT_MODE", raising=False)
+        bridge = ClaudeACPBridge()
+        assert bridge._mode == "read-write"
 
 
 # ---------------------------------------------------------------------------
@@ -135,8 +188,8 @@ class TestInitialize:
         """initialize() accepts and ignores extra keyword arguments."""
         result = await bridge.initialize(
             protocol_version=1,
-            client_capabilities=MagicMock(),
-            client_info=MagicMock(),
+            client_capabilities=object(),
+            client_info=object(),
             extra_field="ignored",
         )
         assert result.agent_info.name == "claude-acp-bridge"
@@ -151,172 +204,136 @@ class TestNewSession:
     """Test session creation via new_session()."""
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_returns_new_session_response(
-        self, _mock_options_cls, mock_sdk_cls, bridge
-    ):
+    async def test_returns_new_session_response(self, bridge, tmp_path, monkeypatch):
         """new_session() returns a NewSessionResponse with session_id."""
         from acp.schema import NewSessionResponse
 
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
-        result = await bridge.new_session(cwd="/workspace")
+        result = await bridge.new_session(cwd=str(tmp_path))
         assert isinstance(result, NewSessionResponse)
         assert isinstance(result.session_id, str)
         assert len(result.session_id) > 0
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_session_id_is_uuid(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_session_id_is_uuid(self, bridge, tmp_path, monkeypatch):
         """The session_id is a UUID-formatted string."""
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
-        result = await bridge.new_session(cwd="/workspace")
+        result = await bridge.new_session(cwd=str(tmp_path))
         # UUID format: 8-4-4-4-12 hex
         assert result.session_id.count("-") == 4
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_passes_model(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_passes_model(self, bridge, tmp_path, monkeypatch):
         """The configured model is passed to ClaudeAgentOptions."""
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
-        await bridge.new_session(cwd="/workspace")
+        await bridge.new_session(cwd=str(tmp_path))
 
-        call_kwargs = _mock_options_cls.call_args
-        assert call_kwargs.kwargs["model"] == "claude-sonnet-4-5"
+        assert _OptionsRecorder.last_call["model"] == "claude-sonnet-4-5"
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_passes_cwd(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_passes_cwd(self, bridge, tmp_path, monkeypatch):
         """The cwd parameter is passed to ClaudeAgentOptions."""
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
-        await bridge.new_session(cwd="/my/project")
+        await bridge.new_session(cwd=str(tmp_path))
 
-        call_kwargs = _mock_options_cls.call_args
-        assert call_kwargs.kwargs["cwd"] == "/my/project"
+        assert _OptionsRecorder.last_call["cwd"] == str(tmp_path)
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_updates_root_dir(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_updates_root_dir(self, bridge, tmp_path, monkeypatch):
         """new_session() updates the bridge's _root_dir from cwd."""
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
-        await bridge.new_session(cwd="/new/root")
-        assert bridge._root_dir == "/new/root"
+        await bridge.new_session(cwd=str(tmp_path))
+        assert bridge._root_dir == str(tmp_path)
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_passes_mcp_servers(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_passes_mcp_servers(self, bridge, tmp_path, monkeypatch):
         """MCP server configs are converted and passed to options."""
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
-        mcp_servers = [MagicMock()]
-        mcp_servers[0].model_dump.return_value = {
-            "name": "test-mcp",
-            "command": "python",
-            "args": ["-m", "server"],
-        }
+        mcp_servers = [
+            FakeNamespace(
+                name="test-mcp",
+                command="python",
+                args=["-m", "server"],
+            )
+        ]
 
-        await bridge.new_session(cwd="/workspace", mcp_servers=mcp_servers)
+        await bridge.new_session(cwd=str(tmp_path), mcp_servers=mcp_servers)
 
-        call_kwargs = _mock_options_cls.call_args
-        mcp = call_kwargs.kwargs["mcp_servers"]
+        mcp = _OptionsRecorder.last_call["mcp_servers"]
+        assert isinstance(mcp, dict)
         assert "test-mcp" in mcp
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_none_mcp_servers(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_none_mcp_servers(self, bridge, tmp_path, monkeypatch):
         """None mcp_servers results in empty dict."""
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
-        await bridge.new_session(cwd="/workspace", mcp_servers=None)
+        await bridge.new_session(cwd=str(tmp_path), mcp_servers=None)
 
-        call_kwargs = _mock_options_cls.call_args
-        assert call_kwargs.kwargs["mcp_servers"] == {}
+        assert _OptionsRecorder.last_call["mcp_servers"] == {}
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_bypass_permissions(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_bypass_permissions(self, bridge, tmp_path, monkeypatch):
         """Options include permission_mode=bypassPermissions."""
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
-        await bridge.new_session(cwd="/workspace")
+        await bridge.new_session(cwd=str(tmp_path))
 
-        call_kwargs = _mock_options_cls.call_args
-        assert call_kwargs.kwargs["permission_mode"] == "bypassPermissions"
+        assert _OptionsRecorder.last_call["permission_mode"] == "bypassPermissions"
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_stores_sdk_client(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_stores_sdk_client(self, bridge, tmp_path, monkeypatch):
         """new_session() stores the SDK client on the bridge."""
         mock_instance = make_sdk_mock()
-        mock_sdk_cls.return_value = mock_instance
+        _patch_sdk(monkeypatch, mock_client=mock_instance)
 
-        await bridge.new_session(cwd="/workspace")
+        await bridge.new_session(cwd=str(tmp_path))
         assert bridge._sdk_client is mock_instance
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_stores_session_id(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_stores_session_id(self, bridge, tmp_path, monkeypatch):
         """new_session() stores the session_id on the bridge."""
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
-        result = await bridge.new_session(cwd="/workspace")
+        result = await bridge.new_session(cwd=str(tmp_path))
         assert bridge._session_id == result.session_id
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_sandbox_callback_read_only(self, _mock_options_cls, mock_sdk_cls):
+    async def test_sandbox_callback_read_only(self, tmp_path, monkeypatch):
         """In read-only mode, options include a can_use_tool callback."""
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
-        with patch.dict("os.environ", {"VS_AGENT_MODE": "read-only"}):
-            bridge_ro = ClaudeACPBridge(model="claude-sonnet-4-5")
-            await bridge_ro.new_session(cwd="/workspace")
+        monkeypatch.setenv("VS_AGENT_MODE", "read-only")
+        bridge_ro = ClaudeACPBridge(model="claude-sonnet-4-5")
+        await bridge_ro.new_session(cwd=str(tmp_path))
 
-        call_kwargs = _mock_options_cls.call_args
-        assert call_kwargs.kwargs["can_use_tool"] is not None
+        assert _OptionsRecorder.last_call["can_use_tool"] is not None
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_no_sandbox_read_write(self, _mock_options_cls, mock_sdk_cls):
+    async def test_no_sandbox_read_write(self, tmp_path, monkeypatch):
         """In read-write mode, can_use_tool is None."""
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
-        with patch.dict("os.environ", {"VS_AGENT_MODE": "read-write"}):
-            bridge_rw = ClaudeACPBridge(model="claude-sonnet-4-5")
-            await bridge_rw.new_session(cwd="/workspace")
+        monkeypatch.setenv("VS_AGENT_MODE", "read-write")
+        bridge_rw = ClaudeACPBridge(model="claude-sonnet-4-5")
+        await bridge_rw.new_session(cwd=str(tmp_path))
 
-        call_kwargs = _mock_options_cls.call_args
-        assert call_kwargs.kwargs["can_use_tool"] is None
+        assert _OptionsRecorder.last_call["can_use_tool"] is None
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_include_partial_messages(
-        self, _mock_options_cls, mock_sdk_cls, bridge
-    ):
+    async def test_include_partial_messages(self, bridge, tmp_path, monkeypatch):
         """new_session() passes include_partial_messages=True for delta streaming."""
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
-        await bridge.new_session(cwd="/workspace")
+        await bridge.new_session(cwd=str(tmp_path))
 
-        call_kwargs = _mock_options_cls.call_args
-        assert call_kwargs.kwargs["include_partial_messages"] is True
+        assert _OptionsRecorder.last_call["include_partial_messages"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -382,10 +399,11 @@ class TestExtractPromptText:
 
     def test_non_text_block_with_text_attr(self):
         """Non-TextContentBlock with .text attribute is handled."""
-        block = MagicMock()
-        block.text = "fallback text"
-        # Make isinstance check fail for TextContentBlock
-        result = _extract_prompt_text([block])
+
+        class FakeBlock:
+            text = "fallback text"
+
+        result = _extract_prompt_text([FakeBlock()])  # type: ignore[list-item]
         assert "fallback text" in result
 
 
@@ -417,13 +435,16 @@ class TestMCPServerConfigConversion:
 
     def test_pydantic_model_conversion(self):
         """Pydantic model with model_dump() is handled."""
-        model = MagicMock()
-        model.model_dump.return_value = {
-            "name": "pydantic-mcp",
-            "command": "node",
-            "args": ["serve.js"],
-        }
-        result = _convert_mcp_servers([model])
+
+        class FakePydanticModel:
+            def model_dump(self):
+                return {
+                    "name": "pydantic-mcp",
+                    "command": "node",
+                    "args": ["serve.js"],
+                }
+
+        result = _convert_mcp_servers([FakePydanticModel()])
         assert "pydantic-mcp" in result
         assert result["pydantic-mcp"]["command"] == "node"
 
@@ -479,34 +500,28 @@ class TestBridgeLifecycleUnit:
     """
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_initialize_then_session_mocked(
-        self, _mock_options_cls, mock_sdk_cls, bridge
-    ):
+    async def test_initialize_then_session_mocked(self, bridge, tmp_path, monkeypatch):
         """Full initialize -> new_session lifecycle with mocked SDK."""
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
         # Step 1: initialize
         init_result = await bridge.initialize(protocol_version=1)
         assert init_result.agent_info.name == "claude-acp-bridge"
 
         # Step 2: new_session
-        session_result = await bridge.new_session(cwd="/workspace")
+        session_result = await bridge.new_session(cwd=str(tmp_path))
         assert isinstance(session_result.session_id, str)
         assert len(session_result.session_id) > 0
         assert bridge._sdk_client is not None
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_cancel_mocked(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_cancel_mocked(self, bridge, tmp_path, monkeypatch):
         """cancel() interrupts the SDK client."""
         mock_client = make_sdk_mock()
-        mock_sdk_cls.return_value = mock_client
+        _patch_sdk(monkeypatch, mock_client=mock_client)
 
         # Create session first
-        await bridge.new_session(cwd="/workspace")
+        await bridge.new_session(cwd=str(tmp_path))
         assert bridge._sdk_client is mock_client
 
         # Cancel
@@ -580,16 +595,13 @@ class TestSetSessionModel:
         assert bridge._model == "claude-opus-4-6"
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_updates_sdk_options(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_updates_sdk_options(self, bridge, tmp_path, monkeypatch):
         """set_session_model updates SDK client options.model in active session."""
         mock_client = make_sdk_mock()
-        mock_client._options = MagicMock()
-        mock_client._options.model = "claude-sonnet-4-5"
-        mock_sdk_cls.return_value = mock_client
+        mock_client._options = FakeNamespace(model="claude-sonnet-4-5")
+        _patch_sdk(monkeypatch, mock_client=mock_client)
 
-        await bridge.new_session(cwd="/workspace")
+        await bridge.new_session(cwd=str(tmp_path))
         await bridge.set_session_model(model_id="claude-opus-4-6", session_id="s1")
 
         assert bridge._model == "claude-opus-4-6"
@@ -603,19 +615,15 @@ class TestSetSessionModel:
         assert bridge._model == "claude-haiku-4-5"
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_no_options_attr_no_crash(
-        self, _mock_options_cls, mock_sdk_cls, bridge
-    ):
+    async def test_no_options_attr_no_crash(self, bridge, tmp_path, monkeypatch):
         """set_session_model handles SDK client without _options attribute."""
         mock_client = make_sdk_mock()
         # Deliberately no _options attr (getattr returns None)
         if hasattr(mock_client, "_options"):
             del mock_client._options
-        mock_sdk_cls.return_value = mock_client
+        _patch_sdk(monkeypatch, mock_client=mock_client)
 
-        await bridge.new_session(cwd="/workspace")
+        await bridge.new_session(cwd=str(tmp_path))
         # Should not raise
         await bridge.set_session_model(model_id="claude-opus-4-6", session_id="s1")
         assert bridge._model == "claude-opus-4-6"
@@ -654,28 +662,25 @@ class TestSetSessionMode:
         assert bridge._mode == "read-only"
 
     @pytest.mark.asyncio
-    async def test_switch_to_read_write(self, bridge):  # noqa: ARG002
+    async def test_switch_to_read_write(self, monkeypatch):
         """set_session_mode can switch from read-only to read-write."""
-        with patch.dict("os.environ", {"VS_AGENT_MODE": "read-only"}):
-            ro_bridge = ClaudeACPBridge()
+        monkeypatch.setenv("VS_AGENT_MODE", "read-only")
+        ro_bridge = ClaudeACPBridge()
         assert ro_bridge._mode == "read-only"
 
         await ro_bridge.set_session_mode(mode_id="read-write", session_id="s1")
         assert ro_bridge._mode == "read-write"
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
     async def test_updates_sandbox_callback_to_read_only(
-        self, _mock_options_cls, mock_sdk_cls, bridge
+        self, bridge, tmp_path, monkeypatch
     ):
         """Switching to read-only mode installs a sandbox callback."""
         mock_client = make_sdk_mock()
-        mock_client._options = MagicMock()
-        mock_client._options.can_use_tool = None
-        mock_sdk_cls.return_value = mock_client
+        mock_client._options = FakeNamespace(can_use_tool=None)
+        _patch_sdk(monkeypatch, mock_client=mock_client)
 
-        await bridge.new_session(cwd="/workspace")
+        await bridge.new_session(cwd=str(tmp_path))
         assert mock_client._options.can_use_tool is None
 
         await bridge.set_session_mode(mode_id="read-only", session_id="s1")
@@ -683,22 +688,21 @@ class TestSetSessionMode:
         assert mock_client._options.can_use_tool is not None
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_updates_sandbox_callback_to_read_write(
-        self, _mock_options_cls, mock_sdk_cls
-    ):
+    async def test_updates_sandbox_callback_to_read_write(self, tmp_path, monkeypatch):
         """Switching to read-write mode removes the sandbox callback."""
         mock_client = make_sdk_mock()
-        mock_client._options = MagicMock()
-        mock_sdk_cls.return_value = mock_client
+        mock_client._options = FakeNamespace(can_use_tool=None)
+        _patch_sdk(monkeypatch, mock_client=mock_client)
 
-        with patch.dict("os.environ", {"VS_AGENT_MODE": "read-only"}):
-            ro_bridge = ClaudeACPBridge()
-        ro_bridge.on_connect(MagicMock())
+        monkeypatch.setenv("VS_AGENT_MODE", "read-only")
+        ro_bridge = ClaudeACPBridge()
+        from .conftest import FakeConn
 
-        await ro_bridge.new_session(cwd="/workspace")
-        # read-only mode should have installed a callback
+        ro_bridge.on_connect(FakeConn())
+
+        await ro_bridge.new_session(cwd=str(tmp_path))
+        # set_session_mode to read-only installs the callback
+        await ro_bridge.set_session_mode(mode_id="read-only", session_id="s1")
         assert mock_client._options.can_use_tool is not None
 
         await ro_bridge.set_session_mode(mode_id="read-write", session_id="s1")
@@ -713,18 +717,14 @@ class TestSetSessionMode:
         assert bridge._mode == "read-only"
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_no_options_attr_no_crash(
-        self, _mock_options_cls, mock_sdk_cls, bridge
-    ):
+    async def test_no_options_attr_no_crash(self, bridge, tmp_path, monkeypatch):
         """set_session_mode handles SDK client without _options attribute."""
         mock_client = make_sdk_mock()
         if hasattr(mock_client, "_options"):
             del mock_client._options
-        mock_sdk_cls.return_value = mock_client
+        _patch_sdk(monkeypatch, mock_client=mock_client)
 
-        await bridge.new_session(cwd="/workspace")
+        await bridge.new_session(cwd=str(tmp_path))
         await bridge.set_session_mode(mode_id="read-only", session_id="s1")
         assert bridge._mode == "read-only"
 
@@ -780,18 +780,12 @@ class TestAuthenticate:
         assert isinstance(result, AuthenticateResponse)
 
     @pytest.mark.asyncio
-    async def test_debug_logs_api_key_presence(self, bridge_debug):
-        """authenticate in debug mode logs ANTHROPIC_API_KEY presence."""
-
-        with (
-            patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test"}),
-            patch("protocol.acp.claude_bridge.logger") as mock_logger,
-        ):
+    async def test_debug_logs_sdk_auth(self, bridge_debug, caplog):
+        """authenticate in debug mode logs SDK auth readiness."""
+        with caplog.at_level(logging.DEBUG, logger="protocol.acp.claude_bridge"):
             await bridge_debug.authenticate(method_id="api-key")
-            mock_logger.debug.assert_called()
-            call_args = mock_logger.debug.call_args
-            # Verify the log message mentions API key presence
-            assert "api-key" in str(call_args) or "API key" in str(call_args)
+
+        assert any("SDK handles auth internally" in r.message for r in caplog.records)
 
     @pytest.mark.asyncio
     async def test_does_not_affect_bridge_state(self, bridge):
@@ -829,16 +823,14 @@ class TestListSessions:
         assert result.sessions == []
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
     async def test_returns_session_info_after_new_session(
-        self, _mock_options_cls, mock_sdk_cls, bridge
+        self, bridge, tmp_path, monkeypatch
     ):
         """list_sessions returns SessionInfo after new_session creates one."""
         from acp.schema import ListSessionsResponse, SessionInfo
 
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await bridge.new_session(cwd="/workspace")
+        _patch_sdk(monkeypatch)
+        await bridge.new_session(cwd=str(tmp_path))
         session_id = bridge._session_id
 
         result = await bridge.list_sessions()
@@ -848,59 +840,58 @@ class TestListSessions:
         info = result.sessions[0]
         assert isinstance(info, SessionInfo)
         assert info.session_id == session_id
-        assert info.cwd == "/workspace"
+        assert info.cwd == str(tmp_path)
         assert info.title == "claude-sonnet-4-5 (read-write)"
         assert info.updated_at is not None
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_cwd_filter(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_cwd_filter(self, bridge, tmp_path, monkeypatch):
         """list_sessions filters sessions by cwd when specified."""
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
-        await bridge.new_session(cwd="/workspace-a")
-        await bridge.new_session(cwd="/workspace-b")
+        dir_a = str(tmp_path / "workspace-a")
+        dir_b = str(tmp_path / "workspace-b")
+        await bridge.new_session(cwd=dir_a)
+        await bridge.new_session(cwd=dir_b)
 
         # Filter to only workspace-a
-        result = await bridge.list_sessions(cwd="/workspace-a")
+        result = await bridge.list_sessions(cwd=dir_a)
         assert len(result.sessions) == 1
-        assert result.sessions[0].cwd == "/workspace-a"
+        assert result.sessions[0].cwd == dir_a
 
         # Filter to workspace-b
-        result = await bridge.list_sessions(cwd="/workspace-b")
+        result = await bridge.list_sessions(cwd=dir_b)
         assert len(result.sessions) == 1
-        assert result.sessions[0].cwd == "/workspace-b"
+        assert result.sessions[0].cwd == dir_b
 
         # No filter returns all
         result = await bridge.list_sessions()
         assert len(result.sessions) == 2
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_multiple_sessions(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_multiple_sessions(self, bridge, tmp_path, monkeypatch):
         """list_sessions returns all tracked sessions."""
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
-        await bridge.new_session(cwd="/ws1")
-        await bridge.new_session(cwd="/ws2")
-        await bridge.new_session(cwd="/ws3")
+        dir1 = str(tmp_path / "ws1")
+        dir2 = str(tmp_path / "ws2")
+        dir3 = str(tmp_path / "ws3")
+        await bridge.new_session(cwd=dir1)
+        await bridge.new_session(cwd=dir2)
+        await bridge.new_session(cwd=dir3)
 
         result = await bridge.list_sessions()
         assert len(result.sessions) == 3
         cwds = {s.cwd for s in result.sessions}
-        assert cwds == {"/ws1", "/ws2", "/ws3"}
+        assert cwds == {dir1, dir2, dir3}
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_cwd_filter_no_match(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_cwd_filter_no_match(self, bridge, tmp_path, monkeypatch):
         """list_sessions with non-matching cwd returns empty list."""
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await bridge.new_session(cwd="/workspace")
+        _patch_sdk(monkeypatch)
+        await bridge.new_session(cwd=str(tmp_path))
 
-        result = await bridge.list_sessions(cwd="/nonexistent")
+        result = await bridge.list_sessions(cwd=str(tmp_path / "nonexistent"))
         assert result.sessions == []
 
 
@@ -913,96 +904,80 @@ class TestLoadSession:
     """Test load_session reconnects SDK from stored state."""
 
     @pytest.mark.asyncio
-    async def test_returns_none_for_unknown_session(self, bridge):
+    async def test_returns_none_for_unknown_session(self, bridge, tmp_path):
         """load_session returns None for a session_id not in _sessions."""
-        result = await bridge.load_session(cwd="/workspace", session_id="nonexistent")
+        result = await bridge.load_session(cwd=str(tmp_path), session_id="nonexistent")
         assert result is None
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_loads_existing_session(
-        self, _mock_options_cls, mock_sdk_cls, bridge
-    ):
+    async def test_loads_existing_session(self, bridge, tmp_path, monkeypatch):
         """load_session returns LoadSessionResponse for a known session."""
         from acp.schema import LoadSessionResponse
 
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await bridge.new_session(cwd="/workspace")
+        factory = _patch_sdk(monkeypatch)
+        await bridge.new_session(cwd=str(tmp_path))
         session_id = bridge._session_id
 
-        # Create a fresh mock for the load reconnection
-        new_mock = make_sdk_mock()
-        mock_sdk_cls.return_value = new_mock
+        # Swap to a fresh mock for the load reconnection
+        factory.client = make_sdk_mock()
 
-        result = await bridge.load_session(cwd="/workspace", session_id=session_id)
+        result = await bridge.load_session(cwd=str(tmp_path), session_id=session_id)
         assert result is not None
         assert isinstance(result, LoadSessionResponse)
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_disconnects_previous_client(
-        self, _mock_options_cls, mock_sdk_cls, bridge
-    ):
+    async def test_disconnects_previous_client(self, bridge, tmp_path, monkeypatch):
         """load_session disconnects the previous SDK client before reconnecting."""
         original_mock = make_sdk_mock()
-        mock_sdk_cls.return_value = original_mock
-        await bridge.new_session(cwd="/workspace")
+        factory = _patch_sdk(monkeypatch, mock_client=original_mock)
+        await bridge.new_session(cwd=str(tmp_path))
         session_id = bridge._session_id
 
         # Reset disconnect tracking, then load
         original_mock.disconnect.reset_mock()
         new_mock = make_sdk_mock()
-        mock_sdk_cls.return_value = new_mock
+        factory.client = new_mock
 
-        await bridge.load_session(cwd="/workspace", session_id=session_id)
+        await bridge.load_session(cwd=str(tmp_path), session_id=session_id)
 
         original_mock.disconnect.assert_called_once()
         new_mock.connect.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
     async def test_config_preserved_from_stored_state(
-        self, _mock_options_cls, mock_sdk_cls, bridge
+        self, bridge, tmp_path, monkeypatch
     ):
         """load_session rebuilds SDK client with model/mode from stored state."""
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await bridge.new_session(cwd="/workspace")
+        factory = _patch_sdk(monkeypatch)
+        await bridge.new_session(cwd=str(tmp_path))
         session_id = bridge._session_id
 
         # Mutate bridge-level model to prove load restores from stored state
         bridge._model = "claude-opus-4-6"
 
-        new_mock = make_sdk_mock()
-        mock_sdk_cls.return_value = new_mock
+        factory.client = make_sdk_mock()
 
-        await bridge.load_session(cwd="/new-cwd", session_id=session_id)
+        new_cwd = str(tmp_path / "new-cwd")
+        await bridge.load_session(cwd=new_cwd, session_id=session_id)
 
         # Bridge model should be restored from stored state, not the mutated value
         assert bridge._model == "claude-sonnet-4-5"
         assert bridge._session_id == session_id
-        assert bridge._root_dir == "/new-cwd"
+        assert bridge._root_dir == new_cwd
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_marks_session_connected(
-        self, _mock_options_cls, mock_sdk_cls, bridge
-    ):
+    async def test_marks_session_connected(self, bridge, tmp_path, monkeypatch):
         """load_session sets the session state back to connected=True."""
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await bridge.new_session(cwd="/workspace")
+        factory = _patch_sdk(monkeypatch)
+        await bridge.new_session(cwd=str(tmp_path))
         session_id = bridge._session_id
 
         # Mark disconnected (as cancel would do)
         bridge._sessions[session_id].connected = False
 
-        new_mock = make_sdk_mock()
-        mock_sdk_cls.return_value = new_mock
+        factory.client = make_sdk_mock()
 
-        await bridge.load_session(cwd="/workspace", session_id=session_id)
+        await bridge.load_session(cwd=str(tmp_path), session_id=session_id)
         assert bridge._sessions[session_id].connected is True
 
 
@@ -1015,93 +990,77 @@ class TestResumeSession:
     """Test resume_session reconnects SDK from stored state."""
 
     @pytest.mark.asyncio
-    async def test_returns_none_for_unknown_session(self, bridge):
+    async def test_returns_none_for_unknown_session(self, bridge, tmp_path):
         """resume_session returns None for a session_id not in _sessions."""
-        result = await bridge.resume_session(cwd="/workspace", session_id="unknown")
+        result = await bridge.resume_session(cwd=str(tmp_path), session_id="unknown")
         assert result is None
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_resumes_existing_session(
-        self, _mock_options_cls, mock_sdk_cls, bridge
-    ):
+    async def test_resumes_existing_session(self, bridge, tmp_path, monkeypatch):
         """resume_session returns ResumeSessionResponse for a known session."""
         from acp.schema import ResumeSessionResponse
 
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await bridge.new_session(cwd="/workspace")
+        factory = _patch_sdk(monkeypatch)
+        await bridge.new_session(cwd=str(tmp_path))
         session_id = bridge._session_id
 
-        new_mock = make_sdk_mock()
-        mock_sdk_cls.return_value = new_mock
+        factory.client = make_sdk_mock()
 
-        result = await bridge.resume_session(cwd="/workspace", session_id=session_id)
+        result = await bridge.resume_session(cwd=str(tmp_path), session_id=session_id)
         assert result is not None
         assert isinstance(result, ResumeSessionResponse)
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_disconnects_previous_client(
-        self, _mock_options_cls, mock_sdk_cls, bridge
-    ):
+    async def test_disconnects_previous_client(self, bridge, tmp_path, monkeypatch):
         """resume_session disconnects the previous SDK client."""
         original_mock = make_sdk_mock()
-        mock_sdk_cls.return_value = original_mock
-        await bridge.new_session(cwd="/workspace")
+        factory = _patch_sdk(monkeypatch, mock_client=original_mock)
+        await bridge.new_session(cwd=str(tmp_path))
         session_id = bridge._session_id
 
         original_mock.disconnect.reset_mock()
         new_mock = make_sdk_mock()
-        mock_sdk_cls.return_value = new_mock
+        factory.client = new_mock
 
-        await bridge.resume_session(cwd="/workspace", session_id=session_id)
+        await bridge.resume_session(cwd=str(tmp_path), session_id=session_id)
 
         original_mock.disconnect.assert_called_once()
         new_mock.connect.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
     async def test_config_preserved_from_stored_state(
-        self, _mock_options_cls, mock_sdk_cls, bridge
+        self, bridge, tmp_path, monkeypatch
     ):
         """resume_session rebuilds SDK client with config from stored state."""
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await bridge.new_session(cwd="/workspace")
+        factory = _patch_sdk(monkeypatch)
+        await bridge.new_session(cwd=str(tmp_path))
         session_id = bridge._session_id
 
         # Mutate bridge-level model
         bridge._model = "claude-opus-4-6"
 
-        new_mock = make_sdk_mock()
-        mock_sdk_cls.return_value = new_mock
+        factory.client = make_sdk_mock()
 
-        await bridge.resume_session(cwd="/new-cwd", session_id=session_id)
+        new_cwd = str(tmp_path / "new-cwd")
+        await bridge.resume_session(cwd=new_cwd, session_id=session_id)
 
         # Bridge model restored from stored state
         assert bridge._model == "claude-sonnet-4-5"
         assert bridge._session_id == session_id
-        assert bridge._root_dir == "/new-cwd"
+        assert bridge._root_dir == new_cwd
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_marks_session_connected(
-        self, _mock_options_cls, mock_sdk_cls, bridge
-    ):
+    async def test_marks_session_connected(self, bridge, tmp_path, monkeypatch):
         """resume_session sets the session state back to connected=True."""
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await bridge.new_session(cwd="/workspace")
+        factory = _patch_sdk(monkeypatch)
+        await bridge.new_session(cwd=str(tmp_path))
         session_id = bridge._session_id
 
         bridge._sessions[session_id].connected = False
 
-        new_mock = make_sdk_mock()
-        mock_sdk_cls.return_value = new_mock
+        factory.client = make_sdk_mock()
 
-        await bridge.resume_session(cwd="/workspace", session_id=session_id)
+        await bridge.resume_session(cwd=str(tmp_path), session_id=session_id)
         assert bridge._sessions[session_id].connected is True
 
 
@@ -1114,48 +1073,42 @@ class TestForkSession:
     """Test fork_session creates a new session from an existing one."""
 
     @pytest.mark.asyncio
-    async def test_raises_for_unknown_session(self, bridge):
+    async def test_raises_for_unknown_session(self, bridge, tmp_path):
         """fork_session raises RuntimeError for a session_id not in _sessions."""
         with pytest.raises(RuntimeError, match=r"Cannot fork.*not found"):
-            await bridge.fork_session(cwd="/workspace", session_id="nonexistent")
+            await bridge.fork_session(cwd=str(tmp_path), session_id="nonexistent")
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
     async def test_returns_fork_response_with_new_id(
-        self, _mock_options_cls, mock_sdk_cls, bridge
+        self, bridge, tmp_path, monkeypatch
     ):
         """fork_session returns ForkSessionResponse with a new session_id."""
         from acp.schema import ForkSessionResponse
 
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await bridge.new_session(cwd="/workspace")
+        factory = _patch_sdk(monkeypatch)
+        await bridge.new_session(cwd=str(tmp_path))
         source_id = bridge._session_id
 
         new_mock = make_sdk_mock()
-        mock_sdk_cls.return_value = new_mock
+        factory.client = new_mock
 
-        result = await bridge.fork_session(cwd="/workspace", session_id=source_id)
+        result = await bridge.fork_session(cwd=str(tmp_path), session_id=source_id)
         assert isinstance(result, ForkSessionResponse)
         # The new session_id must differ from the source
         assert result.session_id != source_id
         assert result.session_id is not None
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_clones_config_from_source(
-        self, _mock_options_cls, mock_sdk_cls, bridge
-    ):
+    async def test_clones_config_from_source(self, bridge, tmp_path, monkeypatch):
         """fork_session clones model and mode from the source session."""
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await bridge.new_session(cwd="/workspace")
+        factory = _patch_sdk(monkeypatch)
+        await bridge.new_session(cwd=str(tmp_path))
         source_id = bridge._session_id
 
-        new_mock = make_sdk_mock()
-        mock_sdk_cls.return_value = new_mock
+        factory.client = make_sdk_mock()
 
-        result = await bridge.fork_session(cwd="/fork-cwd", session_id=source_id)
+        fork_cwd = str(tmp_path / "fork-cwd")
+        result = await bridge.fork_session(cwd=fork_cwd, session_id=source_id)
         new_id = result.session_id
 
         # Verify the forked session has the source's model and mode
@@ -1163,21 +1116,18 @@ class TestForkSession:
         source_state = bridge._sessions[source_id]
         assert forked_state.model == source_state.model
         assert forked_state.mode == source_state.mode
-        assert forked_state.cwd == "/fork-cwd"
+        assert forked_state.cwd == fork_cwd
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_new_session_tracked(self, _mock_options_cls, mock_sdk_cls, bridge):
+    async def test_new_session_tracked(self, bridge, tmp_path, monkeypatch):
         """fork_session stores the new session in self._sessions."""
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await bridge.new_session(cwd="/workspace")
+        factory = _patch_sdk(monkeypatch)
+        await bridge.new_session(cwd=str(tmp_path))
         source_id = bridge._session_id
 
-        new_mock = make_sdk_mock()
-        mock_sdk_cls.return_value = new_mock
+        factory.client = make_sdk_mock()
 
-        result = await bridge.fork_session(cwd="/workspace", session_id=source_id)
+        result = await bridge.fork_session(cwd=str(tmp_path), session_id=source_id)
         new_id = result.session_id
 
         assert new_id in bridge._sessions
@@ -1187,41 +1137,35 @@ class TestForkSession:
         assert source_id in bridge._sessions
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
-    async def test_disconnects_previous_client(
-        self, _mock_options_cls, mock_sdk_cls, bridge
-    ):
+    async def test_disconnects_previous_client(self, bridge, tmp_path, monkeypatch):
         """fork_session disconnects the current SDK client before forking."""
         original_mock = make_sdk_mock()
-        mock_sdk_cls.return_value = original_mock
-        await bridge.new_session(cwd="/workspace")
+        factory = _patch_sdk(monkeypatch, mock_client=original_mock)
+        await bridge.new_session(cwd=str(tmp_path))
         source_id = bridge._session_id
 
         original_mock.disconnect.reset_mock()
         new_mock = make_sdk_mock()
-        mock_sdk_cls.return_value = new_mock
+        factory.client = new_mock
 
-        await bridge.fork_session(cwd="/workspace", session_id=source_id)
+        await bridge.fork_session(cwd=str(tmp_path), session_id=source_id)
 
         original_mock.disconnect.assert_called_once()
         new_mock.connect.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
     async def test_bridge_state_updated_to_forked_session(
-        self, _mock_options_cls, mock_sdk_cls, bridge
+        self, bridge, tmp_path, monkeypatch
     ):
         """fork_session updates bridge._session_id to the new forked session."""
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await bridge.new_session(cwd="/workspace")
+        factory = _patch_sdk(monkeypatch)
+        await bridge.new_session(cwd=str(tmp_path))
         source_id = bridge._session_id
 
         new_mock = make_sdk_mock()
-        mock_sdk_cls.return_value = new_mock
+        factory.client = new_mock
 
-        result = await bridge.fork_session(cwd="/workspace", session_id=source_id)
+        result = await bridge.fork_session(cwd=str(tmp_path), session_id=source_id)
         assert bridge._session_id == result.session_id
         assert bridge._sdk_client is new_mock
 
@@ -1235,23 +1179,21 @@ class TestSessionTracking:
     """Test that new_session stores _SessionState and cancel marks disconnected."""
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
     async def test_new_session_stores_session_state(
-        self, _mock_options_cls, mock_sdk_cls, bridge
+        self, bridge, tmp_path, monkeypatch
     ):
         """new_session stores a _SessionState in self._sessions."""
         from protocol.acp.claude_bridge import _SessionState
 
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await bridge.new_session(cwd="/workspace")
+        _patch_sdk(monkeypatch)
+        await bridge.new_session(cwd=str(tmp_path))
         session_id = bridge._session_id
 
         assert session_id in bridge._sessions
         state = bridge._sessions[session_id]
         assert isinstance(state, _SessionState)
         assert state.session_id == session_id
-        assert state.cwd == "/workspace"
+        assert state.cwd == str(tmp_path)
         assert state.model == "claude-sonnet-4-5"
         assert state.mode == "read-write"
         assert state.mcp_servers == []
@@ -1259,14 +1201,12 @@ class TestSessionTracking:
         assert state.created_at is not None
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
     async def test_cancel_marks_session_disconnected(
-        self, _mock_options_cls, mock_sdk_cls, bridge
+        self, bridge, tmp_path, monkeypatch
     ):
         """cancel sets the session's connected flag to False."""
-        mock_sdk_cls.return_value = make_sdk_mock()
-        await bridge.new_session(cwd="/workspace")
+        _patch_sdk(monkeypatch)
+        await bridge.new_session(cwd=str(tmp_path))
         session_id = bridge._session_id
 
         assert bridge._sessions[session_id].connected is True
@@ -1274,24 +1214,24 @@ class TestSessionTracking:
         assert bridge._sessions[session_id].connected is False
 
     @pytest.mark.asyncio
-    @patch("protocol.acp.claude_bridge.ClaudeSDKClient")
-    @patch("protocol.acp.claude_bridge.ClaudeAgentOptions")
     async def test_multiple_sessions_tracked_independently(
-        self, _mock_options_cls, mock_sdk_cls, bridge
+        self, bridge, tmp_path, monkeypatch
     ):
         """Each new_session creates a separate _SessionState entry."""
-        mock_sdk_cls.return_value = make_sdk_mock()
+        _patch_sdk(monkeypatch)
 
-        await bridge.new_session(cwd="/ws1")
+        dir1 = str(tmp_path / "ws1")
+        dir2 = str(tmp_path / "ws2")
+        await bridge.new_session(cwd=dir1)
         id1 = bridge._session_id
-        await bridge.new_session(cwd="/ws2")
+        await bridge.new_session(cwd=dir2)
         id2 = bridge._session_id
 
         assert id1 != id2
         assert id1 in bridge._sessions
         assert id2 in bridge._sessions
-        assert bridge._sessions[id1].cwd == "/ws1"
-        assert bridge._sessions[id2].cwd == "/ws2"
+        assert bridge._sessions[id1].cwd == dir1
+        assert bridge._sessions[id2].cwd == dir2
 
 
 # ---------------------------------------------------------------------------
@@ -1302,45 +1242,45 @@ class TestSessionTracking:
 class TestBridgeFeatureConfig:
     """Verify bridge reads VS_* env vars and wires them to ClaudeAgentOptions."""
 
-    def test_max_turns_from_env(self):
-        with patch.dict("os.environ", {"VS_MAX_TURNS": "10"}):
-            bridge = ClaudeACPBridge()
+    def test_max_turns_from_env(self, monkeypatch):
+        monkeypatch.setenv("VS_MAX_TURNS", "10")
+        bridge = ClaudeACPBridge()
         assert bridge._max_turns == 10
 
-    def test_budget_from_env(self):
-        with patch.dict("os.environ", {"VS_BUDGET_USD": "2.5"}):
-            bridge = ClaudeACPBridge()
+    def test_budget_from_env(self, monkeypatch):
+        monkeypatch.setenv("VS_BUDGET_USD", "2.5")
+        bridge = ClaudeACPBridge()
         assert bridge._budget_usd == 2.5
 
-    def test_allowed_tools_from_env(self):
-        with patch.dict("os.environ", {"VS_ALLOWED_TOOLS": "Glob, Read, Grep"}):
-            bridge = ClaudeACPBridge()
+    def test_allowed_tools_from_env(self, monkeypatch):
+        monkeypatch.setenv("VS_ALLOWED_TOOLS", "Glob, Read, Grep")
+        bridge = ClaudeACPBridge()
         assert bridge._allowed_tools == ["Glob", "Read", "Grep"]
 
-    def test_disallowed_tools_from_env(self):
-        with patch.dict("os.environ", {"VS_DISALLOWED_TOOLS": "Bash, Write"}):
-            bridge = ClaudeACPBridge()
+    def test_disallowed_tools_from_env(self, monkeypatch):
+        monkeypatch.setenv("VS_DISALLOWED_TOOLS", "Bash, Write")
+        bridge = ClaudeACPBridge()
         assert bridge._disallowed_tools == ["Bash", "Write"]
 
-    def test_effort_from_env(self):
-        with patch.dict("os.environ", {"VS_EFFORT": "high"}):
-            bridge = ClaudeACPBridge()
+    def test_effort_from_env(self, monkeypatch):
+        monkeypatch.setenv("VS_EFFORT", "high")
+        bridge = ClaudeACPBridge()
         assert bridge._effort == "high"
 
-    def test_fallback_model_from_env(self):
-        with patch.dict("os.environ", {"VS_FALLBACK_MODEL": "claude-haiku-4-5"}):
-            bridge = ClaudeACPBridge()
+    def test_fallback_model_from_env(self, monkeypatch):
+        monkeypatch.setenv("VS_FALLBACK_MODEL", "claude-haiku-4-5")
+        bridge = ClaudeACPBridge()
         assert bridge._fallback_model == "claude-haiku-4-5"
 
-    def test_include_dirs_from_env(self):
-        with patch.dict("os.environ", {"VS_INCLUDE_DIRS": ".vault, src"}):
-            bridge = ClaudeACPBridge()
+    def test_include_dirs_from_env(self, monkeypatch):
+        monkeypatch.setenv("VS_INCLUDE_DIRS", ".vault, src")
+        bridge = ClaudeACPBridge()
         assert bridge._include_dirs == [".vault", "src"]
 
-    def test_output_format_from_env(self):
-        with patch.dict("os.environ", {"VS_OUTPUT_FORMAT": "json"}):
-            bridge = ClaudeACPBridge()
-        assert bridge._output_format_str == "json"
+    def test_output_format_from_env(self, monkeypatch):
+        monkeypatch.setenv("VS_OUTPUT_FORMAT", "json")
+        bridge = ClaudeACPBridge()
+        assert bridge._output_format == "json"
 
     def test_defaults_when_no_env(self):
         """Without VS_* env vars, all feature fields default to None/empty."""
@@ -1352,51 +1292,58 @@ class TestBridgeFeatureConfig:
         assert bridge._effort is None
         assert bridge._fallback_model is None
         assert bridge._include_dirs == []
-        assert bridge._output_format_str is None
+        assert bridge._output_format is None
 
-    def test_build_options_includes_features(self):
+    def test_build_options_includes_features(self, monkeypatch, tmp_path):
         """_build_options() passes features to ClaudeAgentOptions kwargs."""
-        with patch.dict(
-            "os.environ",
-            {
-                "VS_MAX_TURNS": "15",
-                "VS_BUDGET_USD": "3.0",
-                "VS_EFFORT": "max",
-                "VS_FALLBACK_MODEL": "claude-haiku-4-5",
-                "VS_ALLOWED_TOOLS": "Glob, Read",
-                "VS_DISALLOWED_TOOLS": "Bash",
-                "VS_INCLUDE_DIRS": ".vault",
-            },
-        ):
-            bridge = ClaudeACPBridge()
+        monkeypatch.setenv("VS_MAX_TURNS", "15")
+        monkeypatch.setenv("VS_BUDGET_USD", "3.0")
+        monkeypatch.setenv("VS_EFFORT", "max")
+        monkeypatch.setenv("VS_FALLBACK_MODEL", "claude-haiku-4-5")
+        monkeypatch.setenv("VS_ALLOWED_TOOLS", "Glob, Read")
+        monkeypatch.setenv("VS_DISALLOWED_TOOLS", "Bash")
+        monkeypatch.setenv("VS_INCLUDE_DIRS", ".vault")
+        bridge = ClaudeACPBridge()
 
-        # Mock ClaudeAgentOptions to capture kwargs
-        with patch("protocol.acp.claude_bridge.ClaudeAgentOptions") as mock_opts:
-            mock_opts.return_value = MagicMock()
-            bridge._build_options("/tmp", {}, None)
+        # Capture kwargs by replacing ClaudeAgentOptions with a recorder
+        captured = {}
 
-        call_kwargs = mock_opts.call_args[1]
-        assert call_kwargs["max_turns"] == 15
-        assert call_kwargs["max_budget_usd"] == 3.0
-        assert call_kwargs["effort"] == "max"
-        assert call_kwargs["fallback_model"] == "claude-haiku-4-5"
-        assert call_kwargs["allowed_tools"] == ["Glob", "Read"]
-        assert call_kwargs["disallowed_tools"] == ["Bash"]
-        assert call_kwargs["add_dirs"] == [".vault"]
+        class OptionsRecorder:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
 
-    def test_build_options_omits_none_features(self):
+        monkeypatch.setattr(
+            "protocol.acp.claude_bridge.ClaudeAgentOptions", OptionsRecorder
+        )
+        bridge._build_options(str(tmp_path), {}, None)
+
+        assert captured["max_turns"] == 15
+        assert captured["max_budget_usd"] == 3.0
+        assert captured["effort"] == "max"
+        assert captured["fallback_model"] == "claude-haiku-4-5"
+        assert captured["allowed_tools"] == ["Glob", "Read"]
+        assert captured["disallowed_tools"] == ["Bash"]
+        assert captured["add_dirs"] == [".vault"]
+
+    def test_build_options_omits_none_features(self, monkeypatch, tmp_path):
         """_build_options() omits features that are None/empty."""
         bridge = ClaudeACPBridge()
 
-        with patch("protocol.acp.claude_bridge.ClaudeAgentOptions") as mock_opts:
-            mock_opts.return_value = MagicMock()
-            bridge._build_options("/tmp", {}, None)
+        captured = {}
 
-        call_kwargs = mock_opts.call_args[1]
-        assert "max_turns" not in call_kwargs
-        assert "max_budget_usd" not in call_kwargs
-        assert "effort" not in call_kwargs
-        assert "fallback_model" not in call_kwargs
-        assert "allowed_tools" not in call_kwargs
-        assert "disallowed_tools" not in call_kwargs
-        assert "add_dirs" not in call_kwargs
+        class OptionsRecorder:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+        monkeypatch.setattr(
+            "protocol.acp.claude_bridge.ClaudeAgentOptions", OptionsRecorder
+        )
+        bridge._build_options(str(tmp_path), {}, None)
+
+        assert "max_turns" not in captured
+        assert "max_budget_usd" not in captured
+        assert "effort" not in captured
+        assert "fallback_model" not in captured
+        assert "allowed_tools" not in captured
+        assert "disallowed_tools" not in captured
+        assert "add_dirs" not in captured

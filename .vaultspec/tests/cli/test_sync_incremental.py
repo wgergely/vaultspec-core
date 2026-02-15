@@ -5,8 +5,6 @@ Covers: multi-pass rule/agent/skill/system/config sync, mixed operations.
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
 import cli
 import pytest
 
@@ -19,6 +17,12 @@ from .conftest import (  # type: ignore[unresolved-import]
 pytestmark = [pytest.mark.unit]
 
 
+@pytest.fixture(autouse=True)
+def _patch_resolve_model(monkeypatch):
+    """All tests in this module need resolve_model patched."""
+    monkeypatch.setattr(cli, "resolve_model", mock_resolve_model)
+
+
 # ---------------------------------------------------------------------------
 # TestIncrementalRules
 # ---------------------------------------------------------------------------
@@ -27,8 +31,7 @@ pytestmark = [pytest.mark.unit]
 class TestIncrementalRules:
     """Multi-pass rule sync: add, modify, remove, prune across iterations."""
 
-    @patch.object(cli, "resolve_model", side_effect=mock_resolve_model)
-    def test_add_modify_remove_loop(self, _mock_rm):
+    def test_add_modify_remove_loop(self):
         """Full lifecycle: add/sync/modify/prune."""
         rules_dir = TEST_PROJECT / ".vaultspec" / "rules"
         args = make_ns()
@@ -73,8 +76,7 @@ class TestIncrementalRules:
             assert (TEST_PROJECT / tool_dir / "rules" / "beta.md").exists()
             assert (TEST_PROJECT / tool_dir / "rules" / "delta.md").exists()
 
-    @patch.object(cli, "resolve_model", side_effect=mock_resolve_model)
-    def test_idempotent_resync(self, _mock_rm):
+    def test_idempotent_resync(self):
         """Syncing twice with no changes keeps files identical."""
         (TEST_PROJECT / ".vaultspec" / "rules" / "stable.md").write_text(
             "---\nname: stable\n---\n\nstable content", encoding="utf-8"
@@ -90,8 +92,7 @@ class TestIncrementalRules:
         )
         assert content_v1 == content_v2
 
-    @patch.object(cli, "resolve_model", side_effect=mock_resolve_model)
-    def test_cross_destination_consistency(self, _mock_rm):
+    def test_cross_destination_consistency(self):
         """All tool destinations get the same body content after sync."""
         (TEST_PROJECT / ".vaultspec" / "rules" / "shared.md").write_text(
             "---\nname: shared\n---\n\nshared content here", encoding="utf-8"
@@ -108,8 +109,7 @@ class TestIncrementalRules:
         # All destinations have the same body content
         assert bodies[".claude"] == bodies[".gemini"] == bodies[".agent"]
 
-    @patch.object(cli, "resolve_model", side_effect=mock_resolve_model)
-    def test_five_pass_churn(self, _mock_rm):
+    def test_five_pass_churn(self):
         """Simulate 5 sync passes with different mutations each time."""
         rules_dir = TEST_PROJECT / ".vaultspec" / "rules"
         args = make_ns()
@@ -165,8 +165,7 @@ class TestIncrementalRules:
 class TestIncrementalAgents:
     """Agent add/modify/remove across sync passes."""
 
-    @patch.object(cli, "resolve_model", side_effect=mock_resolve_model)
-    def test_agent_lifecycle(self, _mock_rm):
+    def test_agent_lifecycle(self):
         agents_dir = TEST_PROJECT / ".vaultspec" / "agents"
         args = make_ns()
         args_prune = make_ns(prune=True)
@@ -197,8 +196,7 @@ class TestIncrementalAgents:
         assert not (TEST_PROJECT / ".claude" / "agents" / "coder.md").exists()
         assert not (TEST_PROJECT / ".gemini" / "agents" / "coder.md").exists()
 
-    @patch.object(cli, "resolve_model", side_effect=mock_resolve_model)
-    def test_agent_tier_change(self, _mock_rm):
+    def test_agent_tier_change(self):
         """Changing an agent's tier changes the resolved model in output."""
         agents_dir = TEST_PROJECT / ".vaultspec" / "agents"
         args = make_ns()
@@ -233,8 +231,7 @@ class TestIncrementalAgents:
 class TestIncrementalSkills:
     """Skill add/modify/remove across sync passes."""
 
-    @patch.object(cli, "resolve_model", side_effect=mock_resolve_model)
-    def test_skill_lifecycle(self, _mock_rm):
+    def test_skill_lifecycle(self):
         skills_dir = TEST_PROJECT / ".vaultspec" / "skills"
         args = make_ns()
         args_prune = make_ns(prune=True)
@@ -388,8 +385,7 @@ class TestIncrementalConfig:
 class TestMixedOperations:
     """Cross-resource-type operations in a single integration flow."""
 
-    @patch.object(cli, "resolve_model", side_effect=mock_resolve_model)
-    def test_full_mixed_lifecycle(self, _mock_rm):
+    def test_full_mixed_lifecycle(self):
         """Add rules+agents+skills, sync, modify+remove some, resync."""
         rules_dir = TEST_PROJECT / ".vaultspec" / "rules"
         agents_dir = TEST_PROJECT / ".vaultspec" / "agents"

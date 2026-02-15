@@ -5,11 +5,9 @@ Covers: _make_sandbox_callback, _is_vault_path.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 import pytest
 
-from protocol.acp.claude_bridge import (
+from protocol.sandbox import (
     _SHELL_TOOLS,
     _is_vault_path,
     _make_sandbox_callback,
@@ -26,9 +24,9 @@ pytestmark = [pytest.mark.unit]
 class TestSandboxCallback:
     """Test the can_use_tool sandbox enforcement."""
 
-    def test_read_write_mode_returns_none(self):
+    def test_read_write_mode_returns_none(self, tmp_path):
         """In read-write mode, no restrictions apply (callback is None)."""
-        callback = _make_sandbox_callback(mode="read-write", root_dir="/workspace")
+        callback = _make_sandbox_callback(mode="read-write", root_dir=str(tmp_path))
         assert callback is None
 
     @pytest.mark.asyncio
@@ -42,7 +40,7 @@ class TestSandboxCallback:
         result = await callback(
             "Write",
             {"file_path": str(tmp_path / ".vault" / "adr" / "test.md")},
-            MagicMock(),  # ToolPermissionContext
+            object(),  # ToolPermissionContext
         )
         assert result.behavior == "allow"
 
@@ -54,7 +52,7 @@ class TestSandboxCallback:
         result = await callback(
             "Write",
             {"file_path": str(tmp_path / "src" / "main.py")},
-            MagicMock(),
+            object(),
         )
         assert result.behavior == "deny"
         assert (
@@ -67,7 +65,7 @@ class TestSandboxCallback:
         callback = _make_sandbox_callback(mode="read-only", root_dir=str(tmp_path))
 
         result = await callback(
-            "Edit", {"file_path": str(tmp_path / "README.md")}, MagicMock()
+            "Edit", {"file_path": str(tmp_path / "README.md")}, object()
         )
         assert result.behavior == "deny"
 
@@ -77,7 +75,7 @@ class TestSandboxCallback:
         callback = _make_sandbox_callback(mode="read-only", root_dir=str(tmp_path))
 
         result = await callback(
-            "MultiEdit", {"file_path": str(tmp_path / "lib.py")}, MagicMock()
+            "MultiEdit", {"file_path": str(tmp_path / "lib.py")}, object()
         )
         assert result.behavior == "deny"
 
@@ -89,7 +87,7 @@ class TestSandboxCallback:
         result = await callback(
             "NotebookEdit",
             {"file_path": str(tmp_path / "nb.ipynb")},
-            MagicMock(),
+            object(),
         )
         assert result.behavior == "deny"
 
@@ -102,7 +100,7 @@ class TestSandboxCallback:
             result = await callback(
                 tool,
                 {"file_path": str(tmp_path / "src" / "main.py")},
-                MagicMock(),
+                object(),
             )
             assert result.behavior == "allow", f"{tool} should be allowed"
 
@@ -118,7 +116,7 @@ class TestSandboxCallback:
                     tmp_path / ".vault" / "exec" / "2026-02-15-test" / "step-1.md"
                 )
             },
-            MagicMock(),
+            object(),
         )
         assert result.behavior == "allow"
 
@@ -133,7 +131,7 @@ class TestSandboxCallback:
             ".vault_backup/data.md",
         ]:
             result = await callback(
-                "Write", {"file_path": str(tmp_path / suffix)}, MagicMock()
+                "Write", {"file_path": str(tmp_path / suffix)}, object()
             )
             assert result.behavior == "deny", f"Should block: {suffix}"
 
@@ -143,7 +141,7 @@ class TestSandboxCallback:
         callback = _make_sandbox_callback(mode="read-only", root_dir=str(tmp_path))
 
         result = await callback(
-            "Write", {"file_path": str(tmp_path / "bad.py")}, MagicMock()
+            "Write", {"file_path": str(tmp_path / "bad.py")}, object()
         )
         assert result.interrupt is False
 
@@ -153,7 +151,7 @@ class TestSandboxCallback:
         callback = _make_sandbox_callback(mode="read-only", root_dir=str(tmp_path))
 
         result = await callback(
-            "Read", {"file_path": str(tmp_path / "file.py")}, MagicMock()
+            "Read", {"file_path": str(tmp_path / "file.py")}, object()
         )
         assert result.updated_input is None
         assert result.updated_permissions is None
@@ -209,15 +207,15 @@ class TestShellToolsSandbox:
         callback = _make_sandbox_callback(mode="read-only", root_dir=str(tmp_path))
         assert callback is not None
 
-        result = await callback("Bash", {"command": "ls"}, MagicMock())
+        result = await callback("Bash", {"command": "ls"}, object())
         assert result.behavior == "deny"
         assert (
             "read-only" in result.message.lower() or "shell" in result.message.lower()
         )
 
-    def test_bash_allowed_in_readwrite_mode(self):
+    def test_bash_allowed_in_readwrite_mode(self, tmp_path):
         """In read-write mode, callback is None (no restrictions, Bash allowed)."""
-        callback = _make_sandbox_callback(mode="read-write", root_dir="/workspace")
+        callback = _make_sandbox_callback(mode="read-write", root_dir=str(tmp_path))
         assert callback is None
 
     @pytest.mark.asyncio
@@ -227,7 +225,7 @@ class TestShellToolsSandbox:
 
         # Write outside .vault/ denied
         result = await callback(
-            "Write", {"file_path": str(tmp_path / "src" / "hack.py")}, MagicMock()
+            "Write", {"file_path": str(tmp_path / "src" / "hack.py")}, object()
         )
         assert result.behavior == "deny"
 
@@ -235,7 +233,7 @@ class TestShellToolsSandbox:
         result = await callback(
             "Edit",
             {"file_path": str(tmp_path / ".vault" / "adr" / "test.md")},
-            MagicMock(),
+            object(),
         )
         assert result.behavior == "allow"
 
@@ -244,7 +242,7 @@ class TestShellToolsSandbox:
         """Deny message for Bash suggests alternative tools."""
         callback = _make_sandbox_callback(mode="read-only", root_dir=str(tmp_path))
 
-        result = await callback("Bash", {"command": "ls"}, MagicMock())
+        result = await callback("Bash", {"command": "ls"}, object())
         assert result.behavior == "deny"
         # The message should mention Read, Glob, or Grep as alternatives
         msg_lower = result.message.lower()
@@ -255,5 +253,5 @@ class TestShellToolsSandbox:
         """Bash denial includes interrupt=False (non-interrupting)."""
         callback = _make_sandbox_callback(mode="read-only", root_dir=str(tmp_path))
 
-        result = await callback("Bash", {"command": "echo hi"}, MagicMock())
+        result = await callback("Bash", {"command": "echo hi"}, object())
         assert result.interrupt is False

@@ -7,9 +7,7 @@ _parse_agent_metadata, _parse_tools, and _inject_permission_prompt.
 
 from __future__ import annotations
 
-import asyncio
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from mcp.server.fastmcp.exceptions import ToolError
@@ -17,6 +15,7 @@ from subagent_server.server import (
     _inject_permission_prompt,
     _parse_agent_metadata,
     _parse_tools,
+    _prepare_dispatch_kwargs,
     _resolve_effective_mode,
     _strip_quotes,
     cancel_task,
@@ -33,6 +32,66 @@ from orchestration.task_engine import (
 )
 
 pytestmark = [pytest.mark.unit]
+
+
+# ---------------------------------------------------------------------------
+# Module-level helpers
+# ---------------------------------------------------------------------------
+
+
+def _patch_server(monkeypatch, **overrides):
+    """Patch subagent_server.server globals via monkeypatch."""
+    import subagent_server.server as srv
+
+    for attr, value in overrides.items():
+        monkeypatch.setattr(srv, attr, value)
+
+
+async def _noop_run_subagent(**_kwargs):
+    """No-op async stand-in for run_subagent."""
+
+
+class _FakeSubagentResult:
+    """Fake result from run_subagent."""
+
+    def __init__(
+        self, response_text="Done.", written_files=None, session_id="sess-001"
+    ):
+        self.response_text = response_text
+        self.written_files = written_files or []
+        self.session_id = session_id
+
+
+class _FakeBackgroundTask:
+    """Fake asyncio.Task with a cancel() method."""
+
+    def __init__(self):
+        self.cancel_calls = 0
+
+    def cancel(self):
+        self.cancel_calls += 1
+
+
+class _FakeClient:
+    """Fake ACP client with graceful_cancel."""
+
+    def __init__(self):
+        self.graceful_cancel_calls = 0
+
+    async def graceful_cancel(self):
+        self.graceful_cancel_calls += 1
+
+
+class _RefreshRecorder:
+    """Records calls to _refresh_if_changed."""
+
+    def __init__(self, return_value=False):
+        self._return_value = return_value
+        self.call_count = 0
+
+    def __call__(self):
+        self.call_count += 1
+        return self._return_value
 
 
 # ---------------------------------------------------------------------------
@@ -115,69 +174,74 @@ class TestListAgents:
     """Tests for the list_agents MCP tool."""
 
     @pytest.mark.asyncio
-    async def test_populated_cache(self, baker_cache):
+    async def test_populated_cache(self, baker_cache, monkeypatch):
         """list_agents returns all agents from the cache."""
-        with (
-            patch("subagent_server.server._agent_cache", baker_cache),
-            patch("subagent_server.server._refresh_if_changed", return_value=False),
-        ):
-            result = await list_agents()
-            data = json.loads(result)
-            assert len(data["agents"]) == 2
-            names = {a["name"] for a in data["agents"]}
-            assert "simple-executor" in names
-            assert "research-analyst" in names
+        _patch_server(
+            monkeypatch,
+            _agent_cache=baker_cache,
+            _refresh_if_changed=lambda: False,
+        )
+        result = await list_agents()
+        data = json.loads(result)
+        assert len(data["agents"]) == 2
+        names = {a["name"] for a in data["agents"]}
+        assert "simple-executor" in names
+        assert "research-analyst" in names
 
     @pytest.mark.asyncio
-    async def test_empty_cache(self):
+    async def test_empty_cache(self, monkeypatch):
         """list_agents returns empty list when no agents are cached."""
-        with (
-            patch("subagent_server.server._agent_cache", {}),
-            patch("subagent_server.server._refresh_if_changed", return_value=False),
-        ):
-            result = await list_agents()
-            data = json.loads(result)
-            assert data["agents"] == []
+        _patch_server(
+            monkeypatch,
+            _agent_cache={},
+            _refresh_if_changed=lambda: False,
+        )
+        result = await list_agents()
+        data = json.loads(result)
+        assert data["agents"] == []
 
     @pytest.mark.asyncio
-    async def test_response_json_structure(self, baker_cache):
+    async def test_response_json_structure(self, baker_cache, monkeypatch):
         """list_agents response has correct top-level keys and agent fields."""
-        with (
-            patch("subagent_server.server._agent_cache", baker_cache),
-            patch("subagent_server.server._refresh_if_changed", return_value=False),
-        ):
-            result = await list_agents()
-            data = json.loads(result)
-            assert "agents" in data
-            assert "hint" in data
-            for agent in data["agents"]:
-                assert "name" in agent
-                assert "tier" in agent
-                assert "description" in agent
+        _patch_server(
+            monkeypatch,
+            _agent_cache=baker_cache,
+            _refresh_if_changed=lambda: False,
+        )
+        result = await list_agents()
+        data = json.loads(result)
+        assert "agents" in data
+        assert "hint" in data
+        for agent in data["agents"]:
+            assert "name" in agent
+            assert "tier" in agent
+            assert "description" in agent
 
     @pytest.mark.asyncio
-    async def test_refresh_is_triggered(self, baker_cache):
+    async def test_refresh_is_triggered(self, baker_cache, monkeypatch):
         """list_agents calls _refresh_if_changed before returning."""
-        refresh_mock = MagicMock(return_value=False)
-        with (
-            patch("subagent_server.server._agent_cache", baker_cache),
-            patch("subagent_server.server._refresh_if_changed", refresh_mock),
-        ):
-            await list_agents()
-            refresh_mock.assert_called_once()
+        recorder = _RefreshRecorder(return_value=False)
+        _patch_server(
+            monkeypatch,
+            _agent_cache=baker_cache,
+            _refresh_if_changed=recorder,
+        )
+        await list_agents()
+        assert recorder.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_tier_and_description_passthrough(self, baker_cache):
+    async def test_tier_and_description_passthrough(self, baker_cache, monkeypatch):
         """Agent tier and description are passed through correctly."""
-        with (
-            patch("subagent_server.server._agent_cache", baker_cache),
-            patch("subagent_server.server._refresh_if_changed", return_value=False),
-        ):
-            result = await list_agents()
-            data = json.loads(result)
-            executor = next(a for a in data["agents"] if a["name"] == "simple-executor")
-            assert executor["tier"] == "LOW"
-            assert executor["description"] == "A helpful French Baker agent"
+        _patch_server(
+            monkeypatch,
+            _agent_cache=baker_cache,
+            _refresh_if_changed=lambda: False,
+        )
+        result = await list_agents()
+        data = json.loads(result)
+        executor = next(a for a in data["agents"] if a["name"] == "simple-executor")
+        assert executor["tier"] == "LOW"
+        assert executor["description"] == "A helpful French Baker agent"
 
 
 # ---------------------------------------------------------------------------
@@ -189,57 +253,55 @@ class TestDispatchAgent:
     """Tests for the dispatch_agent MCP tool."""
 
     @pytest.mark.asyncio
-    async def test_successful_dispatch(self, baker_cache, fresh_task_engine):
+    async def test_successful_dispatch(
+        self, baker_cache, fresh_task_engine, monkeypatch
+    ):
         """Successful dispatch returns taskId and 'working' status."""
-        with (
-            patch("subagent_server.server._agent_cache", baker_cache),
-            patch("subagent_server.server._refresh_if_changed", return_value=False),
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch("subagent_server.server._background_tasks", {}),
-            patch("subagent_server.server._active_clients", {}),
-            patch(
-                "subagent_server.server.run_subagent",
-                new_callable=AsyncMock,
-            ) as mock_run,
-        ):
-            mock_run.return_value = MagicMock(
-                response_text="Done.",
-                written_files=[],
-                session_id="sess-001",
-            )
-
-            result = await dispatch_agent(
-                agent="simple-executor",
-                task="Bake a baguette",
-            )
-            data = json.loads(result)
-            assert data["status"] == "working"
-            assert data["agent"] == "simple-executor"
-            assert "taskId" in data
-            assert data["mode"] == "read-write"
+        _patch_server(
+            monkeypatch,
+            _agent_cache=baker_cache,
+            _refresh_if_changed=lambda: False,
+            task_engine=fresh_task_engine,
+            _background_tasks={},
+            _active_clients={},
+            run_subagent=_noop_run_subagent,
+        )
+        result = await dispatch_agent(
+            agent="simple-executor",
+            task="Bake a baguette",
+        )
+        data = json.loads(result)
+        assert data["status"] == "working"
+        assert data["agent"] == "simple-executor"
+        assert "taskId" in data
+        assert data["mode"] == "read-write"
 
     @pytest.mark.asyncio
-    async def test_unknown_agent_raises_tool_error(self, baker_cache):
+    async def test_unknown_agent_raises_tool_error(self, baker_cache, monkeypatch):
         """Dispatching an unknown agent raises ToolError."""
-        with (
-            patch("subagent_server.server._agent_cache", baker_cache),
-            patch("subagent_server.server._refresh_if_changed", return_value=False),
-            pytest.raises(ToolError, match="not found"),
-        ):
+        _patch_server(
+            monkeypatch,
+            _agent_cache=baker_cache,
+            _refresh_if_changed=lambda: False,
+        )
+        with pytest.raises(ToolError, match="not found"):
             await dispatch_agent(
                 agent="nonexistent-patissier",
                 task="Bake a croissant",
             )
 
     @pytest.mark.asyncio
-    async def test_invalid_mode_raises_tool_error(self, baker_cache, fresh_task_engine):
+    async def test_invalid_mode_raises_tool_error(
+        self, baker_cache, fresh_task_engine, monkeypatch
+    ):
         """Providing an invalid mode raises ToolError."""
-        with (
-            patch("subagent_server.server._agent_cache", baker_cache),
-            patch("subagent_server.server._refresh_if_changed", return_value=False),
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            pytest.raises(ToolError, match="Invalid mode"),
-        ):
+        _patch_server(
+            monkeypatch,
+            _agent_cache=baker_cache,
+            _refresh_if_changed=lambda: False,
+            task_engine=fresh_task_engine,
+        )
+        with pytest.raises(ToolError, match="Invalid mode"):
             await dispatch_agent(
                 agent="simple-executor",
                 task="Bake bread",
@@ -247,72 +309,72 @@ class TestDispatchAgent:
             )
 
     @pytest.mark.asyncio
-    async def test_model_override_passthrough(self, baker_cache, fresh_task_engine):
+    async def test_model_override_passthrough(
+        self, baker_cache, fresh_task_engine, monkeypatch
+    ):
         """Model override is included in the dispatch response."""
-        with (
-            patch("subagent_server.server._agent_cache", baker_cache),
-            patch("subagent_server.server._refresh_if_changed", return_value=False),
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch("subagent_server.server._background_tasks", {}),
-            patch("subagent_server.server._active_clients", {}),
-            patch(
-                "subagent_server.server.run_subagent",
-                new_callable=AsyncMock,
-            ),
-        ):
-            result = await dispatch_agent(
-                agent="simple-executor",
-                task="Bake sourdough",
-                model="claude-opus-4-20250514",
-            )
-            data = json.loads(result)
-            assert data["model"] == "claude-opus-4-20250514"
+        _patch_server(
+            monkeypatch,
+            _agent_cache=baker_cache,
+            _refresh_if_changed=lambda: False,
+            task_engine=fresh_task_engine,
+            _background_tasks={},
+            _active_clients={},
+            run_subagent=_noop_run_subagent,
+        )
+        result = await dispatch_agent(
+            agent="simple-executor",
+            task="Bake sourdough",
+            model="claude-opus-4-20250514",
+        )
+        data = json.loads(result)
+        assert data["model"] == "claude-opus-4-20250514"
 
     @pytest.mark.asyncio
-    async def test_task_engine_creates_task(self, baker_cache, fresh_task_engine):
+    async def test_task_engine_creates_task(
+        self, baker_cache, fresh_task_engine, monkeypatch
+    ):
         """dispatch_agent creates a task in the engine."""
-        with (
-            patch("subagent_server.server._agent_cache", baker_cache),
-            patch("subagent_server.server._refresh_if_changed", return_value=False),
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch("subagent_server.server._background_tasks", {}),
-            patch("subagent_server.server._active_clients", {}),
-            patch(
-                "subagent_server.server.run_subagent",
-                new_callable=AsyncMock,
-            ),
-        ):
-            result = await dispatch_agent(
-                agent="simple-executor",
-                task="Proof the dough",
-            )
-            data = json.loads(result)
-            task_id = data["taskId"]
-            task_obj = fresh_task_engine.get_task(task_id)
-            assert task_obj is not None
-            assert task_obj.agent == "simple-executor"
-            assert task_obj.status == TaskStatus.WORKING
+        _patch_server(
+            monkeypatch,
+            _agent_cache=baker_cache,
+            _refresh_if_changed=lambda: False,
+            task_engine=fresh_task_engine,
+            _background_tasks={},
+            _active_clients={},
+            run_subagent=_noop_run_subagent,
+        )
+        result = await dispatch_agent(
+            agent="simple-executor",
+            task="Proof the dough",
+        )
+        data = json.loads(result)
+        task_id = data["taskId"]
+        task_obj = fresh_task_engine.get_task(task_id)
+        assert task_obj is not None
+        assert task_obj.agent == "simple-executor"
+        assert task_obj.status == TaskStatus.WORKING
 
     @pytest.mark.asyncio
-    async def test_default_mode_from_agent_cache(self, baker_cache, fresh_task_engine):
+    async def test_default_mode_from_agent_cache(
+        self, baker_cache, fresh_task_engine, monkeypatch
+    ):
         """When no mode is passed, uses agent's default_mode from cache."""
-        with (
-            patch("subagent_server.server._agent_cache", baker_cache),
-            patch("subagent_server.server._refresh_if_changed", return_value=False),
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch("subagent_server.server._background_tasks", {}),
-            patch("subagent_server.server._active_clients", {}),
-            patch(
-                "subagent_server.server.run_subagent",
-                new_callable=AsyncMock,
-            ),
-        ):
-            result = await dispatch_agent(
-                agent="research-analyst",
-                task="Analyze the flour supply chain",
-            )
-            data = json.loads(result)
-            assert data["mode"] == "read-only"
+        _patch_server(
+            monkeypatch,
+            _agent_cache=baker_cache,
+            _refresh_if_changed=lambda: False,
+            task_engine=fresh_task_engine,
+            _background_tasks={},
+            _active_clients={},
+            run_subagent=_noop_run_subagent,
+        )
+        result = await dispatch_agent(
+            agent="research-analyst",
+            task="Analyze the flour supply chain",
+        )
+        data = json.loads(result)
+        assert data["mode"] == "read-only"
 
 
 # ---------------------------------------------------------------------------
@@ -324,96 +386,91 @@ class TestGetTaskStatus:
     """Tests for the get_task_status MCP tool."""
 
     @pytest.mark.asyncio
-    async def test_working_task(self, fresh_task_engine):
+    async def test_working_task(self, fresh_task_engine, monkeypatch):
         """Returns status 'working' for an active task."""
         fresh_task_engine.create_task("simple-executor", task_id="task-001")
-        with (
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch(
-                "subagent_server.server.lock_manager", fresh_task_engine._lock_manager
-            ),
-        ):
-            result = await get_task_status(task_id="task-001")
-            data = json.loads(result)
-            assert data["taskId"] == "task-001"
-            assert data["status"] == "working"
-            assert data["agent"] == "simple-executor"
+        _patch_server(
+            monkeypatch,
+            task_engine=fresh_task_engine,
+            lock_manager=fresh_task_engine._lock_manager,
+        )
+        result = await get_task_status(task_id="task-001")
+        data = json.loads(result)
+        assert data["taskId"] == "task-001"
+        assert data["status"] == "working"
+        assert data["agent"] == "simple-executor"
 
     @pytest.mark.asyncio
-    async def test_completed_task_with_result(self, fresh_task_engine):
+    async def test_completed_task_with_result(self, fresh_task_engine, monkeypatch):
         """Returns status 'completed' with result payload."""
         fresh_task_engine.create_task("simple-executor", task_id="task-002")
         fresh_task_engine.complete_task("task-002", {"summary": "Baguettes baked"})
-
-        with (
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch(
-                "subagent_server.server.lock_manager", fresh_task_engine._lock_manager
-            ),
-        ):
-            result = await get_task_status(task_id="task-002")
-            data = json.loads(result)
-            assert data["status"] == "completed"
-            assert data["result"]["summary"] == "Baguettes baked"
+        _patch_server(
+            monkeypatch,
+            task_engine=fresh_task_engine,
+            lock_manager=fresh_task_engine._lock_manager,
+        )
+        result = await get_task_status(task_id="task-002")
+        data = json.loads(result)
+        assert data["status"] == "completed"
+        assert data["result"]["summary"] == "Baguettes baked"
 
     @pytest.mark.asyncio
-    async def test_failed_task_with_error(self, fresh_task_engine):
+    async def test_failed_task_with_error(self, fresh_task_engine, monkeypatch):
         """Returns status 'failed' with error message."""
         fresh_task_engine.create_task("simple-executor", task_id="task-003")
         fresh_task_engine.fail_task("task-003", "Oven caught fire")
-
-        with (
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch(
-                "subagent_server.server.lock_manager", fresh_task_engine._lock_manager
-            ),
-        ):
-            result = await get_task_status(task_id="task-003")
-            data = json.loads(result)
-            assert data["status"] == "failed"
-            assert data["error"] == "Oven caught fire"
+        _patch_server(
+            monkeypatch,
+            task_engine=fresh_task_engine,
+            lock_manager=fresh_task_engine._lock_manager,
+        )
+        result = await get_task_status(task_id="task-003")
+        data = json.loads(result)
+        assert data["status"] == "failed"
+        assert data["error"] == "Oven caught fire"
 
     @pytest.mark.asyncio
-    async def test_nonexistent_task_raises_tool_error(self, fresh_task_engine):
+    async def test_nonexistent_task_raises_tool_error(
+        self, fresh_task_engine, monkeypatch
+    ):
         """Querying a nonexistent task raises ToolError."""
-        with (
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            pytest.raises(ToolError, match="not found"),
-        ):
+        _patch_server(monkeypatch, task_engine=fresh_task_engine)
+        with pytest.raises(ToolError, match="not found"):
             await get_task_status(task_id="task-ghost")
 
     @pytest.mark.asyncio
-    async def test_cancelled_task(self, fresh_task_engine):
+    async def test_cancelled_task(self, fresh_task_engine, monkeypatch):
         """Returns status 'cancelled' for a cancelled task."""
         fresh_task_engine.create_task("simple-executor", task_id="task-004")
         fresh_task_engine.cancel_task("task-004")
-
-        with (
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch(
-                "subagent_server.server.lock_manager", fresh_task_engine._lock_manager
-            ),
-        ):
-            result = await get_task_status(task_id="task-004")
-            data = json.loads(result)
-            assert data["status"] == "cancelled"
+        _patch_server(
+            monkeypatch,
+            task_engine=fresh_task_engine,
+            lock_manager=fresh_task_engine._lock_manager,
+        )
+        result = await get_task_status(task_id="task-004")
+        data = json.loads(result)
+        assert data["status"] == "cancelled"
 
     @pytest.mark.asyncio
-    async def test_includes_lock_info_when_present(self, fresh_task_engine):
+    async def test_includes_lock_info_when_present(
+        self, fresh_task_engine, monkeypatch
+    ):
         """Response includes lock details when the task holds a lock."""
         fresh_task_engine.create_task("simple-executor", task_id="task-005")
         lm = fresh_task_engine._lock_manager
         lm.acquire_lock("task-005", {".vault/plan.md"}, "read-only")
-
-        with (
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch("subagent_server.server.lock_manager", lm),
-        ):
-            result = await get_task_status(task_id="task-005")
-            data = json.loads(result)
-            assert "lock" in data
-            assert ".vault/plan.md" in data["lock"]["paths"]
-            assert data["lock"]["mode"] == "read-only"
+        _patch_server(
+            monkeypatch,
+            task_engine=fresh_task_engine,
+            lock_manager=lm,
+        )
+        result = await get_task_status(task_id="task-005")
+        data = json.loads(result)
+        assert "lock" in data
+        assert ".vault/plan.md" in data["lock"]["paths"]
+        assert data["lock"]["mode"] == "read-only"
 
 
 # ---------------------------------------------------------------------------
@@ -425,76 +482,69 @@ class TestCancelTask:
     """Tests for the cancel_task MCP tool."""
 
     @pytest.mark.asyncio
-    async def test_cancel_working_task(self, fresh_task_engine):
+    async def test_cancel_working_task(self, fresh_task_engine, monkeypatch):
         """Cancelling a working task returns 'cancelled' status."""
         fresh_task_engine.create_task("simple-executor", task_id="task-010")
-
-        with (
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch("subagent_server.server._active_clients", {}),
-            patch("subagent_server.server._background_tasks", {}),
-        ):
-            result = await cancel_task(task_id="task-010")
-            data = json.loads(result)
-            assert data["status"] == "cancelled"
-            assert data["taskId"] == "task-010"
-            assert data["agent"] == "simple-executor"
+        _patch_server(
+            monkeypatch,
+            task_engine=fresh_task_engine,
+            _active_clients={},
+            _background_tasks={},
+        )
+        result = await cancel_task(task_id="task-010")
+        data = json.loads(result)
+        assert data["status"] == "cancelled"
+        assert data["taskId"] == "task-010"
+        assert data["agent"] == "simple-executor"
 
     @pytest.mark.asyncio
-    async def test_cancel_already_completed_raises_tool_error(self, fresh_task_engine):
+    async def test_cancel_already_completed_raises_tool_error(
+        self, fresh_task_engine, monkeypatch
+    ):
         """Cancelling a completed task raises ToolError."""
         fresh_task_engine.create_task("simple-executor", task_id="task-011")
         fresh_task_engine.complete_task("task-011", {"summary": "Done"})
-
-        with (
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            pytest.raises(ToolError, match="already completed"),
-        ):
+        _patch_server(monkeypatch, task_engine=fresh_task_engine)
+        with pytest.raises(ToolError, match="already completed"):
             await cancel_task(task_id="task-011")
 
     @pytest.mark.asyncio
-    async def test_cancel_nonexistent_raises_tool_error(self, fresh_task_engine):
+    async def test_cancel_nonexistent_raises_tool_error(
+        self, fresh_task_engine, monkeypatch
+    ):
         """Cancelling a nonexistent task raises ToolError."""
-        with (
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            pytest.raises(ToolError, match="not found"),
-        ):
+        _patch_server(monkeypatch, task_engine=fresh_task_engine)
+        with pytest.raises(ToolError, match="not found"):
             await cancel_task(task_id="task-phantom")
 
     @pytest.mark.asyncio
-    async def test_cancel_invokes_graceful_cancel(self, fresh_task_engine):
+    async def test_cancel_invokes_graceful_cancel(self, fresh_task_engine, monkeypatch):
         """Cancellation sends ACP graceful_cancel when client is active."""
         fresh_task_engine.create_task("simple-executor", task_id="task-012")
-        mock_client = AsyncMock()
-        client_ref = [mock_client]
-
-        with (
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch(
-                "subagent_server.server._active_clients",
-                {"task-012": client_ref},
-            ),
-            patch("subagent_server.server._background_tasks", {}),
-        ):
-            await cancel_task(task_id="task-012")
-            mock_client.graceful_cancel.assert_awaited_once()
+        fake_client = _FakeClient()
+        client_ref = [fake_client]
+        _patch_server(
+            monkeypatch,
+            task_engine=fresh_task_engine,
+            _active_clients={"task-012": client_ref},
+            _background_tasks={},
+        )
+        await cancel_task(task_id="task-012")
+        assert fake_client.graceful_cancel_calls == 1
 
     @pytest.mark.asyncio
-    async def test_cancel_stops_background_task(self, fresh_task_engine):
+    async def test_cancel_stops_background_task(self, fresh_task_engine, monkeypatch):
         """Cancellation calls .cancel() on the background asyncio.Task."""
         fresh_task_engine.create_task("simple-executor", task_id="task-013")
-        mock_bg_task = MagicMock()
-
-        with (
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch("subagent_server.server._active_clients", {}),
-            patch(
-                "subagent_server.server._background_tasks",
-                {"task-013": mock_bg_task},
-            ),
-        ):
-            await cancel_task(task_id="task-013")
-            mock_bg_task.cancel.assert_called_once()
+        fake_bg_task = _FakeBackgroundTask()
+        _patch_server(
+            monkeypatch,
+            task_engine=fresh_task_engine,
+            _active_clients={},
+            _background_tasks={"task-013": fake_bg_task},
+        )
+        await cancel_task(task_id="task-013")
+        assert fake_bg_task.cancel_calls == 1
 
 
 # ---------------------------------------------------------------------------
@@ -506,75 +556,74 @@ class TestGetLocks:
     """Tests for the get_locks MCP tool."""
 
     @pytest.mark.asyncio
-    async def test_no_active_locks(self, fresh_task_engine):
+    async def test_no_active_locks(self, fresh_task_engine, monkeypatch):
         """Returns empty lock list when no locks are held."""
-        with (
-            patch(
-                "subagent_server.server.lock_manager", fresh_task_engine._lock_manager
-            ),
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-        ):
-            result = await get_locks()
-            data = json.loads(result)
-            assert data["locks"] == []
-            assert data["count"] == 0
+        _patch_server(
+            monkeypatch,
+            lock_manager=fresh_task_engine._lock_manager,
+            task_engine=fresh_task_engine,
+        )
+        result = await get_locks()
+        data = json.loads(result)
+        assert data["locks"] == []
+        assert data["count"] == 0
 
     @pytest.mark.asyncio
-    async def test_with_active_locks(self, fresh_task_engine):
+    async def test_with_active_locks(self, fresh_task_engine, monkeypatch):
         """Returns all active locks with correct structure."""
         lm = fresh_task_engine._lock_manager
         fresh_task_engine.create_task("simple-executor", task_id="task-020")
         fresh_task_engine.create_task("research-analyst", task_id="task-021")
         lm.acquire_lock("task-020", {".vault/plan.md"}, "read-write")
         lm.acquire_lock("task-021", {".vault/adr/001.md"}, "read-only")
+        _patch_server(
+            monkeypatch,
+            lock_manager=lm,
+            task_engine=fresh_task_engine,
+        )
+        result = await get_locks()
+        data = json.loads(result)
+        assert data["count"] == 2
+        assert len(data["locks"]) == 2
 
-        with (
-            patch("subagent_server.server.lock_manager", lm),
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-        ):
-            result = await get_locks()
-            data = json.loads(result)
-            assert data["count"] == 2
-            assert len(data["locks"]) == 2
-
-            task_ids = {lock["taskId"] for lock in data["locks"]}
-            assert "task-020" in task_ids
-            assert "task-021" in task_ids
+        task_ids = {lock["taskId"] for lock in data["locks"]}
+        assert "task-020" in task_ids
+        assert "task-021" in task_ids
 
     @pytest.mark.asyncio
-    async def test_lock_structure(self, fresh_task_engine):
+    async def test_lock_structure(self, fresh_task_engine, monkeypatch):
         """Each lock entry includes taskId, agent, paths, mode, acquired_at."""
         lm = fresh_task_engine._lock_manager
         fresh_task_engine.create_task("simple-executor", task_id="task-030")
         lm.acquire_lock("task-030", {".vault/exec/log.md"}, "read-write")
-
-        with (
-            patch("subagent_server.server.lock_manager", lm),
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-        ):
-            result = await get_locks()
-            data = json.loads(result)
-            lock = data["locks"][0]
-            assert lock["taskId"] == "task-030"
-            assert lock["agent"] == "simple-executor"
-            assert ".vault/exec/log.md" in lock["paths"]
-            assert lock["mode"] == "read-write"
-            assert "acquired_at" in lock
+        _patch_server(
+            monkeypatch,
+            lock_manager=lm,
+            task_engine=fresh_task_engine,
+        )
+        result = await get_locks()
+        data = json.loads(result)
+        lock = data["locks"][0]
+        assert lock["taskId"] == "task-030"
+        assert lock["agent"] == "simple-executor"
+        assert ".vault/exec/log.md" in lock["paths"]
+        assert lock["mode"] == "read-write"
+        assert "acquired_at" in lock
 
     @pytest.mark.asyncio
-    async def test_lock_with_unknown_task(self):
+    async def test_lock_with_unknown_task(self, monkeypatch):
         """Lock entry shows 'unknown' agent when task is missing from engine."""
         lm = LockManager()
         lm.acquire_lock("orphan-task", {".vault/orphan.md"}, "read-only")
         engine = TaskEngine(ttl_seconds=60.0, lock_manager=lm)
-
-        with (
-            patch("subagent_server.server.lock_manager", lm),
-            patch("subagent_server.server.task_engine", engine),
-        ):
-            result = await get_locks()
-            data = json.loads(result)
-            assert data["locks"][0]["agent"] == "unknown"
+        _patch_server(
+            monkeypatch,
+            lock_manager=lm,
+            task_engine=engine,
+        )
+        result = await get_locks()
+        data = json.loads(result)
+        assert data["locks"][0]["agent"] == "unknown"
 
 
 # ---------------------------------------------------------------------------
@@ -653,16 +702,16 @@ class TestPermissionHelpers:
         """Explicit mode overrides agent default."""
         assert _resolve_effective_mode("any", "read-only") == "read-only"
 
-    def test_resolve_effective_mode_from_cache(self):
+    def test_resolve_effective_mode_from_cache(self, monkeypatch):
         """When mode is None, uses agent's default_mode from cache."""
         cache = {"analyst": {"default_mode": "read-only"}}
-        with patch("subagent_server.server._agent_cache", cache):
-            assert _resolve_effective_mode("analyst", None) == "read-only"
+        _patch_server(monkeypatch, _agent_cache=cache)
+        assert _resolve_effective_mode("analyst", None) == "read-only"
 
-    def test_resolve_effective_mode_fallback(self):
+    def test_resolve_effective_mode_fallback(self, monkeypatch):
         """When no mode and no agent default, falls back to read-write."""
-        with patch("subagent_server.server._agent_cache", {}):
-            assert _resolve_effective_mode("any", None) == "read-write"
+        _patch_server(monkeypatch, _agent_cache={})
+        assert _resolve_effective_mode("any", None) == "read-write"
 
     def test_strip_quotes_basic(self):
         """Strips surrounding double-quotes."""
@@ -679,179 +728,93 @@ class TestPermissionHelpers:
 
 
 class TestDispatchAgentOverrides:
-    """Verify dispatch_agent passes runtime overrides to run_subagent."""
+    """Verify _prepare_dispatch_kwargs builds correct kwargs for run_subagent.
 
-    @pytest.mark.asyncio
-    async def test_max_turns_override(self, baker_cache, fresh_task_engine):
-        """max_turns override is passed to run_subagent."""
-        bg_tasks: dict[str, asyncio.Task] = {}
-        with (
-            patch("subagent_server.server._agent_cache", baker_cache),
-            patch("subagent_server.server._refresh_if_changed", return_value=False),
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch("subagent_server.server._background_tasks", bg_tasks),
-            patch("subagent_server.server._active_clients", {}),
-            patch(
-                "subagent_server.server.run_subagent",
-                new_callable=AsyncMock,
-            ) as mock_run,
-        ):
-            mock_run.return_value = MagicMock(
-                response_text="Done.",
-                written_files=[],
-                session_id="sess-001",
-            )
-            await dispatch_agent(
-                agent="simple-executor",
-                task="Bake bread",
-                max_turns=10,
-            )
+    Tests the pure helper function directly instead of the full dispatch_agent
+    flow, which depends on server globals and background tasks.
+    """
 
-            # Wait for background task to complete
-            if bg_tasks:
-                await asyncio.gather(*bg_tasks.values(), return_exceptions=True)
+    def test_max_turns_override(self, tmp_path):
+        """max_turns override is included in kwargs."""
+        kwargs = _prepare_dispatch_kwargs(
+            agent_name="simple-executor",
+            task="Bake bread",
+            root_dir=tmp_path,
+            mode="read-write",
+            max_turns=10,
+        )
+        assert kwargs["max_turns"] == 10
 
-            mock_run.assert_called_once()
-            call_kwargs = mock_run.call_args[1]
-            assert call_kwargs["max_turns"] == 10
+    def test_budget_override(self, tmp_path):
+        """budget override is included in kwargs."""
+        kwargs = _prepare_dispatch_kwargs(
+            agent_name="simple-executor",
+            task="Bake bread",
+            root_dir=tmp_path,
+            mode="read-write",
+            budget=2.5,
+        )
+        assert kwargs["budget"] == 2.5
 
-    @pytest.mark.asyncio
-    async def test_budget_override(self, baker_cache, fresh_task_engine):
-        """budget override is passed to run_subagent."""
-        bg_tasks: dict[str, asyncio.Task] = {}
-        with (
-            patch("subagent_server.server._agent_cache", baker_cache),
-            patch("subagent_server.server._refresh_if_changed", return_value=False),
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch("subagent_server.server._background_tasks", bg_tasks),
-            patch("subagent_server.server._active_clients", {}),
-            patch(
-                "subagent_server.server.run_subagent",
-                new_callable=AsyncMock,
-            ) as mock_run,
-        ):
-            mock_run.return_value = MagicMock(
-                response_text="Done.",
-                written_files=[],
-                session_id="sess-001",
-            )
-            await dispatch_agent(
-                agent="simple-executor",
-                task="Bake bread",
-                budget=2.5,
-            )
+    def test_effort_override(self, tmp_path):
+        """effort override is included in kwargs."""
+        kwargs = _prepare_dispatch_kwargs(
+            agent_name="simple-executor",
+            task="Bake bread",
+            root_dir=tmp_path,
+            mode="read-write",
+            effort="high",
+        )
+        assert kwargs["effort"] == "high"
 
-            # Wait for background task to complete
-            if bg_tasks:
-                await asyncio.gather(*bg_tasks.values(), return_exceptions=True)
+    def test_output_format_override(self, tmp_path):
+        """output_format override is included in kwargs."""
+        kwargs = _prepare_dispatch_kwargs(
+            agent_name="simple-executor",
+            task="Bake bread",
+            root_dir=tmp_path,
+            mode="read-write",
+            output_format="json",
+        )
+        assert kwargs["output_format"] == "json"
 
-            mock_run.assert_called_once()
-            call_kwargs = mock_run.call_args[1]
-            assert call_kwargs["budget"] == 2.5
+    def test_no_overrides_passes_none(self, tmp_path):
+        """Without overrides, None values are in kwargs."""
+        kwargs = _prepare_dispatch_kwargs(
+            agent_name="simple-executor",
+            task="Bake bread",
+            root_dir=tmp_path,
+            mode="read-write",
+        )
+        assert kwargs["max_turns"] is None
+        assert kwargs["budget"] is None
+        assert kwargs["effort"] is None
+        assert kwargs["output_format"] is None
 
-    @pytest.mark.asyncio
-    async def test_effort_override(self, baker_cache, fresh_task_engine):
-        """effort override is passed to run_subagent."""
-        bg_tasks: dict[str, asyncio.Task] = {}
-        with (
-            patch("subagent_server.server._agent_cache", baker_cache),
-            patch("subagent_server.server._refresh_if_changed", return_value=False),
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch("subagent_server.server._background_tasks", bg_tasks),
-            patch("subagent_server.server._active_clients", {}),
-            patch(
-                "subagent_server.server.run_subagent",
-                new_callable=AsyncMock,
-            ) as mock_run,
-        ):
-            mock_run.return_value = MagicMock(
-                response_text="Done.",
-                written_files=[],
-                session_id="sess-001",
-            )
-            await dispatch_agent(
-                agent="simple-executor",
-                task="Bake bread",
-                effort="high",
-            )
-
-            # Wait for background task to complete
-            if bg_tasks:
-                await asyncio.gather(*bg_tasks.values(), return_exceptions=True)
-
-            mock_run.assert_called_once()
-            call_kwargs = mock_run.call_args[1]
-            assert call_kwargs["effort"] == "high"
-
-    @pytest.mark.asyncio
-    async def test_output_format_override(self, baker_cache, fresh_task_engine):
-        """output_format override is passed to run_subagent."""
-        bg_tasks: dict[str, asyncio.Task] = {}
-        with (
-            patch("subagent_server.server._agent_cache", baker_cache),
-            patch("subagent_server.server._refresh_if_changed", return_value=False),
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch("subagent_server.server._background_tasks", bg_tasks),
-            patch("subagent_server.server._active_clients", {}),
-            patch(
-                "subagent_server.server.run_subagent",
-                new_callable=AsyncMock,
-            ) as mock_run,
-        ):
-            mock_run.return_value = MagicMock(
-                response_text="Done.",
-                written_files=[],
-                session_id="sess-001",
-            )
-            await dispatch_agent(
-                agent="simple-executor",
-                task="Bake bread",
-                output_format="json",
-            )
-
-            # Wait for background task to complete
-            if bg_tasks:
-                await asyncio.gather(*bg_tasks.values(), return_exceptions=True)
-
-            mock_run.assert_called_once()
-            call_kwargs = mock_run.call_args[1]
-            assert call_kwargs["output_format"] == "json"
-
-    @pytest.mark.asyncio
-    async def test_no_overrides_passes_none(self, baker_cache, fresh_task_engine):
-        """Without overrides, None values are passed to run_subagent."""
-        bg_tasks: dict[str, asyncio.Task] = {}
-        with (
-            patch("subagent_server.server._agent_cache", baker_cache),
-            patch("subagent_server.server._refresh_if_changed", return_value=False),
-            patch("subagent_server.server.task_engine", fresh_task_engine),
-            patch("subagent_server.server._background_tasks", bg_tasks),
-            patch("subagent_server.server._active_clients", {}),
-            patch(
-                "subagent_server.server.run_subagent",
-                new_callable=AsyncMock,
-            ) as mock_run,
-        ):
-            mock_run.return_value = MagicMock(
-                response_text="Done.",
-                written_files=[],
-                session_id="sess-001",
-            )
-            await dispatch_agent(
-                agent="simple-executor",
-                task="Bake bread",
-            )
-
-            # Wait for background task to complete
-            if bg_tasks:
-                await asyncio.gather(*bg_tasks.values(), return_exceptions=True)
-
-            mock_run.assert_called_once()
-            call_kwargs = mock_run.call_args[1]
-            assert call_kwargs["max_turns"] is None
-            assert call_kwargs["budget"] is None
-            assert call_kwargs["effort"] is None
-            assert call_kwargs["output_format"] is None
+    def test_all_overrides_combined(self, tmp_path):
+        """All overrides are passed together correctly."""
+        kwargs = _prepare_dispatch_kwargs(
+            agent_name="simple-executor",
+            task="Bake bread",
+            root_dir=tmp_path,
+            mode="read-only",
+            model="claude-opus-4-6",
+            max_turns=5,
+            budget=1.0,
+            effort="low",
+            output_format="json",
+        )
+        assert kwargs["agent_name"] == "simple-executor"
+        assert kwargs["initial_task"] == "Bake bread"
+        assert kwargs["root_dir"] == tmp_path
+        assert kwargs["mode"] == "read-only"
+        assert kwargs["model_override"] == "claude-opus-4-6"
+        assert kwargs["max_turns"] == 5
+        assert kwargs["budget"] == 1.0
+        assert kwargs["effort"] == "low"
+        assert kwargs["output_format"] == "json"
+        assert kwargs["interactive"] is False
+        assert kwargs["quiet"] is True
 
 
 # ---------------------------------------------------------------------------

@@ -98,8 +98,18 @@ class ClaudeProvider(AgentProvider):
             env["VS_OUTPUT_FORMAT"] = agent_meta["output_format"]
         if agent_meta.get("fallback_model"):
             env["VS_FALLBACK_MODEL"] = agent_meta["fallback_model"]
-        if agent_meta.get("include_dirs"):
-            env["VS_INCLUDE_DIRS"] = agent_meta["include_dirs"]
+        include_dirs = agent_meta.get("include_dirs", "")
+        if include_dirs:
+            validated = []
+            for d in (x.strip() for x in include_dirs.split(",") if x.strip()):
+                try:
+                    resolved = (root_dir / d).resolve()
+                    if resolved.is_relative_to(root_dir.resolve()):
+                        validated.append(d)
+                except (ValueError, OSError):
+                    pass
+            if validated:
+                env["VS_INCLUDE_DIRS"] = ",".join(validated)
 
         return ProcessSpec(
             executable=sys.executable,

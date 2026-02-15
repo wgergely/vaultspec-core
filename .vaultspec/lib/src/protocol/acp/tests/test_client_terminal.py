@@ -5,13 +5,27 @@ Covers: create_terminal read-only guard in SubagentClient.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
-
 import pytest
 
 from protocol.acp.client import SubagentClient
 
 pytestmark = [pytest.mark.unit]
+
+
+# ---------------------------------------------------------------------------
+# Fake subprocess for terminal tests
+# ---------------------------------------------------------------------------
+
+
+class _FakeProcess:
+    """Stand-in for asyncio.subprocess.Process."""
+
+    def __init__(self):
+        self.returncode = None
+        self.stdout = self
+
+    async def read(self, *_args, **_kwargs):
+        return b""
 
 
 class TestCreateTerminalReadOnly:
@@ -28,23 +42,23 @@ class TestCreateTerminalReadOnly:
             )
 
     @pytest.mark.asyncio
-    async def test_create_terminal_allowed_readwrite(self, tmp_path):
-        """Terminal creation succeeds in read-write mode (subprocess mocked)."""
+    async def test_create_terminal_allowed_readwrite(self, tmp_path, monkeypatch):
+        """Terminal creation succeeds in read-write mode (subprocess faked)."""
         client = SubagentClient(root_dir=tmp_path, mode="read-write")
 
-        mock_proc = AsyncMock()
-        mock_proc.stdout = AsyncMock()
-        mock_proc.stdout.read = AsyncMock(return_value=b"")
-        mock_proc.returncode = None
+        async def _fake_create_subprocess_exec(*_args, **_kwargs):
+            return _FakeProcess()
 
-        with patch(
-            "protocol.acp.client.asyncio.create_subprocess_exec", return_value=mock_proc
-        ):
-            response = await client.create_terminal(
-                command="echo",
-                session_id="test-session",
-                args=["hello"],
-            )
+        monkeypatch.setattr(
+            "protocol.acp.client.asyncio.create_subprocess_exec",
+            _fake_create_subprocess_exec,
+        )
+
+        response = await client.create_terminal(
+            command="echo",
+            session_id="test-session",
+            args=["hello"],
+        )
         assert response.terminal_id is not None
         assert len(response.terminal_id) > 0
 
