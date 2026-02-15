@@ -160,6 +160,39 @@ class AgentProvider(abc.ABC):
         return self.models.BY_LEVEL.get(level, self.models.MEDIUM)
 
     @abc.abstractmethod
+    def load_system_prompt(self, root_dir: pathlib.Path) -> str:
+        """Load provider-specific system prompt file."""
+
+    @abc.abstractmethod
+    def load_rules(self, root_dir: pathlib.Path) -> str:
+        """Load and resolve provider-specific rules."""
+
+    @abc.abstractmethod
+    def construct_system_prompt(
+        self,
+        persona: str,
+        rules: str,
+        system_instructions: str = "",
+    ) -> str:
+        """Combine system instructions, persona, and rules."""
+
+    def _validate_include_dirs(
+        self,
+        include_dirs: str,
+        root_dir: pathlib.Path,
+    ) -> list[str]:
+        """Validate and filter include_dirs against path traversal."""
+        validated: list[str] = []
+        for d in (x.strip() for x in include_dirs.split(",") if x.strip()):
+            try:
+                resolved = (root_dir / d).resolve()
+                if resolved.is_relative_to(root_dir.resolve()):
+                    validated.append(d)
+            except (ValueError, OSError):
+                pass
+        return validated
+
+    @abc.abstractmethod
     def prepare_process(
         self,
         agent_name: str,

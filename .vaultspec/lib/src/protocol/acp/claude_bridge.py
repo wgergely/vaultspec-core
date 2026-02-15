@@ -357,6 +357,8 @@ class ClaudeACPBridge:
         # Quality & behavior
         if self._effort:
             kwargs["effort"] = self._effort
+        if self._output_format == "json":
+            kwargs["output_format"] = {"type": "json_object"}
         if self._fallback_model:
             kwargs["fallback_model"] = self._fallback_model
         if self._include_dirs:
