@@ -165,6 +165,11 @@ async def run_subagent(
     output_format: str | None = None,
 ) -> SubagentResult:
     """Orchestrates the agent lifecycle with fallback support."""
+    if max_turns is not None and max_turns <= 0:
+        raise ValueError(f"max_turns must be positive, got {max_turns}")
+    if budget is not None and budget < 0:
+        raise ValueError(f"budget must be non-negative, got {budget}")
+
     if context_files is None:
         context_files = []
 

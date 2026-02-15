@@ -6,7 +6,6 @@ Covers: sync_files, sync_skills, system_sync, config_sync, end-to-end cycles.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import patch
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -21,6 +20,12 @@ from .conftest import (  # type: ignore[unresolved-import]
 )
 
 pytestmark = [pytest.mark.unit]
+
+
+@pytest.fixture(autouse=True)
+def _patch_resolve_model(monkeypatch):
+    """All tests in this module need resolve_model patched."""
+    monkeypatch.setattr(cli, "resolve_model", mock_resolve_model)
 
 
 # ---------------------------------------------------------------------------
@@ -322,8 +327,7 @@ class TestConfigSync:
 
 
 class TestEndToEnd:
-    @patch.object(cli, "resolve_model", side_effect=mock_resolve_model)
-    def test_full_sync_cycle(self, _mock_rm):
+    def test_full_sync_cycle(self):
         """Create sources -> sync -> verify destinations."""
         # Set up source files
         (TEST_PROJECT / ".vaultspec" / "rules" / "no-swear.md").write_text(
@@ -369,8 +373,7 @@ class TestEndToEnd:
         # Verify system
         assert (TEST_PROJECT / ".gemini" / "SYSTEM.md").exists()
 
-    @patch.object(cli, "resolve_model", side_effect=mock_resolve_model)
-    def test_modify_resync_cycle(self, _mock_rm):
+    def test_modify_resync_cycle(self):
         """Sync -> modify source -> sync -> verify update."""
         rule_src = TEST_PROJECT / ".vaultspec" / "rules" / "rule1.md"
         rule_src.write_text("---\nname: rule1\n---\n\nOriginal body.", encoding="utf-8")
@@ -389,8 +392,7 @@ class TestEndToEnd:
         content_v2 = dest.read_text(encoding="utf-8")
         assert "Updated body" in content_v2
 
-    @patch.object(cli, "resolve_model", side_effect=mock_resolve_model)
-    def test_prune_cycle(self, _mock_rm):
+    def test_prune_cycle(self):
         """Sync -> delete source -> sync --prune -> verify deletion."""
         rule_src = TEST_PROJECT / ".vaultspec" / "rules" / "ephemeral.md"
         rule_src.write_text("---\nname: ephemeral\n---\n\nGone soon.", encoding="utf-8")
@@ -406,8 +408,7 @@ class TestEndToEnd:
         cli.rules_sync(args_prune)
         assert not dest.exists()
 
-    @patch.object(cli, "resolve_model", side_effect=mock_resolve_model)
-    def test_force_overwrite_cycle(self, _mock_rm):
+    def test_force_overwrite_cycle(self):
         """Create custom dest -> sync (skip) -> sync --force (overwrite)."""
         (TEST_PROJECT / ".vaultspec" / "FRAMEWORK.md").write_text(
             "Internal content", encoding="utf-8"

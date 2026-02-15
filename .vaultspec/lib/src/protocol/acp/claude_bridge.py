@@ -22,7 +22,6 @@ import dataclasses
 import datetime
 import logging
 import os
-import pathlib
 import sys
 import uuid
 from typing import TYPE_CHECKING, Any
@@ -65,10 +64,11 @@ from claude_agent_sdk import (
 )
 from claude_agent_sdk.types import (
     McpStdioServerConfig,
-    PermissionResultAllow,
-    PermissionResultDeny,
     StreamEvent,
-    ToolPermissionContext,
+)
+
+from protocol.sandbox import (
+    _make_sandbox_callback,
 )
 
 if TYPE_CHECKING:
@@ -86,67 +86,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Sandboxing
+# Sandboxing — _make_sandbox_callback imported from protocol.sandbox
 # ---------------------------------------------------------------------------
-
-# Tools that perform file writes in Claude Code
-_WRITE_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
-_SHELL_TOOLS = frozenset({"Bash"})
-
-
-def _is_vault_path(file_path: str, root_dir: str) -> bool:
-    """Return True if *file_path* is inside ``<root_dir>/.vault/``."""
-    try:
-        resolved = pathlib.Path(file_path).resolve()
-        root = pathlib.Path(root_dir).resolve()
-        rel = resolved.relative_to(root).as_posix()
-        return rel.startswith(".vault/") or rel == ".vault"
-    except (ValueError, OSError):
-        return False
-
-
-def _make_sandbox_callback(mode: str, root_dir: str) -> Any:
-    """Build a ``can_use_tool`` callback for the given agent mode.
-
-    In ``read-write`` mode no restrictions are applied (returns ``None``).
-    In ``read-only`` mode write operations are only allowed when the target
-    path is inside ``.vault/``.
-    """
-    if mode != "read-only":
-        return None
-
-    async def _callback(
-        tool_name: str,
-        tool_input: dict[str, Any],
-        _context: ToolPermissionContext,
-    ) -> PermissionResultAllow | PermissionResultDeny:
-        if tool_name in _SHELL_TOOLS:
-            return PermissionResultDeny(
-                behavior="deny",
-                message=(
-                    "Read-only mode: shell commands are not permitted. "
-                    "Use Read, Glob, or Grep tools instead."
-                ),
-                interrupt=False,
-            )
-        if tool_name in _WRITE_TOOLS:
-            path = tool_input.get("file_path", "")
-            if not _is_vault_path(path, root_dir):
-                return PermissionResultDeny(
-                    behavior="deny",
-                    message=(
-                        f"Read-only mode: writes are restricted to .vault/ "
-                        f"(attempted: {path})"
-                    ),
-                    interrupt=False,
-                )
-        return PermissionResultAllow(
-            behavior="allow",
-            updated_input=None,
-            updated_permissions=None,
-        )
-
-    return _callback
 
 
 # ---------------------------------------------------------------------------
@@ -272,29 +213,48 @@ class ClaudeACPBridge:
         self._system_prompt: str | None = os.environ.get("VS_SYSTEM_PROMPT")
 
         # Extended agent configuration from VS_* env vars
-        self._max_turns: int | None = (
-            int(os.environ["VS_MAX_TURNS"]) if "VS_MAX_TURNS" in os.environ else None
-        )
-        self._budget_usd: float | None = (
-            float(os.environ["VS_BUDGET_USD"])
-            if "VS_BUDGET_USD" in os.environ
-            else None
-        )
+        try:
+            self._max_turns: int | None = (
+                int(os.environ["VS_MAX_TURNS"])
+                if "VS_MAX_TURNS" in os.environ
+                else None
+            )
+        except ValueError:
+            self._max_turns = None
+        try:
+            self._budget_usd: float | None = (
+                float(os.environ["VS_BUDGET_USD"])
+                if "VS_BUDGET_USD" in os.environ
+                else None
+            )
+        except ValueError:
+            self._budget_usd = None
+
+        # Range validation: ignore invalid values
+        if self._max_turns is not None and self._max_turns <= 0:
+            self._max_turns = None
+        if self._budget_usd is not None and self._budget_usd < 0:
+            self._budget_usd = None
+
         self._allowed_tools: list[str] = (
-            [t.strip() for t in os.environ["VS_ALLOWED_TOOLS"].split(",")]
+            [t.strip() for t in os.environ["VS_ALLOWED_TOOLS"].split(",") if t.strip()]
             if "VS_ALLOWED_TOOLS" in os.environ
             else []
         )
         self._disallowed_tools: list[str] = (
-            [t.strip() for t in os.environ["VS_DISALLOWED_TOOLS"].split(",")]
+            [
+                t.strip()
+                for t in os.environ["VS_DISALLOWED_TOOLS"].split(",")
+                if t.strip()
+            ]
             if "VS_DISALLOWED_TOOLS" in os.environ
             else []
         )
         self._effort: str | None = os.environ.get("VS_EFFORT")
-        self._output_format_str: str | None = os.environ.get("VS_OUTPUT_FORMAT")
+        self._output_format: str | None = os.environ.get("VS_OUTPUT_FORMAT")
         self._fallback_model: str | None = os.environ.get("VS_FALLBACK_MODEL")
         self._include_dirs: list[str] = (
-            [d.strip() for d in os.environ["VS_INCLUDE_DIRS"].split(",")]
+            [d.strip() for d in os.environ["VS_INCLUDE_DIRS"].split(",") if d.strip()]
             if "VS_INCLUDE_DIRS" in os.environ
             else []
         )
@@ -538,16 +498,15 @@ class ClaudeACPBridge:
     ) -> AuthenticateResponse | None:
         """Authenticate using the specified method.
 
-        Claude SDK authenticates via the ``ANTHROPIC_API_KEY`` environment
-        variable — no protocol-level authentication is needed.  This method
-        returns an empty ``AuthenticateResponse`` to satisfy ACP callers.
+        Claude SDK handles authentication internally — no protocol-level
+        authentication is needed.  This method returns an empty
+        ``AuthenticateResponse`` to satisfy ACP callers.
         """
         _ = method_id
         _ = kwargs
         if self._debug:
-            has_key = "ANTHROPIC_API_KEY" in os.environ
             logger.debug(
-                "authenticate(method=%s) — API key present: %s", method_id, has_key
+                "authenticate(method=%s) — SDK handles auth internally", method_id
             )
         return AuthenticateResponse()
 

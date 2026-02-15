@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest import mock
+import subprocess
 
 import pytest
 
@@ -50,11 +50,11 @@ class TestGeminiProvider:
         return GeminiProvider()
 
     @pytest.fixture(autouse=True)
-    def _clear_version_cache(self):
-        """Reset the module-level version cache before each test."""
+    def _seed_version_cache(self):
+        """Pre-seed the module-level version cache to skip real subprocess."""
         from protocol.providers import gemini as gmod
 
-        gmod._cached_version = None
+        gmod._cached_version = (0, 27, 0)
         yield
         gmod._cached_version = None
 
@@ -92,18 +92,14 @@ class TestGeminiProvider:
         assert provider.get_model_capability(high_model) == CapabilityLevel.HIGH
 
     def test_prepare_process_returns_spec(self, provider, tmp_path):
-        with mock.patch(
-            "protocol.providers.gemini.GeminiProvider.check_version",
-            return_value=(0, 27, 0),
-        ):
-            spec = provider.prepare_process(
-                agent_name="test-agent",
-                agent_meta={"model": GeminiModels.LOW},
-                agent_persona="You are a test agent.",
-                task_context="Do something.",
-                root_dir=tmp_path,
-                model_override=GeminiModels.LOW,
-            )
+        spec = provider.prepare_process(
+            agent_name="test-agent",
+            agent_meta={"model": GeminiModels.LOW},
+            agent_persona="You are a test agent.",
+            task_context="Do something.",
+            root_dir=tmp_path,
+            model_override=GeminiModels.LOW,
+        )
         assert isinstance(spec, ProcessSpec)
         assert "--experimental-acp" in spec.args
         assert "--system" not in spec.args
@@ -122,18 +118,14 @@ class TestGeminiProvider:
             "You must always respond in French.",
             encoding="utf-8",
         )
-        with mock.patch(
-            "protocol.providers.gemini.GeminiProvider.check_version",
-            return_value=(0, 27, 0),
-        ):
-            spec = provider.prepare_process(
-                agent_name="test-agent",
-                agent_meta={"model": GeminiModels.LOW},
-                agent_persona="You are Jean-Claude.",
-                task_context="Bake croissants.",
-                root_dir=tmp_path,
-                model_override=GeminiModels.LOW,
-            )
+        spec = provider.prepare_process(
+            agent_name="test-agent",
+            agent_meta={"model": GeminiModels.LOW},
+            agent_persona="You are Jean-Claude.",
+            task_context="Bake croissants.",
+            root_dir=tmp_path,
+            model_override=GeminiModels.LOW,
+        )
         # Task is passed directly, not mixed with system prompt
         assert spec.initial_prompt_override == "Bake croissants."
         # System prompt written to temp file referenced by env var
@@ -149,25 +141,21 @@ class TestGeminiProvider:
 
     def test_prepare_process_no_system_md(self, provider, tmp_path):
         """Without SYSTEM.md, system file has persona but no system instructions."""
-        with mock.patch(
-            "protocol.providers.gemini.GeminiProvider.check_version",
-            return_value=(0, 27, 0),
-        ):
-            spec = provider.prepare_process(
-                agent_name="test-agent",
-                agent_meta={"model": GeminiModels.LOW},
-                agent_persona="You are Jean-Claude.",
-                task_context="Bake croissants.",
-                root_dir=tmp_path,
-                model_override=GeminiModels.LOW,
-            )
+        spec = provider.prepare_process(
+            agent_name="test-agent",
+            agent_meta={"model": GeminiModels.LOW},
+            agent_persona="You are Jean-Claude.",
+            task_context="Bake croissants.",
+            root_dir=tmp_path,
+            model_override=GeminiModels.LOW,
+        )
         assert spec.initial_prompt_override == "Bake croissants."
         content = spec.cleanup_paths[0].read_text(encoding="utf-8")
         assert "SYSTEM INSTRUCTIONS" not in content
         assert "AGENT PERSONA" in content
 
     def test_system_prompt_ordering(self, provider):
-        """Prompt ordering: system instructions → persona → rules."""
+        """Prompt ordering: system instructions -> persona -> rules."""
         prompt = provider.construct_system_prompt(
             "I am a persona",
             "These are rules",
@@ -193,32 +181,45 @@ class TestGeminiVersionCheck:
         yield
         gmod._cached_version = None
 
-    def test_parse_version_output(self):
-        result = mock.MagicMock()
-        result.stdout = "gemini v0.27.0"
-        result.stderr = ""
-        target = "protocol.providers.gemini.subprocess.run"
-        with mock.patch(target, return_value=result):
-            version = GeminiProvider.check_version("gemini")
+    def test_parse_version_output(self, monkeypatch):
+        result = subprocess.CompletedProcess(
+            args=["gemini", "--version"],
+            returncode=0,
+            stdout="gemini v0.27.0",
+            stderr="",
+        )
+        monkeypatch.setattr(
+            "protocol.providers.gemini.subprocess.run",
+            lambda *_a, **_kw: result,
+        )
+        version = GeminiProvider.check_version("gemini")
         assert version == (0, 27, 0)
 
-    def test_version_cached(self):
-        result = mock.MagicMock()
-        result.stdout = "gemini v0.27.0"
-        result.stderr = ""
-        target = "protocol.providers.gemini.subprocess.run"
-        with mock.patch(target, return_value=result) as mock_run:
-            v1 = GeminiProvider.check_version("gemini")
-            v2 = GeminiProvider.check_version("gemini")
-        assert v1 == v2
-        mock_run.assert_called_once()
+    def test_version_cached(self, monkeypatch):
+        call_count = 0
 
-    def test_executable_not_found(self):
-        with mock.patch(
-            "protocol.providers.gemini.subprocess.run",
-            side_effect=FileNotFoundError,
-        ):
-            version = GeminiProvider.check_version("gemini")
+        def fake_run(*_args, **_kwargs):
+            nonlocal call_count
+            call_count += 1
+            return subprocess.CompletedProcess(
+                args=["gemini", "--version"],
+                returncode=0,
+                stdout="gemini v0.27.0",
+                stderr="",
+            )
+
+        monkeypatch.setattr("protocol.providers.gemini.subprocess.run", fake_run)
+        v1 = GeminiProvider.check_version("gemini")
+        v2 = GeminiProvider.check_version("gemini")
+        assert v1 == v2
+        assert call_count == 1
+
+    def test_executable_not_found(self, monkeypatch):
+        def raise_fnf(*_args, **_kwargs):
+            raise FileNotFoundError
+
+        monkeypatch.setattr("protocol.providers.gemini.subprocess.run", raise_fnf)
+        version = GeminiProvider.check_version("gemini")
         assert version is None
 
 
@@ -298,7 +299,7 @@ class TestGetProviderForModel:
 
 
 # ---------------------------------------------------------------------------
-# TestGeminiSandboxFlag — Phase 1: --sandbox flag in read-only mode
+# TestGeminiSandboxFlag -- Phase 1: --sandbox flag in read-only mode
 # ---------------------------------------------------------------------------
 
 
@@ -310,50 +311,42 @@ class TestGeminiSandboxFlag:
         return GeminiProvider()
 
     @pytest.fixture(autouse=True)
-    def _clear_version_cache(self):
+    def _seed_version_cache(self):
         from protocol.providers import gemini as gmod
 
-        gmod._cached_version = None
+        gmod._cached_version = (0, 27, 0)
         yield
         gmod._cached_version = None
 
     def test_gemini_sandbox_flag_readonly(self, provider, tmp_path):
         """prepare_process(..., mode='read-only') includes --sandbox in args."""
-        with mock.patch(
-            "protocol.providers.gemini.GeminiProvider.check_version",
-            return_value=(0, 27, 0),
-        ):
-            spec = provider.prepare_process(
-                agent_name="test-agent",
-                agent_meta={"model": GeminiModels.LOW},
-                agent_persona="You are a test agent.",
-                task_context="Analyze code.",
-                root_dir=tmp_path,
-                model_override=GeminiModels.LOW,
-                mode="read-only",
-            )
+        spec = provider.prepare_process(
+            agent_name="test-agent",
+            agent_meta={"model": GeminiModels.LOW},
+            agent_persona="You are a test agent.",
+            task_context="Analyze code.",
+            root_dir=tmp_path,
+            model_override=GeminiModels.LOW,
+            mode="read-only",
+        )
         assert "--sandbox" in spec.args
 
     def test_gemini_no_sandbox_flag_readwrite(self, provider, tmp_path):
         """prepare_process(..., mode='read-write') does NOT include --sandbox."""
-        with mock.patch(
-            "protocol.providers.gemini.GeminiProvider.check_version",
-            return_value=(0, 27, 0),
-        ):
-            spec = provider.prepare_process(
-                agent_name="test-agent",
-                agent_meta={"model": GeminiModels.LOW},
-                agent_persona="You are a test agent.",
-                task_context="Build feature.",
-                root_dir=tmp_path,
-                model_override=GeminiModels.LOW,
-                mode="read-write",
-            )
+        spec = provider.prepare_process(
+            agent_name="test-agent",
+            agent_meta={"model": GeminiModels.LOW},
+            agent_persona="You are a test agent.",
+            task_context="Build feature.",
+            root_dir=tmp_path,
+            model_override=GeminiModels.LOW,
+            mode="read-write",
+        )
         assert "--sandbox" not in spec.args
 
 
 # ---------------------------------------------------------------------------
-# TestClaudeModePassthrough — Phase 1: mode doesn't change Claude args
+# TestClaudeModePassthrough -- Phase 1: mode doesn't change Claude args
 # ---------------------------------------------------------------------------
 
 
@@ -405,7 +398,7 @@ class TestClaudeModePassthrough:
 
 
 # ---------------------------------------------------------------------------
-# TestClaudeFeaturePassthrough — Phase 5: env vars from agent_meta
+# TestClaudeFeaturePassthrough -- Phase 5: env vars from agent_meta
 # ---------------------------------------------------------------------------
 
 
@@ -496,7 +489,8 @@ class TestClaudeFeaturePassthrough:
             task_context="Do it.",
             root_dir=tmp_path,
         )
-        assert spec.env["VS_INCLUDE_DIRS"] == ".vault, src"
+        # Production code splits on comma, validates, and re-joins with ","
+        assert spec.env["VS_INCLUDE_DIRS"] == ".vault,src"
 
     def test_output_format_env(self, provider, tmp_path):
         spec = provider.prepare_process(
@@ -534,7 +528,7 @@ class TestClaudeFeaturePassthrough:
 
 
 # ---------------------------------------------------------------------------
-# TestGeminiFeaturePassthrough — Phase 5: CLI flags from agent_meta
+# TestGeminiFeaturePassthrough -- Phase 5: CLI flags from agent_meta
 # ---------------------------------------------------------------------------
 
 
@@ -546,26 +540,22 @@ class TestGeminiFeaturePassthrough:
         return GeminiProvider()
 
     @pytest.fixture(autouse=True)
-    def _clear_version_cache(self):
+    def _seed_version_cache(self):
         from protocol.providers import gemini as gmod
 
-        gmod._cached_version = None
+        gmod._cached_version = (0, 27, 0)
         yield
         gmod._cached_version = None
 
     def _make_spec(self, provider, tmp_path, **extra_meta):
         meta = {"model": GeminiModels.LOW, **extra_meta}
-        with mock.patch(
-            "protocol.providers.gemini.GeminiProvider.check_version",
-            return_value=(0, 27, 0),
-        ):
-            return provider.prepare_process(
-                agent_name="test",
-                agent_meta=meta,
-                agent_persona="",
-                task_context="Do it.",
-                root_dir=tmp_path,
-            )
+        return provider.prepare_process(
+            agent_name="test",
+            agent_meta=meta,
+            agent_persona="",
+            task_context="Do it.",
+            root_dir=tmp_path,
+        )
 
     def test_allowed_tools_flags(self, provider, tmp_path):
         spec = self._make_spec(provider, tmp_path, allowed_tools="Glob, Read")

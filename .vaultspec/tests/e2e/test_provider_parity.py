@@ -9,7 +9,6 @@ mechanisms.
 from __future__ import annotations
 
 from pathlib import Path
-from unittest import mock
 
 import pytest
 
@@ -37,13 +36,14 @@ def gemini():
 
 
 @pytest.fixture(autouse=True)
-def _clear_gemini_version_cache():
-    """Reset module-level version cache around each test."""
+def _seed_gemini_version_cache(monkeypatch):
+    """Pre-seed the Gemini version cache so check_version() is a no-op."""
     from protocol.providers import gemini as gmod
 
-    gmod._cached_version = None
-    yield
-    gmod._cached_version = None
+    monkeypatch.setattr(gmod, "_cached_version", (0, 27, 0))
+    monkeypatch.setattr(
+        "protocol.providers.gemini.shutil.which", lambda _name: "/usr/bin/gemini"
+    )
 
 
 def _gemini_spec(
@@ -54,26 +54,16 @@ def _gemini_spec(
     task: str = "Do the thing.",
     mode: str = "read-write",
 ) -> ProcessSpec:
-    """Build a GeminiProvider ProcessSpec with mocked deps."""
-    with (
-        mock.patch(
-            "protocol.providers.gemini.shutil.which",
-            return_value="/usr/bin/gemini",
-        ),
-        mock.patch(
-            "protocol.providers.gemini.GeminiProvider.check_version",
-            return_value=(0, 27, 0),
-        ),
-    ):
-        return provider.prepare_process(
-            agent_name="parity-agent",
-            agent_meta={"tier": "LOW"},
-            agent_persona=persona,
-            task_context=task,
-            root_dir=tmp_path,
-            model_override=GeminiModels.LOW,
-            mode=mode,
-        )
+    """Build a GeminiProvider ProcessSpec (no mocks needed -- cache pre-seeded)."""
+    return provider.prepare_process(
+        agent_name="parity-agent",
+        agent_meta={"tier": "LOW"},
+        agent_persona=persona,
+        task_context=task,
+        root_dir=tmp_path,
+        model_override=GeminiModels.LOW,
+        mode=mode,
+    )
 
 
 def _claude_spec(

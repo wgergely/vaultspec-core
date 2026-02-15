@@ -22,7 +22,6 @@ import json
 import os
 import pathlib
 import sys
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -320,7 +319,7 @@ class TestSandboxEnforcement:
         result = await callback(
             "Write",
             {"file_path": str(project_root / ".vault" / "stories" / "new-story.md")},
-            MagicMock(),  # ToolPermissionContext
+            object(),  # ToolPermissionContext
         )
         assert result.behavior == "allow"
 
@@ -328,16 +327,16 @@ class TestSandboxEnforcement:
         result = await callback(
             "Write",
             {"file_path": str(project_root / "src" / "main.py")},
-            MagicMock(),
+            object(),
         )
         assert result.behavior == "deny"
 
     @pytest.mark.asyncio
-    async def test_read_write_mode_no_restrictions(self):
+    async def test_read_write_mode_no_restrictions(self, tmp_path):
         """In read-write mode, no sandbox callback is created."""
         from protocol.acp.claude_bridge import _make_sandbox_callback
 
-        callback = _make_sandbox_callback(mode="read-write", root_dir="/workspace")
+        callback = _make_sandbox_callback(mode="read-write", root_dir=str(tmp_path))
         assert callback is None
 
 

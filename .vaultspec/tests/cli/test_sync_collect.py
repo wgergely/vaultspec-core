@@ -8,7 +8,6 @@ _generate_config, _generate_system_prompt.
 from __future__ import annotations
 
 import shutil
-from unittest.mock import patch
 
 import cli
 import pytest
@@ -161,8 +160,8 @@ class TestTransformRule:
 
 
 class TestTransformAgent:
-    @patch.object(cli, "resolve_model", side_effect=mock_resolve_model)
-    def test_valid_tier(self, _mock_rm):
+    def test_valid_tier(self, monkeypatch):
+        monkeypatch.setattr(cli, "resolve_model", mock_resolve_model)
         result = cli.transform_agent(
             "claude", "coder.md", {"description": "A coder", "tier": "HIGH"}, "Body"
         )
@@ -172,8 +171,8 @@ class TestTransformAgent:
         assert meta["name"] == "coder"
         assert "Body" in body
 
-    @patch.object(cli, "resolve_model", return_value=None)
-    def test_missing_model_returns_none(self, _mock_rm):
+    def test_missing_model_returns_none(self, monkeypatch):
+        monkeypatch.setattr(cli, "resolve_model", lambda *_args, **_kw: None)
         result = cli.transform_agent(
             "claude", "agent.md", {"description": "x", "tier": "HIGH"}, "Body"
         )

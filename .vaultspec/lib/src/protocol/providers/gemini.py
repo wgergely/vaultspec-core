@@ -179,11 +179,16 @@ class GeminiProvider(AgentProvider):
         if fmt and fmt != "text":
             args.extend(["--output-format", fmt])
 
-        # Additional workspace directories
+        # Additional workspace directories (validated against traversal)
         include_dirs = agent_meta.get("include_dirs", "")
         if include_dirs:
             for d in (x.strip() for x in include_dirs.split(",") if x.strip()):
-                args.extend(["--include-directories", d])
+                try:
+                    resolved = (root_dir / d).resolve()
+                    if resolved.is_relative_to(root_dir.resolve()):
+                        args.extend(["--include-directories", d])
+                except (ValueError, OSError):
+                    pass
 
         return ProcessSpec(
             executable=executable,

@@ -114,6 +114,37 @@ def _inject_permission_prompt(task_content: str, mode: str) -> str:
     return task_content
 
 
+def _prepare_dispatch_kwargs(
+    agent_name: str,
+    task: str,
+    root_dir: pathlib.Path,
+    mode: str,
+    model: str | None = None,
+    max_turns: int | None = None,
+    budget: float | None = None,
+    effort: str | None = None,
+    output_format: str | None = None,
+) -> dict:
+    """Build kwargs dict for ``run_subagent`` from dispatch parameters.
+
+    Pure function -- no server globals needed.  Extracted for testability.
+    """
+    return {
+        "agent_name": agent_name,
+        "initial_task": task,
+        "root_dir": root_dir,
+        "model_override": model,
+        "interactive": False,
+        "debug": False,
+        "quiet": True,
+        "mode": mode,
+        "max_turns": max_turns,
+        "budget": budget,
+        "effort": effort,
+        "output_format": output_format,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Artifact extraction
 # ---------------------------------------------------------------------------
@@ -366,6 +397,11 @@ async def dispatch_agent(
 
     if agent not in _agent_cache:
         raise ToolError(f"Agent '{agent}' not found.")
+
+    if max_turns is not None and max_turns <= 0:
+        raise ToolError(f"max_turns must be positive, got {max_turns}")
+    if budget is not None and budget < 0:
+        raise ToolError(f"budget must be non-negative, got {budget}")
 
     effective_mode = _resolve_effective_mode(agent, mode)
     if effective_mode not in ("read-write", "read-only"):
