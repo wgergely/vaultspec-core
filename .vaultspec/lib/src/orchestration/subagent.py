@@ -214,8 +214,6 @@ async def run_subagent(
         model_override=current_model,
         mode=mode,
     )
-    spec.env["VS_AGENT_MODE"] = mode
-
     # 4. Spawn and Connect
     session_id = resume_session_id or str(asyncio.get_event_loop().time())
     logger_instance = SessionLogger(session_id, root_dir)

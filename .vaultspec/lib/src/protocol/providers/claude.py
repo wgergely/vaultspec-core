@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from typing import TYPE_CHECKING
@@ -16,6 +17,11 @@ from .base import (
 if TYPE_CHECKING:
     import pathlib
 
+logger = logging.getLogger(__name__)
+
+# Features only supported by the Gemini provider
+_GEMINI_ONLY_FEATURES = ("approval_mode",)
+
 
 class ClaudeProvider(AgentProvider):
     """Provider for Anthropic Claude models via Python ACP bridge."""
@@ -27,6 +33,13 @@ class ClaudeProvider(AgentProvider):
     @property
     def models(self) -> ModelRegistry:
         return ClaudeModels
+
+    def load_system_prompt(self, root_dir: pathlib.Path) -> str:
+        """Load .claude/CLAUDE.md if it exists."""
+        system_file = root_dir / ".claude" / "CLAUDE.md"
+        if not system_file.exists():
+            return ""
+        return system_file.read_text(encoding="utf-8")
 
     def load_rules(self, root_dir: pathlib.Path) -> str:
         """Loads and resolves nested rules from .claude/rules/."""
@@ -42,9 +55,16 @@ class ClaudeProvider(AgentProvider):
 
         return "\n\n".join(all_rules)
 
-    def _build_system_context(self, persona: str, rules: str) -> str:
-        """Combine persona and rules into system context for initial prompt."""
+    def construct_system_prompt(
+        self,
+        persona: str,
+        rules: str,
+        system_instructions: str = "",
+    ) -> str:
+        """Combines system instructions, persona, and rules."""
         parts = []
+        if system_instructions.strip():
+            parts.append(f"# SYSTEM INSTRUCTIONS\n{system_instructions}")
         if persona.strip():
             parts.append(f"# AGENT PERSONA\n{persona}")
         if rules.strip():
@@ -62,13 +82,26 @@ class ClaudeProvider(AgentProvider):
         mode: str = "read-write",
     ) -> ProcessSpec:
         _ = agent_name
-        _ = mode
 
-        # Load rules
+        # Warn on Gemini-only features
+        for key in _GEMINI_ONLY_FEATURES:
+            if agent_meta.get(key):
+                logger.warning(
+                    "Feature '%s' is not supported by %s provider; ignoring",
+                    key,
+                    self.name,
+                )
+
+        # Load system instructions and rules
+        system_instructions = self.load_system_prompt(root_dir)
         rules = self.load_rules(root_dir)
 
-        # Construct system context (persona + rules)
-        system_context = self._build_system_context(agent_persona, rules)
+        # Construct system context
+        system_context = self.construct_system_prompt(
+            agent_persona,
+            rules,
+            system_instructions,
+        )
 
         # Determine model
         model = model_override or agent_meta.get("model")
@@ -76,14 +109,15 @@ class ClaudeProvider(AgentProvider):
             tier = agent_meta.get("tier", "MEDIUM")
             model = self.get_best_model_for_capability(CapabilityLevel[tier.upper()])
 
-        # Prepare environment — strip CLAUDECODE to unblock nested sessions
+        # Prepare environment
         env = os.environ.copy()
         env.pop("CLAUDECODE", None)
         env["VS_ROOT_DIR"] = str(root_dir)
+        env["VS_AGENT_MODE"] = mode
         if system_context:
             env["VS_SYSTEM_PROMPT"] = system_context
 
-        # Safety & control features from agent YAML / runtime overrides
+        # Safety & control features from agent YAML
         if agent_meta.get("max_turns"):
             env["VS_MAX_TURNS"] = agent_meta["max_turns"]
         if agent_meta.get("budget"):
@@ -100,14 +134,7 @@ class ClaudeProvider(AgentProvider):
             env["VS_FALLBACK_MODEL"] = agent_meta["fallback_model"]
         include_dirs = agent_meta.get("include_dirs", "")
         if include_dirs:
-            validated = []
-            for d in (x.strip() for x in include_dirs.split(",") if x.strip()):
-                try:
-                    resolved = (root_dir / d).resolve()
-                    if resolved.is_relative_to(root_dir.resolve()):
-                        validated.append(d)
-                except (ValueError, OSError):
-                    pass
+            validated = self._validate_include_dirs(include_dirs, root_dir)
             if validated:
                 env["VS_INCLUDE_DIRS"] = ",".join(validated)
 

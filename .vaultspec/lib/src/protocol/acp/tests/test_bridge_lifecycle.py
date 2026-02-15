@@ -1335,3 +1335,44 @@ class TestBridgeFeatureConfig:
         assert "allowed_tools" not in captured
         assert "disallowed_tools" not in captured
         assert "add_dirs" not in captured
+        assert "output_format" not in captured
+
+    def test_output_format_json_passed_to_sdk(self, monkeypatch):
+        """_build_options() passes output_format dict when json."""
+        monkeypatch.setenv("VS_OUTPUT_FORMAT", "json")
+        bridge = ClaudeACPBridge()
+
+        captured = {}
+
+        class OptionsRecorder:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+        monkeypatch.setattr(
+            "protocol.acp.claude_bridge.ClaudeAgentOptions",
+            OptionsRecorder,
+        )
+        bridge._build_options(str(TEST_PROJECT), {}, None)
+
+        assert captured["output_format"] == {
+            "type": "json_object",
+        }
+
+    def test_output_format_text_not_passed(self, monkeypatch):
+        """_build_options() omits output_format for text."""
+        monkeypatch.setenv("VS_OUTPUT_FORMAT", "text")
+        bridge = ClaudeACPBridge()
+
+        captured = {}
+
+        class OptionsRecorder:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+        monkeypatch.setattr(
+            "protocol.acp.claude_bridge.ClaudeAgentOptions",
+            OptionsRecorder,
+        )
+        bridge._build_options(str(TEST_PROJECT), {}, None)
+
+        assert "output_format" not in captured

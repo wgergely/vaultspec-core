@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import inspect
+import logging
 import subprocess
 
 import pytest
 
 from orchestration.subagent import get_provider_for_model
 from protocol.providers.base import (
+    AgentProvider,
     CapabilityLevel,
     ClaudeModels,
     GeminiModels,
@@ -605,3 +608,234 @@ class TestGeminiFeaturePassthrough:
             "--include-directories",
         ):
             assert flag not in spec.args
+
+
+# ---------------------------------------------------------------------------
+# TestProviderAPIParity -- both providers share the same interface
+# ---------------------------------------------------------------------------
+
+
+class TestProviderAPIParity:
+    """Verify both providers implement the same abstract API."""
+
+    def test_construct_system_prompt_signature_matches(self):
+        """Both providers have the same construct_system_prompt signature."""
+        claude_sig = inspect.signature(ClaudeProvider.construct_system_prompt)
+        gemini_sig = inspect.signature(GeminiProvider.construct_system_prompt)
+        assert list(claude_sig.parameters) == list(gemini_sig.parameters)
+
+    def test_load_system_prompt_exists_on_both(self):
+        """Both providers have load_system_prompt()."""
+        assert hasattr(ClaudeProvider, "load_system_prompt")
+        assert hasattr(GeminiProvider, "load_system_prompt")
+
+    def test_load_rules_exists_on_both(self):
+        """Both providers have load_rules()."""
+        assert hasattr(ClaudeProvider, "load_rules")
+        assert hasattr(GeminiProvider, "load_rules")
+
+    def test_abstract_methods_on_base(self):
+        """Base class declares expected abstract methods."""
+        abstracts = AgentProvider.__abstractmethods__
+        for method in (
+            "load_system_prompt",
+            "load_rules",
+            "construct_system_prompt",
+            "prepare_process",
+        ):
+            assert method in abstracts
+
+    def test_validate_include_dirs_on_base(self):
+        """Base class provides _validate_include_dirs."""
+        assert hasattr(AgentProvider, "_validate_include_dirs")
+
+
+# ---------------------------------------------------------------------------
+# TestClaudeModeEnv -- Claude now sets VS_AGENT_MODE
+# ---------------------------------------------------------------------------
+
+
+class TestClaudeModeEnv:
+    """Verify Claude provider sets VS_AGENT_MODE in env."""
+
+    @pytest.fixture
+    def provider(self):
+        return ClaudeProvider()
+
+    def test_mode_sets_env_var_read_write(self, provider):
+        spec = provider.prepare_process(
+            agent_name="test",
+            agent_meta={"model": ClaudeModels.MEDIUM},
+            agent_persona="",
+            task_context="Do it.",
+            root_dir=TEST_PROJECT,
+            mode="read-write",
+        )
+        assert spec.env["VS_AGENT_MODE"] == "read-write"
+
+    def test_mode_sets_env_var_read_only(self, provider):
+        spec = provider.prepare_process(
+            agent_name="test",
+            agent_meta={"model": ClaudeModels.MEDIUM},
+            agent_persona="",
+            task_context="Do it.",
+            root_dir=TEST_PROJECT,
+            mode="read-only",
+        )
+        assert spec.env["VS_AGENT_MODE"] == "read-only"
+
+
+# ---------------------------------------------------------------------------
+# TestClaudeSystemPrompt -- load_system_prompt and construct_system_prompt
+# ---------------------------------------------------------------------------
+
+
+class TestClaudeSystemPrompt:
+    """Verify Claude provider system prompt methods."""
+
+    @pytest.fixture
+    def provider(self):
+        return ClaudeProvider()
+
+    def test_load_system_prompt_reads_claude_md(self, provider, tmp_path):
+        """load_system_prompt reads .claude/CLAUDE.md."""
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        (claude_dir / "CLAUDE.md").write_text(
+            "System instructions here.",
+            encoding="utf-8",
+        )
+        result = provider.load_system_prompt(tmp_path)
+        assert "System instructions here." in result
+
+    def test_load_system_prompt_missing_file(self, provider, tmp_path):
+        """load_system_prompt returns '' when file is missing."""
+        assert provider.load_system_prompt(tmp_path) == ""
+
+    def test_construct_system_prompt_ordering(self, provider):
+        """Prompt ordering: system instructions -> persona -> rules."""
+        prompt = provider.construct_system_prompt(
+            "I am a persona",
+            "These are rules",
+            "These are instructions",
+        )
+        instr_pos = prompt.index("SYSTEM INSTRUCTIONS")
+        persona_pos = prompt.index("AGENT PERSONA")
+        rules_pos = prompt.index("SYSTEM RULES")
+        assert instr_pos < persona_pos < rules_pos
+
+    def test_construct_system_prompt_no_instructions(self, provider):
+        """Without system_instructions, no SYSTEM INSTRUCTIONS section."""
+        prompt = provider.construct_system_prompt("persona", "rules", "")
+        assert "SYSTEM INSTRUCTIONS" not in prompt
+        assert "AGENT PERSONA" in prompt
+
+
+# ---------------------------------------------------------------------------
+# TestProviderFeatureWarnings -- cross-provider warnings
+# ---------------------------------------------------------------------------
+
+
+class TestProviderFeatureWarnings:
+    """Verify providers warn on unsupported features."""
+
+    def test_claude_warns_on_approval_mode(self, caplog):
+        provider = ClaudeProvider()
+        with caplog.at_level(
+            logging.WARNING,
+            logger="protocol.providers.claude",
+        ):
+            provider.prepare_process(
+                agent_name="test",
+                agent_meta={
+                    "model": ClaudeModels.MEDIUM,
+                    "approval_mode": "yolo",
+                },
+                agent_persona="",
+                task_context="Do it.",
+                root_dir=TEST_PROJECT,
+            )
+        assert any(
+            "approval_mode" in r.message and "claude" in r.message
+            for r in caplog.records
+        )
+
+    def test_gemini_warns_on_max_turns(self, caplog):
+        from protocol.providers import gemini as gmod
+
+        gmod._cached_version = (0, 27, 0)
+        try:
+            provider = GeminiProvider()
+            with caplog.at_level(
+                logging.WARNING,
+                logger="protocol.providers.gemini",
+            ):
+                provider.prepare_process(
+                    agent_name="test",
+                    agent_meta={
+                        "model": GeminiModels.LOW,
+                        "max_turns": "10",
+                    },
+                    agent_persona="",
+                    task_context="Do it.",
+                    root_dir=TEST_PROJECT,
+                )
+            assert any(
+                "max_turns" in r.message and "gemini" in r.message
+                for r in caplog.records
+            )
+        finally:
+            gmod._cached_version = None
+
+    def test_gemini_warns_on_budget(self, caplog):
+        from protocol.providers import gemini as gmod
+
+        gmod._cached_version = (0, 27, 0)
+        try:
+            provider = GeminiProvider()
+            with caplog.at_level(
+                logging.WARNING,
+                logger="protocol.providers.gemini",
+            ):
+                provider.prepare_process(
+                    agent_name="test",
+                    agent_meta={
+                        "model": GeminiModels.LOW,
+                        "budget": "5.0",
+                    },
+                    agent_persona="",
+                    task_context="Do it.",
+                    root_dir=TEST_PROJECT,
+                )
+            assert any(
+                "budget" in r.message and "gemini" in r.message for r in caplog.records
+            )
+        finally:
+            gmod._cached_version = None
+
+
+# ---------------------------------------------------------------------------
+# TestValidateIncludeDirsBase -- extracted validation
+# ---------------------------------------------------------------------------
+
+
+class TestValidateIncludeDirsBase:
+    """Verify _validate_include_dirs on base class."""
+
+    def test_valid_dirs_accepted(self, tmp_path):
+        (tmp_path / ".vault").mkdir()
+        (tmp_path / "src").mkdir()
+        provider = ClaudeProvider()
+        result = provider._validate_include_dirs(".vault, src", tmp_path)
+        assert ".vault" in result
+        assert "src" in result
+
+    def test_traversal_rejected(self, tmp_path):
+        provider = ClaudeProvider()
+        result = provider._validate_include_dirs("../outside", tmp_path)
+        assert result == []
+
+    def test_empty_string(self, tmp_path):
+        provider = ClaudeProvider()
+        result = provider._validate_include_dirs("", tmp_path)
+        assert result == []

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 import shutil
@@ -19,6 +20,17 @@ from .base import (
 
 if TYPE_CHECKING:
     import pathlib
+
+logger = logging.getLogger(__name__)
+
+# Features only supported by the Claude provider
+_CLAUDE_ONLY_FEATURES = (
+    "max_turns",
+    "budget",
+    "disallowed_tools",
+    "effort",
+    "fallback_model",
+)
 
 _MIN_VERSION_WINDOWS = (0, 9, 0)  # v0.9.0 fixes Windows ACP hang
 _MIN_VERSION_RECOMMENDED = (0, 27, 0)  # v0.27.0 has stable agent skills
@@ -126,6 +138,15 @@ class GeminiProvider(AgentProvider):
     ) -> ProcessSpec:
         _ = agent_name
 
+        # Warn on Claude-only features
+        for key in _CLAUDE_ONLY_FEATURES:
+            if agent_meta.get(key):
+                logger.warning(
+                    "Feature '%s' is not supported by %s provider; ignoring",
+                    key,
+                    self.name,
+                )
+
         #  Locate executable and check version
         executable = shutil.which("gemini") or "gemini"
         self.check_version(executable)
@@ -182,13 +203,8 @@ class GeminiProvider(AgentProvider):
         # Additional workspace directories (validated against traversal)
         include_dirs = agent_meta.get("include_dirs", "")
         if include_dirs:
-            for d in (x.strip() for x in include_dirs.split(",") if x.strip()):
-                try:
-                    resolved = (root_dir / d).resolve()
-                    if resolved.is_relative_to(root_dir.resolve()):
-                        args.extend(["--include-directories", d])
-                except (ValueError, OSError):
-                    pass
+            for d in self._validate_include_dirs(include_dirs, root_dir):
+                args.extend(["--include-directories", d])
 
         return ProcessSpec(
             executable=executable,
