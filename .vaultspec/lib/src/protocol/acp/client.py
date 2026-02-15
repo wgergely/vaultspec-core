@@ -307,6 +307,12 @@ class SubagentClient(Client):
         **kwargs: Any,
     ) -> CreateTerminalResponse:
         """Spawn a subprocess and track it as an ACP terminal."""
+        if self.mode == "read-only":
+            raise ValueError(
+                "Terminal creation denied: read-only mode "
+                "does not permit shell access. "
+                "Use read_text_file for file access instead."
+            )
         _ = session_id
         _ = kwargs
         terminal_id = str(uuid.uuid4())

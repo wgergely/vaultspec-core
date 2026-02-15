@@ -193,6 +193,7 @@ async def run_subagent(
         task_context,
         root_dir,
         model_override=current_model,
+        mode=mode,
     )
     spec.env["VS_AGENT_MODE"] = mode
 

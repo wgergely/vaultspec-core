@@ -168,6 +168,7 @@ class AgentProvider(abc.ABC):
         task_context: str,
         root_dir: pathlib.Path,
         model_override: str | None = None,
+        mode: str = "read-write",
     ) -> ProcessSpec:
         """Prepares the process specification for spawning the agent.
 
@@ -178,6 +179,7 @@ class AgentProvider(abc.ABC):
             task_context: The initial task description.
             root_dir: The workspace root directory.
             model_override: Optional model override.
+            mode: Agent sandbox mode ("read-only" or "read-write").
 
         Returns:
             ProcessSpec containing command, args, env, cleanup paths,

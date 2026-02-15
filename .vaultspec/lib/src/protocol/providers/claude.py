@@ -59,8 +59,10 @@ class ClaudeProvider(AgentProvider):
         task_context: str,
         root_dir: pathlib.Path,
         model_override: str | None = None,
+        mode: str = "read-write",
     ) -> ProcessSpec:
         _ = agent_name
+        _ = mode
 
         # Load rules
         rules = self.load_rules(root_dir)
