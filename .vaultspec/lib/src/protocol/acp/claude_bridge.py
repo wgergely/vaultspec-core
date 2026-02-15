@@ -41,8 +41,12 @@ from acp.schema import (
     NewSessionResponse,
     PromptResponse,
     ResumeSessionResponse,
+    SessionCapabilities,
+    SessionForkCapabilities,
     SessionInfo,
     SessionInfoUpdate,
+    SessionListCapabilities,
+    SessionResumeCapabilities,
     TextContentBlock,
     ToolCallProgress,
     ToolCallStart,
@@ -265,6 +269,7 @@ class ClaudeACPBridge:
         self._session_id: str | None = None
         self._root_dir: str = os.environ.get("VS_ROOT_DIR", os.getcwd())
         self._mode: str = os.environ.get("VS_AGENT_MODE", "read-write")
+        self._system_prompt: str | None = os.environ.get("VS_SYSTEM_PROMPT")
 
         # All sessions tracked by this bridge instance
         self._sessions: dict[str, _SessionState] = {}
@@ -315,7 +320,14 @@ class ClaudeACPBridge:
                 name="claude-acp-bridge",
                 version="0.1.0",
             ),
-            agent_capabilities=AgentCapabilities(),
+            agent_capabilities=AgentCapabilities(
+                load_session=True,
+                session_capabilities=SessionCapabilities(
+                    fork=SessionForkCapabilities(),
+                    list=SessionListCapabilities(),
+                    resume=SessionResumeCapabilities(),
+                ),
+            ),
         )
 
     # ------------------------------------------------------------------
@@ -346,7 +358,7 @@ class ClaudeACPBridge:
             mcp_servers=sdk_mcp,
             can_use_tool=sandbox_cb,
             permission_mode="bypassPermissions",
-            system_prompt=None,
+            system_prompt=self._system_prompt,
             include_partial_messages=True,
         )
         self._sdk_client = ClaudeSDKClient(options)
@@ -517,7 +529,7 @@ class ClaudeACPBridge:
             mcp_servers=sdk_mcp,
             can_use_tool=sandbox_cb,
             permission_mode="bypassPermissions",
-            system_prompt=None,
+            system_prompt=self._system_prompt,
             include_partial_messages=True,
         )
         self._sdk_client = ClaudeSDKClient(options)
@@ -579,7 +591,7 @@ class ClaudeACPBridge:
             mcp_servers=sdk_mcp,
             can_use_tool=sandbox_cb,
             permission_mode="bypassPermissions",
-            system_prompt=None,
+            system_prompt=self._system_prompt,
             include_partial_messages=True,
         )
         self._sdk_client = ClaudeSDKClient(options)
@@ -635,7 +647,7 @@ class ClaudeACPBridge:
             mcp_servers=sdk_mcp,
             can_use_tool=sandbox_cb,
             permission_mode="bypassPermissions",
-            system_prompt=None,
+            system_prompt=self._system_prompt,
             include_partial_messages=True,
         )
         self._sdk_client = ClaudeSDKClient(options)

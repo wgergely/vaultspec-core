@@ -106,13 +106,16 @@ class TestGeminiProvider:
             )
         assert isinstance(spec, ProcessSpec)
         assert "--experimental-acp" in spec.args
-        assert "--system" not in spec.args  # Gemini CLI has no --system flag
-        assert len(spec.cleanup_paths) == 0
-        assert spec.initial_prompt_override is not None
-        assert "AGENT PERSONA" in spec.initial_prompt_override
+        assert "--system" not in spec.args
+        assert spec.initial_prompt_override == "Do something."
+        # System prompt delivered via GEMINI_SYSTEM_MD temp file
+        assert len(spec.cleanup_paths) == 1
+        assert spec.env.get("GEMINI_SYSTEM_MD")
+        system_content = spec.cleanup_paths[0].read_text(encoding="utf-8")
+        assert "AGENT PERSONA" in system_content
 
     def test_prepare_process_includes_system_md(self, provider, tmp_path):
-        """SYSTEM.md content is injected into initial_prompt_override."""
+        """SYSTEM.md content goes to GEMINI_SYSTEM_MD temp file."""
         system_dir = tmp_path / ".gemini"
         system_dir.mkdir()
         (system_dir / "SYSTEM.md").write_text(
@@ -131,16 +134,21 @@ class TestGeminiProvider:
                 root_dir=tmp_path,
                 model_override=GeminiModels.LOW,
             )
-        prompt = spec.initial_prompt_override
-        assert "SYSTEM INSTRUCTIONS" in prompt
-        assert "respond in French" in prompt
-        assert "AGENT PERSONA" in prompt
-        assert "Jean-Claude" in prompt
-        # System instructions come before persona
-        assert prompt.index("SYSTEM INSTRUCTIONS") < prompt.index("AGENT PERSONA")
+        # Task is passed directly, not mixed with system prompt
+        assert spec.initial_prompt_override == "Bake croissants."
+        # System prompt written to temp file referenced by env var
+        assert len(spec.cleanup_paths) == 1
+        sys_file = spec.cleanup_paths[0]
+        assert spec.env["GEMINI_SYSTEM_MD"] == str(sys_file)
+        content = sys_file.read_text(encoding="utf-8")
+        assert "SYSTEM INSTRUCTIONS" in content
+        assert "respond in French" in content
+        assert "AGENT PERSONA" in content
+        assert "Jean-Claude" in content
+        assert content.index("SYSTEM INSTRUCTIONS") < content.index("AGENT PERSONA")
 
     def test_prepare_process_no_system_md(self, provider, tmp_path):
-        """Without SYSTEM.md, prompt has persona but no system instructions."""
+        """Without SYSTEM.md, system file has persona but no system instructions."""
         with mock.patch(
             "protocol.providers.gemini.GeminiProvider.check_version",
             return_value=(0, 27, 0),
@@ -153,9 +161,10 @@ class TestGeminiProvider:
                 root_dir=tmp_path,
                 model_override=GeminiModels.LOW,
             )
-        prompt = spec.initial_prompt_override
-        assert "SYSTEM INSTRUCTIONS" not in prompt
-        assert "AGENT PERSONA" in prompt
+        assert spec.initial_prompt_override == "Bake croissants."
+        content = spec.cleanup_paths[0].read_text(encoding="utf-8")
+        assert "SYSTEM INSTRUCTIONS" not in content
+        assert "AGENT PERSONA" in content
 
     def test_system_prompt_ordering(self, provider):
         """Prompt ordering: system instructions → persona → rules."""

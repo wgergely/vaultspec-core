@@ -105,10 +105,11 @@ def test_gemini_process_spec_complete(test_project_root):
         root_dir=test_project_root,
     )
 
-    # Gemini writes the system prompt to a temp file; verify it's referenced in args
-    assert "--system" in spec.args
-    system_idx = spec.args.index("--system")
-    system_file = Path(spec.args[system_idx + 1])
+    # Gemini CLI has no --system flag; system prompt is delivered
+    # via GEMINI_SYSTEM_MD env var pointing to a temp file.
+    assert "--system" not in spec.args
+    assert "GEMINI_SYSTEM_MD" in spec.env
+    system_file = Path(spec.env["GEMINI_SYSTEM_MD"])
     assert system_file.exists()
     content = system_file.read_text(encoding="utf-8")
     assert "Jean-Claude" in content

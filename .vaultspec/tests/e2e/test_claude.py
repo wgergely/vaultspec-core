@@ -70,7 +70,7 @@ def test_claude_loads_rules(test_project_root):
 
 @pytest.mark.unit
 def test_claude_process_spec_complete(test_project_root):
-    """Verify Claude ProcessSpec has initial_prompt_override with all context."""
+    """Verify Claude ProcessSpec delivers system prompt via env var."""
     (test_project_root / ".claude" / "rules" / "identity.md").write_text(
         "Your name is Jean-Claude.\n",
         encoding="utf-8",
@@ -85,10 +85,13 @@ def test_claude_process_spec_complete(test_project_root):
         root_dir=test_project_root,
     )
 
-    assert spec.initial_prompt_override is not None
-    assert "Jean-Claude" in spec.initial_prompt_override
-    assert "helpful assistant" in spec.initial_prompt_override
-    assert "Tell me your name" in spec.initial_prompt_override
+    # initial_prompt_override is task-only (no system prefix)
+    assert spec.initial_prompt_override == "Tell me your name."
+    # System prompt delivered via VS_SYSTEM_PROMPT env var
+    assert "VS_SYSTEM_PROMPT" in spec.env
+    sys_prompt = spec.env["VS_SYSTEM_PROMPT"]
+    assert "Jean-Claude" in sys_prompt
+    assert "helpful assistant" in sys_prompt
 
 
 # ---------------------------------------------------------------------------
