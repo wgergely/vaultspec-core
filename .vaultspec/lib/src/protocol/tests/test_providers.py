@@ -106,20 +106,68 @@ class TestGeminiProvider:
             )
         assert isinstance(spec, ProcessSpec)
         assert "--experimental-acp" in spec.args
-        assert "--system" in spec.args
-        assert len(spec.cleanup_paths) == 1
+        assert "--system" not in spec.args  # Gemini CLI has no --system flag
+        assert len(spec.cleanup_paths) == 0
+        assert spec.initial_prompt_override is not None
+        assert "AGENT PERSONA" in spec.initial_prompt_override
 
-        # Cleanup temp file
-        for p in spec.cleanup_paths:
-            if p.exists():
-                p.unlink()
+    def test_prepare_process_includes_system_md(self, provider, tmp_path):
+        """SYSTEM.md content is injected into initial_prompt_override."""
+        system_dir = tmp_path / ".gemini"
+        system_dir.mkdir()
+        (system_dir / "SYSTEM.md").write_text(
+            "You must always respond in French.",
+            encoding="utf-8",
+        )
+        with mock.patch(
+            "protocol.providers.gemini.GeminiProvider.check_version",
+            return_value=(0, 27, 0),
+        ):
+            spec = provider.prepare_process(
+                agent_name="test-agent",
+                agent_meta={"model": GeminiModels.LOW},
+                agent_persona="You are Jean-Claude.",
+                task_context="Bake croissants.",
+                root_dir=tmp_path,
+                model_override=GeminiModels.LOW,
+            )
+        prompt = spec.initial_prompt_override
+        assert "SYSTEM INSTRUCTIONS" in prompt
+        assert "respond in French" in prompt
+        assert "AGENT PERSONA" in prompt
+        assert "Jean-Claude" in prompt
+        # System instructions come before persona
+        assert prompt.index("SYSTEM INSTRUCTIONS") < prompt.index("AGENT PERSONA")
 
-    def test_system_prompt_persona_first(self, provider):
-        """M5 fix: prompt ordering is persona-first, rules-second."""
-        prompt = provider.construct_system_prompt("I am a persona", "These are rules")
+    def test_prepare_process_no_system_md(self, provider, tmp_path):
+        """Without SYSTEM.md, prompt has persona but no system instructions."""
+        with mock.patch(
+            "protocol.providers.gemini.GeminiProvider.check_version",
+            return_value=(0, 27, 0),
+        ):
+            spec = provider.prepare_process(
+                agent_name="test-agent",
+                agent_meta={"model": GeminiModels.LOW},
+                agent_persona="You are Jean-Claude.",
+                task_context="Bake croissants.",
+                root_dir=tmp_path,
+                model_override=GeminiModels.LOW,
+            )
+        prompt = spec.initial_prompt_override
+        assert "SYSTEM INSTRUCTIONS" not in prompt
+        assert "AGENT PERSONA" in prompt
+
+    def test_system_prompt_ordering(self, provider):
+        """Prompt ordering: system instructions → persona → rules."""
+        prompt = provider.construct_system_prompt(
+            "I am a persona",
+            "These are rules",
+            "These are instructions",
+        )
+        instr_pos = prompt.index("SYSTEM INSTRUCTIONS")
         persona_pos = prompt.index("AGENT PERSONA")
         rules_pos = prompt.index("SYSTEM RULES")
-        assert persona_pos < rules_pos
+        assert instr_pos < persona_pos < rules_pos
 
 
 # ---------------------------------------------------------------------------
@@ -219,8 +267,8 @@ class TestClaudeProvider:
             model_override=ClaudeModels.MEDIUM,
         )
         assert isinstance(spec, ProcessSpec)
-        assert "mcp" in spec.args
-        assert "serve" in spec.args
+        assert "-m" in spec.args
+        assert "protocol.acp.claude_bridge" in spec.args
 
 
 # ---------------------------------------------------------------------------

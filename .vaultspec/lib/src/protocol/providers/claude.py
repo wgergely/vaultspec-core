@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-import shutil
+import sys
 from typing import TYPE_CHECKING
 
 from .base import (
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 class ClaudeProvider(AgentProvider):
-    """Provider for Anthropic Claude models via Claude CLI."""
+    """Provider for Anthropic Claude models via Python ACP bridge."""
 
     @property
     def name(self) -> str:
@@ -62,9 +62,6 @@ class ClaudeProvider(AgentProvider):
     ) -> ProcessSpec:
         _ = agent_name
 
-        # Locate executable
-        executable = shutil.which("claude") or "claude"
-
         # Load rules
         rules = self.load_rules(root_dir)
 
@@ -77,8 +74,10 @@ class ClaudeProvider(AgentProvider):
             tier = agent_meta.get("tier", "MEDIUM")
             model = self.get_best_model_for_capability(CapabilityLevel[tier.upper()])
 
-        # Prepare environment
+        # Prepare environment — strip CLAUDECODE to unblock nested sessions
         env = os.environ.copy()
+        env.pop("CLAUDECODE", None)
+        env["VS_ROOT_DIR"] = str(root_dir)
 
         # Build initial prompt with system context prepended to task
         initial_prompt = (
@@ -88,8 +87,8 @@ class ClaudeProvider(AgentProvider):
         )
 
         return ProcessSpec(
-            executable=executable,
-            args=["mcp", "serve"],
+            executable=sys.executable,
+            args=["-m", "protocol.acp.claude_bridge", "--model", model],
             env=env,
             cleanup_paths=[],
             initial_prompt_override=initial_prompt,
