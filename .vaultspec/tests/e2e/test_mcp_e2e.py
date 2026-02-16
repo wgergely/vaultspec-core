@@ -88,9 +88,13 @@ async def _mcp_dispatch_and_wait(
 ) -> dict:
     """Dispatch an agent via MCP call_tool and poll until completion."""
     import subagent_server.server as _srv
+    from subagent_server.server import initialize_server
 
+    # Initialize server with the test workspace
+    initialize_server(root_dir=root, ttl_seconds=300.0)
+
+    # Build agent cache from disk
     agent_cache: dict = {}
-    # Build cache from agent files on disk
     agents_dir = root / ".vaultspec" / "agents"
     if agents_dir.is_dir():
         for md_file in agents_dir.glob("*.md"):
@@ -103,54 +107,33 @@ async def _mcp_dispatch_and_wait(
                 "tools": [],
             }
 
-    # Save originals
-    originals = {
-        attr: getattr(_srv, attr)
-        for attr in (
-            "_agent_cache",
-            "_refresh_if_changed",
-            "task_engine",
-            "_background_tasks",
-            "_active_clients",
-            "ROOT_DIR",
-            "AGENTS_DIR",
-            "lock_manager",
-        )
-    }
-    try:
-        _srv._agent_cache = agent_cache
-        _srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
-        _srv.task_engine = engine
-        _srv._background_tasks = {}
-        _srv._active_clients = {}
-        _srv.ROOT_DIR = root
-        _srv.AGENTS_DIR = agents_dir
-        _srv.lock_manager = engine._lock_manager  # type: ignore[assignment]
+    # Override specific globals for the test
+    _srv._agent_cache = agent_cache
+    _srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+    _srv.task_engine = engine
+    _srv._background_tasks = {}
+    _srv._active_clients = {}
+    _srv.lock_manager = engine._lock_manager  # type: ignore[assignment]
 
-        # Dispatch
-        _, dispatch_result = await mcp.call_tool(
-            "dispatch_agent",
-            {"agent": agent, "task": task},
-        )
-        dispatch_data = json.loads(dispatch_result["result"])  # type: ignore[index]
-        task_id = dispatch_data["taskId"]
+    # Dispatch
+    _, dispatch_result = await mcp.call_tool(
+        "dispatch_agent",
+        {"agent": agent, "task": task},
+    )
+    dispatch_data = json.loads(dispatch_result["result"])  # type: ignore[index]
+    task_id = dispatch_data["taskId"]
 
-        # Poll until completed/failed or timeout
-        deadline = asyncio.get_event_loop().time() + timeout
-        while asyncio.get_event_loop().time() < deadline:
-            await asyncio.sleep(1.0)
-            _, status_result = await mcp.call_tool(
-                "get_task_status", {"task_id": task_id}
-            )
-            status_data = json.loads(status_result["result"])  # type: ignore[index]
-            if status_data["status"] in ("completed", "failed"):
-                return status_data
+    # Poll until completed/failed or timeout
+    deadline = asyncio.get_event_loop().time() + timeout
+    while asyncio.get_event_loop().time() < deadline:
+        await asyncio.sleep(1.0)
+        _, status_result = await mcp.call_tool("get_task_status", {"task_id": task_id})
+        status_data = json.loads(status_result["result"])  # type: ignore[index]
+        if status_data["status"] in ("completed", "failed"):
+            return status_data
 
-        msg = f"Task {task_id} did not complete within {timeout}s"
-        raise TimeoutError(msg)
-    finally:
-        for attr, val in originals.items():
-            setattr(_srv, attr, val)
+    msg = f"Task {task_id} did not complete within {timeout}s"
+    raise TimeoutError(msg)
 
 
 @pytest.mark.integration

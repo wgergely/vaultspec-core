@@ -4,6 +4,8 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
+import pathlib
 import re
 import sys
 import time
@@ -11,7 +13,6 @@ from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import pathlib
     from collections.abc import AsyncIterator
 
 from mcp.server.fastmcp import FastMCP
@@ -31,10 +32,7 @@ from orchestration.task_engine import (
     LockManager,
     TaskEngine,
 )
-from orchestration.utils import (
-    find_project_root,
-    safe_read_text,
-)
+from orchestration.utils import safe_read_text
 from protocol.acp.types import SubagentError
 
 # Configure logging to stderr
@@ -72,20 +70,39 @@ mcp = FastMCP(
     lifespan=_server_lifespan,
 )
 
-ROOT_DIR = find_project_root()
-AGENTS_DIR = ROOT_DIR / ".vaultspec" / "agents"
-
-# Advisory lock manager for workspace coordination (Phase 4).
-lock_manager = LockManager()
-
-# Internal task engine (Layer 2) for tracking subagent task lifecycle.
-task_engine = TaskEngine(ttl_seconds=3600.0, lock_manager=lock_manager)
-
-# Maps task_id -> asyncio.Task for background subagent coroutines.
+# Globals — must be initialized via initialize_server() before use.
+ROOT_DIR: pathlib.Path
+AGENTS_DIR: pathlib.Path
+lock_manager: LockManager
+task_engine: TaskEngine
+_agent_cache: dict[str, dict[str, object]] = {}
 _background_tasks: dict[str, asyncio.Task[None]] = {}
-
-# Maps task_id -> Client for graceful ACP cancellation.
 _active_clients: dict[str, list] = {}
+
+
+def initialize_server(
+    root_dir: pathlib.Path,
+    ttl_seconds: float = 3600.0,
+) -> None:
+    """Initialize server configuration.  MUST be called before mcp.run().
+
+    Args:
+        root_dir: Workspace root directory (required).
+        ttl_seconds: Task TTL in seconds (default 3600).
+    """
+    global ROOT_DIR, AGENTS_DIR, lock_manager, task_engine
+
+    ROOT_DIR = root_dir
+    AGENTS_DIR = ROOT_DIR / ".vaultspec" / "agents"
+    lock_manager = LockManager()
+    task_engine = TaskEngine(ttl_seconds=ttl_seconds, lock_manager=lock_manager)
+
+    logger.info(
+        "MCP server initialized: root=%s, agents_dir=%s, ttl=%s",
+        ROOT_DIR,
+        AGENTS_DIR,
+        ttl_seconds,
+    )
 
 
 def _resolve_effective_mode(agent: str, mode: str | None) -> str:
@@ -178,7 +195,6 @@ def _merge_artifacts(text_artifacts: list[str], written_files: list[str]) -> lis
     return sorted(merged)
 
 
-_agent_cache: dict[str, dict[str, object]] = {}
 _agent_mtimes: dict[str, float] = {}
 _POLL_INTERVAL = 5.0
 
@@ -579,8 +595,22 @@ async def get_locks() -> str:
     return json.dumps({"locks": res, "count": len(res)}, indent=2)
 
 
-def main():
-    """Start the MCP server."""
+def main(root_dir: pathlib.Path | None = None) -> None:
+    """Start the MCP server.
+
+    Args:
+        root_dir: Workspace root.  Falls back to ``VS_MCP_ROOT_DIR`` env var.
+    """
+    if root_dir is None:
+        root_str = os.environ.get("VS_MCP_ROOT_DIR")
+        if not root_str:
+            raise RuntimeError(
+                "MCP server requires root_dir parameter or VS_MCP_ROOT_DIR env var"
+            )
+        root_dir = pathlib.Path(root_str)
+
+    ttl = float(os.environ.get("VS_MCP_TTL_SECONDS", "3600.0"))
+    initialize_server(root_dir=root_dir, ttl_seconds=ttl)
     mcp.run()
 
 
