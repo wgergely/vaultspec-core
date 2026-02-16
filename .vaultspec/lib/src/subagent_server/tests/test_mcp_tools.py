@@ -23,6 +23,7 @@ from subagent_server.server import (
     dispatch_agent,
     get_locks,
     get_task_status,
+    initialize_server,
     list_agents,
 )
 
@@ -38,30 +39,14 @@ from .conftest import TEST_PROJECT
 pytestmark = [pytest.mark.unit]
 
 
-def _set_server(**overrides):
-    """Set subagent_server.server globals directly."""
-    for attr, value in overrides.items():
-        setattr(srv, attr, value)
-
-
 @pytest.fixture(autouse=True)
-def _restore_server_globals():
-    """Save and restore subagent_server.server globals after each test."""
-    originals = {}
-    for attr in (
-        "_agent_cache",
-        "_refresh_if_changed",
-        "task_engine",
-        "lock_manager",
-        "_background_tasks",
-        "_active_clients",
-        "run_subagent",
-    ):
-        if hasattr(srv, attr):
-            originals[attr] = getattr(srv, attr)
+def _init_server():
+    """Initialize server with TEST_PROJECT before each test, reset after."""
+    initialize_server(root_dir=TEST_PROJECT, ttl_seconds=60.0)
     yield
-    for attr, val in originals.items():
-        setattr(srv, attr, val)
+    srv._agent_cache.clear()
+    srv._background_tasks.clear()
+    srv._active_clients.clear()
 
 
 @pytest.fixture
@@ -136,10 +121,8 @@ class TestListAgents:
     @pytest.mark.asyncio
     async def test_populated_cache(self, baker_cache):
         """list_agents returns all agents from the cache."""
-        _set_server(
-            _agent_cache=baker_cache,
-            _refresh_if_changed=lambda: False,
-        )
+        srv._agent_cache = baker_cache
+        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
         result = await list_agents()
         data = json.loads(result)
         assert len(data["agents"]) == 2
@@ -150,10 +133,8 @@ class TestListAgents:
     @pytest.mark.asyncio
     async def test_empty_cache(self):
         """list_agents returns empty list when no agents are cached."""
-        _set_server(
-            _agent_cache={},
-            _refresh_if_changed=lambda: False,
-        )
+        srv._agent_cache = {}
+        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
         result = await list_agents()
         data = json.loads(result)
         assert data["agents"] == []
@@ -161,10 +142,8 @@ class TestListAgents:
     @pytest.mark.asyncio
     async def test_response_json_structure(self, baker_cache):
         """list_agents response has correct top-level keys and agent fields."""
-        _set_server(
-            _agent_cache=baker_cache,
-            _refresh_if_changed=lambda: False,
-        )
+        srv._agent_cache = baker_cache
+        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
         result = await list_agents()
         data = json.loads(result)
         assert "agents" in data
@@ -183,20 +162,16 @@ class TestListAgents:
             calls.append(1)
             return False
 
-        _set_server(
-            _agent_cache=baker_cache,
-            _refresh_if_changed=_tracking_refresh,
-        )
+        srv._agent_cache = baker_cache
+        srv._refresh_if_changed = _tracking_refresh  # type: ignore[assignment]
         await list_agents()
         assert len(calls) == 1
 
     @pytest.mark.asyncio
     async def test_tier_and_description_passthrough(self, baker_cache):
         """Agent tier and description are passed through correctly."""
-        _set_server(
-            _agent_cache=baker_cache,
-            _refresh_if_changed=lambda: False,
-        )
+        srv._agent_cache = baker_cache
+        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
         result = await list_agents()
         data = json.loads(result)
         executor = next(a for a in data["agents"] if a["name"] == "simple-executor")
@@ -215,14 +190,12 @@ class TestDispatchAgent:
         async def _noop(**_kw):
             pass
 
-        _set_server(
-            _agent_cache=baker_cache,
-            _refresh_if_changed=lambda: False,
-            task_engine=fresh_task_engine,
-            _background_tasks={},
-            _active_clients={},
-            run_subagent=_noop,
-        )
+        srv._agent_cache = baker_cache
+        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+        srv.task_engine = fresh_task_engine
+        srv._background_tasks = {}
+        srv._active_clients = {}
+        srv.run_subagent = _noop  # type: ignore[assignment]
         result = await dispatch_agent(
             agent="simple-executor",
             task="Bake a baguette",
@@ -236,10 +209,8 @@ class TestDispatchAgent:
     @pytest.mark.asyncio
     async def test_unknown_agent_raises_tool_error(self, baker_cache):
         """Dispatching an unknown agent raises ToolError."""
-        _set_server(
-            _agent_cache=baker_cache,
-            _refresh_if_changed=lambda: False,
-        )
+        srv._agent_cache = baker_cache
+        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
         with pytest.raises(ToolError, match="not found"):
             await dispatch_agent(
                 agent="nonexistent-patissier",
@@ -249,11 +220,9 @@ class TestDispatchAgent:
     @pytest.mark.asyncio
     async def test_invalid_mode_raises_tool_error(self, baker_cache, fresh_task_engine):
         """Providing an invalid mode raises ToolError."""
-        _set_server(
-            _agent_cache=baker_cache,
-            _refresh_if_changed=lambda: False,
-            task_engine=fresh_task_engine,
-        )
+        srv._agent_cache = baker_cache
+        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+        srv.task_engine = fresh_task_engine
         with pytest.raises(ToolError, match="Invalid mode"):
             await dispatch_agent(
                 agent="simple-executor",
@@ -269,14 +238,12 @@ class TestDispatchAgent:
         async def _noop(**_kw):
             pass
 
-        _set_server(
-            _agent_cache=baker_cache,
-            _refresh_if_changed=lambda: False,
-            task_engine=fresh_task_engine,
-            _background_tasks={},
-            _active_clients={},
-            run_subagent=_noop,
-        )
+        srv._agent_cache = baker_cache
+        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+        srv.task_engine = fresh_task_engine
+        srv._background_tasks = {}
+        srv._active_clients = {}
+        srv.run_subagent = _noop  # type: ignore[assignment]
         result = await dispatch_agent(
             agent="simple-executor",
             task="Bake sourdough",
@@ -293,14 +260,12 @@ class TestDispatchAgent:
         async def _noop(**_kw):
             pass
 
-        _set_server(
-            _agent_cache=baker_cache,
-            _refresh_if_changed=lambda: False,
-            task_engine=fresh_task_engine,
-            _background_tasks={},
-            _active_clients={},
-            run_subagent=_noop,
-        )
+        srv._agent_cache = baker_cache
+        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+        srv.task_engine = fresh_task_engine
+        srv._background_tasks = {}
+        srv._active_clients = {}
+        srv.run_subagent = _noop  # type: ignore[assignment]
         result = await dispatch_agent(
             agent="simple-executor",
             task="Proof the dough",
@@ -320,14 +285,12 @@ class TestDispatchAgent:
         async def _noop(**_kw):
             pass
 
-        _set_server(
-            _agent_cache=baker_cache,
-            _refresh_if_changed=lambda: False,
-            task_engine=fresh_task_engine,
-            _background_tasks={},
-            _active_clients={},
-            run_subagent=_noop,
-        )
+        srv._agent_cache = baker_cache
+        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+        srv.task_engine = fresh_task_engine
+        srv._background_tasks = {}
+        srv._active_clients = {}
+        srv.run_subagent = _noop  # type: ignore[assignment]
         result = await dispatch_agent(
             agent="research-analyst",
             task="Analyze the flour supply chain",
@@ -343,10 +306,8 @@ class TestGetTaskStatus:
     async def test_working_task(self, fresh_task_engine):
         """Returns status 'working' for an active task."""
         fresh_task_engine.create_task("simple-executor", task_id="task-001")
-        _set_server(
-            task_engine=fresh_task_engine,
-            lock_manager=fresh_task_engine._lock_manager,
-        )
+        srv.task_engine = fresh_task_engine
+        srv.lock_manager = fresh_task_engine._lock_manager
         result = await get_task_status(task_id="task-001")
         data = json.loads(result)
         assert data["taskId"] == "task-001"
@@ -358,10 +319,8 @@ class TestGetTaskStatus:
         """Returns status 'completed' with result payload."""
         fresh_task_engine.create_task("simple-executor", task_id="task-002")
         fresh_task_engine.complete_task("task-002", {"summary": "Baguettes baked"})
-        _set_server(
-            task_engine=fresh_task_engine,
-            lock_manager=fresh_task_engine._lock_manager,
-        )
+        srv.task_engine = fresh_task_engine
+        srv.lock_manager = fresh_task_engine._lock_manager
         result = await get_task_status(task_id="task-002")
         data = json.loads(result)
         assert data["status"] == "completed"
@@ -372,10 +331,8 @@ class TestGetTaskStatus:
         """Returns status 'failed' with error message."""
         fresh_task_engine.create_task("simple-executor", task_id="task-003")
         fresh_task_engine.fail_task("task-003", "Oven caught fire")
-        _set_server(
-            task_engine=fresh_task_engine,
-            lock_manager=fresh_task_engine._lock_manager,
-        )
+        srv.task_engine = fresh_task_engine
+        srv.lock_manager = fresh_task_engine._lock_manager
         result = await get_task_status(task_id="task-003")
         data = json.loads(result)
         assert data["status"] == "failed"
@@ -384,7 +341,7 @@ class TestGetTaskStatus:
     @pytest.mark.asyncio
     async def test_nonexistent_task_raises_tool_error(self, fresh_task_engine):
         """Querying a nonexistent task raises ToolError."""
-        _set_server(task_engine=fresh_task_engine)
+        srv.task_engine = fresh_task_engine
         with pytest.raises(ToolError, match="not found"):
             await get_task_status(task_id="task-ghost")
 
@@ -393,10 +350,8 @@ class TestGetTaskStatus:
         """Returns status 'cancelled' for a cancelled task."""
         fresh_task_engine.create_task("simple-executor", task_id="task-004")
         fresh_task_engine.cancel_task("task-004")
-        _set_server(
-            task_engine=fresh_task_engine,
-            lock_manager=fresh_task_engine._lock_manager,
-        )
+        srv.task_engine = fresh_task_engine
+        srv.lock_manager = fresh_task_engine._lock_manager
         result = await get_task_status(task_id="task-004")
         data = json.loads(result)
         assert data["status"] == "cancelled"
@@ -407,10 +362,8 @@ class TestGetTaskStatus:
         fresh_task_engine.create_task("simple-executor", task_id="task-005")
         lm = fresh_task_engine._lock_manager
         lm.acquire_lock("task-005", {".vault/plan.md"}, "read-only")
-        _set_server(
-            task_engine=fresh_task_engine,
-            lock_manager=lm,
-        )
+        srv.task_engine = fresh_task_engine
+        srv.lock_manager = lm
         result = await get_task_status(task_id="task-005")
         data = json.loads(result)
         assert "lock" in data
@@ -425,11 +378,9 @@ class TestCancelTask:
     async def test_cancel_working_task(self, fresh_task_engine):
         """Cancelling a working task returns 'cancelled' status."""
         fresh_task_engine.create_task("simple-executor", task_id="task-010")
-        _set_server(
-            task_engine=fresh_task_engine,
-            _active_clients={},
-            _background_tasks={},
-        )
+        srv.task_engine = fresh_task_engine
+        srv._active_clients = {}
+        srv._background_tasks = {}
         result = await cancel_task(task_id="task-010")
         data = json.loads(result)
         assert data["status"] == "cancelled"
@@ -441,20 +392,20 @@ class TestCancelTask:
         """Cancelling a completed task raises ToolError."""
         fresh_task_engine.create_task("simple-executor", task_id="task-011")
         fresh_task_engine.complete_task("task-011", {"summary": "Done"})
-        _set_server(task_engine=fresh_task_engine)
+        srv.task_engine = fresh_task_engine
         with pytest.raises(ToolError, match="already completed"):
             await cancel_task(task_id="task-011")
 
     @pytest.mark.asyncio
     async def test_cancel_nonexistent_raises_tool_error(self, fresh_task_engine):
         """Cancelling a nonexistent task raises ToolError."""
-        _set_server(task_engine=fresh_task_engine)
+        srv.task_engine = fresh_task_engine
         with pytest.raises(ToolError, match="not found"):
             await cancel_task(task_id="task-phantom")
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_cancel_invokes_graceful_cancel(self, _fresh_task_engine):
+    async def test_cancel_invokes_graceful_cancel(self):
         """Cancellation sends ACP graceful_cancel when client is active.
 
         Integration: requires real ACP client with graceful_cancel method.
@@ -463,7 +414,7 @@ class TestCancelTask:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_cancel_stops_background_task(self, _fresh_task_engine):
+    async def test_cancel_stops_background_task(self):
         """Cancellation calls .cancel() on the background asyncio.Task.
 
         Integration: requires real asyncio.Task from a running dispatch.
@@ -477,10 +428,8 @@ class TestGetLocks:
     @pytest.mark.asyncio
     async def test_no_active_locks(self, fresh_task_engine):
         """Returns empty lock list when no locks are held."""
-        _set_server(
-            lock_manager=fresh_task_engine._lock_manager,
-            task_engine=fresh_task_engine,
-        )
+        srv.lock_manager = fresh_task_engine._lock_manager
+        srv.task_engine = fresh_task_engine
         result = await get_locks()
         data = json.loads(result)
         assert data["locks"] == []
@@ -494,10 +443,8 @@ class TestGetLocks:
         fresh_task_engine.create_task("research-analyst", task_id="task-021")
         lm.acquire_lock("task-020", {".vault/plan.md"}, "read-write")
         lm.acquire_lock("task-021", {".vault/adr/001.md"}, "read-only")
-        _set_server(
-            lock_manager=lm,
-            task_engine=fresh_task_engine,
-        )
+        srv.lock_manager = lm
+        srv.task_engine = fresh_task_engine
         result = await get_locks()
         data = json.loads(result)
         assert data["count"] == 2
@@ -513,10 +460,8 @@ class TestGetLocks:
         lm = fresh_task_engine._lock_manager
         fresh_task_engine.create_task("simple-executor", task_id="task-030")
         lm.acquire_lock("task-030", {".vault/exec/log.md"}, "read-write")
-        _set_server(
-            lock_manager=lm,
-            task_engine=fresh_task_engine,
-        )
+        srv.lock_manager = lm
+        srv.task_engine = fresh_task_engine
         result = await get_locks()
         data = json.loads(result)
         lock = data["locks"][0]
@@ -532,10 +477,8 @@ class TestGetLocks:
         lm = LockManager()
         lm.acquire_lock("orphan-task", {".vault/orphan.md"}, "read-only")
         engine = TaskEngine(ttl_seconds=60.0, lock_manager=lm)
-        _set_server(
-            lock_manager=lm,
-            task_engine=engine,
-        )
+        srv.lock_manager = lm
+        srv.task_engine = engine
         result = await get_locks()
         data = json.loads(result)
         assert data["locks"][0]["agent"] == "unknown"
@@ -609,13 +552,12 @@ class TestPermissionHelpers:
 
     def test_resolve_effective_mode_from_cache(self):
         """When mode is None, uses agent's default_mode from cache."""
-        cache = {"analyst": {"default_mode": "read-only"}}
-        _set_server(_agent_cache=cache)
+        srv._agent_cache = {"analyst": {"default_mode": "read-only"}}
         assert _resolve_effective_mode("analyst", None) == "read-only"
 
     def test_resolve_effective_mode_fallback(self):
         """When no mode and no agent default, falls back to read-write."""
-        _set_server(_agent_cache={})
+        srv._agent_cache = {}
         assert _resolve_effective_mode("any", None) == "read-write"
 
     def test_strip_quotes_basic(self):

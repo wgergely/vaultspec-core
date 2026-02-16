@@ -13,13 +13,10 @@ import sys
 import warnings
 from pathlib import Path
 
-from _paths import ROOT_DIR  # shared path bootstrap
-
 try:
     from subagent_server.server import main as server_main
 
     from orchestration.subagent import run_subagent
-    from orchestration.utils import find_project_root
     from protocol.acp.client import SubagentClient
     from protocol.providers.base import ClaudeModels, GeminiModels
 except ImportError as e:
@@ -27,9 +24,8 @@ except ImportError as e:
     sys.exit(1)
 
 
-def list_available_agents(root: Path | None = None):
+def list_available_agents(root: Path):
     """List all agents found in the workspace."""
-    root = root if root is not None else ROOT_DIR
     agents_dir = root / ".vaultspec" / "agents"
     if not agents_dir.exists():
         print("No agents found.", file=sys.stderr)
@@ -95,7 +91,7 @@ def command_run(args):
 
     warnings.simplefilter("ignore", ResourceWarning)
 
-    project_root = args.root if args.root is not None else find_project_root()
+    project_root = args.root
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -133,9 +129,9 @@ def command_run(args):
         loop.close()
 
 
-def command_serve(_args):
+def command_serve(args):
     """Handle 'serve' subcommand."""
-    server_main()
+    server_main(root_dir=args.root)
 
 
 def command_a2a_serve(args):
@@ -145,7 +141,7 @@ def command_a2a_serve(args):
     from protocol.a2a.agent_card import agent_card_from_definition
     from protocol.a2a.server import create_app
 
-    root = args.root if args.root is not None else find_project_root()
+    root = args.root
     agent_name = args.agent or "researcher"
     port = args.port or 10010
 
@@ -193,7 +189,7 @@ def command_list(args):
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sub-agent CLI")
     parser.add_argument(
-        "--root", type=Path, default=None, help="Override workspace root"
+        "--root", type=Path, required=True, help="Workspace root directory"
     )
     subparsers = parser.add_subparsers(
         dest="command", required=True, help="Command to execute"

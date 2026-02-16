@@ -23,31 +23,25 @@ if str(_LIB_SRC) not in sys.path:
 
 import subagent_server.server as srv  # noqa: E402
 from mcp.server.fastmcp.exceptions import ToolError  # noqa: E402
-from subagent_server.server import mcp  # noqa: E402
+from subagent_server.server import initialize_server, mcp  # noqa: E402
 
 from orchestration.task_engine import LockManager, TaskEngine  # noqa: E402
 
 pytestmark = [pytest.mark.api]
 
+# Canonical test fixture root
+_PROJECT_ROOT = _LIB_SRC.parents[2]
+TEST_PROJECT = _PROJECT_ROOT / "test-project"
+
 
 @pytest.fixture(autouse=True)
-def _restore_server_globals():
-    """Save and restore subagent_server.server globals after each test."""
-    originals = {}
-    for attr in (
-        "_agent_cache",
-        "_refresh_if_changed",
-        "task_engine",
-        "lock_manager",
-        "_background_tasks",
-        "_active_clients",
-        "run_subagent",
-    ):
-        if hasattr(srv, attr):
-            originals[attr] = getattr(srv, attr)
+def _init_server():
+    """Initialize server with TEST_PROJECT before each test, reset after."""
+    initialize_server(root_dir=TEST_PROJECT, ttl_seconds=60.0)
     yield
-    for attr, val in originals.items():
-        setattr(srv, attr, val)
+    srv._agent_cache.clear()
+    srv._background_tasks.clear()
+    srv._active_clients.clear()
 
 
 @pytest.fixture
@@ -70,12 +64,6 @@ def baker_cache():
             "tools": ["Read", "Write", "Bash"],
         },
     }
-
-
-def _set_server(**overrides):
-    """Set subagent_server.server globals directly."""
-    for attr, value in overrides.items():
-        setattr(srv, attr, value)
 
 
 async def _noop_run_subagent(**_kwargs):
@@ -158,10 +146,8 @@ class TestProtocolCallTool:
     @pytest.mark.asyncio
     async def test_list_agents_via_call_tool(self, baker_cache):
         """call_tool('list_agents') returns valid JSON with agents."""
-        _set_server(
-            _agent_cache=baker_cache,
-            _refresh_if_changed=lambda: False,
-        )
+        srv._agent_cache = baker_cache
+        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
         _, result = await mcp.call_tool("list_agents", {})
         data = json.loads(result["result"])  # type: ignore[index]
         assert len(data["agents"]) == 1
@@ -170,14 +156,12 @@ class TestProtocolCallTool:
     @pytest.mark.asyncio
     async def test_dispatch_agent_via_call_tool(self, baker_cache, fresh_engine):
         """call_tool('dispatch_agent') creates a task and returns taskId."""
-        _set_server(
-            _agent_cache=baker_cache,
-            _refresh_if_changed=lambda: False,
-            task_engine=fresh_engine,
-            _background_tasks={},
-            _active_clients={},
-            run_subagent=_noop_run_subagent,
-        )
+        srv._agent_cache = baker_cache
+        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+        srv.task_engine = fresh_engine
+        srv._background_tasks = {}
+        srv._active_clients = {}
+        srv.run_subagent = _noop_run_subagent  # type: ignore[assignment]
         _, result = await mcp.call_tool(
             "dispatch_agent",
             {"agent": "simple-executor", "task": "Bake baguettes"},
@@ -190,10 +174,8 @@ class TestProtocolCallTool:
     @pytest.mark.asyncio
     async def test_dispatch_unknown_agent_raises_error(self, baker_cache):
         """call_tool('dispatch_agent') with unknown agent raises ToolError."""
-        _set_server(
-            _agent_cache=baker_cache,
-            _refresh_if_changed=lambda: False,
-        )
+        srv._agent_cache = baker_cache
+        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
         with pytest.raises(ToolError, match="not found"):
             await mcp.call_tool(
                 "dispatch_agent",
@@ -204,10 +186,8 @@ class TestProtocolCallTool:
     async def test_get_task_status_via_call_tool(self, fresh_engine):
         """call_tool('get_task_status') returns task state."""
         fresh_engine.create_task("simple-executor", task_id="proto-001")
-        _set_server(
-            task_engine=fresh_engine,
-            lock_manager=fresh_engine._lock_manager,
-        )
+        srv.task_engine = fresh_engine
+        srv.lock_manager = fresh_engine._lock_manager
         _, result = await mcp.call_tool("get_task_status", {"task_id": "proto-001"})
         data = json.loads(result["result"])  # type: ignore[index]
         assert data["status"] == "working"
@@ -216,7 +196,7 @@ class TestProtocolCallTool:
     @pytest.mark.asyncio
     async def test_get_task_status_not_found(self, fresh_engine):
         """call_tool('get_task_status') for missing task raises ToolError."""
-        _set_server(task_engine=fresh_engine)
+        srv.task_engine = fresh_engine
         with pytest.raises(ToolError, match="not found"):
             await mcp.call_tool("get_task_status", {"task_id": "nonexistent"})
 
@@ -224,11 +204,9 @@ class TestProtocolCallTool:
     async def test_cancel_task_via_call_tool(self, fresh_engine):
         """call_tool('cancel_task') cancels a working task."""
         fresh_engine.create_task("simple-executor", task_id="proto-002")
-        _set_server(
-            task_engine=fresh_engine,
-            _active_clients={},
-            _background_tasks={},
-        )
+        srv.task_engine = fresh_engine
+        srv._active_clients = {}
+        srv._background_tasks = {}
         _, result = await mcp.call_tool("cancel_task", {"task_id": "proto-002"})
         data = json.loads(result["result"])  # type: ignore[index]
         assert data["status"] == "cancelled"
@@ -236,10 +214,8 @@ class TestProtocolCallTool:
     @pytest.mark.asyncio
     async def test_get_locks_via_call_tool(self, fresh_engine):
         """call_tool('get_locks') returns empty list when no locks."""
-        _set_server(
-            lock_manager=fresh_engine._lock_manager,
-            task_engine=fresh_engine,
-        )
+        srv.lock_manager = fresh_engine._lock_manager
+        srv.task_engine = fresh_engine
         _, result = await mcp.call_tool("get_locks", {})
         data = json.loads(result["result"])  # type: ignore[index]
         assert data["locks"] == []
@@ -252,10 +228,8 @@ class TestProtocolCallTool:
         fresh_engine._lock_manager.acquire_lock(
             "proto-003", {".vault/plan.md"}, "read-only"
         )
-        _set_server(
-            lock_manager=fresh_engine._lock_manager,
-            task_engine=fresh_engine,
-        )
+        srv.lock_manager = fresh_engine._lock_manager
+        srv.task_engine = fresh_engine
         _, result = await mcp.call_tool("get_locks", {})
         data = json.loads(result["result"])  # type: ignore[index]
         assert data["count"] == 1
@@ -263,7 +237,7 @@ class TestProtocolCallTool:
 
 
 class TestProtocolRoundTrip:
-    """Test a full dispatch → poll → complete lifecycle via call_tool."""
+    """Test a full dispatch -> poll -> complete lifecycle via call_tool."""
 
     @pytest.mark.asyncio
     async def test_dispatch_poll_complete_cycle(self, baker_cache, fresh_engine):
@@ -279,15 +253,13 @@ class TestProtocolRoundTrip:
         async def _test_run(**_kw):
             return canned_result
 
-        _set_server(
-            _agent_cache=baker_cache,
-            _refresh_if_changed=lambda: False,
-            task_engine=fresh_engine,
-            _background_tasks={},
-            _active_clients={},
-            run_subagent=_test_run,
-            lock_manager=fresh_engine._lock_manager,
-        )
+        srv._agent_cache = baker_cache
+        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+        srv.task_engine = fresh_engine
+        srv._background_tasks = {}
+        srv._active_clients = {}
+        srv.run_subagent = _test_run  # type: ignore[assignment]
+        srv.lock_manager = fresh_engine._lock_manager
 
         # Step 1: Dispatch
         _, dispatch_result = await mcp.call_tool(
