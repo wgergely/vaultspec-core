@@ -24,10 +24,6 @@ TEST_PROJECT = _PROJECT_ROOT / "test-project"
 from protocol.acp.claude_bridge import ClaudeACPBridge  # noqa: E402
 from protocol.providers.base import ClaudeModels  # noqa: E402
 
-# ---------------------------------------------------------------------------
-# AsyncItemIterator — async iterator over a list of items
-# ---------------------------------------------------------------------------
-
 
 class AsyncItemIterator:
     """Async iterator over a fixed list, for testing async-for loops."""
@@ -50,11 +46,6 @@ class AsyncItemIterator:
         item = self._items[self._index]
         self._index += 1
         return item
-
-
-# ---------------------------------------------------------------------------
-# SDKClientRecorder — records SDK client method calls
-# ---------------------------------------------------------------------------
 
 
 class SDKClientRecorder:
@@ -106,11 +97,6 @@ class SDKClientRecorder:
         return AsyncItemIterator(self.messages, raise_exc=self.stream_error)
 
 
-# ---------------------------------------------------------------------------
-# ConnRecorder — records ACP connection calls
-# ---------------------------------------------------------------------------
-
-
 class ConnRecorder:
     """Records calls to ACP connection session_update."""
 
@@ -121,11 +107,6 @@ class ConnRecorder:
         self.session_update_calls.append(kwargs)
 
 
-# ---------------------------------------------------------------------------
-# Factory functions
-# ---------------------------------------------------------------------------
-
-
 def make_test_client(messages=None):
     """Build an SDKClientRecorder with optional pre-built messages."""
     return SDKClientRecorder(messages=messages)
@@ -134,11 +115,6 @@ def make_test_client(messages=None):
 def make_test_conn():
     """Build a ConnRecorder for ACP connection assertions."""
     return ConnRecorder()
-
-
-# ---------------------------------------------------------------------------
-# DI bridge factory (constructor DI — no monkeypatching)
-# ---------------------------------------------------------------------------
 
 
 def make_di_bridge(*, client=None, **bridge_kwargs):
@@ -173,11 +149,6 @@ def make_di_bridge(*, client=None, **bridge_kwargs):
         **bridge_kwargs,
     )
     return bridge, holder, captured_options
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture

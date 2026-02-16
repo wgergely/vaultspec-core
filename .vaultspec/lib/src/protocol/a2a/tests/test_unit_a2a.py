@@ -23,10 +23,6 @@ from protocol.a2a.tests.conftest import (
     make_request_context,
 )
 
-# ------------------------------------------------------------------
-# State mapping tests
-# ------------------------------------------------------------------
-
 
 @pytest.mark.unit
 class TestStateMapping:
@@ -71,11 +67,6 @@ class TestStateMapping:
             a2a_state = VAULTSPEC_TO_A2A[state]
             back = A2A_TO_VAULTSPEC[a2a_state]
             assert back == state, f"Roundtrip failed for {state}"
-
-
-# ------------------------------------------------------------------
-# Agent card tests
-# ------------------------------------------------------------------
 
 
 @pytest.mark.unit
@@ -137,11 +128,6 @@ class TestAgentCard:
         assert restored.skills[0].id == card.skills[0].id
 
 
-# ------------------------------------------------------------------
-# Executor tests
-# ------------------------------------------------------------------
-
-
 @pytest.mark.unit
 class TestEchoExecutor:
     @pytest.mark.asyncio
@@ -199,11 +185,6 @@ class TestPrefixExecutor:
         msg = events[1].status.message
         assert msg is not None
         assert msg.parts[0].root.text == "[Claude] analyze code"
-
-
-# ------------------------------------------------------------------
-# Message serialization tests
-# ------------------------------------------------------------------
 
 
 @pytest.mark.unit

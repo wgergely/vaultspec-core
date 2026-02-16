@@ -49,11 +49,6 @@ def test_project_root() -> Iterator[Path]:
     _cleanup_test_project(root)
 
 
-# ---------------------------------------------------------------------------
-# Unit-level provider tests (no CLI required)
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.unit
 def test_claude_loads_rules(test_project_root):
     """Verify ClaudeProvider.load_rules() reads .claude/rules/ files."""
@@ -92,11 +87,6 @@ def test_claude_process_spec_complete(test_project_root):
     sys_prompt = spec.env["VS_SYSTEM_PROMPT"]
     assert "Jean-Claude" in sys_prompt
     assert "helpful assistant" in sys_prompt
-
-
-# ---------------------------------------------------------------------------
-# CLI integration tests (require Claude CLI on PATH)
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.integration

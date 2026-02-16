@@ -45,10 +45,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Server initialization
-# ---------------------------------------------------------------------------
-
 
 @asynccontextmanager
 async def _server_lifespan(_app: FastMCP) -> AsyncIterator[None]:
@@ -90,11 +86,6 @@ _background_tasks: dict[str, asyncio.Task[None]] = {}
 
 # Maps task_id -> Client for graceful ACP cancellation.
 _active_clients: dict[str, list] = {}
-
-
-# ---------------------------------------------------------------------------
-# Permission enforcement helpers
-# ---------------------------------------------------------------------------
 
 
 def _resolve_effective_mode(agent: str, mode: str | None) -> str:
@@ -145,10 +136,6 @@ def _prepare_dispatch_kwargs(
     }
 
 
-# ---------------------------------------------------------------------------
-# Artifact extraction
-# ---------------------------------------------------------------------------
-
 _ARTIFACT_PATTERN = re.compile(
     r"""(?:^|[\s"'`(])"""  # word boundary or quote/backtick
     r"""("""
@@ -190,10 +177,6 @@ def _merge_artifacts(text_artifacts: list[str], written_files: list[str]) -> lis
             merged.append(normalized)
     return sorted(merged)
 
-
-# ---------------------------------------------------------------------------
-# Agent resource cache and helpers
-# ---------------------------------------------------------------------------
 
 _agent_cache: dict[str, dict[str, object]] = {}
 _agent_mtimes: dict[str, float] = {}
@@ -330,11 +313,6 @@ async def _poll_agent_files() -> None:
         await asyncio.sleep(_POLL_INTERVAL)
         if _refresh_if_changed():
             await _send_list_changed()
-
-
-# ---------------------------------------------------------------------------
-# MCP Tool implementations
-# ---------------------------------------------------------------------------
 
 
 @mcp.tool(

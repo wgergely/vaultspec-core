@@ -18,11 +18,6 @@ from protocol.acp.client import SubagentClient
 pytestmark = [pytest.mark.unit]
 
 
-# ---------------------------------------------------------------------------
-# TestPermissionDenial
-# ---------------------------------------------------------------------------
-
-
 class TestPermissionDenial:
     """Tests for permission denial scenarios in SubagentClient."""
 

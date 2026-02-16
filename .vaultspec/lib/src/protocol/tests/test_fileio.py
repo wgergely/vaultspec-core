@@ -13,11 +13,6 @@ from protocol.acp.client import SubagentClient
 pytestmark = [pytest.mark.unit]
 
 
-# ---------------------------------------------------------------------------
-# TestReadOnlyModeEnforcement
-# ---------------------------------------------------------------------------
-
-
 class TestReadOnlyModeEnforcement:
     """Tests that read-only mode restricts writes to .vault/ only."""
 

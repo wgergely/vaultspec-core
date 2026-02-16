@@ -25,11 +25,6 @@ from .conftest import TEST_PROJECT, make_di_bridge, make_test_client, make_test_
 pytestmark = [pytest.mark.unit]
 
 
-# ---------------------------------------------------------------------------
-# TestConstructor
-# ---------------------------------------------------------------------------
-
-
 class TestConstructor:
     """Test ClaudeACPBridge constructor and defaults."""
 
@@ -73,11 +68,6 @@ class TestConstructor:
         assert bridge._mode == "read-write"
 
 
-# ---------------------------------------------------------------------------
-# TestOnConnect
-# ---------------------------------------------------------------------------
-
-
 class TestOnConnect:
     """Test the on_connect lifecycle method."""
 
@@ -90,11 +80,6 @@ class TestOnConnect:
     def test_conn_starts_none(self, bridge):
         """Before on_connect, _conn is None."""
         assert bridge._conn is None
-
-
-# ---------------------------------------------------------------------------
-# TestInitialize
-# ---------------------------------------------------------------------------
 
 
 class TestInitialize:
@@ -141,11 +126,6 @@ class TestInitialize:
             extra_field="ignored",
         )
         assert result.agent_info.name == "claude-acp-bridge"
-
-
-# ---------------------------------------------------------------------------
-# TestNewSession
-# ---------------------------------------------------------------------------
 
 
 class TestNewSession:
@@ -274,11 +254,6 @@ class TestNewSession:
         assert captured["include_partial_messages"] is True
 
 
-# ---------------------------------------------------------------------------
-# TestExtMethod / TestExtNotification
-# ---------------------------------------------------------------------------
-
-
 class TestExtMethod:
     """Test the ext_method stub."""
 
@@ -303,11 +278,6 @@ class TestExtNotification:
         """ext_notification returns None."""
         result = await bridge.ext_notification("custom/event", {"data": 1})
         assert result is None
-
-
-# ---------------------------------------------------------------------------
-# TestExtractPromptText
-# ---------------------------------------------------------------------------
 
 
 class TestExtractPromptText:
@@ -340,11 +310,6 @@ class TestExtractPromptText:
         block = SimpleNamespace(text="fallback text")
         result = _extract_prompt_text([block])  # type: ignore[list-item]
         assert "fallback text" in result
-
-
-# ---------------------------------------------------------------------------
-# TestMCPServerConfigConversion
-# ---------------------------------------------------------------------------
 
 
 class TestMCPServerConfigConversion:
@@ -419,11 +384,6 @@ class TestMCPServerConfigConversion:
         """Non-dict, non-model entries are skipped."""
         result = _convert_mcp_servers(["not-a-server", 42])
         assert result == {}
-
-
-# ---------------------------------------------------------------------------
-# TestBridgeLifecycleUnit
-# ---------------------------------------------------------------------------
 
 
 class TestBridgeLifecycleUnit:
@@ -512,11 +472,6 @@ class TestBridgeLifecycleUnit:
         assert spec.env.get("VS_SYSTEM_PROMPT")
 
 
-# ---------------------------------------------------------------------------
-# TestSetSessionModel
-# ---------------------------------------------------------------------------
-
-
 class TestSetSessionModel:
     """Test set_session_model updates the bridge model."""
 
@@ -577,11 +532,6 @@ class TestSetSessionModel:
             model_id=ClaudeModels.HIGH, session_id="s1"
         )
         assert bridge_debug._model == ClaudeModels.HIGH
-
-
-# ---------------------------------------------------------------------------
-# TestSetSessionMode
-# ---------------------------------------------------------------------------
 
 
 class TestSetSessionMode:
@@ -668,11 +618,6 @@ class TestSetSessionMode:
         assert bridge_debug._mode == "read-only"
 
 
-# ---------------------------------------------------------------------------
-# TestAuthenticate
-# ---------------------------------------------------------------------------
-
-
 class TestAuthenticate:
     """Test authenticate returns AuthenticateResponse."""
 
@@ -730,11 +675,6 @@ class TestAuthenticate:
         assert bridge._conn is original_conn
         assert bridge._sdk_client is original_client
         assert bridge._session_id is original_session
-
-
-# ---------------------------------------------------------------------------
-# TestListSessions
-# ---------------------------------------------------------------------------
 
 
 class TestListSessions:
@@ -820,11 +760,6 @@ class TestListSessions:
         assert result.sessions == []
 
 
-# ---------------------------------------------------------------------------
-# TestLoadSession
-# ---------------------------------------------------------------------------
-
-
 class TestLoadSession:
     """Test load_session reconnects SDK from stored state."""
 
@@ -906,11 +841,6 @@ class TestLoadSession:
         assert bridge._sessions[session_id].connected is True
 
 
-# ---------------------------------------------------------------------------
-# TestResumeSession
-# ---------------------------------------------------------------------------
-
-
 class TestResumeSession:
     """Test resume_session reconnects SDK from stored state."""
 
@@ -989,11 +919,6 @@ class TestResumeSession:
 
         await bridge.resume_session(cwd=str(TEST_PROJECT), session_id=session_id)
         assert bridge._sessions[session_id].connected is True
-
-
-# ---------------------------------------------------------------------------
-# TestForkSession
-# ---------------------------------------------------------------------------
 
 
 class TestForkSession:
@@ -1093,11 +1018,6 @@ class TestForkSession:
         assert bridge._sdk_client is new_client
 
 
-# ---------------------------------------------------------------------------
-# TestSessionTracking
-# ---------------------------------------------------------------------------
-
-
 class TestSessionTracking:
     """Test that new_session stores _SessionState and cancel marks disconnected."""
 
@@ -1149,11 +1069,6 @@ class TestSessionTracking:
         assert id2 in bridge._sessions
         assert bridge._sessions[id1].cwd == dir1
         assert bridge._sessions[id2].cwd == dir2
-
-
-# ---------------------------------------------------------------------------
-# TestBridgeFeatureConfig — Phase 5: DI constructor config passthrough
-# ---------------------------------------------------------------------------
 
 
 class TestBridgeFeatureConfig:

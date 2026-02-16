@@ -12,10 +12,6 @@ from orchestration.task_engine import (  # noqa: E402
     TaskStatus,
 )
 
-# ---------------------------------------------------------------------------
-# TestLockManager
-# ---------------------------------------------------------------------------
-
 
 class TestLockManager:
     def test_acquire_lock_basic(self):
@@ -47,11 +43,6 @@ class TestLockManager:
         assert len(locks) == 1
         assert locks[0].task_id == "t1"
         assert locks[0].mode == "read-only"
-
-
-# ---------------------------------------------------------------------------
-# TestTaskEngine
-# ---------------------------------------------------------------------------
 
 
 class TestTaskEngine:
@@ -107,11 +98,38 @@ class TestTaskEngine:
         time.sleep(0.2)
         assert engine.get_task(task.task_id) is None
 
-    def test_locks_integrated(self, engine):
-        engine.create_task("test-agent", mode="read-only")
-        # Assuming TaskEngine automatically acquires locks for .vault/ in read-only
-        if engine._lock_manager:
-            engine._lock_manager.get_locks()
-        # If TaskEngine doesn't automatically acquire them (it should based on ADR),
-        # this test might need adjustment.
-        pass
+    def test_locks_released_on_complete(self):
+        """TaskEngine releases advisory locks when a task reaches a terminal state."""
+        lm = LockManager()
+        engine = TaskEngine(ttl_seconds=60, lock_manager=lm)
+        task = engine.create_task("test-agent", mode="read-only")
+
+        lm.acquire_lock(task.task_id, {".vault/adr"}, "read-only")
+        assert len(lm.get_locks()) == 1
+
+        engine.complete_task(task.task_id, {"summary": "done"})
+        assert len(lm.get_locks()) == 0
+
+    def test_locks_released_on_fail(self):
+        """TaskEngine releases advisory locks on task failure."""
+        lm = LockManager()
+        engine = TaskEngine(ttl_seconds=60, lock_manager=lm)
+        task = engine.create_task("test-agent", mode="read-write")
+
+        lm.acquire_lock(task.task_id, {"src/"}, "read-write")
+        assert len(lm.get_locks()) == 1
+
+        engine.fail_task(task.task_id, "boom")
+        assert len(lm.get_locks()) == 0
+
+    def test_locks_released_on_cancel(self):
+        """TaskEngine releases advisory locks on task cancellation."""
+        lm = LockManager()
+        engine = TaskEngine(ttl_seconds=60, lock_manager=lm)
+        task = engine.create_task("test-agent", mode="read-only")
+
+        lm.acquire_lock(task.task_id, {".vault/plans"}, "read-only")
+        assert len(lm.get_locks()) == 1
+
+        engine.cancel_task(task.task_id)
+        assert len(lm.get_locks()) == 0

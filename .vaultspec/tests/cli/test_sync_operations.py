@@ -21,11 +21,6 @@ from .conftest import (  # type: ignore[unresolved-import]
 pytestmark = [pytest.mark.unit]
 
 
-# ---------------------------------------------------------------------------
-# TestSyncFiles
-# ---------------------------------------------------------------------------
-
-
 class TestSyncFiles:
     def _make_sources(
         self, root: Path, names: list[str]
@@ -138,11 +133,6 @@ class TestSyncFiles:
         assert result.added == 0
 
 
-# ---------------------------------------------------------------------------
-# TestSyncSkills
-# ---------------------------------------------------------------------------
-
-
 class TestSyncSkills:
     def _make_skill_sources(
         self, root: Path, names: list[str]
@@ -212,11 +202,6 @@ class TestSyncSkills:
         assert (skills_dir / "my-custom-skill" / "SKILL.md").exists()
 
 
-# ---------------------------------------------------------------------------
-# TestSystemSync
-# ---------------------------------------------------------------------------
-
-
 class TestSystemSync:
     def test_generates_from_parts(self):
         (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
@@ -253,11 +238,6 @@ class TestSystemSync:
         content = system_file.read_text(encoding="utf-8")
         assert content.startswith(cli.CONFIG_HEADER)
         assert "# Base" in content
-
-
-# ---------------------------------------------------------------------------
-# TestConfigSync
-# ---------------------------------------------------------------------------
 
 
 class TestConfigSync:
@@ -312,11 +292,6 @@ class TestConfigSync:
         cli.config_sync(args)
         content = config_file.read_text(encoding="utf-8")
         assert content.startswith(cli.CONFIG_HEADER)
-
-
-# ---------------------------------------------------------------------------
-# TestEndToEnd
-# ---------------------------------------------------------------------------
 
 
 class TestEndToEnd:

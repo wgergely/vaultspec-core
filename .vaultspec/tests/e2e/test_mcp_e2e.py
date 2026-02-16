@@ -153,11 +153,6 @@ async def _mcp_dispatch_and_wait(
             setattr(_srv, attr, val)
 
 
-# ---------------------------------------------------------------------------
-# Gemini MCP E2E
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.integration
 @pytest.mark.gemini
 @pytest.mark.skipif(not _has_gemini_cli, reason="Gemini CLI not installed")
@@ -180,11 +175,6 @@ async def test_mcp_dispatch_gemini(test_project_root, fresh_engine):
     assert "Jean-Claude" in result["result"]["response"], (
         "Gemini agent did not adopt Jean-Claude persona"
     )
-
-
-# ---------------------------------------------------------------------------
-# Claude MCP E2E
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.integration

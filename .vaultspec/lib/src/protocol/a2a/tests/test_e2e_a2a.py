@@ -29,10 +29,6 @@ from protocol.a2a.server import create_app
 from protocol.a2a.tests.conftest import EchoExecutor, PrefixExecutor, _make_card
 from protocol.providers.base import ClaudeModels, GeminiModels
 
-# ---------------------------------------------------------------------------
-# Skip markers for E2E tests
-# ---------------------------------------------------------------------------
-
 requires_anthropic = pytest.mark.skipif(
     not shutil.which("claude"),
     reason="Claude CLI not on PATH",
@@ -43,16 +39,8 @@ requires_gemini = pytest.mark.skipif(
     reason="Gemini CLI not on PATH",
 )
 
-# ---------------------------------------------------------------------------
-# Shared test root directory
-# ---------------------------------------------------------------------------
 
 _TEST_ROOT = Path(__file__).resolve().parents[6]  # repo root
-
-
-# ---------------------------------------------------------------------------
-# JSON-RPC helpers (reused from test_integration_a2a.py pattern)
-# ---------------------------------------------------------------------------
 
 
 def _send_message_payload(text: str, message_id: str | None = None) -> dict:

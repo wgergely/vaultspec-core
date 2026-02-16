@@ -89,15 +89,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Sandboxing — _make_sandbox_callback imported from protocol.sandbox
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# MCP config conversion
-# ---------------------------------------------------------------------------
-
 
 def _convert_mcp_servers(
     acp_servers: list[Any],
@@ -131,11 +122,6 @@ def _convert_mcp_servers(
     return result
 
 
-# ---------------------------------------------------------------------------
-# Prompt extraction
-# ---------------------------------------------------------------------------
-
-
 def _extract_prompt_text(
     prompt: list[
         TextContentBlock
@@ -155,11 +141,6 @@ def _extract_prompt_text(
     return "\n".join(parts)
 
 
-# ---------------------------------------------------------------------------
-# Session state tracking
-# ---------------------------------------------------------------------------
-
-
 @dataclasses.dataclass
 class _SessionState:
     """Per-session state tracked by the bridge."""
@@ -172,11 +153,6 @@ class _SessionState:
     created_at: str
     sdk_client: ClaudeSDKClient | None = None
     connected: bool = True
-
-
-# ---------------------------------------------------------------------------
-# ACP Bridge Agent
-# ---------------------------------------------------------------------------
 
 
 class ClaudeACPBridge:
@@ -341,10 +317,6 @@ class ClaudeACPBridge:
         # Cancel tracking — set by cancel(), checked in prompt()
         self._cancelled: bool = False
 
-    # ------------------------------------------------------------------
-    # Agent protocol: lifecycle
-    # ------------------------------------------------------------------
-
     def on_connect(self, conn: Any) -> None:
         """Called by ``AgentSideConnection`` with the client-facing connection.
 
@@ -353,10 +325,6 @@ class ClaudeACPBridge:
         interface.
         """
         self._conn = conn
-
-    # ------------------------------------------------------------------
-    # Agent protocol: initialize
-    # ------------------------------------------------------------------
 
     async def initialize(
         self,
@@ -384,10 +352,6 @@ class ClaudeACPBridge:
                 ),
             ),
         )
-
-    # ------------------------------------------------------------------
-    # Internal: build SDK options
-    # ------------------------------------------------------------------
 
     def _build_options(
         self,
@@ -432,10 +396,6 @@ class ClaudeACPBridge:
             kwargs["add_dirs"] = self._include_dirs
 
         return self._options_factory(**kwargs)
-
-    # ------------------------------------------------------------------
-    # Agent protocol: new_session
-    # ------------------------------------------------------------------
 
     async def new_session(
         self,
@@ -484,10 +444,6 @@ class ClaudeACPBridge:
 
         return NewSessionResponse(session_id=session_id)
 
-    # ------------------------------------------------------------------
-    # Agent protocol: prompt
-    # ------------------------------------------------------------------
-
     async def prompt(
         self,
         prompt: list[
@@ -535,10 +491,6 @@ class ClaudeACPBridge:
 
         return PromptResponse(stop_reason=stop_reason)
 
-    # ------------------------------------------------------------------
-    # Agent protocol: cancel
-    # ------------------------------------------------------------------
-
     async def cancel(self, session_id: str, **kwargs: Any) -> None:
         _ = kwargs
         self._cancelled = True
@@ -555,10 +507,6 @@ class ClaudeACPBridge:
         # Mark session as disconnected
         if session_id in self._sessions:
             self._sessions[session_id].connected = False
-
-    # ------------------------------------------------------------------
-    # Agent protocol: stubs for optional methods
-    # ------------------------------------------------------------------
 
     async def authenticate(
         self,
@@ -830,10 +778,6 @@ class ClaudeACPBridge:
         if self._debug:
             logger.debug("ext_notification: %s", method)
 
-    # ------------------------------------------------------------------
-    # SDK → ACP event streaming
-    # ------------------------------------------------------------------
-
     async def _emit_updates(self, message: Any, session_id: str) -> None:
         """Map an SDK message to ACP ``session/update`` notifications."""
         if self._conn is None:
@@ -1033,68 +977,6 @@ class ClaudeACPBridge:
         )
 
 
-# ---------------------------------------------------------------------------
-# Test mode: stub SDK for subprocess e2e tests without API key
-# ---------------------------------------------------------------------------
-
-
-def _install_test_mode_stubs() -> None:
-    """Replace ``ClaudeSDKClient`` and ``ClaudeAgentOptions`` with no-op stubs.
-
-    This allows the bridge to run as a real subprocess and respond to
-    ACP JSON-RPC messages without needing a Claude API key.  The stub
-    client's ``connect()`` and ``query()`` are no-ops, and
-    ``receive_messages()`` yields an empty iterator.
-    """
-
-    class _StubSDKClient:
-        """Minimal stand-in for ``ClaudeSDKClient``."""
-
-        def __init__(self, options: Any) -> None:
-            self._options = options
-
-        async def connect(self) -> None:
-            pass
-
-        async def query(self, prompt: str) -> None:
-            pass
-
-        def receive_messages(self) -> Any:
-            return _EmptyAsyncIter()
-
-        def interrupt(self) -> None:
-            pass
-
-        def disconnect(self) -> None:
-            pass
-
-    class _EmptyAsyncIter:
-        def __aiter__(self) -> _EmptyAsyncIter:
-            return self
-
-        async def __anext__(self) -> Any:
-            raise StopAsyncIteration
-
-    class _StubOptions:
-        """Minimal stand-in for ``ClaudeAgentOptions``."""
-
-        def __init__(self, **kwargs: Any) -> None:
-            for k, v in kwargs.items():
-                setattr(self, k, v)
-
-    # Patch module globals so ClaudeACPBridge.__init__ and
-    # new_session() pick up the stubs.
-    import protocol.acp.claude_bridge as _mod
-
-    _mod.ClaudeSDKClient = _StubSDKClient  # type: ignore[misc,assignment]
-    _mod.ClaudeAgentOptions = _StubOptions  # type: ignore[misc,assignment]
-
-
-# ---------------------------------------------------------------------------
-# CLI entry point (python -m protocol.acp.claude_bridge)
-# ---------------------------------------------------------------------------
-
-
 async def main() -> None:
     parser = argparse.ArgumentParser(
         description="ACP bridge server wrapping claude-agent-sdk",
@@ -1109,11 +991,6 @@ async def main() -> None:
         action="store_true",
         help="Enable debug logging",
     )
-    parser.add_argument(
-        "--test-mode",
-        action="store_true",
-        help="Use stub SDK client (for e2e testing without API key)",
-    )
     args = parser.parse_args()
 
     if args.debug:
@@ -1122,9 +999,6 @@ async def main() -> None:
             format="%(asctime)s %(name)s %(levelname)s %(message)s",
             stream=sys.stderr,
         )
-
-    if args.test_mode:
-        _install_test_mode_stubs()
 
     bridge = ClaudeACPBridge(model=args.model, debug=args.debug)
     await run_agent(bridge)  # type: ignore[arg-type]  # structural Agent protocol

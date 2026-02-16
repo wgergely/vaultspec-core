@@ -51,11 +51,6 @@ def test_project_root() -> Iterator[Path]:
     _cleanup_test_project(root)
 
 
-# ---------------------------------------------------------------------------
-# Unit-level provider tests (no CLI required)
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.unit
 def test_gemini_loads_rules(test_project_root):
     """Verify GeminiProvider.load_rules() reads .gemini/rules/ files."""
@@ -117,11 +112,6 @@ def test_gemini_process_spec_complete(test_project_root):
 
     # Clean up the temp file
     system_file.unlink(missing_ok=True)
-
-
-# ---------------------------------------------------------------------------
-# CLI integration tests (require Gemini CLI on PATH)
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.integration

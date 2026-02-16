@@ -9,9 +9,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
-# ---------------------------------------------------------------------------
-# YAML parsing: prefer PyYAML, fall back to simple key-value parser
-# ---------------------------------------------------------------------------
 def _simple_yaml_load(text: str) -> dict[str, Any]:
     """Minimal key-value YAML parser for simple frontmatter.
 

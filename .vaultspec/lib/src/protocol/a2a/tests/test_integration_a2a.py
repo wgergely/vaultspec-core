@@ -62,11 +62,6 @@ def _build_client(executor, name="test", port=10099) -> httpx.AsyncClient:
     )
 
 
-# ------------------------------------------------------------------
-# Agent Card tests
-# ------------------------------------------------------------------
-
-
 @pytest.mark.integration
 class TestAgentCardServed:
     @pytest.mark.asyncio
@@ -91,11 +86,6 @@ class TestAgentCardServed:
             assert resp.status_code == 200
             data = resp.json()
             assert data["name"] == "test"
-
-
-# ------------------------------------------------------------------
-# Message send tests
-# ------------------------------------------------------------------
 
 
 @pytest.mark.integration
@@ -149,11 +139,6 @@ class TestMessageSend:
             assert parts[0]["text"] == "[Claude] analyze code"
 
 
-# ------------------------------------------------------------------
-# Bidirectional / multi-agent tests
-# ------------------------------------------------------------------
-
-
 @pytest.mark.integration
 class TestBidirectional:
     @pytest.mark.asyncio
@@ -182,11 +167,6 @@ class TestBidirectional:
             assert body_b["result"]["status"]["state"] == "completed"
             msg_b = body_b["result"]["status"]["message"]["parts"][0]["text"]
             assert msg_b == "[AgentB] hello from A"
-
-
-# ------------------------------------------------------------------
-# Task state / lifecycle tests
-# ------------------------------------------------------------------
 
 
 @pytest.mark.integration
@@ -257,11 +237,6 @@ class TestTaskLifecycle:
 
             # Should be an error since task is already completed
             assert "error" in cancel_body
-
-
-# ------------------------------------------------------------------
-# Error handling tests
-# ------------------------------------------------------------------
 
 
 @pytest.mark.integration

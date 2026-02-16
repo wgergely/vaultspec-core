@@ -12,11 +12,6 @@ import pytest
 TEST_PROJECT = Path(__file__).resolve().parent.parent.parent.parent / "test-project"
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def cleanup_test_project(root: Path) -> None:
     """Remove transient artifacts, preserving .vault/ and README."""
     for item in root.iterdir():
@@ -53,11 +48,6 @@ def make_ns(**kwargs) -> argparse.Namespace:
     defaults = {"prune": False, "dry_run": False, "force": False}
     defaults.update(kwargs)
     return argparse.Namespace(**defaults)
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(autouse=True)

@@ -10,10 +10,6 @@ import pytest
 
 pytestmark = [pytest.mark.api]
 
-# ---------------------------------------------------------------------------
-# TestTaskEngineIntegration
-# ---------------------------------------------------------------------------
-
 
 class TestTaskEngineIntegration:
     """Verify the task engine and lock manager interact correctly."""

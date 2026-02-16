@@ -18,11 +18,6 @@ from .conftest import (  # type: ignore[unresolved-import]
 pytestmark = [pytest.mark.unit]
 
 
-# ---------------------------------------------------------------------------
-# TestIncrementalRules
-# ---------------------------------------------------------------------------
-
-
 class TestIncrementalRules:
     """Multi-pass rule sync: add, modify, remove, prune across iterations."""
 
@@ -152,11 +147,6 @@ class TestIncrementalRules:
         assert "d-mod" in d_content
 
 
-# ---------------------------------------------------------------------------
-# TestIncrementalAgents
-# ---------------------------------------------------------------------------
-
-
 class TestIncrementalAgents:
     """Agent add/modify/remove across sync passes."""
 
@@ -218,11 +208,6 @@ class TestIncrementalAgents:
         assert "Flex upgraded" in c2
 
 
-# ---------------------------------------------------------------------------
-# TestIncrementalSkills
-# ---------------------------------------------------------------------------
-
-
 class TestIncrementalSkills:
     """Skill add/modify/remove across sync passes."""
 
@@ -261,11 +246,6 @@ class TestIncrementalSkills:
         cli.skills_sync(args_prune)
         assert not (TEST_PROJECT / ".claude" / "skills" / "spec-deploy").exists()
         assert (TEST_PROJECT / ".claude" / "skills" / "spec-test" / "SKILL.md").exists()
-
-
-# ---------------------------------------------------------------------------
-# TestIncrementalSystem
-# ---------------------------------------------------------------------------
 
 
 class TestIncrementalSystem:
@@ -324,11 +304,6 @@ class TestIncrementalSystem:
         assert content_v1 == content_v2
 
 
-# ---------------------------------------------------------------------------
-# TestIncrementalConfig
-# ---------------------------------------------------------------------------
-
-
 class TestIncrementalConfig:
     """Config sync responds to FRAMEWORK.md / PROJECT.md changes."""
 
@@ -370,11 +345,6 @@ class TestIncrementalConfig:
         c2 = (TEST_PROJECT / ".claude" / "CLAUDE.md").read_text(encoding="utf-8")
         assert "project v2" in c2
         assert "project v1" not in c2
-
-
-# ---------------------------------------------------------------------------
-# TestMixedOperations
-# ---------------------------------------------------------------------------
 
 
 class TestMixedOperations:
