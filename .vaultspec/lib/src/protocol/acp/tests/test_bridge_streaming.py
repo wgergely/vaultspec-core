@@ -31,11 +31,6 @@ from .conftest import (
 pytestmark = [pytest.mark.unit]
 
 
-# ---------------------------------------------------------------------------
-# TestPrompt
-# ---------------------------------------------------------------------------
-
-
 class TestPrompt:
     """Test the prompt method."""
 
@@ -132,11 +127,6 @@ class TestPrompt:
         prompt_blocks = [TextContentBlock(type="text", text="test")]
         result = await bridge.prompt(prompt=prompt_blocks, session_id="s1")
         assert result.stop_reason == "refusal"
-
-
-# ---------------------------------------------------------------------------
-# TestEmitUpdates
-# ---------------------------------------------------------------------------
 
 
 class TestEmitUpdates:
@@ -241,11 +231,6 @@ class TestEmitUpdates:
         assert len(test_conn.session_update_calls) == 0
 
 
-# ---------------------------------------------------------------------------
-# TestEmitAssistant
-# ---------------------------------------------------------------------------
-
-
 class TestEmitAssistant:
     """Test _emit_assistant maps content blocks to session_update calls."""
 
@@ -342,11 +327,6 @@ class TestEmitAssistant:
         assert len(test_conn.session_update_calls) == 0
 
 
-# ---------------------------------------------------------------------------
-# TestEmitUserMessage
-# ---------------------------------------------------------------------------
-
-
 class TestEmitUserMessage:
     """Test _emit_user_message maps UserMessage to ToolCallProgress."""
 
@@ -438,11 +418,6 @@ class TestEmitUserMessage:
         assert call_kwargs["update"].status == "completed"
 
 
-# ---------------------------------------------------------------------------
-# TestEmitSystemMessage
-# ---------------------------------------------------------------------------
-
-
 class TestEmitSystemMessage:
     """Test _emit_system_message maps SystemMessage to SessionInfoUpdate."""
 
@@ -471,11 +446,6 @@ class TestEmitSystemMessage:
 
         call_kwargs = test_conn.session_update_calls[-1]
         assert call_kwargs["update"].title == "system"
-
-
-# ---------------------------------------------------------------------------
-# TestEmitResult
-# ---------------------------------------------------------------------------
 
 
 class TestEmitResult:
@@ -559,11 +529,6 @@ class TestEmitResult:
 
         call_kwargs = test_conn.session_update_calls[-1]
         assert "Result:" in call_kwargs["update"].title
-
-
-# ---------------------------------------------------------------------------
-# TestEmitStreamEvent
-# ---------------------------------------------------------------------------
 
 
 class TestEmitStreamEvent:
@@ -855,11 +820,6 @@ class TestEmitStreamEvent:
         assert call_kwargs["update"].content.text == "  \n  "
 
 
-# ---------------------------------------------------------------------------
-# TestContentBlockStartTracking
-# ---------------------------------------------------------------------------
-
-
 class TestContentBlockStartTracking:
     """Test content_block_start event tracking for tool_use correlation."""
 
@@ -988,11 +948,6 @@ class TestContentBlockStartTracking:
 
         await connected_bridge._emit_stream_event(msg, "s1")
         assert 0 not in connected_bridge._block_index_to_tool
-
-
-# ---------------------------------------------------------------------------
-# TestInputJsonDelta
-# ---------------------------------------------------------------------------
 
 
 class TestInputJsonDelta:

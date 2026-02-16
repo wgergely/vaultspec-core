@@ -22,10 +22,6 @@ from .conftest import TEST_PROJECT
 
 pytestmark = [pytest.mark.unit]
 
-# ---------------------------------------------------------------------------
-# TestSharedResolveIncludes (base.py free function)
-# ---------------------------------------------------------------------------
-
 
 class TestSharedResolveIncludes:
     def test_basic(self, tmp_path):
@@ -42,11 +38,6 @@ class TestSharedResolveIncludes:
     def test_url_passthrough(self, tmp_path):
         result = resolve_includes("@https://example.com/file.md", tmp_path, tmp_path)
         assert "@https://example.com/file.md" in result
-
-
-# ---------------------------------------------------------------------------
-# TestGeminiProvider
-# ---------------------------------------------------------------------------
 
 
 class TestGeminiProvider:
@@ -172,11 +163,6 @@ class TestGeminiProvider:
         assert instr_pos < persona_pos < rules_pos
 
 
-# ---------------------------------------------------------------------------
-# TestGeminiVersionCheck
-# ---------------------------------------------------------------------------
-
-
 class TestGeminiVersionCheck:
     @pytest.fixture(autouse=True)
     def _clear_version_cache(self):
@@ -222,11 +208,6 @@ class TestGeminiVersionCheck:
 
         version = GeminiProvider.check_version("gemini", run_fn=raise_fnf)
         assert version is None
-
-
-# ---------------------------------------------------------------------------
-# TestClaudeProvider
-# ---------------------------------------------------------------------------
 
 
 class TestClaudeProvider:
@@ -282,11 +263,6 @@ class TestClaudeProvider:
         assert "protocol.acp.claude_bridge" in spec.args
 
 
-# ---------------------------------------------------------------------------
-# TestGetProviderForModel
-# ---------------------------------------------------------------------------
-
-
 class TestGetProviderForModel:
     def test_none_returns_gemini(self):
         provider = get_provider_for_model(None)
@@ -297,11 +273,6 @@ class TestGetProviderForModel:
         # for unknown or None models.
         provider = get_provider_for_model(GeminiModels.LOW)
         assert provider.name == "gemini"
-
-
-# ---------------------------------------------------------------------------
-# TestGeminiSandboxFlag -- Phase 1: --sandbox flag in read-only mode
-# ---------------------------------------------------------------------------
 
 
 class TestGeminiSandboxFlag:
@@ -344,11 +315,6 @@ class TestGeminiSandboxFlag:
             mode="read-write",
         )
         assert "--sandbox" not in spec.args
-
-
-# ---------------------------------------------------------------------------
-# TestClaudeModePassthrough -- Phase 1: mode doesn't change Claude args
-# ---------------------------------------------------------------------------
 
 
 class TestClaudeModePassthrough:
@@ -396,11 +362,6 @@ class TestClaudeModePassthrough:
         # Should succeed without error and produce valid args
         assert isinstance(spec, ProcessSpec)
         assert "-m" in spec.args
-
-
-# ---------------------------------------------------------------------------
-# TestClaudeFeaturePassthrough -- Phase 5: env vars from agent_meta
-# ---------------------------------------------------------------------------
 
 
 class TestClaudeFeaturePassthrough:
@@ -528,11 +489,6 @@ class TestClaudeFeaturePassthrough:
             assert key not in spec.env
 
 
-# ---------------------------------------------------------------------------
-# TestGeminiFeaturePassthrough -- Phase 5: CLI flags from agent_meta
-# ---------------------------------------------------------------------------
-
-
 class TestGeminiFeaturePassthrough:
     """Verify GeminiProvider adds CLI flags from agent_meta fields."""
 
@@ -606,11 +562,6 @@ class TestGeminiFeaturePassthrough:
             assert flag not in spec.args
 
 
-# ---------------------------------------------------------------------------
-# TestProviderAPIParity -- both providers share the same interface
-# ---------------------------------------------------------------------------
-
-
 class TestProviderAPIParity:
     """Verify both providers implement the same abstract API."""
 
@@ -646,11 +597,6 @@ class TestProviderAPIParity:
         assert hasattr(AgentProvider, "_validate_include_dirs")
 
 
-# ---------------------------------------------------------------------------
-# TestClaudeModeEnv -- Claude now sets VS_AGENT_MODE
-# ---------------------------------------------------------------------------
-
-
 class TestClaudeModeEnv:
     """Verify Claude provider sets VS_AGENT_MODE in env."""
 
@@ -679,11 +625,6 @@ class TestClaudeModeEnv:
             mode="read-only",
         )
         assert spec.env["VS_AGENT_MODE"] == "read-only"
-
-
-# ---------------------------------------------------------------------------
-# TestClaudeSystemPrompt -- load_system_prompt and construct_system_prompt
-# ---------------------------------------------------------------------------
 
 
 class TestClaudeSystemPrompt:
@@ -725,11 +666,6 @@ class TestClaudeSystemPrompt:
         prompt = provider.construct_system_prompt("persona", "rules", "")
         assert "SYSTEM INSTRUCTIONS" not in prompt
         assert "AGENT PERSONA" in prompt
-
-
-# ---------------------------------------------------------------------------
-# TestProviderFeatureWarnings -- cross-provider warnings
-# ---------------------------------------------------------------------------
 
 
 class TestProviderFeatureWarnings:
@@ -808,11 +744,6 @@ class TestProviderFeatureWarnings:
             )
         finally:
             gmod._cached_version = None
-
-
-# ---------------------------------------------------------------------------
-# TestValidateIncludeDirsBase -- extracted validation
-# ---------------------------------------------------------------------------
 
 
 class TestValidateIncludeDirsBase:

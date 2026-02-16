@@ -18,11 +18,6 @@ from .conftest import TEST_PROJECT
 pytestmark = [pytest.mark.unit]
 
 
-# ---------------------------------------------------------------------------
-# TestSandboxCallback
-# ---------------------------------------------------------------------------
-
-
 class TestSandboxCallback:
     """Test the can_use_tool sandbox enforcement."""
 
@@ -158,11 +153,6 @@ class TestSandboxCallback:
         assert result.updated_permissions is None
 
 
-# ---------------------------------------------------------------------------
-# TestIsVaultPath
-# ---------------------------------------------------------------------------
-
-
 class TestIsVaultPath:
     """Test the _is_vault_path helper."""
 
@@ -193,11 +183,6 @@ class TestIsVaultPath:
 
     def test_outside_root(self):
         assert _is_vault_path("/completely/different/path", str(TEST_PROJECT)) is False
-
-
-# ---------------------------------------------------------------------------
-# TestShellToolsSandbox (Phase 1 terminal sandbox)
-# ---------------------------------------------------------------------------
 
 
 class TestShellToolsSandbox:

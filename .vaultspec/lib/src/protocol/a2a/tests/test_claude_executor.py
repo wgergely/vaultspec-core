@@ -19,10 +19,6 @@ from protocol.a2a.executors.claude_executor import ClaudeA2AExecutor
 from protocol.a2a.tests.conftest import TEST_PROJECT, make_request_context
 from protocol.providers.base import ClaudeModels
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _make_result(
     *,
@@ -132,11 +128,6 @@ def _make_executor(
         client_factory=lambda _opts: client,
         options_factory=_OptionsRecorder,
     )
-
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.integration

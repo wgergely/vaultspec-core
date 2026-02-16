@@ -38,20 +38,10 @@ from .conftest import TEST_PROJECT
 pytestmark = [pytest.mark.unit]
 
 
-# ---------------------------------------------------------------------------
-# Module-level helpers
-# ---------------------------------------------------------------------------
-
-
 def _set_server(**overrides):
     """Set subagent_server.server globals directly."""
     for attr, value in overrides.items():
         setattr(srv, attr, value)
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(autouse=True)
@@ -140,11 +130,6 @@ A minimal agent definition.
     return agent_file
 
 
-# ---------------------------------------------------------------------------
-# TestListAgents
-# ---------------------------------------------------------------------------
-
-
 class TestListAgents:
     """Tests for the list_agents MCP tool."""
 
@@ -217,11 +202,6 @@ class TestListAgents:
         executor = next(a for a in data["agents"] if a["name"] == "simple-executor")
         assert executor["tier"] == "LOW"
         assert executor["description"] == "A helpful French Baker agent"
-
-
-# ---------------------------------------------------------------------------
-# TestDispatchAgent
-# ---------------------------------------------------------------------------
 
 
 class TestDispatchAgent:
@@ -356,11 +336,6 @@ class TestDispatchAgent:
         assert data["mode"] == "read-only"
 
 
-# ---------------------------------------------------------------------------
-# TestGetTaskStatus
-# ---------------------------------------------------------------------------
-
-
 class TestGetTaskStatus:
     """Tests for the get_task_status MCP tool."""
 
@@ -443,11 +418,6 @@ class TestGetTaskStatus:
         assert data["lock"]["mode"] == "read-only"
 
 
-# ---------------------------------------------------------------------------
-# TestCancelTask
-# ---------------------------------------------------------------------------
-
-
 class TestCancelTask:
     """Tests for the cancel_task MCP tool."""
 
@@ -499,11 +469,6 @@ class TestCancelTask:
         Integration: requires real asyncio.Task from a running dispatch.
         """
         pytest.skip("requires real background asyncio.Task from dispatch")
-
-
-# ---------------------------------------------------------------------------
-# TestGetLocks
-# ---------------------------------------------------------------------------
 
 
 class TestGetLocks:
@@ -576,11 +541,6 @@ class TestGetLocks:
         assert data["locks"][0]["agent"] == "unknown"
 
 
-# ---------------------------------------------------------------------------
-# TestAgentCache
-# ---------------------------------------------------------------------------
-
-
 class TestAgentCache:
     """Tests for agent cache helpers: parsing, tools, metadata extraction."""
 
@@ -629,11 +589,6 @@ class TestAgentCache:
         assert result == ["Read", "Write", "Bash"]
 
 
-# ---------------------------------------------------------------------------
-# TestPermissionHelpers
-# ---------------------------------------------------------------------------
-
-
 class TestPermissionHelpers:
     """Tests for permission enforcement helpers."""
 
@@ -670,11 +625,6 @@ class TestPermissionHelpers:
     def test_strip_quotes_no_quotes(self):
         """Returns value unchanged when no surrounding quotes."""
         assert _strip_quotes("hello world") == "hello world"
-
-
-# ---------------------------------------------------------------------------
-# TestDispatchAgentOverrides -- Phase 5: runtime overrides
-# ---------------------------------------------------------------------------
 
 
 class TestDispatchAgentOverrides:
@@ -765,11 +715,6 @@ class TestDispatchAgentOverrides:
         assert kwargs["output_format"] == "json"
         assert kwargs["interactive"] is False
         assert kwargs["quiet"] is True
-
-
-# ---------------------------------------------------------------------------
-# TestParseAgentMetadataExtended -- Phase 5: new metadata fields
-# ---------------------------------------------------------------------------
 
 
 class TestParseAgentMetadataExtended:

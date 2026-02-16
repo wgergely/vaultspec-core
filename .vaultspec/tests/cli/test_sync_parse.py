@@ -14,11 +14,6 @@ from .conftest import TEST_PROJECT  # type: ignore[unresolved-import]
 pytestmark = [pytest.mark.unit]
 
 
-# ---------------------------------------------------------------------------
-# TestParseFrontmatter
-# ---------------------------------------------------------------------------
-
-
 class TestParseFrontmatter:
     def test_valid_yaml(self):
         content = "---\nname: hello\ntrigger: always_on\n---\n\n# Body"
@@ -61,11 +56,6 @@ class TestParseFrontmatter:
         assert "Line 1\nLine 2\nLine 3" in body
 
 
-# ---------------------------------------------------------------------------
-# TestBuildFile
-# ---------------------------------------------------------------------------
-
-
 class TestBuildFile:
     def test_round_trip(self):
         fm = {"name": "test-rule", "trigger": "always_on"}
@@ -86,11 +76,6 @@ class TestBuildFile:
         assert body2.strip() == ""
 
 
-# ---------------------------------------------------------------------------
-# TestAtomicWrite
-# ---------------------------------------------------------------------------
-
-
 class TestAtomicWrite:
     def test_creates_new_file(self):
         p = TEST_PROJECT / "new.md"
@@ -107,11 +92,6 @@ class TestAtomicWrite:
         p = TEST_PROJECT / "clean.md"
         cli.atomic_write(p, "data")
         assert not (TEST_PROJECT / "clean.md.tmp").exists()
-
-
-# ---------------------------------------------------------------------------
-# TestIsCliManaged
-# ---------------------------------------------------------------------------
 
 
 class TestIsCliManaged:
@@ -135,11 +115,6 @@ class TestIsCliManaged:
         assert cli._is_cli_managed(p) is False
 
 
-# ---------------------------------------------------------------------------
-# TestInitPaths
-# ---------------------------------------------------------------------------
-
-
 class TestInitPaths:
     def test_sets_globals(self):
         cli.init_paths(TEST_PROJECT)
@@ -161,11 +136,6 @@ class TestInitPaths:
         assert (
             cli.TOOL_CONFIGS["claude"].rules_dir == TEST_PROJECT / ".claude" / "rules"
         )
-
-
-# ---------------------------------------------------------------------------
-# TestSyncResult
-# ---------------------------------------------------------------------------
 
 
 class TestSyncResult:

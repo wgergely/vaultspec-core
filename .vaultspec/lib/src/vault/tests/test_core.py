@@ -18,10 +18,6 @@ from orchestration.utils import (  # noqa: E402
 )
 from protocol.providers.base import ClaudeModels, GeminiModels  # noqa: E402
 
-# ---------------------------------------------------------------------------
-# TestParseFrontmatter
-# ---------------------------------------------------------------------------
-
 
 class TestParseFrontmatter:
     def test_valid_frontmatter(self):
@@ -78,11 +74,6 @@ class TestParseFrontmatter:
         assert body == "Line 1\nLine 2\nLine 3"
 
 
-# ---------------------------------------------------------------------------
-# TestSafeReadText
-# ---------------------------------------------------------------------------
-
-
 class TestSafeReadText:
     def test_read_existing_file(self, test_root_dir):
         test_file = test_root_dir / "test.txt"
@@ -101,11 +92,6 @@ class TestSafeReadText:
             outside_file.write_text("secret data", encoding="utf-8")
             with pytest.raises(SecurityError):
                 safe_read_text(outside_file, test_root_dir)
-
-
-# ---------------------------------------------------------------------------
-# TestLoadAgent
-# ---------------------------------------------------------------------------
 
 
 class TestLoadAgent:

@@ -22,9 +22,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-# ---------------------------------------------------------------------------
-# YAML parsing: prefer PyYAML, fall back to simple parser
-# ---------------------------------------------------------------------------
 try:
     import yaml
 
@@ -89,9 +86,6 @@ except ImportError:
         return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# Provider imports for tier-based model resolution
-# ---------------------------------------------------------------------------
 from _paths import LIB_SRC_DIR  # noqa: F401
 from _paths import ROOT_DIR as _PATHS_ROOT_DIR  # shared path bootstrap
 
@@ -112,9 +106,6 @@ except ImportError:
         file=sys.stderr,
     )
 
-# ---------------------------------------------------------------------------
-# Path constants
-# ---------------------------------------------------------------------------
 
 PROTECTED_SKILLS = {"fd", "rg", "sg", "sd"}
 
@@ -223,10 +214,6 @@ class SyncResult:
     errors: list[str] = field(default_factory=list)
 
 
-# ---------------------------------------------------------------------------
-# Frontmatter utilities
-# ---------------------------------------------------------------------------
-
 from vault.parser import parse_frontmatter  # noqa: E402
 
 
@@ -247,11 +234,6 @@ def atomic_write(path: Path, content: str) -> None:
     tmp.replace(path)
 
 
-# ---------------------------------------------------------------------------
-# Tier resolution
-# ---------------------------------------------------------------------------
-
-
 def resolve_model(tool: str, tier: str) -> str | None:
     """Resolve a capability tier name to a model string."""
     if CapabilityLevel is None or tool not in PROVIDERS:
@@ -261,11 +243,6 @@ def resolve_model(tool: str, tier: str) -> str | None:
     except (KeyError, AttributeError):
         return None
     return PROVIDERS[tool].get_best_model_for_capability(level)
-
-
-# ---------------------------------------------------------------------------
-# Rules handler
-# ---------------------------------------------------------------------------
 
 
 def collect_rules() -> dict[str, tuple[Path, dict[str, Any], str]]:
@@ -365,11 +342,6 @@ def rules_sync(args: argparse.Namespace) -> None:
         total.errors.extend(result.errors)
 
     print_summary("Rules", total)
-
-
-# ---------------------------------------------------------------------------
-# Agents handler
-# ---------------------------------------------------------------------------
 
 
 def collect_agents() -> dict[str, tuple[Path, dict[str, Any], str]]:
@@ -532,11 +504,6 @@ def agents_sync(
     print_summary("Agents", total)
 
 
-# ---------------------------------------------------------------------------
-# Skills handler
-# ---------------------------------------------------------------------------
-
-
 def collect_skills() -> dict[str, tuple[Path, dict[str, Any], str]]:
     """Collect spec-* skill definitions from .vaultspec/skills/."""
     sources: dict[str, tuple[Path, dict[str, Any], str]] = {}
@@ -636,11 +603,6 @@ def skills_sync(args: argparse.Namespace) -> None:
         total.errors.extend(result.errors)
 
     print_summary("Skills", total)
-
-
-# ---------------------------------------------------------------------------
-# Sync engine
-# ---------------------------------------------------------------------------
 
 
 def sync_files(
@@ -766,11 +728,6 @@ def sync_skills(
                         result.pruned += 1
 
     return result
-
-
-# ---------------------------------------------------------------------------
-# Config handler (CLAUDE.md / GEMINI.md / AGENTS.md generation)
-# ---------------------------------------------------------------------------
 
 
 def _collect_rule_refs(cfg: ToolConfig) -> list[str]:
@@ -932,11 +889,6 @@ def config_sync(args: argparse.Namespace) -> None:
             result.updated += 1
 
     print_summary("Config", result)
-
-
-# ---------------------------------------------------------------------------
-# System prompt handler
-# ---------------------------------------------------------------------------
 
 
 def collect_system_parts() -> dict[str, tuple[Path, dict[str, Any], str]]:
@@ -1117,10 +1069,6 @@ def print_summary(resource: str, result: SyncResult) -> None:
     print(f"  {resource}: {summary}")
 
 
-# ---------------------------------------------------------------------------
-# Test runner
-# ---------------------------------------------------------------------------
-
 VALID_CATEGORIES = {"all", "unit", "api", "search", "index", "quality"}
 
 MODULE_PATHS = {
@@ -1162,11 +1110,6 @@ def test_run(args: argparse.Namespace) -> None:
     print(f"Running: {' '.join(cmd)}")
     result = subprocess.run(cmd, cwd=str(ROOT_DIR))
     sys.exit(result.returncode)
-
-
-# ---------------------------------------------------------------------------
-# CLI entry point
-# ---------------------------------------------------------------------------
 
 
 def add_sync_flags(parser: argparse.ArgumentParser) -> None:

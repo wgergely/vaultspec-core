@@ -186,11 +186,6 @@ async def _run_plan_step(
     )
 
 
-# ---------------------------------------------------------------------------
-# Gemini Full-Cycle Test
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.integration
 @pytest.mark.gemini
 @pytest.mark.skipif(not _has_gemini_cli, reason="Gemini CLI not installed")
@@ -228,11 +223,6 @@ async def test_full_cycle_gemini(pipeline_root):
         _validate_frontmatter(doc)
 
 
-# ---------------------------------------------------------------------------
-# Claude Full-Cycle Test
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.integration
 @pytest.mark.claude
 @pytest.mark.skipif(not _has_claude_cli, reason="Claude CLI not installed")
@@ -268,11 +258,6 @@ async def test_full_cycle_claude(pipeline_root):
     # Validate frontmatter on all created documents
     for doc in research_docs + adr_docs + plan_docs:
         _validate_frontmatter(doc)
-
-
-# ---------------------------------------------------------------------------
-# Pipeline structure unit tests (no CLI required)
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit

@@ -19,11 +19,6 @@ from .conftest import TEST_PROJECT  # type: ignore[unresolved-import]
 pytestmark = [pytest.mark.unit]
 
 
-# ---------------------------------------------------------------------------
-# TestCollectRules
-# ---------------------------------------------------------------------------
-
-
 class TestCollectRules:
     def test_builtin_and_custom(self):
         (TEST_PROJECT / ".vaultspec" / "rules" / "a.md").write_text(
@@ -61,11 +56,6 @@ class TestCollectRules:
         assert "Custom override" in body
 
 
-# ---------------------------------------------------------------------------
-# TestCollectAgents
-# ---------------------------------------------------------------------------
-
-
 class TestCollectAgents:
     def test_valid_frontmatter(self):
         (TEST_PROJECT / ".vaultspec" / "agents" / "coder.md").write_text(
@@ -83,11 +73,6 @@ class TestCollectAgents:
         assert cli.collect_agents() == {}
 
 
-# ---------------------------------------------------------------------------
-# TestCollectSkills
-# ---------------------------------------------------------------------------
-
-
 class TestCollectSkills:
     def test_filters_task_prefix(self):
         (TEST_PROJECT / ".vaultspec" / "skills" / "spec-deploy.md").write_text(
@@ -102,11 +87,6 @@ class TestCollectSkills:
 
     def test_empty_skills_dir(self):
         assert cli.collect_skills() == {}
-
-
-# ---------------------------------------------------------------------------
-# TestCollectSystemParts
-# ---------------------------------------------------------------------------
 
 
 class TestCollectSystemParts:
@@ -128,11 +108,6 @@ class TestCollectSystemParts:
         assert cli.collect_system_parts() == {}
 
 
-# ---------------------------------------------------------------------------
-# TestTransformRule
-# ---------------------------------------------------------------------------
-
-
 class TestTransformRule:
     def test_claude_includes_name(self):
         out = cli.transform_rule("claude", "my-rule.md", {}, "Body text")
@@ -151,11 +126,6 @@ class TestTransformRule:
         out = cli.transform_rule("gemini", "rule.md", {}, "Content")
         meta, _body = cli.parse_frontmatter(out)
         assert meta["name"] == "rule"
-
-
-# ---------------------------------------------------------------------------
-# TestTransformAgent
-# ---------------------------------------------------------------------------
 
 
 class TestTransformAgent:
@@ -187,11 +157,6 @@ class TestTransformAgent:
         assert result is None
 
 
-# ---------------------------------------------------------------------------
-# TestTransformSkill
-# ---------------------------------------------------------------------------
-
-
 class TestTransformSkill:
     def test_extracts_description(self):
         out = cli.transform_skill(
@@ -201,11 +166,6 @@ class TestTransformSkill:
         assert meta["description"] == "Deploy things"
         assert meta["name"] == "spec-deploy"
         assert "# Deploy" in body
-
-
-# ---------------------------------------------------------------------------
-# TestListings
-# ---------------------------------------------------------------------------
 
 
 class TestListings:
@@ -237,11 +197,6 @@ class TestListings:
     def test_skill_listing_empty(self):
         listing = cli._collect_skill_listing()
         assert listing == ""
-
-
-# ---------------------------------------------------------------------------
-# TestGenerateConfig
-# ---------------------------------------------------------------------------
 
 
 class TestGenerateConfig:
@@ -284,11 +239,6 @@ class TestGenerateConfig:
         content = cli._generate_config(cfg)
         assert content is not None
         assert "@rules/my-rule.md" in content
-
-
-# ---------------------------------------------------------------------------
-# TestGenerateSystemPrompt
-# ---------------------------------------------------------------------------
 
 
 class TestGenerateSystemPrompt:

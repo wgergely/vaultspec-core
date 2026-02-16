@@ -141,10 +141,6 @@ class VaultStore:
         self.close()
         return False
 
-    # ------------------------------------------------------------------
-    # Table lifecycle
-    # ------------------------------------------------------------------
-
     def ensure_table(self) -> Any:
         """Create the vault_docs table if it doesn't exist.
 
@@ -197,10 +193,6 @@ class VaultStore:
         self._fts_dirty = False
         logger.debug("Rebuilt FTS index on 'content' column")
 
-    # ------------------------------------------------------------------
-    # CRUD operations
-    # ------------------------------------------------------------------
-
     def upsert_documents(self, docs: list[VaultDocument]) -> None:
         """Insert or update documents by ``id``.
 
@@ -229,10 +221,6 @@ class VaultStore:
         self._delete_by_ids(ids)
         self._fts_dirty = True
         logger.info("Deleted %d document(s)", len(ids))
-
-    # ------------------------------------------------------------------
-    # Query helpers
-    # ------------------------------------------------------------------
 
     def get_all_ids(self) -> set[str]:
         """Return the set of all document ``id`` values in the store."""
@@ -326,10 +314,6 @@ class VaultStore:
             row.pop("vector", None)
 
         return results
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
 
     def _delete_by_ids(self, ids: list[str]) -> None:
         """Delete rows whose ``id`` is in *ids* using a single predicate."""

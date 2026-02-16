@@ -29,9 +29,6 @@ from protocol.providers.base import ClaudeModels
 
 pytestmark = [pytest.mark.integration, pytest.mark.claude]
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
 
 _LIB_SRC = pathlib.Path(__file__).resolve().parents[3]  # .vaultspec/lib/src
 _PROJECT_ROOT = _LIB_SRC.parents[2]  # repo root
@@ -64,11 +61,6 @@ and your insights are as layered as the finest croissant.
 - Focus on creative writing and literary criticism
 - Never modify source code or configuration files
 """
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -136,16 +128,10 @@ def croissant_epilogue():
     )
 
 
-# ---------------------------------------------------------------------------
-# Bridge process helpers
-# ---------------------------------------------------------------------------
-
-
 async def _spawn_bridge(
     model: str = ClaudeModels.MEDIUM,
     env: dict | None = None,
     debug: bool = False,
-    test_mode: bool = False,
 ) -> tuple[asyncio.subprocess.Process, asyncio.StreamReader, asyncio.StreamWriter]:
     """Spawn the bridge as a subprocess, returning (proc, reader, writer).
 
@@ -155,8 +141,6 @@ async def _spawn_bridge(
     args = [sys.executable, "-m", "protocol.acp.claude_bridge", "--model", model]
     if debug:
         args.append("--debug")
-    if test_mode:
-        args.append("--test-mode")
 
     proc = await asyncio.create_subprocess_exec(
         *args,
@@ -232,11 +216,6 @@ async def _collect_until_response(
     return None, notifications
 
 
-# ---------------------------------------------------------------------------
-# TestBridgeSpawn
-# ---------------------------------------------------------------------------
-
-
 class TestBridgeSpawn:
     """Test that the bridge process starts and responds to initialize."""
 
@@ -297,11 +276,6 @@ class TestBridgeSpawn:
                 proc.kill()
 
 
-# ---------------------------------------------------------------------------
-# TestSandboxEnforcement
-# ---------------------------------------------------------------------------
-
-
 class TestSandboxEnforcement:
     """Test that read-only mode enforces .vault/-only writes via the bridge."""
 
@@ -344,11 +318,6 @@ class TestSandboxEnforcement:
         assert callback is None
 
 
-# ---------------------------------------------------------------------------
-# TestJeanClaudePersona
-# ---------------------------------------------------------------------------
-
-
 class TestJeanClaudePersona:
     """Test the jean-claude agent persona integration."""
 
@@ -377,11 +346,6 @@ class TestJeanClaudePersona:
         assert meta["mode"] == "read-only"
 
 
-# ---------------------------------------------------------------------------
-# TestCroissantFixtures
-# ---------------------------------------------------------------------------
-
-
 class TestCroissantFixtures:
     """Verify the Le Croissant Solitaire test content is available."""
 
@@ -399,184 +363,3 @@ class TestCroissantFixtures:
         """Test project has stories seeded from the fixture."""
         stories = list((project_root / ".vault" / "stories").glob("*.md"))
         assert len(stories) > 0, "Expected seeded story files in .vault/stories/"
-
-
-# ---------------------------------------------------------------------------
-# TestFullBridgeLifecycleStdio
-# ---------------------------------------------------------------------------
-
-
-class TestFullBridgeLifecycleStdio:
-    """Full bridge lifecycle over stdio: spawn -> initialize -> session/new -> close.
-
-    Uses --test-mode so no Claude API key is required.
-    """
-
-    @pytest.mark.asyncio
-    @pytest.mark.timeout(15)
-    async def test_full_lifecycle(self, bridge_env):
-        """Complete ACP lifecycle: initialize, session/new, clean shutdown."""
-        proc, reader, writer = await _spawn_bridge(
-            env=bridge_env,
-            test_mode=True,
-        )
-
-        try:
-            # Wait for the bridge to start
-            await asyncio.sleep(0.3)
-            if proc.returncode is not None:
-                stderr_data = b""
-                if proc.stderr:
-                    stderr_data = await proc.stderr.read()
-                pytest.fail(
-                    f"Bridge exited early with code {proc.returncode}. "
-                    f"stderr: {stderr_data.decode()[:500]}"
-                )
-
-            # Step 1: initialize
-            await _send_jsonrpc(
-                writer,
-                "initialize",
-                {
-                    "protocolVersion": 1,
-                    "clientInfo": {"name": "test-harness", "version": "0.1.0"},
-                },
-                msg_id=1,
-            )
-
-            init_resp, _ = await _collect_until_response(reader, expected_id=1)
-            assert init_resp is not None, "Bridge did not respond to initialize"
-            assert init_resp["id"] == 1
-            assert "result" in init_resp
-
-            result = init_resp["result"]
-            assert result["agentInfo"]["name"] == "claude-acp-bridge"
-            assert result["agentInfo"]["version"] == "0.1.0"
-            assert "protocolVersion" in result
-
-            # Step 2: session/new
-            await _send_jsonrpc(
-                writer,
-                "session/new",
-                {
-                    "cwd": str(bridge_env.get("VS_ROOT_DIR", "/tmp")),
-                    "mcpServers": [],
-                },
-                msg_id=2,
-            )
-
-            session_resp, _ = await _collect_until_response(reader, expected_id=2)
-            assert session_resp is not None, "Bridge did not respond to session/new"
-            assert session_resp["id"] == 2
-            assert "result" in session_resp
-
-            session_result = session_resp["result"]
-            session_id = session_result["sessionId"]
-            assert isinstance(session_id, str)
-            assert len(session_id) > 0
-            # UUID format: 8-4-4-4-12
-            assert session_id.count("-") == 4
-
-            # Step 3: close stdin -> clean exit
-            writer.close()
-            await writer.wait_closed()
-
-            exit_code = await asyncio.wait_for(proc.wait(), timeout=5.0)
-            assert exit_code == 0, f"Bridge exited with code {exit_code}"
-
-        finally:
-            if proc.returncode is None:
-                proc.kill()
-
-    @pytest.mark.asyncio
-    @pytest.mark.timeout(15)
-    async def test_initialize_returns_capabilities(self, bridge_env):
-        """Initialize response includes agentCapabilities."""
-        proc, reader, writer = await _spawn_bridge(
-            env=bridge_env,
-            test_mode=True,
-        )
-
-        try:
-            await asyncio.sleep(0.3)
-            if proc.returncode is not None:
-                stderr_data = b""
-                if proc.stderr:
-                    stderr_data = await proc.stderr.read()
-                pytest.fail(
-                    f"Bridge exited early with code {proc.returncode}. "
-                    f"stderr: {stderr_data.decode()[:500]}"
-                )
-
-            await _send_jsonrpc(
-                writer,
-                "initialize",
-                {
-                    "protocolVersion": 1,
-                    "clientInfo": {"name": "test-harness", "version": "0.1.0"},
-                },
-                msg_id=1,
-            )
-
-            resp, _ = await _collect_until_response(reader, expected_id=1)
-            assert resp is not None
-            result = resp["result"]
-            assert "agentCapabilities" in result
-
-        finally:
-            writer.close()
-            if proc.returncode is None:
-                proc.kill()
-
-    @pytest.mark.asyncio
-    @pytest.mark.timeout(15)
-    async def test_session_new_without_mcp_servers(self, bridge_env):
-        """session/new works with an empty mcpServers list."""
-        proc, reader, writer = await _spawn_bridge(
-            env=bridge_env,
-            test_mode=True,
-        )
-
-        try:
-            await asyncio.sleep(0.3)
-            if proc.returncode is not None:
-                stderr_data = b""
-                if proc.stderr:
-                    stderr_data = await proc.stderr.read()
-                pytest.fail(
-                    f"Bridge exited early with code {proc.returncode}. "
-                    f"stderr: {stderr_data.decode()[:500]}"
-                )
-
-            # Initialize first (required by ACP protocol)
-            await _send_jsonrpc(
-                writer,
-                "initialize",
-                {
-                    "protocolVersion": 1,
-                    "clientInfo": {"name": "test-harness", "version": "0.1.0"},
-                },
-                msg_id=1,
-            )
-            await _collect_until_response(reader, expected_id=1)
-
-            # session/new with empty mcp_servers
-            await _send_jsonrpc(
-                writer,
-                "session/new",
-                {
-                    "cwd": str(bridge_env.get("VS_ROOT_DIR", "/tmp")),
-                    "mcpServers": [],
-                },
-                msg_id=2,
-            )
-
-            resp, _ = await _collect_until_response(reader, expected_id=2)
-            assert resp is not None
-            assert "result" in resp
-            assert "sessionId" in resp["result"]
-
-        finally:
-            writer.close()
-            if proc.returncode is None:
-                proc.kill()

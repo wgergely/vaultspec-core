@@ -30,11 +30,6 @@ from orchestration.task_engine import LockManager, TaskEngine  # noqa: E402
 pytestmark = [pytest.mark.api]
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture(autouse=True)
 def _restore_server_globals():
     """Save and restore subagent_server.server globals after each test."""
@@ -77,11 +72,6 @@ def baker_cache():
     }
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _set_server(**overrides):
     """Set subagent_server.server globals directly."""
     for attr, value in overrides.items():
@@ -90,11 +80,6 @@ def _set_server(**overrides):
 
 async def _noop_run_subagent(**_kwargs):
     """No-op async stand-in for run_subagent."""
-
-
-# ---------------------------------------------------------------------------
-# TestToolRegistration — verify MCP schema metadata
-# ---------------------------------------------------------------------------
 
 
 class TestToolRegistration:
@@ -165,11 +150,6 @@ class TestToolRegistration:
         required = schema.get("required", [])
         assert "agent" in required
         assert "task" in required
-
-
-# ---------------------------------------------------------------------------
-# TestProtocolCallTool — call tools through mcp.call_tool()
-# ---------------------------------------------------------------------------
 
 
 class TestProtocolCallTool:
@@ -280,11 +260,6 @@ class TestProtocolCallTool:
         data = json.loads(result["result"])  # type: ignore[index]
         assert data["count"] == 1
         assert data["locks"][0]["agent"] == "simple-executor"
-
-
-# ---------------------------------------------------------------------------
-# TestProtocolRoundTrip — full dispatch → poll → complete cycle
-# ---------------------------------------------------------------------------
 
 
 class TestProtocolRoundTrip:

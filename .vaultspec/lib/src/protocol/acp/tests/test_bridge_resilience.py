@@ -26,11 +26,6 @@ from .conftest import (
 pytestmark = [pytest.mark.unit]
 
 
-# ---------------------------------------------------------------------------
-# TestCancel
-# ---------------------------------------------------------------------------
-
-
 class TestCancel:
     """Test session cancellation."""
 
@@ -69,11 +64,6 @@ class TestCancel:
         await bridge.new_session(cwd=str(TEST_PROJECT))
         # Should not raise
         await bridge.cancel(session_id="s1")
-
-
-# ---------------------------------------------------------------------------
-# TestCancelTracking
-# ---------------------------------------------------------------------------
 
 
 class TestCancelTracking:
@@ -222,11 +212,6 @@ class TestCancelTracking:
         result = await bridge.prompt(prompt=prompt_blocks, session_id="s1")
         assert bridge._cancelled is False
         assert result.stop_reason == "end_turn"
-
-
-# ---------------------------------------------------------------------------
-# TestGranularErrorHandling
-# ---------------------------------------------------------------------------
 
 
 class TestGranularErrorHandling:

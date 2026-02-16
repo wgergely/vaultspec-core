@@ -20,10 +20,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Engine singleton (lazy-loaded, holds shared RAG resources)
-# ---------------------------------------------------------------------------
-
 
 class VaultRAG:
     """Singleton engine that holds shared RAG resources."""
@@ -104,11 +100,6 @@ def get_engine(root_dir: pathlib.Path) -> VaultRAG:
             pass
 
     return _engine
-
-
-# ---------------------------------------------------------------------------
-# Tier 1 functions (no RAG dependencies)
-# ---------------------------------------------------------------------------
 
 
 def list_documents(
@@ -304,11 +295,6 @@ def get_status(root_dir: pathlib.Path) -> dict:
         logger.debug(f"Could not read index info: {e}")
 
     return result
-
-
-# ---------------------------------------------------------------------------
-# Tier 2 functions (require RAG dependencies)
-# ---------------------------------------------------------------------------
 
 
 def index(root_dir: pathlib.Path, *, full: bool = False) -> IndexResult:

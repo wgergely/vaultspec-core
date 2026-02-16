@@ -24,10 +24,6 @@ from .conftest import TEST_PROJECT
 
 pytestmark = [pytest.mark.unit]
 
-# ---------------------------------------------------------------------------
-# TestRequestPermission
-# ---------------------------------------------------------------------------
-
 
 class TestRequestPermission:
     @pytest.fixture
@@ -112,11 +108,6 @@ class TestRequestPermission:
         assert result.outcome.outcome == "selected"
 
 
-# ---------------------------------------------------------------------------
-# TestSessionUpdate
-# ---------------------------------------------------------------------------
-
-
 class TestSessionUpdate:
     @pytest.fixture
     def client(self):
@@ -156,7 +147,7 @@ class TestSessionUpdate:
         assert "read_file" in captured.err
 
     @pytest.mark.asyncio
-    async def test_tool_call_progress(self, client):
+    async def test_tool_call_progress_no_crash(self, client, capsys):
         update = ToolCallProgress(
             session_update="tool_call_update",
             tool_call_id="tc-1",
@@ -164,11 +155,12 @@ class TestSessionUpdate:
             status="in_progress",
         )
         await client.session_update("s1", update)
-        # Progress currently does nothing
-        pass
+        captured = capsys.readouterr()
+        assert "Traceback" not in captured.out
+        assert "Traceback" not in captured.err
 
     @pytest.mark.asyncio
-    async def test_agent_plan_update(self, client):
+    async def test_agent_plan_update_no_crash(self, client, capsys):
         update = AgentPlanUpdate(
             session_update="plan",
             entries=[
@@ -177,21 +169,15 @@ class TestSessionUpdate:
             ],
         )
         await client.session_update("s1", update)
-        # Plan update currently does nothing
-        pass
+        captured = capsys.readouterr()
+        assert "Traceback" not in captured.out
+        assert "Traceback" not in captured.err
 
     @pytest.mark.asyncio
-    async def test_debug_mode_shows_info_updates(self):
+    async def test_session_info_update_no_crash(self):
         client = SubagentClient(root_dir=TEST_PROJECT, debug=True)
         update = SessionInfoUpdate(session_update="session_info_update")
         await client.session_update("s1", update)
-        # Info update currently does nothing
-        pass
-
-
-# ---------------------------------------------------------------------------
-# TestFileIO
-# ---------------------------------------------------------------------------
 
 
 class TestFileIO:
@@ -274,11 +260,6 @@ class TestFileIO:
                     path=str(outside),
                     session_id="s1",
                 )
-
-
-# ---------------------------------------------------------------------------
-# TestTerminalLifecycle
-# ---------------------------------------------------------------------------
 
 
 class TestTerminalLifecycle:

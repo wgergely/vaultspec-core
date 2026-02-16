@@ -16,10 +16,6 @@ from subagent_server.server import (  # noqa: E402
     _strip_quotes,
 )
 
-# ---------------------------------------------------------------------------
-# TestHelpers (Extracted from server logic)
-# ---------------------------------------------------------------------------
-
 
 class TestHelpers:
     def test_strip_quotes_normal(self):
@@ -38,11 +34,6 @@ class TestHelpers:
         # This test would normally look into _agent_cache,
         # but we are testing the logic flow here.
         assert _resolve_effective_mode("any", None) == "read-write"
-
-
-# ---------------------------------------------------------------------------
-# TestArtifactExtraction
-# ---------------------------------------------------------------------------
 
 
 class TestArtifactExtraction:
@@ -70,11 +61,6 @@ class TestArtifactExtraction:
         text = "Created src/z.rs then src/a.rs then .vault/b.md"
         result = _extract_artifacts(text)
         assert result == sorted(result)
-
-
-# ---------------------------------------------------------------------------
-# TestMergeArtifacts
-# ---------------------------------------------------------------------------
 
 
 class TestMergeArtifacts:
