@@ -10,7 +10,7 @@ import pytest
 
 from protocol.providers.base import ClaudeModels
 
-from .conftest import (  # type: ignore[unresolved-import]
+from .conftest import (
     TEST_PROJECT,
     make_ns,
 )

@@ -14,7 +14,7 @@ import pytest
 
 from protocol.providers.base import ClaudeModels
 
-from .conftest import TEST_PROJECT  # type: ignore[unresolved-import]
+from .conftest import TEST_PROJECT
 
 pytestmark = [pytest.mark.unit]
 

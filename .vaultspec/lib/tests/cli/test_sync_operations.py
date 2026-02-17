@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 import cli
 import pytest
 
-from .conftest import (  # type: ignore[unresolved-import]
+from .conftest import (
     TEST_PROJECT,
     make_ns,
 )

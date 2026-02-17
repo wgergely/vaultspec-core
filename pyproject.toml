@@ -92,4 +92,4 @@ known-third-party = ["acp"]
 
 [tool.ty.environment]
 python-version = "3.13"
-root = [".", ".vaultspec/lib/src", ".vaultspec/lib/scripts", ".vaultspec/lib", ".vaultspec/lib/tests"]
+root = [".", ".vaultspec/lib/src", ".vaultspec/lib/scripts", ".vaultspec/lib"]
