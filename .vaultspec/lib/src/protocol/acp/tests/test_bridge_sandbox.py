@@ -6,14 +6,13 @@ Covers: _make_sandbox_callback, _is_vault_path.
 from __future__ import annotations
 
 import pytest
+from tests.constants import TEST_PROJECT
 
 from protocol.sandbox import (
     _SHELL_TOOLS,
     _is_vault_path,
     _make_sandbox_callback,
 )
-
-from .conftest import TEST_PROJECT
 
 pytestmark = [pytest.mark.unit]
 

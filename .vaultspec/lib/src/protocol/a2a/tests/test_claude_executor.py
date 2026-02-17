@@ -14,9 +14,10 @@ import pytest
 from a2a.server.events import EventQueue
 from a2a.types import TaskState, TaskStatusUpdateEvent
 from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock
+from tests.constants import TEST_PROJECT
 
 from protocol.a2a.executors.claude_executor import ClaudeA2AExecutor
-from protocol.a2a.tests.conftest import TEST_PROJECT, make_request_context
+from protocol.a2a.tests.conftest import make_request_context
 from protocol.providers.base import ClaudeModels
 
 

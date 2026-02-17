@@ -114,7 +114,7 @@ def rerank_with_graph(
         try:
             graph = _VaultGraph(root_dir)
         except Exception as e:
-            logger.warning(f"Could not load vault graph for re-ranking: {e}")
+            logger.error("Search failed: %s", e, exc_info=True)
             return results
 
     for result in results:
@@ -160,8 +160,12 @@ class VaultSearcher:
         model: EmbeddingModel,
         store: VaultStore,
         *,
-        graph_ttl_seconds: float = 300.0,
+        graph_ttl_seconds: float | None = None,
     ) -> None:
+        if graph_ttl_seconds is None:
+            from core.config import get_config
+
+            graph_ttl_seconds = get_config().graph_ttl_seconds
         self.root_dir = root_dir
         self.model = model
         self.store = store
@@ -179,7 +183,7 @@ class VaultSearcher:
                 self._cached_graph = _VaultGraph(self.root_dir)
                 self._graph_built_at = now
             except Exception as e:
-                logger.warning(f"Could not build vault graph: {e}")
+                logger.error("Search failed: %s", e, exc_info=True)
                 return None
         return self._cached_graph
 

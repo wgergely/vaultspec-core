@@ -1,17 +1,15 @@
 """Unit tests for protocol.sandbox — vault-path detection and sandbox callbacks."""
 
-from pathlib import Path
-
 import pytest
 
 pytestmark = [pytest.mark.unit]
 
 claude_sdk = pytest.importorskip("claude_agent_sdk")
 
+from tests.constants import TEST_PROJECT  # noqa: E402
+
 from protocol.sandbox import _is_vault_path, _make_sandbox_callback  # noqa: E402
 
-_LIB_SRC = Path(__file__).resolve().parent.parent.parent
-TEST_PROJECT = _LIB_SRC.parent.parent.parent / "test-project"
 TEST_PROJECT_STR = str(TEST_PROJECT)
 
 

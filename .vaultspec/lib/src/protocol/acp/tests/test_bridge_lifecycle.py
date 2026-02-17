@@ -12,6 +12,7 @@ import sys
 from types import SimpleNamespace
 
 import pytest
+from tests.constants import TEST_PROJECT
 
 from protocol.acp.claude_bridge import (
     ClaudeACPBridge,
@@ -20,7 +21,7 @@ from protocol.acp.claude_bridge import (
 )
 from protocol.providers.base import ClaudeModels
 
-from .conftest import TEST_PROJECT, make_di_bridge, make_test_client, make_test_conn
+from .conftest import make_di_bridge, make_test_client, make_test_conn
 
 pytestmark = [pytest.mark.unit]
 
@@ -439,7 +440,7 @@ class TestBridgeLifecycleUnit:
         assert "-m" in spec.args
         assert "protocol.acp.claude_bridge" in spec.args
         assert "--model" in spec.args
-        assert spec.env.get("VS_ROOT_DIR") == str(TEST_PROJECT)
+        assert spec.env.get("VAULTSPEC_ROOT_DIR") == str(TEST_PROJECT)
         assert "CLAUDECODE" not in spec.env
 
     @pytest.mark.asyncio
@@ -469,7 +470,7 @@ class TestBridgeLifecycleUnit:
 
         assert isinstance(spec, ProcessSpec)
         assert spec.initial_prompt_override == "Do something."
-        assert spec.env.get("VS_SYSTEM_PROMPT")
+        assert spec.env.get("VAULTSPEC_SYSTEM_PROMPT")
 
 
 class TestSetSessionModel:

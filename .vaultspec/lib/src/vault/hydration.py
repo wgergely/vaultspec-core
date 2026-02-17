@@ -25,17 +25,21 @@ def hydrate_template(
 
 def get_template_path(root_dir: pathlib.Path, doc_type: DocType) -> pathlib.Path | None:
     """Maps DocType to its corresponding template file."""
+    from core.config import get_config
+
+    cfg = get_config()
+
     mapping = {
-        DocType.ADR: "ADR.md",
-        DocType.PLAN: "PLAN.md",
-        DocType.RESEARCH: "RESEARCH.md",
-        DocType.REFERENCE: "REF_AUDIT.md",
-        DocType.EXEC: "EXEC_STEP.md",  # Defaulting to step
+        DocType.ADR: "adr.md",
+        DocType.PLAN: "plan.md",
+        DocType.RESEARCH: "research.md",
+        DocType.REFERENCE: "ref-audit.md",
+        DocType.EXEC: "exec-step.md",
     }
 
     name = mapping.get(doc_type)
     if not name:
         return None
 
-    path = root_dir / ".vaultspec" / "templates" / name
+    path = root_dir / cfg.framework_dir / "templates" / name
     return path if path.exists() else None

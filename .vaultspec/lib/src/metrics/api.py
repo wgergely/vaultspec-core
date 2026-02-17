@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -8,6 +9,8 @@ from vault.scanner import get_doc_type, scan_vault
 
 if TYPE_CHECKING:
     import pathlib
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -21,6 +24,8 @@ class VaultSummary:
 
 def get_vault_metrics(root_dir: pathlib.Path) -> VaultSummary:
     """Calculates summary statistics for the vault."""
+    logger.info("Collecting vault metrics from %s", root_dir)
+
     counts = dict.fromkeys(DocType, 0)
     total = 0
 
@@ -34,8 +39,14 @@ def get_vault_metrics(root_dir: pathlib.Path) -> VaultSummary:
         if doc_type:
             counts[doc_type] += 1
 
+    feature_count = len(list_features(root_dir))
+    logger.info(
+        "Metrics collection complete: %d total docs, %d features", total, feature_count
+    )
+    logger.debug("Counts by type: %s", counts)
+
     return VaultSummary(
         total_docs=total,
         counts_by_type=counts,
-        total_features=len(list_features(root_dir)),
+        total_features=feature_count,
     )

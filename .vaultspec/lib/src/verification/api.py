@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from vault.models import DocType, VaultConstants
@@ -8,6 +9,8 @@ from vault.scanner import get_doc_type, scan_vault
 
 if TYPE_CHECKING:
     import pathlib
+
+logger = logging.getLogger(__name__)
 
 
 class VerificationError:
@@ -23,8 +26,15 @@ class VerificationError:
 
 def verify_vault_structure(root_dir: pathlib.Path) -> list[VerificationError]:
     """Checks for unsupported directories and files in .vault/ root."""
+    from core.config import get_config
+
+    logger.info("Verifying vault structure at %s", root_dir)
     errors = VaultConstants.validate_vault_structure(root_dir)
-    return [VerificationError(root_dir / VaultConstants.DOCS_DIR, e) for e in errors]
+    if errors:
+        logger.warning("Found %d structural violations", len(errors))
+    else:
+        logger.debug("Vault structure validation passed")
+    return [VerificationError(root_dir / get_config().docs_dir, e) for e in errors]
 
 
 def verify_file(path: pathlib.Path, root_dir: pathlib.Path) -> list[VerificationError]:
@@ -55,6 +65,7 @@ def verify_file(path: pathlib.Path, root_dir: pathlib.Path) -> list[Verification
         for err in content_errors:
             errors.append(VerificationError(path, err))
     except Exception as e:
+        logger.error("Verification failed for %s", path, exc_info=True)
         errors.append(VerificationError(path, f"Error reading/parsing: {e}"))
 
     return errors
@@ -62,15 +73,25 @@ def verify_file(path: pathlib.Path, root_dir: pathlib.Path) -> list[Verification
 
 def get_malformed(root_dir: pathlib.Path) -> list[VerificationError]:
     """Returns all documents that fail verification."""
+    logger.info("Starting comprehensive vault verification")
     all_errors = verify_vault_structure(root_dir)
+    file_count = 0
     for path in scan_vault(root_dir):
+        file_count += 1
         all_errors.extend(verify_file(path, root_dir))
+    logger.info(
+        "Vault verification complete: scanned %d files, found %d errors",
+        file_count,
+        len(all_errors),
+    )
     return all_errors
 
 
 def list_features(root_dir: pathlib.Path) -> set[str]:
     """Infers features from tags across all documents."""
+    logger.debug("Extracting features from vault")
     features = set()
+    skip_count = 0
     for path in scan_vault(root_dir):
         try:
             content = path.read_text(encoding="utf-8")
@@ -80,12 +101,20 @@ def list_features(root_dir: pathlib.Path) -> set[str]:
                     # It's a feature tag
                     features.add(tag.lstrip("#"))
         except (OSError, UnicodeDecodeError):
+            skip_count += 1
+            logger.debug("Failed to read feature tags from %s", path.name)
             continue
+    logger.info(
+        "Feature extraction complete: found %d features, skipped %d files",
+        len(features),
+        skip_count,
+    )
     return features
 
 
 def verify_vertical_integrity(root_dir: pathlib.Path) -> list[VerificationError]:
     """Ensures every feature used has a corresponding plan doc."""
+    logger.info("Verifying vertical integrity: feature -> plan mapping")
     features_found = set()
     planned_features = set()
     errors = []
@@ -104,16 +133,27 @@ def verify_vertical_integrity(root_dir: pathlib.Path) -> list[VerificationError]
             if doc_type == DocType.PLAN:
                 planned_features.update(doc_features)
         except (OSError, UnicodeDecodeError):
+            logger.debug("Failed to parse vertical integrity from %s", path.name)
             continue
+
+    from core.config import get_config
 
     missing_plans = features_found - planned_features
     for feature in sorted(missing_plans):
         errors.append(
             VerificationError(
-                root_dir / VaultConstants.DOCS_DIR / "plan",
+                root_dir / get_config().docs_dir / "plan",
                 f"Integrity violation: Feature '#{feature}' is "
                 "missing a master plan document.",
             )
         )
 
+    logger.info(
+        "Vertical integrity check: %d features found, %d plans, %d missing",
+        len(features_found),
+        len(planned_features),
+        len(missing_plans),
+    )
+    if errors:
+        logger.warning("Found %d integrity violations", len(errors))
     return errors

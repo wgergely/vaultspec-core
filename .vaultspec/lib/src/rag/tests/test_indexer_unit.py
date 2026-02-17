@@ -1,15 +1,11 @@
 """Unit tests for rag.indexer — extraction and doc preparation (no GPU)."""
 
-from pathlib import Path
-
 import pytest
 from core.config import reset_config
 from rag.indexer import IndexResult, _extract_feature, _extract_title, prepare_document
+from tests.constants import TEST_PROJECT
 
 pytestmark = [pytest.mark.unit]
-
-_LIB_SRC = Path(__file__).resolve().parent.parent.parent
-TEST_PROJECT = _LIB_SRC.parent.parent.parent / "test-project"
 
 
 @pytest.fixture(autouse=True)

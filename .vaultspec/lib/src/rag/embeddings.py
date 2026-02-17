@@ -92,22 +92,33 @@ class EmbeddingModel:
     DIMENSION = 768
     DOCUMENT_PREFIX = "search_document: "
     QUERY_PREFIX = "search_query: "
+
+    @staticmethod
+    def _default_batch_size() -> int:
+        from core.config import get_config
+
+        return get_config().embedding_batch_size
+
+    @staticmethod
+    def _default_max_embed_chars() -> int:
+        from core.config import get_config
+
+        return get_config().max_embed_chars
+
+    # Class-level constants for backwards compat with direct attribute access
     DEFAULT_BATCH_SIZE = 64
-    # Max characters to embed per document. The full text is still stored
-    # in LanceDB for BM25 search, but embedding only the first ~2000 words
-    # captures title, headers, and key concepts while avoiding the massive
-    # padding overhead of 7000+ word documents. ~8000 chars ≈ 2000 words
-    # ≈ 2600 tokens (well within the 8192-token model limit).
     MAX_EMBED_CHARS = 8000
 
     def __init__(self) -> None:
         _check_rag_deps()
         _require_cuda()
+        from core.config import get_config
         from sentence_transformers import SentenceTransformer
 
+        model_name = get_config().embedding_model
         self._device = "cuda"
         self.model = SentenceTransformer(
-            self.MODEL_NAME, device="cuda", trust_remote_code=True
+            model_name, device="cuda", trust_remote_code=True
         )
         logger.info("Embedding model loaded on cuda")
 
@@ -136,11 +147,12 @@ class EmbeddingModel:
         import numpy as np
 
         if batch_size is None:
-            batch_size = self.DEFAULT_BATCH_SIZE
+            batch_size = self._default_batch_size()
 
         # Truncate long documents to avoid massive padding overhead.
         # Full text is still in LanceDB for BM25; embedding captures key concepts.
-        truncated = [t[: self.MAX_EMBED_CHARS] for t in texts]
+        max_chars = self._default_max_embed_chars()
+        truncated = [t[:max_chars] for t in texts]
         prefixed = [f"{self.DOCUMENT_PREFIX}{t}" for t in truncated]
 
         # Sort by length to group similar-sized docs together,

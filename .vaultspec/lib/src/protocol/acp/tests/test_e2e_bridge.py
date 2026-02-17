@@ -20,19 +20,16 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import pathlib
 import sys
 
 import pytest
+from tests.constants import LIB_SRC as _LIB_SRC
+from tests.constants import TEST_PROJECT as _TEST_PROJECT
 
 from protocol.providers.base import ClaudeModels
 
 pytestmark = [pytest.mark.integration, pytest.mark.claude]
 
-
-_LIB_SRC = pathlib.Path(__file__).resolve().parents[3]  # .vaultspec/lib/src
-_PROJECT_ROOT = _LIB_SRC.parents[2]  # repo root
-_TEST_PROJECT = _PROJECT_ROOT / "test-project"
 _STORIES_DIR = _TEST_PROJECT / ".vault" / "stories"
 
 JEAN_CLAUDE_PERSONA = """---
@@ -90,8 +87,8 @@ def project_root(tmp_path):
 def bridge_env(project_root):
     """Environment variables for launching the bridge process."""
     env = os.environ.copy()
-    env["VS_AGENT_MODE"] = "read-only"
-    env["VS_ROOT_DIR"] = str(project_root)
+    env["VAULTSPEC_AGENT_MODE"] = "read-only"
+    env["VAULTSPEC_ROOT_DIR"] = str(project_root)
     env.pop("CLAUDECODE", None)  # Unblock nested Claude sessions
     # Ensure lib/src is on PYTHONPATH so the bridge module is importable
     pythonpath = env.get("PYTHONPATH", "")

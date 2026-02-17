@@ -45,17 +45,20 @@ def load_agent(
 ) -> tuple[dict[str, str], str]:
     """Loads an agent definition, searching provider-specific then
     canonical directories."""
+    from core.config import get_config
+
+    fw_dir = get_config().framework_dir
 
     searched = []
-    # 1. Provider-specific: .vaultspec/agents/<provider>/<name>.md
+    # 1. Provider-specific: <fw_dir>/agents/<provider>/<name>.md
     if provider_name:
-        p_path = root_dir / ".vaultspec" / "agents" / provider_name / f"{agent_name}.md"
+        p_path = root_dir / fw_dir / "agents" / provider_name / f"{agent_name}.md"
         searched.append(p_path)
         if p_path.exists():
             return parse_frontmatter(p_path.read_text(encoding="utf-8"))
 
-    # 2. Canonical: .vaultspec/agents/<name>.md
-    c_path = root_dir / ".vaultspec" / "agents" / f"{agent_name}.md"
+    # 2. Canonical: <fw_dir>/agents/<name>.md
+    c_path = root_dir / fw_dir / "agents" / f"{agent_name}.md"
     searched.append(c_path)
     if c_path.exists():
         return parse_frontmatter(c_path.read_text(encoding="utf-8"))

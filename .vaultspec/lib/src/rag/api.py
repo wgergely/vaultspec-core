@@ -109,7 +109,7 @@ def list_documents(
     feature: str | None = None,
 ) -> list[dict]:
     """List vault documents with optional filtering by type or feature."""
-    from vault.models import DocType, VaultConstants
+    from vault.models import DocType
     from vault.parser import parse_vault_metadata
     from vault.scanner import get_doc_type, scan_vault
 
@@ -139,7 +139,9 @@ def list_documents(
         if not title:
             title = path.stem
 
-        docs_dir = root_dir / VaultConstants.DOCS_DIR
+        from core.config import get_config
+
+        docs_dir = root_dir / get_config().docs_dir
         try:
             rel_path = str(path.relative_to(docs_dir)).replace("\\", "/")
         except ValueError:
@@ -175,7 +177,7 @@ def get_document(root_dir: pathlib.Path, doc_id: str) -> dict | None:
         logger.debug(f"Vector store lookup failed: {e}")
 
     # Fallback: scan the vault filesystem
-    from vault.models import DocType, VaultConstants
+    from vault.models import DocType
     from vault.parser import parse_vault_metadata
     from vault.scanner import get_doc_type, scan_vault
 
@@ -198,7 +200,9 @@ def get_document(root_dir: pathlib.Path, doc_id: str) -> dict | None:
             if not title:
                 title = path.stem
 
-            docs_dir = root_dir / VaultConstants.DOCS_DIR
+            from core.config import get_config
+
+            docs_dir = root_dir / get_config().docs_dir
             try:
                 rel_path = str(path.relative_to(docs_dir)).replace("\\", "/")
             except ValueError:

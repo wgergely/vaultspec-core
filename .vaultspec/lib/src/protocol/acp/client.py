@@ -36,7 +36,6 @@ from acp.schema import (
     WaitForTerminalExitResponse,
     WriteTextFileResponse,
 )
-from vault.models import VaultConstants
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -276,8 +275,11 @@ class SubagentClient(Client):
         # Enforce read-only mode: only .vault/ writes allowed.
         if self.mode == "read-only":
             rel_path = file_path.relative_to(self.root_dir).as_posix()
-            docs_prefix = f"{VaultConstants.DOCS_DIR}/"
-            docs_prefix_win = f"{VaultConstants.DOCS_DIR}\\"
+            from core.config import get_config
+
+            _docs_dir = get_config().docs_dir
+            docs_prefix = f"{_docs_dir}/"
+            docs_prefix_win = f"{_docs_dir}\\"
             if not rel_path.startswith(docs_prefix) and not rel_path.startswith(
                 docs_prefix_win
             ):
@@ -331,13 +333,16 @@ class SubagentClient(Client):
             env=env_dict,
         )
 
-        terminal = _Terminal(proc, output_byte_limit or 1_000_000)
+        from core.config import get_config
+
+        cfg = get_config()
+        terminal = _Terminal(proc, output_byte_limit or cfg.terminal_output_limit)
 
         async def _reader() -> None:
             assert proc.stdout is not None
             try:
                 while True:
-                    chunk = await proc.stdout.read(8192)
+                    chunk = await proc.stdout.read(cfg.io_buffer_size)
                     if not chunk:
                         break
                     terminal.output_chunks.append(chunk)

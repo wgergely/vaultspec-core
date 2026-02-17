@@ -6,10 +6,9 @@ Covers: create_terminal read-only guard in SubagentClient.
 from __future__ import annotations
 
 import pytest
+from tests.constants import TEST_PROJECT
 
 from protocol.acp.client import SubagentClient
-
-from .conftest import TEST_PROJECT
 
 pytestmark = [pytest.mark.unit]
 

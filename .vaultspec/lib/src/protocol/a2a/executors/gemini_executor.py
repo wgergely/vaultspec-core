@@ -6,6 +6,7 @@ mapping results back to A2A events.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -22,6 +23,8 @@ if TYPE_CHECKING:
     import pathlib
 
     from a2a.server.events import EventQueue
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiA2AExecutor(AgentExecutor):
@@ -49,7 +52,7 @@ class GeminiA2AExecutor(AgentExecutor):
         *,
         root_dir: pathlib.Path,
         model: str = GeminiModels.LOW,
-        agent_name: str = "researcher",
+        agent_name: str = "vaultspec-researcher",
         run_subagent: Callable[..., Any] | None = None,
     ) -> None:
         self._root_dir = root_dir
@@ -63,9 +66,16 @@ class GeminiA2AExecutor(AgentExecutor):
         updater = TaskUpdater(event_queue, task_id, context_id)
         prompt = context.get_user_input()
 
+        logger.info(
+            "GeminiA2AExecutor starting task %s with agent %s",
+            task_id,
+            self._agent_name,
+        )
+
         await updater.start_work()
 
         try:
+            logger.debug("Running subagent for task %s", task_id)
             result = await self._run_subagent(
                 agent_name=self._agent_name,
                 root_dir=self._root_dir,
@@ -74,16 +84,19 @@ class GeminiA2AExecutor(AgentExecutor):
             )
             text = result.response_text or ""
             if text:
+                logger.debug("Got response for task %s, adding artifact", task_id)
                 await updater.add_artifact(
                     parts=[Part(root=TextPart(text=text))],
                     name="response",
                 )
+            logger.info("Task %s completed successfully", task_id)
             await updater.complete(
                 message=updater.new_agent_message(
                     parts=[Part(root=TextPart(text=text or "Done"))]
                 )
             )
         except Exception as e:
+            logger.error("GeminiA2AExecutor error for task %s", task_id, exc_info=True)
             await updater.failed(
                 message=updater.new_agent_message(
                     parts=[Part(root=TextPart(text=str(e)))]
@@ -94,4 +107,5 @@ class GeminiA2AExecutor(AgentExecutor):
         task_id = context.task_id or ""
         context_id = context.context_id or ""
         updater = TaskUpdater(event_queue, task_id, context_id)
+        logger.info("Cancelling task %s", task_id)
         await updater.cancel()

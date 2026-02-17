@@ -10,8 +10,8 @@ Usage::
 
     python -m protocol.acp.claude_bridge --model ClaudeModels.MEDIUM
 
-The bridge reads ``VS_AGENT_MODE`` from the environment to decide sandboxing
-policy and ``VS_ROOT_DIR`` for the workspace root.
+The bridge reads ``VAULTSPEC_AGENT_MODE`` from the environment to decide
+sandboxing policy and ``VAULTSPEC_ROOT_DIR`` for the workspace root.
 """
 
 from __future__ import annotations
@@ -21,10 +21,10 @@ import asyncio
 import dataclasses
 import datetime
 import logging
-import os
-import sys
 import uuid
 from typing import TYPE_CHECKING, Any
+
+from logging_config import configure_logging
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -206,42 +206,23 @@ class ClaudeACPBridge:
         # Session state
         self._sdk_client: Any = None
         self._session_id: str | None = None
-        self._root_dir: str = os.environ.get("VS_ROOT_DIR", os.getcwd())
 
-        # Config: DI param takes precedence, else env var, else default
-        self._mode: str = (
-            mode if mode is not None else os.environ.get("VS_AGENT_MODE", "read-write")
-        )
+        # Config: DI param takes precedence, else config (which reads env vars)
+        from core.config import get_config
+
+        cfg = get_config()
+
+        self._root_dir: str = str(cfg.root_dir)
+        self._mode: str = mode if mode is not None else cfg.agent_mode
         self._system_prompt: str | None = (
-            system_prompt
-            if system_prompt is not None
-            else os.environ.get("VS_SYSTEM_PROMPT")
+            system_prompt if system_prompt is not None else cfg.system_prompt
         )
-
-        # Extended agent configuration: DI params or env vars
-        if max_turns is not None:
-            self._max_turns: int | None = max_turns
-        else:
-            try:
-                self._max_turns = (
-                    int(os.environ["VS_MAX_TURNS"])
-                    if "VS_MAX_TURNS" in os.environ
-                    else None
-                )
-            except ValueError:
-                self._max_turns = None
-
-        if budget_usd is not None:
-            self._budget_usd: float | None = budget_usd
-        else:
-            try:
-                self._budget_usd = (
-                    float(os.environ["VS_BUDGET_USD"])
-                    if "VS_BUDGET_USD" in os.environ
-                    else None
-                )
-            except ValueError:
-                self._budget_usd = None
+        self._max_turns: int | None = (
+            max_turns if max_turns is not None else cfg.max_turns
+        )
+        self._budget_usd: float | None = (
+            budget_usd if budget_usd is not None else cfg.budget_usd
+        )
 
         # Range validation: ignore invalid values
         if self._max_turns is not None and self._max_turns <= 0:
@@ -250,56 +231,20 @@ class ClaudeACPBridge:
             self._budget_usd = None
 
         self._allowed_tools: list[str] = (
-            allowed_tools
-            if allowed_tools is not None
-            else (
-                [
-                    t.strip()
-                    for t in os.environ["VS_ALLOWED_TOOLS"].split(",")
-                    if t.strip()
-                ]
-                if "VS_ALLOWED_TOOLS" in os.environ
-                else []
-            )
+            allowed_tools if allowed_tools is not None else cfg.allowed_tools
         )
         self._disallowed_tools: list[str] = (
-            disallowed_tools
-            if disallowed_tools is not None
-            else (
-                [
-                    t.strip()
-                    for t in os.environ["VS_DISALLOWED_TOOLS"].split(",")
-                    if t.strip()
-                ]
-                if "VS_DISALLOWED_TOOLS" in os.environ
-                else []
-            )
+            disallowed_tools if disallowed_tools is not None else cfg.disallowed_tools
         )
-        self._effort: str | None = (
-            effort if effort is not None else os.environ.get("VS_EFFORT")
-        )
+        self._effort: str | None = effort if effort is not None else cfg.effort
         self._output_format: str | None = (
-            output_format
-            if output_format is not None
-            else os.environ.get("VS_OUTPUT_FORMAT")
+            output_format if output_format is not None else cfg.output_format
         )
         self._fallback_model: str | None = (
-            fallback_model
-            if fallback_model is not None
-            else os.environ.get("VS_FALLBACK_MODEL")
+            fallback_model if fallback_model is not None else cfg.fallback_model
         )
         self._include_dirs: list[str] = (
-            include_dirs
-            if include_dirs is not None
-            else (
-                [
-                    d.strip()
-                    for d in os.environ["VS_INCLUDE_DIRS"].split(",")
-                    if d.strip()
-                ]
-                if "VS_INCLUDE_DIRS" in os.environ
-                else []
-            )
+            include_dirs if include_dirs is not None else cfg.include_dirs
         )
 
         # All sessions tracked by this bridge instance
@@ -993,12 +938,7 @@ async def main() -> None:
     )
     args = parser.parse_args()
 
-    if args.debug:
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format="%(asctime)s %(name)s %(levelname)s %(message)s",
-            stream=sys.stderr,
-        )
+    configure_logging(debug=args.debug)
 
     bridge = ClaudeACPBridge(model=args.model, debug=args.debug)
     await run_agent(bridge)  # type: ignore[arg-type]  # structural Agent protocol

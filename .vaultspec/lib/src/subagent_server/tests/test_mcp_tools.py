@@ -26,6 +26,7 @@ from subagent_server.server import (
     initialize_server,
     list_agents,
 )
+from tests.constants import TEST_PROJECT
 
 from orchestration.task_engine import (
     LockManager,
@@ -33,8 +34,6 @@ from orchestration.task_engine import (
     TaskStatus,
 )
 from protocol.providers.base import ClaudeModels, GeminiModels
-
-from .conftest import TEST_PROJECT
 
 pytestmark = [pytest.mark.unit]
 
@@ -60,8 +59,8 @@ def fresh_task_engine():
 def baker_cache():
     """Agent cache with a single French Baker agent entry."""
     return {
-        "simple-executor": {
-            "name": "simple-executor",
+        "vaultspec-simple-executor": {
+            "name": "vaultspec-simple-executor",
             "tier": "LOW",
             "description": "A helpful French Baker agent",
             "default_model": None,
@@ -127,7 +126,7 @@ class TestListAgents:
         data = json.loads(result)
         assert len(data["agents"]) == 2
         names = {a["name"] for a in data["agents"]}
-        assert "simple-executor" in names
+        assert "vaultspec-simple-executor" in names
         assert "research-analyst" in names
 
     @pytest.mark.asyncio
@@ -174,7 +173,9 @@ class TestListAgents:
         srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
         result = await list_agents()
         data = json.loads(result)
-        executor = next(a for a in data["agents"] if a["name"] == "simple-executor")
+        executor = next(
+            a for a in data["agents"] if a["name"] == "vaultspec-simple-executor"
+        )
         assert executor["tier"] == "LOW"
         assert executor["description"] == "A helpful French Baker agent"
 
@@ -197,12 +198,12 @@ class TestDispatchAgent:
         srv._active_clients = {}
         srv.run_subagent = _noop  # type: ignore[assignment]
         result = await dispatch_agent(
-            agent="simple-executor",
+            agent="vaultspec-simple-executor",
             task="Bake a baguette",
         )
         data = json.loads(result)
         assert data["status"] == "working"
-        assert data["agent"] == "simple-executor"
+        assert data["agent"] == "vaultspec-simple-executor"
         assert "taskId" in data
         assert data["mode"] == "read-write"
 
@@ -225,7 +226,7 @@ class TestDispatchAgent:
         srv.task_engine = fresh_task_engine
         with pytest.raises(ToolError, match="Invalid mode"):
             await dispatch_agent(
-                agent="simple-executor",
+                agent="vaultspec-simple-executor",
                 task="Bake bread",
                 mode="execute-only",
             )
@@ -245,7 +246,7 @@ class TestDispatchAgent:
         srv._active_clients = {}
         srv.run_subagent = _noop  # type: ignore[assignment]
         result = await dispatch_agent(
-            agent="simple-executor",
+            agent="vaultspec-simple-executor",
             task="Bake sourdough",
             model=ClaudeModels.HIGH,
         )
@@ -267,14 +268,14 @@ class TestDispatchAgent:
         srv._active_clients = {}
         srv.run_subagent = _noop  # type: ignore[assignment]
         result = await dispatch_agent(
-            agent="simple-executor",
+            agent="vaultspec-simple-executor",
             task="Proof the dough",
         )
         data = json.loads(result)
         task_id = data["taskId"]
         task_obj = fresh_task_engine.get_task(task_id)
         assert task_obj is not None
-        assert task_obj.agent == "simple-executor"
+        assert task_obj.agent == "vaultspec-simple-executor"
         assert task_obj.status == TaskStatus.WORKING
 
     @pytest.mark.asyncio
@@ -305,19 +306,19 @@ class TestGetTaskStatus:
     @pytest.mark.asyncio
     async def test_working_task(self, fresh_task_engine):
         """Returns status 'working' for an active task."""
-        fresh_task_engine.create_task("simple-executor", task_id="task-001")
+        fresh_task_engine.create_task("vaultspec-simple-executor", task_id="task-001")
         srv.task_engine = fresh_task_engine
         srv.lock_manager = fresh_task_engine._lock_manager
         result = await get_task_status(task_id="task-001")
         data = json.loads(result)
         assert data["taskId"] == "task-001"
         assert data["status"] == "working"
-        assert data["agent"] == "simple-executor"
+        assert data["agent"] == "vaultspec-simple-executor"
 
     @pytest.mark.asyncio
     async def test_completed_task_with_result(self, fresh_task_engine):
         """Returns status 'completed' with result payload."""
-        fresh_task_engine.create_task("simple-executor", task_id="task-002")
+        fresh_task_engine.create_task("vaultspec-simple-executor", task_id="task-002")
         fresh_task_engine.complete_task("task-002", {"summary": "Baguettes baked"})
         srv.task_engine = fresh_task_engine
         srv.lock_manager = fresh_task_engine._lock_manager
@@ -329,7 +330,7 @@ class TestGetTaskStatus:
     @pytest.mark.asyncio
     async def test_failed_task_with_error(self, fresh_task_engine):
         """Returns status 'failed' with error message."""
-        fresh_task_engine.create_task("simple-executor", task_id="task-003")
+        fresh_task_engine.create_task("vaultspec-simple-executor", task_id="task-003")
         fresh_task_engine.fail_task("task-003", "Oven caught fire")
         srv.task_engine = fresh_task_engine
         srv.lock_manager = fresh_task_engine._lock_manager
@@ -348,7 +349,7 @@ class TestGetTaskStatus:
     @pytest.mark.asyncio
     async def test_cancelled_task(self, fresh_task_engine):
         """Returns status 'cancelled' for a cancelled task."""
-        fresh_task_engine.create_task("simple-executor", task_id="task-004")
+        fresh_task_engine.create_task("vaultspec-simple-executor", task_id="task-004")
         fresh_task_engine.cancel_task("task-004")
         srv.task_engine = fresh_task_engine
         srv.lock_manager = fresh_task_engine._lock_manager
@@ -359,7 +360,7 @@ class TestGetTaskStatus:
     @pytest.mark.asyncio
     async def test_includes_lock_info_when_present(self, fresh_task_engine):
         """Response includes lock details when the task holds a lock."""
-        fresh_task_engine.create_task("simple-executor", task_id="task-005")
+        fresh_task_engine.create_task("vaultspec-simple-executor", task_id="task-005")
         lm = fresh_task_engine._lock_manager
         lm.acquire_lock("task-005", {".vault/plan.md"}, "read-only")
         srv.task_engine = fresh_task_engine
@@ -377,7 +378,7 @@ class TestCancelTask:
     @pytest.mark.asyncio
     async def test_cancel_working_task(self, fresh_task_engine):
         """Cancelling a working task returns 'cancelled' status."""
-        fresh_task_engine.create_task("simple-executor", task_id="task-010")
+        fresh_task_engine.create_task("vaultspec-simple-executor", task_id="task-010")
         srv.task_engine = fresh_task_engine
         srv._active_clients = {}
         srv._background_tasks = {}
@@ -385,12 +386,12 @@ class TestCancelTask:
         data = json.loads(result)
         assert data["status"] == "cancelled"
         assert data["taskId"] == "task-010"
-        assert data["agent"] == "simple-executor"
+        assert data["agent"] == "vaultspec-simple-executor"
 
     @pytest.mark.asyncio
     async def test_cancel_already_completed_raises_tool_error(self, fresh_task_engine):
         """Cancelling a completed task raises ToolError."""
-        fresh_task_engine.create_task("simple-executor", task_id="task-011")
+        fresh_task_engine.create_task("vaultspec-simple-executor", task_id="task-011")
         fresh_task_engine.complete_task("task-011", {"summary": "Done"})
         srv.task_engine = fresh_task_engine
         with pytest.raises(ToolError, match="already completed"):
@@ -439,7 +440,7 @@ class TestGetLocks:
     async def test_with_active_locks(self, fresh_task_engine):
         """Returns all active locks with correct structure."""
         lm = fresh_task_engine._lock_manager
-        fresh_task_engine.create_task("simple-executor", task_id="task-020")
+        fresh_task_engine.create_task("vaultspec-simple-executor", task_id="task-020")
         fresh_task_engine.create_task("research-analyst", task_id="task-021")
         lm.acquire_lock("task-020", {".vault/plan.md"}, "read-write")
         lm.acquire_lock("task-021", {".vault/adr/001.md"}, "read-only")
@@ -458,7 +459,7 @@ class TestGetLocks:
     async def test_lock_structure(self, fresh_task_engine):
         """Each lock entry includes taskId, agent, paths, mode, acquired_at."""
         lm = fresh_task_engine._lock_manager
-        fresh_task_engine.create_task("simple-executor", task_id="task-030")
+        fresh_task_engine.create_task("vaultspec-simple-executor", task_id="task-030")
         lm.acquire_lock("task-030", {".vault/exec/log.md"}, "read-write")
         srv.lock_manager = lm
         srv.task_engine = fresh_task_engine
@@ -466,7 +467,7 @@ class TestGetLocks:
         data = json.loads(result)
         lock = data["locks"][0]
         assert lock["taskId"] == "task-030"
-        assert lock["agent"] == "simple-executor"
+        assert lock["agent"] == "vaultspec-simple-executor"
         assert ".vault/exec/log.md" in lock["paths"]
         assert lock["mode"] == "read-write"
         assert "acquired_at" in lock
@@ -579,7 +580,7 @@ class TestDispatchAgentOverrides:
     def test_max_turns_override(self):
         """max_turns override is included in kwargs."""
         kwargs = _prepare_dispatch_kwargs(
-            agent_name="simple-executor",
+            agent_name="vaultspec-simple-executor",
             task="Bake bread",
             root_dir=TEST_PROJECT,
             mode="read-write",
@@ -590,7 +591,7 @@ class TestDispatchAgentOverrides:
     def test_budget_override(self):
         """budget override is included in kwargs."""
         kwargs = _prepare_dispatch_kwargs(
-            agent_name="simple-executor",
+            agent_name="vaultspec-simple-executor",
             task="Bake bread",
             root_dir=TEST_PROJECT,
             mode="read-write",
@@ -601,7 +602,7 @@ class TestDispatchAgentOverrides:
     def test_effort_override(self):
         """effort override is included in kwargs."""
         kwargs = _prepare_dispatch_kwargs(
-            agent_name="simple-executor",
+            agent_name="vaultspec-simple-executor",
             task="Bake bread",
             root_dir=TEST_PROJECT,
             mode="read-write",
@@ -612,7 +613,7 @@ class TestDispatchAgentOverrides:
     def test_output_format_override(self):
         """output_format override is included in kwargs."""
         kwargs = _prepare_dispatch_kwargs(
-            agent_name="simple-executor",
+            agent_name="vaultspec-simple-executor",
             task="Bake bread",
             root_dir=TEST_PROJECT,
             mode="read-write",
@@ -623,7 +624,7 @@ class TestDispatchAgentOverrides:
     def test_no_overrides_passes_none(self):
         """Without overrides, None values are in kwargs."""
         kwargs = _prepare_dispatch_kwargs(
-            agent_name="simple-executor",
+            agent_name="vaultspec-simple-executor",
             task="Bake bread",
             root_dir=TEST_PROJECT,
             mode="read-write",
@@ -636,7 +637,7 @@ class TestDispatchAgentOverrides:
     def test_all_overrides_combined(self):
         """All overrides are passed together correctly."""
         kwargs = _prepare_dispatch_kwargs(
-            agent_name="simple-executor",
+            agent_name="vaultspec-simple-executor",
             task="Bake bread",
             root_dir=TEST_PROJECT,
             mode="read-only",
@@ -646,7 +647,7 @@ class TestDispatchAgentOverrides:
             effort="low",
             output_format="json",
         )
-        assert kwargs["agent_name"] == "simple-executor"
+        assert kwargs["agent_name"] == "vaultspec-simple-executor"
         assert kwargs["initial_task"] == "Bake bread"
         assert kwargs["root_dir"] == TEST_PROJECT
         assert kwargs["mode"] == "read-only"

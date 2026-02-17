@@ -1,14 +1,9 @@
-from pathlib import Path
-
 import pytest
+from tests.constants import PROJECT_ROOT, TEST_PROJECT
 
 from orchestration.utils import SecurityError, find_project_root, safe_read_text
 
 pytestmark = [pytest.mark.unit]
-
-_LIB_SRC = Path(__file__).resolve().parent.parent.parent
-PROJECT_ROOT = _LIB_SRC.parent.parent.parent
-TEST_PROJECT = PROJECT_ROOT / "test-project"
 
 
 class TestSecurityError:

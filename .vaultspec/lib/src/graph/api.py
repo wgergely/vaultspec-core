@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -10,6 +11,8 @@ from vault.scanner import get_doc_type, scan_vault
 
 if TYPE_CHECKING:
     import pathlib
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -33,6 +36,8 @@ class VaultGraph:
         self._build_graph()
 
     def _build_graph(self) -> None:
+        logger.info("Building vault graph from %s", self.root_dir)
+
         # First pass: Create nodes with metadata
         for path in scan_vault(self.root_dir):
             name = path.stem
@@ -44,10 +49,12 @@ class VaultGraph:
                 content = path.read_text(encoding="utf-8")
                 metadata, _body = parse_vault_metadata(content)
                 node.tags = set(metadata.tags)
-            except (OSError, UnicodeDecodeError):
-                pass
+            except (OSError, UnicodeDecodeError) as e:
+                logger.warning("Failed to read metadata from %s: %s", path, e)
 
             self.nodes[name] = node
+
+        logger.info("Graph pass 1: created %d nodes", len(self.nodes))
 
         # Second pass: Extract links
         for name, node in self.nodes.items():
@@ -63,8 +70,10 @@ class VaultGraph:
                 for target in links:
                     if target in self.nodes:
                         self.nodes[target].in_links.add(name)
-            except (OSError, UnicodeDecodeError):
-                continue
+            except (OSError, UnicodeDecodeError) as e:
+                logger.warning("Failed to extract links from %s: %s", node.path, e)
+
+        logger.info("Graph build complete: %d nodes with links", len(self.nodes))
 
     def get_hotspots(
         self,

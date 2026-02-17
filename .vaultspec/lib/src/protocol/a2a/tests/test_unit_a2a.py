@@ -78,10 +78,10 @@ class TestAgentCard:
             "description": "A research agent",
             "tags": ["research", "analysis"],
         }
-        card = agent_card_from_definition("researcher", meta, port=10020)
+        card = agent_card_from_definition("vaultspec-researcher", meta, port=10020)
 
         assert isinstance(card, AgentCard)
-        assert card.name == "researcher"
+        assert card.name == "vaultspec-researcher"
         assert card.description == "A research agent"
         assert card.url == "http://localhost:10020/"
         assert card.version == "0.1.0"

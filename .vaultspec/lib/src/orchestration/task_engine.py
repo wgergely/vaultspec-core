@@ -27,8 +27,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from vault.models import VaultConstants
-
 logger = logging.getLogger(__name__)
 
 
@@ -124,8 +122,12 @@ class LockManager:
     - read-write tasks have no path restrictions.
     """
 
-    # Paths allowed for read-only mode (workspace-relative prefixes).
-    READONLY_ALLOWED_PREFIXES = (f"{VaultConstants.DOCS_DIR}/",)
+    @staticmethod
+    def _readonly_allowed_prefixes() -> tuple[str, ...]:
+        """Paths allowed for read-only mode (workspace-relative prefixes)."""
+        from core.config import get_config
+
+        return (f"{get_config().docs_dir}/",)
 
     def __init__(self) -> None:
         self._locks: dict[str, FileLock] = {}
@@ -217,7 +219,7 @@ class LockManager:
             normalized = path.replace("\\", "/")
             if not any(
                 normalized.startswith(prefix)
-                for prefix in LockManager.READONLY_ALLOWED_PREFIXES
+                for prefix in LockManager._readonly_allowed_prefixes()
             ):
                 violations.append(path)
         return violations
@@ -228,15 +230,19 @@ class TaskEngine:
 
     def __init__(
         self,
-        ttl_seconds: float = 3600.0,
+        ttl_seconds: float | None = None,
         lock_manager: LockManager | None = None,
     ) -> None:
         """Initialize the task engine.
 
         Args:
-            ttl_seconds: Retention period.
+            ttl_seconds: Retention period.  Defaults to config value.
             lock_manager: LockManager for automatic release.
         """
+        if ttl_seconds is None:
+            from core.config import get_config
+
+            ttl_seconds = get_config().task_engine_ttl_seconds
         self._tasks: dict[str, SubagentTask] = {}
         self._lock = threading.Lock()
         self._ttl_seconds = ttl_seconds

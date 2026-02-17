@@ -2,7 +2,7 @@
   "mcpServers": {
     "vs-subagent-mcp": {
       "command": "python",
-      "args": [".vaultspec/scripts/subagent.py", "serve", "--root", "."],
+      "args": [".vaultspec/lib/scripts/subagent.py", "serve", "--root", "."],
       "env": {}
     }
   }
