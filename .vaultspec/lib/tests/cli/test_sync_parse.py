@@ -9,7 +9,7 @@ from __future__ import annotations
 import cli
 import pytest
 
-from .conftest import TEST_PROJECT  # type: ignore[unresolved-import]
+from .conftest import TEST_PROJECT
 
 pytestmark = [pytest.mark.unit]
 
