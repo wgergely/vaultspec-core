@@ -161,23 +161,23 @@ def init_paths(root: Path) -> None:
     AGENTS_SRC_DIR = root / fw_dir / "agents"
     SKILLS_SRC_DIR = root / fw_dir / "skills"
     SYSTEM_SRC_DIR = root / fw_dir / "system"
-    FRAMEWORK_CONFIG_SRC = root / fw_dir / "FRAMEWORK.md"
-    PROJECT_CONFIG_SRC = root / fw_dir / "PROJECT.md"
+    FRAMEWORK_CONFIG_SRC = SYSTEM_SRC_DIR / "framework.md"
+    PROJECT_CONFIG_SRC = SYSTEM_SRC_DIR / "project.md"
 
     # Backward compatibility: warn if old filenames still exist
-    old_internal = root / fw_dir / "INTERNAL.md"
-    old_custom = root / fw_dir / "CUSTOM.md"
-    if old_internal.exists() and not FRAMEWORK_CONFIG_SRC.exists():
-        print(
-            f"Warning: {fw_dir}/INTERNAL.md is deprecated."
-            f" Rename to {fw_dir}/FRAMEWORK.md",
-            file=sys.stderr,
-        )
-    if old_custom.exists() and not PROJECT_CONFIG_SRC.exists():
-        print(
-            f"Warning: {fw_dir}/CUSTOM.md is deprecated. Rename to {fw_dir}/PROJECT.md",
-            file=sys.stderr,
-        )
+    for old_name, new_path in [
+        ("INTERNAL.md", FRAMEWORK_CONFIG_SRC),
+        ("FRAMEWORK.md", FRAMEWORK_CONFIG_SRC),
+        ("CUSTOM.md", PROJECT_CONFIG_SRC),
+        ("PROJECT.md", PROJECT_CONFIG_SRC),
+    ]:
+        old = root / fw_dir / old_name
+        if old.exists() and not new_path.exists():
+            print(
+                f"Warning: {fw_dir}/{old_name} is deprecated."
+                f" Migrate to {new_path.relative_to(root)}",
+                file=sys.stderr,
+            )
 
     claude_dir = cfg.claude_dir
     gemini_dir = cfg.gemini_dir
@@ -787,12 +787,16 @@ def _generate_config(cfg: ToolConfig) -> str | None:
     if not FRAMEWORK_CONFIG_SRC.exists():
         return None
 
-    internal_body = FRAMEWORK_CONFIG_SRC.read_text(encoding="utf-8").strip()
-    custom_body = (
-        PROJECT_CONFIG_SRC.read_text(encoding="utf-8").strip()
-        if PROJECT_CONFIG_SRC.exists()
-        else ""
+    _meta, internal_body = parse_frontmatter(
+        FRAMEWORK_CONFIG_SRC.read_text(encoding="utf-8")
     )
+    internal_body = internal_body.strip()
+    custom_body = ""
+    if PROJECT_CONFIG_SRC.exists():
+        _meta, custom_body = parse_frontmatter(
+            PROJECT_CONFIG_SRC.read_text(encoding="utf-8")
+        )
+        custom_body = custom_body.strip()
 
     fm = {"system_framework": internal_body}
 
@@ -837,13 +841,17 @@ def config_show(_args: argparse.Namespace) -> None:
 
     print(f"Framework: {FRAMEWORK_CONFIG_SRC.relative_to(ROOT_DIR)}")
     print("-" * 60)
-    print(FRAMEWORK_CONFIG_SRC.read_text(encoding="utf-8").strip())
+    _meta, fw_body = parse_frontmatter(FRAMEWORK_CONFIG_SRC.read_text(encoding="utf-8"))
+    print(fw_body.strip())
     print("-" * 60)
 
     if PROJECT_CONFIG_SRC.exists():
         print(f"Project: {PROJECT_CONFIG_SRC.relative_to(ROOT_DIR)}")
         print("-" * 60)
-        print(PROJECT_CONFIG_SRC.read_text(encoding="utf-8").strip())
+        _meta, proj_body = parse_frontmatter(
+            PROJECT_CONFIG_SRC.read_text(encoding="utf-8")
+        )
+        print(proj_body.strip())
         print("-" * 60)
 
     print("Generated references per tool:")
@@ -867,7 +875,8 @@ def config_sync(args: argparse.Namespace) -> None:
     force = getattr(args, "force", False)
 
     if not FRAMEWORK_CONFIG_SRC.exists():
-        print("  Error: No framework config found at .vaultspec/FRAMEWORK.md")
+        rel = FRAMEWORK_CONFIG_SRC.relative_to(ROOT_DIR)
+        print(f"  Error: No framework config found at {rel}")
         return
 
     result = SyncResult()
@@ -890,7 +899,8 @@ def config_sync(args: argparse.Namespace) -> None:
             and not force
         ):
             print(f"    [SKIP] {rel} - file exists with custom content.")
-            msg = "           Migrate to .vaultspec/PROJECT.md, then --force."
+            proj_rel = PROJECT_CONFIG_SRC.relative_to(ROOT_DIR)
+            msg = f"           Migrate to {proj_rel}, then --force."
             print(msg)
             result.skipped += 1
             continue
@@ -994,11 +1004,13 @@ def _generate_system_prompt(cfg: ToolConfig) -> str | None:
     if skill_listing:
         assembled.append(skill_listing)
 
-    # 5. Remaining shared parts (no "tool" key, not "base") in sorted order
+    # 5. Remaining shared parts (no "tool" key, not "base", not config-only)
     for name, (_path, meta, body) in sorted(parts.items()):
         if name == "base":
             continue
         if meta.get("tool") is not None:
+            continue
+        if meta.get("pipeline") == "config":
             continue
         assembled.append(body)
 

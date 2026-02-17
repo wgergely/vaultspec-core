@@ -70,9 +70,9 @@ The system enforces a strict **Research -> Specify -> Plan -> Execute -> Verify*
 
 The system context (what the AI knows about the project and its goals) is managed through config sync and system prompt assembly in `.vaultspec/`:
 
-* **`FRAMEWORK.md` (Bootstrap Prompt):** The XML-structured bootstrap prompt that cold-starts an LLM agent with operational knowledge of vaultspec — identity, pipeline phases, intent-to-skill mapping, dispatch references, and folder conventions. This file should be considered "read-only" for general project work and only modified when the framework's pipeline or skill surface changes.
-* **`PROJECT.md` (User-Editable):** A placeholder for project-specific instructions, extra context, or user preferences. This content is appended verbatim to the generated config files.
-* **`cli.py config sync`:** This command synchronizes `FRAMEWORK.md` and `PROJECT.md` into the root `AGENTS.md` and tool-specific files (`CLAUDE.md`, `GEMINI.md`).
+* **`system/framework.md` (Bootstrap Prompt):** The XML-structured bootstrap prompt that cold-starts an LLM agent with operational knowledge of vaultspec — identity, pipeline phases, intent-to-skill mapping, dispatch references, and folder conventions. Lives in `system/` with `pipeline: config` frontmatter so it feeds into `config sync` output only (not `system sync`).
+* **`system/project.md` (User-Editable):** A placeholder for project-specific instructions, extra context, or user preferences. This content is appended verbatim to the generated config files.
+* **`cli.py config sync`:** This command synchronizes `system/framework.md` and `system/project.md` into the root `AGENTS.md` and tool-specific files (`CLAUDE.md`, `GEMINI.md`).
 * **`cli.py system show`:** Displays the composable system prompt parts and their generation targets.
 * **`cli.py system sync`:** Assembles parts from `system/` into `SYSTEM.md` and syncs it to tool destinations (e.g., `.gemini/SYSTEM.md`).
 
@@ -83,8 +83,8 @@ Framework context is stored in the **YAML frontmatter** (under the `system_frame
 
 | File | Location | Purpose | Managed By |
 | :--- | :--- | :--- | :--- |
-| `FRAMEWORK.md` | `.vaultspec/FRAMEWORK.md` | Bootstrap prompt (pipeline, dispatch, conventions) | Developer |
-| `PROJECT.md` | `.vaultspec/PROJECT.md` | Project-specific context | User |
+| `system/framework.md` | `.vaultspec/system/framework.md` | Bootstrap prompt (pipeline, dispatch, conventions) | `config sync` |
+| `system/project.md` | `.vaultspec/system/project.md` | Project-specific context | User |
 | `AGENTS.md` | `./AGENTS.md` | Root-level AI entry point | `cli.py` |
 | `CLAUDE.md` | `.claude/CLAUDE.md` | Claude Code config | `cli.py` |
 | `GEMINI.md` | `.gemini/GEMINI.md` | Gemini CLI config | `cli.py` |

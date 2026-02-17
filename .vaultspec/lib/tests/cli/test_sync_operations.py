@@ -244,10 +244,10 @@ class TestSystemSync:
 
 class TestConfigSync:
     def test_generates_from_internal_and_custom(self):
-        (TEST_PROJECT / ".vaultspec" / "FRAMEWORK.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
             "Internal instructions here", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "PROJECT.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "project.md").write_text(
             "Custom user content", encoding="utf-8"
         )
         args = make_ns()
@@ -259,7 +259,7 @@ class TestConfigSync:
         assert "Custom user content" in content
 
     def test_generates_with_internal_only(self):
-        (TEST_PROJECT / ".vaultspec" / "FRAMEWORK.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
             "Internal only", encoding="utf-8"
         )
         args = make_ns()
@@ -274,7 +274,7 @@ class TestConfigSync:
         assert not config_file.exists()
 
     def test_skips_custom_dest_without_force(self):
-        (TEST_PROJECT / ".vaultspec" / "FRAMEWORK.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
             "Internal", encoding="utf-8"
         )
         config_file = TEST_PROJECT / ".claude" / "CLAUDE.md"
@@ -285,7 +285,7 @@ class TestConfigSync:
         assert content == "# Hand-written config"
 
     def test_force_overwrites_custom_dest(self):
-        (TEST_PROJECT / ".vaultspec" / "FRAMEWORK.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
             "Internal", encoding="utf-8"
         )
         config_file = TEST_PROJECT / ".claude" / "CLAUDE.md"
@@ -310,7 +310,7 @@ class TestEndToEnd:
         (TEST_PROJECT / ".vaultspec" / "skills" / "vaultspec-lint.md").write_text(
             "---\ndescription: Run linter\n---\n\n# Lint", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "FRAMEWORK.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
             "Be helpful.", encoding="utf-8"
         )
         (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
@@ -382,7 +382,7 @@ class TestEndToEnd:
 
     def test_force_overwrite_cycle(self):
         """Create custom dest -> sync (skip) -> sync --force (overwrite)."""
-        (TEST_PROJECT / ".vaultspec" / "FRAMEWORK.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
             "Internal content", encoding="utf-8"
         )
 
