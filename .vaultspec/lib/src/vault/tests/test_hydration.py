@@ -1,13 +1,9 @@
-from pathlib import Path
-
 import pytest
+from tests.constants import PROJECT_ROOT
 from vault.hydration import get_template_path, hydrate_template
 from vault.models import DocType
 
 pytestmark = [pytest.mark.unit]
-
-_LIB_SRC = Path(__file__).resolve().parent.parent.parent
-PROJECT_ROOT = _LIB_SRC.parent.parent.parent
 
 
 class TestHydrateTemplate:
@@ -47,18 +43,19 @@ class TestGetTemplatePath:
     def test_adr_template_exists(self):
         result = get_template_path(PROJECT_ROOT, DocType.ADR)
         assert result is not None
-        assert result.name == "ADR.md"
+        assert result.name == "adr.md"
 
     def test_plan_template_exists(self):
         result = get_template_path(PROJECT_ROOT, DocType.PLAN)
         assert result is not None
-        assert result.name == "PLAN.md"
+        assert result.name == "plan.md"
 
     def test_exec_template_exists(self):
         result = get_template_path(PROJECT_ROOT, DocType.EXEC)
         assert result is not None
+        assert result.name == "exec-step.md"
 
     def test_research_template_exists(self):
         result = get_template_path(PROJECT_ROOT, DocType.RESEARCH)
         assert result is not None
-        assert result.name == "RESEARCH.md"
+        assert result.name == "research.md"

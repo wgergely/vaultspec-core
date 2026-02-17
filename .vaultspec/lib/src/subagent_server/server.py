@@ -4,17 +4,16 @@ import asyncio
 import contextlib
 import json
 import logging
-import os
-import pathlib
 import re
-import sys
 import time
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import pathlib
     from collections.abc import AsyncIterator
 
+from logging_config import configure_logging
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.fastmcp.resources.types import FunctionResource
@@ -35,12 +34,8 @@ from orchestration.task_engine import (
 from orchestration.utils import safe_read_text
 from protocol.acp.types import SubagentError
 
-# Configure logging to stderr
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-    stream=sys.stderr,
-)
+# Configure logging
+configure_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -82,7 +77,7 @@ _active_clients: dict[str, list] = {}
 
 def initialize_server(
     root_dir: pathlib.Path,
-    ttl_seconds: float = 3600.0,
+    ttl_seconds: float | None = None,
 ) -> None:
     """Initialize server configuration.  MUST be called before mcp.run().
 
@@ -90,10 +85,14 @@ def initialize_server(
         root_dir: Workspace root directory (required).
         ttl_seconds: Task TTL in seconds (default 3600).
     """
+    from core.config import get_config
+
+    cfg = get_config()
+
     global ROOT_DIR, AGENTS_DIR, lock_manager, task_engine
 
     ROOT_DIR = root_dir
-    AGENTS_DIR = ROOT_DIR / ".vaultspec" / "agents"
+    AGENTS_DIR = ROOT_DIR / cfg.framework_dir / "agents"
     lock_manager = LockManager()
     task_engine = TaskEngine(ttl_seconds=ttl_seconds, lock_manager=lock_manager)
 
@@ -196,7 +195,12 @@ def _merge_artifacts(text_artifacts: list[str], written_files: list[str]) -> lis
 
 
 _agent_mtimes: dict[str, float] = {}
-_POLL_INTERVAL = 5.0
+
+
+def _poll_interval() -> float:
+    from core.config import get_config
+
+    return get_config().mcp_poll_interval
 
 
 def _strip_quotes(value: str) -> str:
@@ -326,7 +330,7 @@ async def _send_list_changed() -> None:
 
 async def _poll_agent_files() -> None:
     while True:
-        await asyncio.sleep(_POLL_INTERVAL)
+        await asyncio.sleep(_poll_interval())
         if _refresh_if_changed():
             await _send_list_changed()
 
@@ -599,18 +603,18 @@ def main(root_dir: pathlib.Path | None = None) -> None:
     """Start the MCP server.
 
     Args:
-        root_dir: Workspace root.  Falls back to ``VS_MCP_ROOT_DIR`` env var.
+        root_dir: Workspace root.  Falls back to ``VAULTSPEC_MCP_ROOT_DIR`` env var.
     """
-    if root_dir is None:
-        root_str = os.environ.get("VS_MCP_ROOT_DIR")
-        if not root_str:
-            raise RuntimeError(
-                "MCP server requires root_dir parameter or VS_MCP_ROOT_DIR env var"
-            )
-        root_dir = pathlib.Path(root_str)
+    from core.config import get_config
 
-    ttl = float(os.environ.get("VS_MCP_TTL_SECONDS", "3600.0"))
-    initialize_server(root_dir=root_dir, ttl_seconds=ttl)
+    cfg = get_config()
+
+    if root_dir is None:
+        if cfg.mcp_root_dir is None:
+            raise RuntimeError("MCP server requires root_dir or VAULTSPEC_MCP_ROOT_DIR")
+        root_dir = cfg.mcp_root_dir
+
+    initialize_server(root_dir=root_dir, ttl_seconds=cfg.mcp_ttl_seconds)
     mcp.run()
 
 

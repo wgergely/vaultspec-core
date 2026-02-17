@@ -117,9 +117,12 @@ class VaultStore:
         import pathlib as _pathlib
 
         import lancedb
+        from core.config import get_config
+
+        cfg = get_config()
 
         self.root_dir = _pathlib.Path(root_dir)
-        self.db_path = self.root_dir / ".lance"
+        self.db_path = self.root_dir / cfg.lance_dir
         self.db = lancedb.connect(str(self.db_path))
         self._table = None
         self._fts_dirty = True  # track whether FTS index needs rebuild
@@ -298,7 +301,9 @@ class VaultStore:
             results = query.to_list()
         except Exception as exc:
             logger.warning(
-                "Hybrid search failed (%s), falling back to vector-only", exc
+                "Hybrid search failed (%s), falling back to vector-only",
+                exc,
+                exc_info=True,
             )
             fallback = table.search(
                 np.asarray(query_vector, dtype=np.float32).tolist()

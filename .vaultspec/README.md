@@ -11,60 +11,60 @@ The system enforces a strict **Research -> Specify -> Plan -> Execute -> Verify*
 
 **High-Level Summary:**
 
-* **Research (`spec-research`)** & **Reference (`spec-reference`)** gather the data.
-* **Specify (`spec-adr`)** formalizes the choice.
-* **Plan (`spec-write`)** defines the steps.
-* **Execute (`spec-execute`)** builds it.
-* **Verify (`spec-review`)** validates it.
-* **Curate (`docs-curator`)** cleans up.
+* **Research (`vaultspec-research`)** & **Reference (`vaultspec-reference`)** gather the data.
+* **Specify (`vaultspec-adr`)** formalizes the choice.
+* **Plan (`vaultspec-write`)** defines the steps.
+* **Execute (`vaultspec-execute`)** builds it.
+* **Verify (`vaultspec-review`)** validates it.
+* **Curate (`vaultspec-docs-curator`)** cleans up.
 
 #### Detailed Steps
 
-* **Research (`spec-research`)**:
+* **Research (`vaultspec-research`)**:
   * **Goal:** Understand the problem, explore libraries, and find "frontier" patterns.
-  * **Agent:** `adr-researcher` (High Tier).
+  * **Agent:** `vaultspec-adr-researcher` (High Tier).
   * **Output:** `.vault/research/...` artifact.
-  * *Usage:* "Activate `spec-research` to investigate [topic]."
+  * *Usage:* "Activate `vaultspec-research` to investigate [topic]."
 
-* **Specify (`spec-adr`)**:
+* **Specify (`vaultspec-adr`)**:
   * **Goal:** Make binding technical decisions based on your research.
   * **Output:** `.vault/adr/...` artifact.
-  * *Usage:* "Activate `spec-adr` to formalize our decision on [topic]."
+  * *Usage:* "Activate `vaultspec-adr` to formalize our decision on [topic]."
 
-* **Plan (`spec-write`)**:
+* **Plan (`vaultspec-write`)**:
   * **Goal:** Convert the ADR into a step-by-step implementation plan.
-  * **Agent:** `spec-writer` (High Tier).
+  * **Agent:** `vaultspec-writer` (High Tier).
   * **Output:** `.vault/plan/...` artifact.
-  * *Usage:* "Activate `spec-write` to create a plan for [feature]."
+  * *Usage:* "Activate `vaultspec-write` to create a plan for [feature]."
 
-* **Execute (`spec-execute`)**:
+* **Execute (`vaultspec-execute`)**:
   * **Goal:** Implement the plan using specialized sub-agents.
-  * **Agent:** Orchestrator (You) + Executors (`simple-executor`, `complex-executor`).
+  * **Agent:** Orchestrator (You) + Executors (`vaultspec-simple-executor`, `vaultspec-complex-executor`).
   * **Output:** Code changes + `.vault/exec/...` logs.
-  * *Usage:* "Activate `spec-execute` to implement the plan."
+  * *Usage:* "Activate `vaultspec-execute` to implement the plan."
 
-* **Verify (`spec-review`)**:
+* **Verify (`vaultspec-review`)**:
   * **Goal:** Validate the implementation against the plan and safety standards.
-  * **Agent:** `code-reviewer` (High Tier).
-  * *Usage:* "Activate `spec-review` to audit the implementation."
+  * **Agent:** `vaultspec-code-reviewer` (High Tier).
+  * *Usage:* "Activate `vaultspec-review` to audit the implementation."
 
-* **Curate (`docs-curator`)**:
+* **Curate (`vaultspec-docs-curator`)**:
   * **Goal:** Maintain the hygiene of the `.vault/` vault.
-  * **Agent:** `docs-curator` (Medium Tier).
-  * *Usage:* "Run the `docs-curator` agent to audit the vault."
+  * **Agent:** `vaultspec-docs-curator` (Medium Tier).
+  * *Usage:* "Run the `vaultspec-docs-curator` agent to audit the vault."
 
 ### Agent Reference
 
 | Agent | Tier | Role | When to use |
 | :--- | :--- | :--- | :--- |
-| **`adr-researcher`** | HIGH | Lead Researcher | When exploring new technologies, libraries, or complex architectural problems. |
-| **`spec-writer`** | HIGH | Planner | After an ADR is approved. Converts decisions into actionable steps. |
-| **`docs-curator`** | MEDIUM | Librarian & Orchestrator | To fix broken links, bad tags, and strictly enforce documentation schema rules. |
-| **`reference-auditor`** | MEDIUM | Code Auditor | To scan the codebase or reference implementations (e.g., Zed) for patterns to copy. |
-| **`complex-executor`** | HIGH | Senior Engineer | For difficult logic, refactors, or "blank slate" implementations requiring deep reasoning. |
-| **`standard-executor`** | MEDIUM | Engineer | For typical feature work, component implementation, and standard logic. |
-| **`simple-executor`** | LOW | Junior Engineer | For rote tasks, text updates, simple fixes, and menial labor dispatched by other agents. |
-| **`code-reviewer`** | HIGH | Reviewer & Safety Officer | To audit code for safety, intent compliance, and quality. |
+| **`vaultspec-adr-researcher`** | HIGH | Lead Researcher | When exploring new technologies, libraries, or complex architectural problems. |
+| **`vaultspec-writer`** | HIGH | Planner | After an ADR is approved. Converts decisions into actionable steps. |
+| **`vaultspec-docs-curator`** | MEDIUM | Librarian & Orchestrator | To fix broken links, bad tags, and strictly enforce documentation schema rules. |
+| **`vaultspec-reference-auditor`** | MEDIUM | Code Auditor | To scan the codebase or reference implementations (e.g., Zed) for patterns to copy. |
+| **`vaultspec-complex-executor`** | HIGH | Senior Engineer | For difficult logic, refactors, or "blank slate" implementations requiring deep reasoning. |
+| **`vaultspec-standard-executor`** | MEDIUM | Engineer | For typical feature work, component implementation, and standard logic. |
+| **`vaultspec-simple-executor`** | LOW | Junior Engineer | For rote tasks, text updates, simple fixes, and menial labor dispatched by other agents. |
+| **`vaultspec-code-reviewer`** | HIGH | Reviewer & Safety Officer | To audit code for safety, intent compliance, and quality. |
 
 ## Context Management
 
@@ -93,7 +93,7 @@ Framework context is stored in the **YAML frontmatter** (under the `system_frame
 
 ## Overview Diagram
 
-> **Note:** The `spec-subagent` skill is a **utility task** used internally by other agents. It should **not** be called directly by the user.
+> **Note:** The `vaultspec-subagent` skill is a **utility task** used internally by other agents. It should **not** be called directly by the user.
 
 ```mermaid
 flowchart TD
@@ -137,42 +137,42 @@ flowchart TD
     START["Start: User Prompt"]
 
     %% Phase 1: Research
-    SK_RES["Skill: spec-research<br/>Announce"]
-    SK_SUB_RES["Skill: spec-subagent<br/>Run Command: subagent.py"]
-    SA_RES["Agent: adr-researcher<br/>Search<br/>Write Artifact"]
+    SK_RES["Skill: vaultspec-research<br/>Announce"]
+    SK_SUB_RES["Skill: vaultspec-subagent<br/>Run Command: subagent.py"]
+    SA_RES["Agent: vaultspec-adr-researcher<br/>Search<br/>Write Artifact"]
     PH1_END["Phase 1 Complete"]
 
     %% Phase 2: Specify
-    SK_ADR["Skill: spec-adr<br/>Announce<br/>Write ADR<br/>Notify"]
+    SK_ADR["Skill: vaultspec-adr<br/>Announce<br/>Write ADR<br/>Notify"]
     PH2_END["Phase 2 Complete"]
 
     %% Phase 3: Plan
-    SK_REF["Skill: spec-reference<br/>Announce"]
-    SK_SUB_REF["Skill: spec-subagent<br/>Run Command: subagent.py"]
-    SA_REF["Agent: reference-auditor<br/>Audit Ref<br/>Write Artifact"]
+    SK_REF["Skill: vaultspec-reference<br/>Announce"]
+    SK_SUB_REF["Skill: vaultspec-subagent<br/>Run Command: subagent.py"]
+    SA_REF["Agent: vaultspec-reference-auditor<br/>Audit Ref<br/>Write Artifact"]
 
-    SK_WRITE["Skill: spec-write<br/>Announce"]
-    SK_SUB_WRITE["Skill: spec-subagent<br/>Run Command: subagent.py"]
-    SA_WRITER["Agent: spec-writer<br/>Plan Codebase<br/>Write Artifact"]
+    SK_WRITE["Skill: vaultspec-write<br/>Announce"]
+    SK_SUB_WRITE["Skill: vaultspec-subagent<br/>Run Command: subagent.py"]
+    SA_WRITER["Agent: vaultspec-writer<br/>Plan Codebase<br/>Write Artifact"]
     PH3_END["Phase 3 Complete"]
 
     %% Phase 4: Execute
-    SK_EXEC["Skill: spec-execute<br/>Announce"]
-    SK_SUB_EXEC["Skill: spec-subagent<br/>Run Command: subagent.py"]
-    SA_EXEC["Agent: complex-executor<br/>Edit Code<br/>Validate"]
+    SK_EXEC["Skill: vaultspec-execute<br/>Announce"]
+    SK_SUB_EXEC["Skill: vaultspec-subagent<br/>Run Command: subagent.py"]
+    SA_EXEC["Agent: vaultspec-complex-executor<br/>Edit Code<br/>Validate"]
 
     %% Phase 5: Verify
-    SK_REV["Skill: spec-review<br/>Announce"]
-    SK_SUB_REV["Skill: spec-subagent<br/>Run Command: subagent.py"]
-    SA_REV["Agent: code-reviewer<br/>Audit Safety/Intent<br/>Report"]
+    SK_REV["Skill: vaultspec-review<br/>Announce"]
+    SK_SUB_REV["Skill: vaultspec-subagent<br/>Run Command: subagent.py"]
+    SA_REV["Agent: vaultspec-code-reviewer<br/>Audit Safety/Intent<br/>Report"]
 
     EXEC_RET["Execution Return"]
     PH4_END["Phase 4 Complete"]
 
     %% Revision (if needed)
-    SK_FIX["Skill: spec-execute (Fixes)<br/>Announce"]
-    SK_SUB_FIX["Skill: spec-subagent<br/>Run Command: subagent.py"]
-    SA_FIX["Agent: standard-executor<br/>Fix Code<br/>Verify"]
+    SK_FIX["Skill: vaultspec-execute (Fixes)<br/>Announce"]
+    SK_SUB_FIX["Skill: vaultspec-subagent<br/>Run Command: subagent.py"]
+    SA_FIX["Agent: vaultspec-standard-executor<br/>Fix Code<br/>Verify"]
     PH5_END["Phase 5 Complete"]
 
     %% Conclusion

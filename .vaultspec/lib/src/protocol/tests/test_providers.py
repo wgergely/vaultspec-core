@@ -5,6 +5,7 @@ import logging
 import subprocess
 
 import pytest
+from tests.constants import TEST_PROJECT
 
 from orchestration.subagent import get_provider_for_model
 from protocol.providers.base import (
@@ -17,8 +18,6 @@ from protocol.providers.base import (
 )
 from protocol.providers.claude import ClaudeProvider
 from protocol.providers.gemini import GeminiProvider
-
-from .conftest import TEST_PROJECT
 
 pytestmark = [pytest.mark.unit]
 
@@ -365,7 +364,7 @@ class TestClaudeModePassthrough:
 
 
 class TestClaudeFeaturePassthrough:
-    """Verify ClaudeProvider sets VS_* env vars from agent_meta fields."""
+    """Verify ClaudeProvider sets VAULTSPEC_* env vars from agent_meta fields."""
 
     @pytest.fixture
     def provider(self):
@@ -379,7 +378,7 @@ class TestClaudeFeaturePassthrough:
             task_context="Do it.",
             root_dir=TEST_PROJECT,
         )
-        assert spec.env["VS_MAX_TURNS"] == "25"
+        assert spec.env["VAULTSPEC_MAX_TURNS"] == "25"
 
     def test_budget_env(self, provider):
         spec = provider.prepare_process(
@@ -389,7 +388,7 @@ class TestClaudeFeaturePassthrough:
             task_context="Do it.",
             root_dir=TEST_PROJECT,
         )
-        assert spec.env["VS_BUDGET_USD"] == "1.5"
+        assert spec.env["VAULTSPEC_BUDGET_USD"] == "1.5"
 
     def test_allowed_tools_env(self, provider):
         spec = provider.prepare_process(
@@ -402,7 +401,7 @@ class TestClaudeFeaturePassthrough:
             task_context="Do it.",
             root_dir=TEST_PROJECT,
         )
-        assert spec.env["VS_ALLOWED_TOOLS"] == "Glob, Read"
+        assert spec.env["VAULTSPEC_ALLOWED_TOOLS"] == "Glob, Read"
 
     def test_disallowed_tools_env(self, provider):
         spec = provider.prepare_process(
@@ -415,7 +414,7 @@ class TestClaudeFeaturePassthrough:
             task_context="Do it.",
             root_dir=TEST_PROJECT,
         )
-        assert spec.env["VS_DISALLOWED_TOOLS"] == "Bash"
+        assert spec.env["VAULTSPEC_DISALLOWED_TOOLS"] == "Bash"
 
     def test_effort_env(self, provider):
         spec = provider.prepare_process(
@@ -425,7 +424,7 @@ class TestClaudeFeaturePassthrough:
             task_context="Do it.",
             root_dir=TEST_PROJECT,
         )
-        assert spec.env["VS_EFFORT"] == "high"
+        assert spec.env["VAULTSPEC_EFFORT"] == "high"
 
     def test_fallback_model_env(self, provider):
         spec = provider.prepare_process(
@@ -438,7 +437,7 @@ class TestClaudeFeaturePassthrough:
             task_context="Do it.",
             root_dir=TEST_PROJECT,
         )
-        assert spec.env["VS_FALLBACK_MODEL"] == ClaudeModels.LOW
+        assert spec.env["VAULTSPEC_FALLBACK_MODEL"] == ClaudeModels.LOW
 
     def test_include_dirs_env(self, provider):
         spec = provider.prepare_process(
@@ -452,7 +451,7 @@ class TestClaudeFeaturePassthrough:
             root_dir=TEST_PROJECT,
         )
         # Production code splits on comma, validates, and re-joins with ","
-        assert spec.env["VS_INCLUDE_DIRS"] == ".vault,src"
+        assert spec.env["VAULTSPEC_INCLUDE_DIRS"] == ".vault,src"
 
     def test_output_format_env(self, provider):
         spec = provider.prepare_process(
@@ -465,10 +464,10 @@ class TestClaudeFeaturePassthrough:
             task_context="Do it.",
             root_dir=TEST_PROJECT,
         )
-        assert spec.env["VS_OUTPUT_FORMAT"] == "json"
+        assert spec.env["VAULTSPEC_OUTPUT_FORMAT"] == "json"
 
     def test_empty_meta_no_env_vars(self, provider):
-        """Empty agent_meta should not set any VS_* feature env vars."""
+        """Empty agent_meta should not set any VAULTSPEC_* feature env vars."""
         spec = provider.prepare_process(
             agent_name="test",
             agent_meta={"model": ClaudeModels.MEDIUM},
@@ -477,14 +476,14 @@ class TestClaudeFeaturePassthrough:
             root_dir=TEST_PROJECT,
         )
         for key in (
-            "VS_MAX_TURNS",
-            "VS_BUDGET_USD",
-            "VS_ALLOWED_TOOLS",
-            "VS_DISALLOWED_TOOLS",
-            "VS_EFFORT",
-            "VS_OUTPUT_FORMAT",
-            "VS_FALLBACK_MODEL",
-            "VS_INCLUDE_DIRS",
+            "VAULTSPEC_MAX_TURNS",
+            "VAULTSPEC_BUDGET_USD",
+            "VAULTSPEC_ALLOWED_TOOLS",
+            "VAULTSPEC_DISALLOWED_TOOLS",
+            "VAULTSPEC_EFFORT",
+            "VAULTSPEC_OUTPUT_FORMAT",
+            "VAULTSPEC_FALLBACK_MODEL",
+            "VAULTSPEC_INCLUDE_DIRS",
         ):
             assert key not in spec.env
 
@@ -598,7 +597,7 @@ class TestProviderAPIParity:
 
 
 class TestClaudeModeEnv:
-    """Verify Claude provider sets VS_AGENT_MODE in env."""
+    """Verify Claude provider sets VAULTSPEC_AGENT_MODE in env."""
 
     @pytest.fixture
     def provider(self):
@@ -613,7 +612,7 @@ class TestClaudeModeEnv:
             root_dir=TEST_PROJECT,
             mode="read-write",
         )
-        assert spec.env["VS_AGENT_MODE"] == "read-write"
+        assert spec.env["VAULTSPEC_AGENT_MODE"] == "read-write"
 
     def test_mode_sets_env_var_read_only(self, provider):
         spec = provider.prepare_process(
@@ -624,7 +623,7 @@ class TestClaudeModeEnv:
             root_dir=TEST_PROJECT,
             mode="read-only",
         )
-        assert spec.env["VS_AGENT_MODE"] == "read-only"
+        assert spec.env["VAULTSPEC_AGENT_MODE"] == "read-only"
 
 
 class TestClaudeSystemPrompt:

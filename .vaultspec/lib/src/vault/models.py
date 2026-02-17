@@ -100,7 +100,13 @@ class DocumentMetadata:
 class VaultConstants:
     """Central configuration for the .vault vault structure."""
 
-    DOCS_DIR = ".vault"
+    @staticmethod
+    def _get_docs_dir() -> str:
+        from core.config import get_config
+
+        return get_config().docs_dir
+
+    DOCS_DIR = ".vault"  # Backwards-compat default; prefer _get_docs_dir()
 
     # Supported directories within .vault/
     SUPPORTED_DIRECTORIES: ClassVar[set[str]] = {dt.value for dt in DocType}
@@ -124,7 +130,8 @@ class VaultConstants:
     @classmethod
     def validate_vault_structure(cls, root_dir: Path) -> list[str]:
         """Ensures .vault/ only contains supported subdirectories."""
-        docs_dir = root_dir / cls.DOCS_DIR
+        docs_dir_name = cls._get_docs_dir()
+        docs_dir = root_dir / docs_dir_name
         if not docs_dir.exists():
             return []
 
@@ -138,14 +145,14 @@ class VaultConstants:
                 if not cls.is_supported_directory(item.name):
                     msg = (
                         "Vault violation: Unsupported directory found in "
-                        f"{cls.DOCS_DIR}/: '{item.name}'"
+                        f"{docs_dir_name}/: '{item.name}'"
                     )
                     errors.append(msg)
             elif item.is_file():
                 # Usually we don't expect files in the root of .vault/
                 if item.name.lower() != "readme.md":
                     msg = (
-                        f"Vault violation: File found in {cls.DOCS_DIR}/ root: "
+                        f"Vault violation: File found in {docs_dir_name}/ root: "
                         f"'{item.name}'. Files should be in subdirectories."
                     )
                     errors.append(msg)

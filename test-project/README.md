@@ -7,5 +7,5 @@ All other contents (`*.lance/`, `.vaultspec/`, `.claude/`, `.gemini/`) are gitig
 You can use this to test the CLI synchronization and tool configuration by pointing to this directory as the workspace root:
 
 ```powershell
-python .vaultspec/scripts/cli.py config sync --root ./test-project --force
+python .vaultspec/lib/scripts/cli.py config sync --root ./test-project --force
 ```

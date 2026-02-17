@@ -18,11 +18,11 @@ from __future__ import annotations
 import shutil
 import time
 import uuid
-from pathlib import Path
 
 import httpx
 import pytest
 from a2a.types import AgentCard
+from tests.constants import PROJECT_ROOT as _TEST_ROOT
 
 from protocol.a2a.agent_card import agent_card_from_definition
 from protocol.a2a.server import create_app
@@ -38,9 +38,6 @@ requires_gemini = pytest.mark.skipif(
     not shutil.which("gemini"),
     reason="Gemini CLI not on PATH",
 )
-
-
-_TEST_ROOT = Path(__file__).resolve().parents[6]  # repo root
 
 
 def _send_message_payload(text: str, message_id: str | None = None) -> dict:
@@ -129,7 +126,7 @@ class TestAgentCardFromCLIArgs:
     def test_card_with_host_and_port(self):
         """Card URL reflects custom host and port."""
         card = agent_card_from_definition(
-            "researcher",
+            "vaultspec-researcher",
             {
                 "name": "Researcher",
                 "description": "Research agent",
@@ -139,7 +136,7 @@ class TestAgentCardFromCLIArgs:
             port=10020,
         )
         assert card.url == "http://0.0.0.0:10020/"
-        assert card.name == "researcher"
+        assert card.name == "vaultspec-researcher"
         assert card.skills[0].tags == ["research"]
 
     def test_card_defaults_for_minimal_meta(self):
@@ -325,7 +322,7 @@ class TestGeminiE2E:
         executor = GeminiA2AExecutor(
             root_dir=_TEST_ROOT,
             model=GeminiModels.LOW,
-            agent_name="researcher",
+            agent_name="vaultspec-researcher",
         )
         client = _build_client(executor, name="gemini-e2e", port=10061)
 
@@ -393,7 +390,7 @@ class TestGoldStandardBidirectional:
         gemini_executor = GeminiA2AExecutor(
             root_dir=_TEST_ROOT,
             model=GeminiModels.LOW,
-            agent_name="researcher",
+            agent_name="vaultspec-researcher",
         )
         gemini_card = agent_card_from_definition(
             "gemini-agent",
@@ -504,7 +501,7 @@ class TestGoldStandardBidirectional:
         gemini_executor = GeminiA2AExecutor(
             root_dir=_TEST_ROOT,
             model=GeminiModels.LOW,
-            agent_name="researcher",
+            agent_name="vaultspec-researcher",
         )
         gemini_card = agent_card_from_definition(
             "gemini-agent",

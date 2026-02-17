@@ -1,14 +1,10 @@
-from pathlib import Path
-
 import pytest
 from core.config import reset_config
+from tests.constants import TEST_PROJECT
 from vault.models import DocType
 from vault.scanner import get_doc_type, scan_vault
 
 pytestmark = [pytest.mark.unit]
-
-_LIB_SRC = Path(__file__).resolve().parent.parent.parent
-TEST_PROJECT = _LIB_SRC.parent.parent.parent / "test-project"
 
 
 @pytest.fixture(autouse=True)

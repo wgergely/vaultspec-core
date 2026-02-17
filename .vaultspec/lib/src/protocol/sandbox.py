@@ -7,6 +7,7 @@ Provides file-write restriction callbacks used by both the ACP bridge
 
 from __future__ import annotations
 
+import logging
 import pathlib
 from typing import Any
 
@@ -15,6 +16,8 @@ from claude_agent_sdk.types import (
     PermissionResultDeny,
     ToolPermissionContext,
 )
+
+logger = logging.getLogger(__name__)
 
 # Tools that perform file writes in Claude Code
 _WRITE_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
@@ -48,6 +51,10 @@ def _make_sandbox_callback(mode: str, root_dir: str) -> Any:
         _context: ToolPermissionContext,
     ) -> PermissionResultAllow | PermissionResultDeny:
         if tool_name in _SHELL_TOOLS:
+            logger.warning(
+                "Path access denied: %s (shell commands blocked)",
+                tool_name,
+            )
             return PermissionResultDeny(
                 behavior="deny",
                 message=(
@@ -59,6 +66,10 @@ def _make_sandbox_callback(mode: str, root_dir: str) -> Any:
         if tool_name in _WRITE_TOOLS:
             path = tool_input.get("file_path", "")
             if not _is_vault_path(path, root_dir):
+                logger.warning(
+                    "Path access denied: %s (write outside .vault/)",
+                    path,
+                )
                 return PermissionResultDeny(
                     behavior="deny",
                     message=(
@@ -67,6 +78,7 @@ def _make_sandbox_callback(mode: str, root_dir: str) -> Any:
                     ),
                     interrupt=False,
                 )
+        logger.debug("Path access allowed: %s", tool_name)
         return PermissionResultAllow(
             behavior="allow",
             updated_input=None,

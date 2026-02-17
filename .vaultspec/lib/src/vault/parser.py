@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -7,6 +8,8 @@ from vault.models import DocumentMetadata
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+logger = logging.getLogger(__name__)
 
 
 def _simple_yaml_load(text: str) -> dict[str, Any]:
@@ -61,7 +64,8 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
 
     try:
         frontmatter = _yaml_load(match.group(1))
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to parse frontmatter: %s", e)
         frontmatter = {}
     body = match.group(2)
     return frontmatter, body

@@ -13,11 +13,11 @@ from claude_agent_sdk import (
     TextBlock,
     UserMessage,
 )
+from tests.constants import TEST_PROJECT
 
 from protocol.acp.claude_bridge import ClaudeACPBridge
 
 from .conftest import (
-    TEST_PROJECT,
     make_di_bridge,
     make_test_client,
     make_test_conn,

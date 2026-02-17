@@ -17,10 +17,9 @@ from acp.schema import (
     ToolCallStart,
     ToolCallUpdate,
 )
+from tests.constants import TEST_PROJECT
 
 from protocol.acp.client import SubagentClient
-
-from .conftest import TEST_PROJECT
 
 pytestmark = [pytest.mark.unit]
 

@@ -9,9 +9,10 @@ from __future__ import annotations
 import pytest
 from a2a.server.events import EventQueue
 from a2a.types import TaskState, TaskStatusUpdateEvent
+from tests.constants import TEST_PROJECT
 
 from protocol.a2a.executors.gemini_executor import GeminiA2AExecutor
-from protocol.a2a.tests.conftest import TEST_PROJECT, make_request_context
+from protocol.a2a.tests.conftest import make_request_context
 from protocol.acp.types import SubagentResult
 from protocol.providers.base import GeminiModels
 
@@ -55,7 +56,7 @@ class TestGeminiA2AExecutor:
         executor = GeminiA2AExecutor(
             root_dir=TEST_PROJECT,
             model=GeminiModels.LOW,
-            agent_name="researcher",
+            agent_name="vaultspec-researcher",
             run_subagent=recorder,
         )
         queue = EventQueue()
@@ -65,7 +66,7 @@ class TestGeminiA2AExecutor:
 
         assert len(recorder.calls) == 1
         assert recorder.calls[0] == {
-            "agent_name": "researcher",
+            "agent_name": "vaultspec-researcher",
             "root_dir": TEST_PROJECT,
             "initial_task": "Summarize the codebase",
             "model_override": GeminiModels.LOW,

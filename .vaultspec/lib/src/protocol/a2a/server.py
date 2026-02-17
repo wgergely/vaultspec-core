@@ -8,13 +8,14 @@ Usage::
     from protocol.a2a.server import create_app
     from protocol.a2a.agent_card import agent_card_from_definition
 
-    card = agent_card_from_definition("researcher", meta, port=10010)
+    card = agent_card_from_definition("vaultspec-researcher", meta, port=10010)
     app = create_app(executor, card)
     # app is a Starlette instance, run with uvicorn or test with httpx
 """
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from a2a.server.apps import A2AStarletteApplication
@@ -25,6 +26,8 @@ if TYPE_CHECKING:
     from a2a.server.agent_execution import AgentExecutor
     from a2a.types import AgentCard
     from starlette.applications import Starlette
+
+logger = logging.getLogger(__name__)
 
 
 def create_app(executor: AgentExecutor, agent_card: AgentCard) -> Starlette:
@@ -39,12 +42,18 @@ def create_app(executor: AgentExecutor, agent_card: AgentCard) -> Starlette:
         - ``/.well-known/agent-card.json`` (GET) — agent card
         - ``/`` (POST) — JSON-RPC endpoint for message/send, tasks/*, etc.
     """
+    logger.info("Creating A2A Starlette app for agent: %s", agent_card.name)
+
     handler = DefaultRequestHandler(
         agent_executor=executor,
         task_store=InMemoryTaskStore(),
     )
+    logger.debug("Created request handler with in-memory task store")
+
     a2a_app = A2AStarletteApplication(
         agent_card=agent_card,
         http_handler=handler,
     )
-    return a2a_app.build()
+    app = a2a_app.build()
+    logger.info("A2A Starlette app built successfully")
+    return app

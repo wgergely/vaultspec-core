@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from rag.store import VaultStore
 
 from rag.store import VaultDocument
-from vault.models import DocType, VaultConstants
+from vault.models import DocType
 from vault.parser import parse_vault_metadata
 from vault.scanner import get_doc_type, scan_vault
 
@@ -77,7 +77,9 @@ def prepare_document(
     if doc_type_enum is None:
         return None
 
-    docs_dir = root_dir / VaultConstants.DOCS_DIR
+    from core.config import get_config
+
+    docs_dir = root_dir / get_config().docs_dir
     try:
         rel_path = str(path.relative_to(docs_dir)).replace("\\", "/")
     except ValueError:
@@ -112,10 +114,14 @@ class VaultIndexer:
         model: EmbeddingModel,
         store: VaultStore,
     ) -> None:
+        from core.config import get_config
+
+        cfg = get_config()
+
         self.root_dir = root_dir
         self.model = model
         self.store = store
-        self._meta_path = root_dir / ".lance" / "index_meta.json"
+        self._meta_path = root_dir / cfg.lance_dir / cfg.index_metadata_file
 
     def full_index(self) -> IndexResult:
         """Full re-index of all vault documents.
@@ -256,7 +262,9 @@ class VaultIndexer:
     def _save_meta(self, docs: list[VaultDocument]) -> None:
         """Save index metadata (file mtimes) from VaultDocument list."""
         meta = {}
-        docs_dir = self.root_dir / VaultConstants.DOCS_DIR
+        from core.config import get_config
+
+        docs_dir = self.root_dir / get_config().docs_dir
         for doc in docs:
             path = docs_dir / doc.path
             with contextlib.suppress(OSError):

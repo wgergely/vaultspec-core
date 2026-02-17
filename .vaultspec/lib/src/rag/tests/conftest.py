@@ -2,48 +2,13 @@
 
 import pathlib
 import shutil
-import sys
 import time
 
 import pytest
-
-# Ensure lib/src is importable
-_LIB_SRC = pathlib.Path(__file__).resolve().parent.parent.parent
-if str(_LIB_SRC) not in sys.path:
-    sys.path.insert(0, str(_LIB_SRC))
-
-# Check if RAG deps are available
-try:
-    import lancedb  # noqa: F401
-    import sentence_transformers  # noqa: F401
-    import torch  # noqa: F401
-
-    HAS_RAG = True
-except ImportError:
-    HAS_RAG = False
-
-TEST_PROJECT = (
-    pathlib.Path(__file__).resolve().parent.parent.parent.parent.parent.parent
-    / "test-project"
-)
-
-# GPU fast corpus: 13 representative docs covering all 5 doc_types
-GPU_FAST_CORPUS_STEMS: frozenset[str] = frozenset(
-    [
-        "2026-02-05-editor-demo-architecture",
-        "2026-02-06-displaymap-architecture-design",
-        "2026-02-06-main-window-architecture",
-        "2026-02-07-dispatch-architecture",
-        "2026-02-05-editor-demo-phase1-plan",
-        "2026-02-06-main-window-master-plan",
-        "2026-02-05-turn-completion-summary",
-        "2026-02-06-layout-alignment-summary",
-        "2026-02-07-main-window-safety-audit",
-        "2026-02-05-editor-demo-core-reference",
-        "2026-02-04-displaymap-reference",
-        "2026-02-05-editor-demo-research",
-        "2026-02-07-dispatch-protocol-alignment-audit",
-    ]
+from tests.constants import (
+    GPU_FAST_CORPUS_STEMS,
+    LANCE_SUFFIX_UNIT,
+    TEST_PROJECT,
 )
 
 
@@ -142,7 +107,7 @@ def rag_components():
     Uses .lance-fast-unit/ to avoid colliding with integration fixtures.
     """
     components = _build_rag_components(
-        TEST_PROJECT, fast=True, lance_suffix="-fast-unit"
+        TEST_PROJECT, fast=True, lance_suffix=LANCE_SUFFIX_UNIT
     )
 
     yield components
