@@ -7,11 +7,11 @@ import logging
 import re
 import time
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import pathlib
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Awaitable, Callable
 
 from logging_config import configure_logging
 from mcp.server.fastmcp import FastMCP
@@ -74,27 +74,39 @@ _agent_cache: dict[str, dict[str, object]] = {}
 _background_tasks: dict[str, asyncio.Task[None]] = {}
 _active_clients: dict[str, list] = {}
 
+# Injectable callbacks — overridden via initialize_server() for testing.
+_refresh_fn: Callable[[], bool]
+_run_subagent_fn: Callable[..., Awaitable[Any]]
+
 
 def initialize_server(
     root_dir: pathlib.Path,
     ttl_seconds: float | None = None,
+    *,
+    refresh_callback: Callable[[], bool] | None = None,
+    run_subagent_fn: Callable[..., Awaitable[Any]] | None = None,
 ) -> None:
     """Initialize server configuration.  MUST be called before mcp.run().
 
     Args:
         root_dir: Workspace root directory (required).
         ttl_seconds: Task TTL in seconds (default 3600).
+        refresh_callback: Override for ``_refresh_if_changed`` (testing).
+        run_subagent_fn: Override for ``run_subagent`` (testing).
     """
     from core.config import get_config
 
     cfg = get_config()
 
     global ROOT_DIR, AGENTS_DIR, lock_manager, task_engine
+    global _refresh_fn, _run_subagent_fn
 
     ROOT_DIR = root_dir
     AGENTS_DIR = ROOT_DIR / cfg.framework_dir / "agents"
     lock_manager = LockManager()
     task_engine = TaskEngine(ttl_seconds=ttl_seconds, lock_manager=lock_manager)
+    _refresh_fn = refresh_callback or _refresh_if_changed
+    _run_subagent_fn = run_subagent_fn or run_subagent
 
     logger.info(
         "MCP server initialized: root=%s, agents_dir=%s, ttl=%s",
@@ -331,7 +343,7 @@ async def _send_list_changed() -> None:
 async def _poll_agent_files() -> None:
     while True:
         await asyncio.sleep(_poll_interval())
-        if _refresh_if_changed():
+        if _refresh_fn():
             await _send_list_changed()
 
 
@@ -345,7 +357,7 @@ async def _poll_agent_files() -> None:
 )
 async def list_agents() -> str:
     """Return a list of all available sub-agents and their tiers."""
-    _refresh_if_changed()
+    _refresh_fn()
     agents = []
     for name, metadata in _agent_cache.items():
         agents.append(
@@ -391,7 +403,7 @@ async def dispatch_agent(
     Optional overrides (max_turns, budget, effort, output_format)
     take precedence over agent YAML defaults.
     """
-    _refresh_if_changed()
+    _refresh_fn()
 
     if agent not in _agent_cache:
         raise ToolError(f"Agent '{agent}' not found.")
@@ -433,7 +445,7 @@ async def dispatch_agent(
 
             full_task = _inject_permission_prompt(task_content, effective_mode)
 
-            result = await run_subagent(
+            result = await _run_subagent_fn(
                 agent_name=agent,
                 initial_task=full_task,
                 root_dir=ROOT_DIR,
