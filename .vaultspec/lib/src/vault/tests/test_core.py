@@ -6,17 +6,17 @@ import tempfile
 import pytest
 from vault.parser import parse_frontmatter
 
-pytestmark = [pytest.mark.unit]
-
-from orchestration.subagent import (  # noqa: E402
+from orchestration.subagent import (
     AgentNotFoundError,
     load_agent,
 )
-from orchestration.utils import (  # noqa: E402
+from orchestration.utils import (
     SecurityError,
     safe_read_text,
 )
-from protocol.providers.base import ClaudeModels, GeminiModels  # noqa: E402
+from protocol.providers.base import ClaudeModels, GeminiModels
+
+pytestmark = [pytest.mark.unit]
 
 
 class TestParseFrontmatter:

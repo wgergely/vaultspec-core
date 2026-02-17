@@ -4,13 +4,13 @@ import time
 
 import pytest
 
-pytestmark = [pytest.mark.unit]
-
-from orchestration.task_engine import (  # noqa: E402
+from orchestration.task_engine import (
     LockManager,
     TaskEngine,
     TaskStatus,
 )
+
+pytestmark = [pytest.mark.unit]
 
 
 class TestLockManager:

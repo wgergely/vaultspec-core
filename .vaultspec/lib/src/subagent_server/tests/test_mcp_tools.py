@@ -41,7 +41,11 @@ pytestmark = [pytest.mark.unit]
 @pytest.fixture(autouse=True)
 def _init_server():
     """Initialize server with TEST_PROJECT before each test, reset after."""
-    initialize_server(root_dir=TEST_PROJECT, ttl_seconds=60.0)
+    initialize_server(
+        root_dir=TEST_PROJECT,
+        ttl_seconds=60.0,
+        refresh_callback=lambda: False,
+    )
     yield
     srv._agent_cache.clear()
     srv._background_tasks.clear()
@@ -121,7 +125,7 @@ class TestListAgents:
     async def test_populated_cache(self, baker_cache):
         """list_agents returns all agents from the cache."""
         srv._agent_cache = baker_cache
-        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+
         result = await list_agents()
         data = json.loads(result)
         assert len(data["agents"]) == 2
@@ -133,7 +137,7 @@ class TestListAgents:
     async def test_empty_cache(self):
         """list_agents returns empty list when no agents are cached."""
         srv._agent_cache = {}
-        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+
         result = await list_agents()
         data = json.loads(result)
         assert data["agents"] == []
@@ -142,7 +146,7 @@ class TestListAgents:
     async def test_response_json_structure(self, baker_cache):
         """list_agents response has correct top-level keys and agent fields."""
         srv._agent_cache = baker_cache
-        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+
         result = await list_agents()
         data = json.loads(result)
         assert "agents" in data
@@ -154,7 +158,7 @@ class TestListAgents:
 
     @pytest.mark.asyncio
     async def test_refresh_is_triggered(self, baker_cache):
-        """list_agents calls _refresh_if_changed before returning."""
+        """list_agents calls _refresh_fn before returning."""
         calls = []
 
         def _tracking_refresh():
@@ -162,7 +166,7 @@ class TestListAgents:
             return False
 
         srv._agent_cache = baker_cache
-        srv._refresh_if_changed = _tracking_refresh  # type: ignore[assignment]
+        srv._refresh_fn = _tracking_refresh
         await list_agents()
         assert len(calls) == 1
 
@@ -170,7 +174,7 @@ class TestListAgents:
     async def test_tier_and_description_passthrough(self, baker_cache):
         """Agent tier and description are passed through correctly."""
         srv._agent_cache = baker_cache
-        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+
         result = await list_agents()
         data = json.loads(result)
         executor = next(
@@ -192,11 +196,11 @@ class TestDispatchAgent:
             pass
 
         srv._agent_cache = baker_cache
-        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+
         srv.task_engine = fresh_task_engine
         srv._background_tasks = {}
         srv._active_clients = {}
-        srv.run_subagent = _noop  # type: ignore[assignment]
+        srv._run_subagent_fn = _noop
         result = await dispatch_agent(
             agent="vaultspec-simple-executor",
             task="Bake a baguette",
@@ -211,7 +215,7 @@ class TestDispatchAgent:
     async def test_unknown_agent_raises_tool_error(self, baker_cache):
         """Dispatching an unknown agent raises ToolError."""
         srv._agent_cache = baker_cache
-        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+
         with pytest.raises(ToolError, match="not found"):
             await dispatch_agent(
                 agent="nonexistent-patissier",
@@ -222,7 +226,7 @@ class TestDispatchAgent:
     async def test_invalid_mode_raises_tool_error(self, baker_cache, fresh_task_engine):
         """Providing an invalid mode raises ToolError."""
         srv._agent_cache = baker_cache
-        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+
         srv.task_engine = fresh_task_engine
         with pytest.raises(ToolError, match="Invalid mode"):
             await dispatch_agent(
@@ -240,11 +244,11 @@ class TestDispatchAgent:
             pass
 
         srv._agent_cache = baker_cache
-        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+
         srv.task_engine = fresh_task_engine
         srv._background_tasks = {}
         srv._active_clients = {}
-        srv.run_subagent = _noop  # type: ignore[assignment]
+        srv._run_subagent_fn = _noop
         result = await dispatch_agent(
             agent="vaultspec-simple-executor",
             task="Bake sourdough",
@@ -262,11 +266,11 @@ class TestDispatchAgent:
             pass
 
         srv._agent_cache = baker_cache
-        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+
         srv.task_engine = fresh_task_engine
         srv._background_tasks = {}
         srv._active_clients = {}
-        srv.run_subagent = _noop  # type: ignore[assignment]
+        srv._run_subagent_fn = _noop
         result = await dispatch_agent(
             agent="vaultspec-simple-executor",
             task="Proof the dough",
@@ -287,11 +291,11 @@ class TestDispatchAgent:
             pass
 
         srv._agent_cache = baker_cache
-        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+
         srv.task_engine = fresh_task_engine
         srv._background_tasks = {}
         srv._active_clients = {}
-        srv.run_subagent = _noop  # type: ignore[assignment]
+        srv._run_subagent_fn = _noop
         result = await dispatch_agent(
             agent="research-analyst",
             task="Analyze the flour supply chain",

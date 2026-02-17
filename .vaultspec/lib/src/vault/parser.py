@@ -43,7 +43,6 @@ try:
     _yaml_load = _yaml_load_impl
 
 except ImportError:
-    yaml = None  # type: ignore
     _yaml_load = _simple_yaml_load
 
 

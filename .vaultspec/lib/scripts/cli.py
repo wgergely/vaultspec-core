@@ -33,7 +33,6 @@ try:
         ).rstrip("\n")
 
 except ImportError:
-    yaml = None  # type: ignore
 
     def _yaml_load(text: str) -> dict[str, Any]:
         """Minimal 2-level YAML parser."""
@@ -90,7 +89,6 @@ from _paths import ROOT_DIR as _PATHS_ROOT_DIR  # shared path bootstrap
 from logging_config import configure_logging
 
 try:
-    from protocol.providers.base import CapabilityLevel
     from protocol.providers.claude import ClaudeProvider
     from protocol.providers.gemini import GeminiProvider
 
@@ -99,7 +97,6 @@ try:
         "gemini": GeminiProvider(),
     }
 except ImportError:
-    CapabilityLevel = None  # type: ignore
     PROVIDERS = {}
     print(
         "Warning: agent_providers not found. Tier resolution unavailable.",
@@ -241,11 +238,13 @@ def atomic_write(path: Path, content: str) -> None:
 
 def resolve_model(tool: str, tier: str) -> str | None:
     """Resolve a capability tier name to a model string."""
-    if CapabilityLevel is None or tool not in PROVIDERS:
+    if not PROVIDERS or tool not in PROVIDERS:
         return None
     try:
+        from protocol.providers.base import CapabilityLevel
+
         level = CapabilityLevel[tier.upper()]
-    except (KeyError, AttributeError):
+    except (ImportError, KeyError, AttributeError):
         return None
     return PROVIDERS[tool].get_best_model_for_capability(level)
 

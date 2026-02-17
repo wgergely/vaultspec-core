@@ -26,7 +26,11 @@ pytestmark = [pytest.mark.api]
 @pytest.fixture(autouse=True)
 def _init_server():
     """Initialize server with TEST_PROJECT before each test, reset after."""
-    initialize_server(root_dir=TEST_PROJECT, ttl_seconds=60.0)
+    initialize_server(
+        root_dir=TEST_PROJECT,
+        ttl_seconds=60.0,
+        refresh_callback=lambda: False,
+    )
     yield
     srv._agent_cache.clear()
     srv._background_tasks.clear()
@@ -96,9 +100,8 @@ class TestToolRegistration:
         tool_map = {t.name: t for t in tools}
         for name in ("list_agents", "get_task_status", "get_locks"):
             ann = tool_map[name].annotations
-            assert ann.readOnlyHint is True, (  # type: ignore[union-attr]
-                f"{name} should be readOnlyHint=True"
-            )
+            assert ann is not None, f"{name} missing annotations"
+            assert ann.readOnlyHint is True, f"{name} should be readOnlyHint=True"
 
     @pytest.mark.asyncio
     async def test_dispatch_not_readonly(self):
@@ -106,7 +109,8 @@ class TestToolRegistration:
         tools = await mcp.list_tools()
         tool_map = {t.name: t for t in tools}
         ann = tool_map["dispatch_agent"].annotations
-        assert ann.readOnlyHint is False  # type: ignore[union-attr]
+        assert ann is not None
+        assert ann.readOnlyHint is False
 
     @pytest.mark.asyncio
     async def test_cancel_is_destructive(self):
@@ -114,7 +118,8 @@ class TestToolRegistration:
         tools = await mcp.list_tools()
         tool_map = {t.name: t for t in tools}
         ann = tool_map["cancel_task"].annotations
-        assert ann.destructiveHint is True  # type: ignore[union-attr]
+        assert ann is not None
+        assert ann.destructiveHint is True
 
     @pytest.mark.asyncio
     async def test_dispatch_agent_input_schema(self):
@@ -136,7 +141,7 @@ class TestProtocolCallTool:
     async def test_list_agents_via_call_tool(self, baker_cache):
         """call_tool('list_agents') returns valid JSON with agents."""
         srv._agent_cache = baker_cache
-        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+
         _, result = await mcp.call_tool("list_agents", {})
         data = json.loads(result["result"])  # type: ignore[index]
         assert len(data["agents"]) == 1
@@ -146,11 +151,11 @@ class TestProtocolCallTool:
     async def test_dispatch_agent_via_call_tool(self, baker_cache, fresh_engine):
         """call_tool('dispatch_agent') creates a task and returns taskId."""
         srv._agent_cache = baker_cache
-        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+
         srv.task_engine = fresh_engine
         srv._background_tasks = {}
         srv._active_clients = {}
-        srv.run_subagent = _noop_run_subagent  # type: ignore[assignment]
+        srv._run_subagent_fn = _noop_run_subagent
         _, result = await mcp.call_tool(
             "dispatch_agent",
             {"agent": "vaultspec-simple-executor", "task": "Bake baguettes"},
@@ -164,7 +169,7 @@ class TestProtocolCallTool:
     async def test_dispatch_unknown_agent_raises_error(self, baker_cache):
         """call_tool('dispatch_agent') with unknown agent raises ToolError."""
         srv._agent_cache = baker_cache
-        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+
         with pytest.raises(ToolError, match="not found"):
             await mcp.call_tool(
                 "dispatch_agent",
@@ -243,11 +248,11 @@ class TestProtocolRoundTrip:
             return canned_result
 
         srv._agent_cache = baker_cache
-        srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
+
         srv.task_engine = fresh_engine
         srv._background_tasks = {}
         srv._active_clients = {}
-        srv.run_subagent = _test_run  # type: ignore[assignment]
+        srv._run_subagent_fn = _test_run
         srv.lock_manager = fresh_engine._lock_manager
 
         # Step 1: Dispatch

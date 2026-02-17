@@ -83,7 +83,11 @@ async def _mcp_dispatch_and_wait(
     from subagent_server.server import initialize_server
 
     # Initialize server with the test workspace
-    initialize_server(root_dir=root, ttl_seconds=300.0)
+    initialize_server(
+        root_dir=root,
+        ttl_seconds=300.0,
+        refresh_callback=lambda: False,
+    )
 
     # Build agent cache from disk
     agent_cache: dict = {}
@@ -99,13 +103,13 @@ async def _mcp_dispatch_and_wait(
                 "tools": [],
             }
 
-    # Override specific globals for the test
+    # Override per-test state
     _srv._agent_cache = agent_cache
-    _srv._refresh_if_changed = lambda: False  # type: ignore[assignment]
     _srv.task_engine = engine
     _srv._background_tasks = {}
     _srv._active_clients = {}
-    _srv.lock_manager = engine._lock_manager  # type: ignore[assignment]
+    assert engine._lock_manager is not None
+    _srv.lock_manager = engine._lock_manager
 
     # Dispatch
     _, dispatch_result = await mcp.call_tool(

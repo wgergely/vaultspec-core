@@ -6,15 +6,14 @@ Extracted from the original dispatch server tests.
 from __future__ import annotations
 
 import pytest
-
-pytestmark = [pytest.mark.unit]
-
-from subagent_server.server import (  # noqa: E402
+from subagent_server.server import (
     _extract_artifacts,
     _merge_artifacts,
     _resolve_effective_mode,
     _strip_quotes,
 )
+
+pytestmark = [pytest.mark.unit]
 
 
 class TestHelpers:
