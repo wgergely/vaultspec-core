@@ -27,9 +27,23 @@ try:
     def _yaml_load(text: str) -> dict[str, Any]:
         return yaml.safe_load(text) or {}
 
+    class _LiteralStr(str):
+        """Marker type for strings that should use YAML literal block scalar."""
+
+    def _literal_representer(dumper: yaml.Dumper, data: _LiteralStr) -> yaml.ScalarNode:
+        return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+
+    yaml.add_representer(_LiteralStr, _literal_representer)
+
     def _yaml_dump(data: dict[str, Any]) -> str:
+        prepared = {}
+        for k, v in data.items():
+            if isinstance(v, str) and "\n" in v:
+                prepared[k] = _LiteralStr(v)
+            else:
+                prepared[k] = v
         return yaml.dump(
-            data, default_flow_style=False, allow_unicode=True, sort_keys=False
+            prepared, default_flow_style=False, allow_unicode=True, sort_keys=False
         ).rstrip("\n")
 
 except ImportError:
@@ -1108,7 +1122,7 @@ def test_run(args: argparse.Namespace) -> None:
         for p in MODULE_PATHS[module]:
             cmd.append(str(ROOT_DIR / p))
     else:
-        cmd.append(str(ROOT_DIR / ".vaultspec" / "tests"))
+        cmd.append(str(ROOT_DIR / ".vaultspec" / "lib" / "tests"))
         cmd.append(str(ROOT_DIR / ".vaultspec" / "lib" / "src"))
 
     cmd.extend(extra)
