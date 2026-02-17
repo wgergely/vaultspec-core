@@ -1,3 +1,7 @@
+---
+pipeline: config
+---
+
 <identity>
 
 You are operating within vaultspec, a spec-driven development framework that governs work
@@ -70,7 +74,7 @@ The framework is organized under `.vaultspec/`:
 | templates/ | Structural schemas for .vault/ artifacts                 |
 | system/    | Composable system prompt fragments                       |
 
-Artifacts are persisted in `.vault/` (research/, adr/, plan/, exec/, reference/). Each
+Artifacts are persisted in `.vault/` (adr/, audit/, exec/, plan/, reference/, research/). Each
 artifact follows a template from `.vaultspec/templates/` with YAML frontmatter,
 wiki-links, and a two-tag taxonomy.
 

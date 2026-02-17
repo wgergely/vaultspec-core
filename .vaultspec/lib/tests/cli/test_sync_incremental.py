@@ -307,19 +307,19 @@ class TestIncrementalSystem:
 
 
 class TestIncrementalConfig:
-    """Config sync responds to FRAMEWORK.md / PROJECT.md changes."""
+    """Config sync responds to system/framework.md / system/project.md changes."""
 
     def test_framework_content_change_propagates(self):
         args = make_ns(force=True)
 
-        (TEST_PROJECT / ".vaultspec" / "FRAMEWORK.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
             "v1 framework", encoding="utf-8"
         )
         cli.config_sync(args)
         c1 = (TEST_PROJECT / ".claude" / "CLAUDE.md").read_text(encoding="utf-8")
         assert "v1 framework" in c1
 
-        (TEST_PROJECT / ".vaultspec" / "FRAMEWORK.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
             "v2 framework", encoding="utf-8"
         )
         cli.config_sync(args)
@@ -330,17 +330,17 @@ class TestIncrementalConfig:
     def test_project_content_change_propagates(self):
         args = make_ns(force=True)
 
-        (TEST_PROJECT / ".vaultspec" / "FRAMEWORK.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
             "framework", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "PROJECT.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "project.md").write_text(
             "project v1", encoding="utf-8"
         )
         cli.config_sync(args)
         c1 = (TEST_PROJECT / ".claude" / "CLAUDE.md").read_text(encoding="utf-8")
         assert "project v1" in c1
 
-        (TEST_PROJECT / ".vaultspec" / "PROJECT.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "project.md").write_text(
             "project v2", encoding="utf-8"
         )
         cli.config_sync(args)
@@ -378,7 +378,7 @@ class TestMixedOperations:
         (system_dir / "base.md").write_text(
             "---\n---\n\n# System base", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "FRAMEWORK.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
             "Framework content", encoding="utf-8"
         )
 

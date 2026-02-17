@@ -123,8 +123,14 @@ class TestInitPaths:
         assert TEST_PROJECT / ".vaultspec" / "agents" == cli.AGENTS_SRC_DIR
         assert TEST_PROJECT / ".vaultspec" / "skills" == cli.SKILLS_SRC_DIR
         assert TEST_PROJECT / ".vaultspec" / "system" == cli.SYSTEM_SRC_DIR
-        assert TEST_PROJECT / ".vaultspec" / "FRAMEWORK.md" == cli.FRAMEWORK_CONFIG_SRC
-        assert TEST_PROJECT / ".vaultspec" / "PROJECT.md" == cli.PROJECT_CONFIG_SRC
+        assert (
+            TEST_PROJECT / ".vaultspec" / "system" / "framework.md"
+            == cli.FRAMEWORK_CONFIG_SRC
+        )
+        assert (
+            TEST_PROJECT / ".vaultspec" / "system" / "project.md"
+            == cli.PROJECT_CONFIG_SRC
+        )
 
     def test_tool_configs_populated(self):
         cli.init_paths(TEST_PROJECT)

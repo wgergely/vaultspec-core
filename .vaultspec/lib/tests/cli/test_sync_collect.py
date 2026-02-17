@@ -200,10 +200,10 @@ class TestListings:
 
 class TestGenerateConfig:
     def test_internal_and_custom(self):
-        (TEST_PROJECT / ".vaultspec" / "FRAMEWORK.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
             "Internal body", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "PROJECT.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "project.md").write_text(
             "Custom body", encoding="utf-8"
         )
         cfg = cli.TOOL_CONFIGS["claude"]
@@ -213,7 +213,7 @@ class TestGenerateConfig:
         assert "Custom body" in content
 
     def test_internal_only(self):
-        (TEST_PROJECT / ".vaultspec" / "FRAMEWORK.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
             "Internal body", encoding="utf-8"
         )
         cfg = cli.TOOL_CONFIGS["claude"]
@@ -227,7 +227,7 @@ class TestGenerateConfig:
         assert content is None
 
     def test_includes_rule_references(self):
-        (TEST_PROJECT / ".vaultspec" / "FRAMEWORK.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
             "Internal", encoding="utf-8"
         )
         # Create a synced rule in the destination
