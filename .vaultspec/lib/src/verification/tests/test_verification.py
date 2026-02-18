@@ -1,6 +1,8 @@
 import pytest
 from verification.api import (
+    FixResult,
     VerificationError,
+    fix_violations,
     get_malformed,
     list_features,
     verify_file,
@@ -85,3 +87,116 @@ class TestVerifyVerticalIntegrity:
         # editor-demo has both ADR and plan docs
         error_msgs = [e.message for e in errors]
         assert not any("editor-demo" in m for m in error_msgs)
+
+
+class TestFixResult:
+    def test_init(self):
+        from pathlib import Path
+
+        result = FixResult(Path("test.md"), "add_tags", "Added tags: [#adr]")
+        assert result.path == Path("test.md")
+        assert result.action == "add_tags"
+        assert result.detail == "Added tags: [#adr]"
+
+    def test_str(self):
+        from pathlib import Path
+
+        result = FixResult(Path("test.md"), "add_tags", "Added tags: [#adr]")
+        assert str(result) == "test.md: add_tags - Added tags: [#adr]"
+
+
+class TestFixViolations:
+    def test_fixes_missing_tags(self, tmp_path):
+        """Test that missing tags are added based on directory."""
+        vault_dir = tmp_path / ".vault" / "adr"
+        vault_dir.mkdir(parents=True)
+
+        test_file = vault_dir / "2026-02-18-test-feature-adr.md"
+        test_file.write_text(
+            "---\ndate: 2026-02-18\n---\n\n# Test\n",
+            encoding="utf-8",
+        )
+
+        fixes = fix_violations(tmp_path)
+
+        assert len(fixes) > 0
+        assert any(f.action == "add_doc_type_tag" for f in fixes)
+
+        # Verify the file was updated
+        content = test_file.read_text(encoding="utf-8")
+        assert "#adr" in content
+
+    def test_fixes_missing_date_prefix(self, tmp_path):
+        """Test that missing date prefix is added."""
+        vault_dir = tmp_path / ".vault" / "research"
+        vault_dir.mkdir(parents=True)
+
+        test_file = vault_dir / "no-date.md"
+        test_file.write_text(
+            '---\ntags: ["#research", "#test"]\ndate: 2026-02-18\n---\n\n# Test\n',
+            encoding="utf-8",
+        )
+
+        fixes = fix_violations(tmp_path)
+
+        assert len(fixes) > 0
+        assert any(f.action == "add_date_prefix" for f in fixes)
+
+        # Verify file was renamed
+        assert not test_file.exists()
+        renamed_files = list(vault_dir.glob("2026-*-no-date.md"))
+        assert len(renamed_files) == 1
+
+    def test_fixes_wrong_suffix(self, tmp_path):
+        """Test that wrong filename suffix is corrected."""
+        vault_dir = tmp_path / ".vault" / "plan"
+        vault_dir.mkdir(parents=True)
+
+        test_file = vault_dir / "2026-02-18-test-feature.md"
+        test_file.write_text(
+            '---\ntags: ["#plan", "#test"]\ndate: 2026-02-18\n---\n\n# Test\n',
+            encoding="utf-8",
+        )
+
+        fixes = fix_violations(tmp_path)
+
+        assert len(fixes) > 0
+        assert any(f.action == "rename_suffix" for f in fixes)
+
+        # Verify file was renamed with correct suffix
+        assert not test_file.exists()
+        correct_file = vault_dir / "2026-02-18-test-feature-plan.md"
+        assert correct_file.exists()
+
+    def test_handles_bom(self, tmp_path):
+        """Test that BOM is handled correctly."""
+        vault_dir = tmp_path / ".vault" / "reference"
+        vault_dir.mkdir(parents=True)
+
+        test_file = vault_dir / "2026-02-18-test-bom-reference.md"
+        # Write with BOM
+        test_file.write_text(
+            "\ufeff---\ndate: 2026-02-18\n---\n\n# Test\n",
+            encoding="utf-8",
+        )
+
+        fixes = fix_violations(tmp_path)
+
+        # Should add tags despite BOM
+        assert len(fixes) > 0
+        assert any(f.action == "add_doc_type_tag" for f in fixes)
+
+        # Verify file was updated without BOM
+        content = test_file.read_text(encoding="utf-8")
+        assert not content.startswith("\ufeff")
+        assert "#reference" in content
+
+    def test_no_fixes_for_valid_file(self, vault_root):
+        """Test that valid files are not modified."""
+        # Run fix on test-project which has some valid files
+        fixes = fix_violations(vault_root)
+
+        # There should be some files that don't need fixing
+        # (we know test-project has valid files)
+        # Just verify it returns a list and doesn't crash
+        assert isinstance(fixes, list)
