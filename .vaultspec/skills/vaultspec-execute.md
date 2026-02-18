@@ -6,6 +6,10 @@ description: "Skill to execute implementation plans. Delegates to specialized su
 
 This skill governs the autonomous execution of `<Plan>`s. It ensures that code is written by the appropriate tiered executor, audited for safety, and documented correctly.
 
+---
+<!-- Human-readable documentation above | Agent instructions below -->
+---
+
 ## Instructions
 
 ### Plan Initiation

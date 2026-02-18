@@ -6,6 +6,10 @@ description: "Simple, fast and user-friendly alternative to `find`. Use for disc
 
 **Announce at start:** "I'm using `fd` to find files matching <pattern>."
 
+---
+<!-- Human-readable documentation above | Agent instructions below -->
+---
+
 ## Best Practices
 
 - **Smart Defaults**: `fd` ignores hidden files and directories, and respects `.gitignore` by default.

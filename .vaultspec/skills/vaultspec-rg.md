@@ -6,6 +6,10 @@ description: "High-performance search tool (ripgrep). Use for finding patterns a
 
 **Announce at start:** "I'm using `rg` to search for <pattern>."
 
+---
+<!-- Human-readable documentation above | Agent instructions below -->
+---
+
 ## Best Practices
 
 - **Pre-flight Check**: Always run `rg --files` first to verify which files your script will target.

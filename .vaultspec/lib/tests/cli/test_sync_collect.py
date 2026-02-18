@@ -302,6 +302,40 @@ class TestGenerateSystemPrompt:
         content = cli._generate_system_prompt(cfg)
         assert content is None
 
+    def test_order_frontmatter_respected(self):
+        """Files with lower order appear before files with higher/default order."""
+        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+            "---\n---\n\n# BASE", encoding="utf-8"
+        )
+        # workflow has order: 20 (should appear first among shared)
+        (TEST_PROJECT / ".vaultspec" / "system" / "workflow.md").write_text(
+            "---\norder: 20\n---\n\n# WORKFLOW", encoding="utf-8"
+        )
+        # operations has no order (defaults to 50, should appear after workflow)
+        (TEST_PROJECT / ".vaultspec" / "system" / "operations.md").write_text(
+            "---\n---\n\n# OPERATIONS", encoding="utf-8"
+        )
+        cfg = cli.TOOL_CONFIGS["gemini"]
+        content = cli._generate_system_prompt(cfg)
+        assert content is not None
+        workflow_pos = content.index("# WORKFLOW")
+        operations_pos = content.index("# OPERATIONS")
+        assert workflow_pos < operations_pos
+
+    def test_pipeline_config_excluded(self):
+        """Parts with pipeline: config are excluded from system prompt."""
+        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+            "---\n---\n\n# BASE", encoding="utf-8"
+        )
+        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+            "---\npipeline: config\n---\n\n# FRAMEWORK CONFIG", encoding="utf-8"
+        )
+        cfg = cli.TOOL_CONFIGS["gemini"]
+        content = cli._generate_system_prompt(cfg)
+        assert content is not None
+        assert "# BASE" in content
+        assert "# FRAMEWORK CONFIG" not in content
+
     def test_includes_agent_listing(self):
         (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
             "---\n---\n\n# Base", encoding="utf-8"
@@ -329,3 +363,88 @@ class TestGenerateSystemPrompt:
         assert content is not None
         assert "## Available Skills" in content
         assert "**vaultspec-deploy**" in content
+
+
+class TestGenerateSystemRules:
+    def test_generates_for_tool_without_system_file(self):
+        """Claude (rules_dir but no system_file) gets behavioral rules."""
+        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+            "---\n---\n\n# BASE MANDATES", encoding="utf-8"
+        )
+        (TEST_PROJECT / ".vaultspec" / "system" / "operations.md").write_text(
+            "---\n---\n\n# OPERATIONS", encoding="utf-8"
+        )
+        cfg = cli.TOOL_CONFIGS["claude"]
+        content = cli._generate_system_rules(cfg)
+        assert content is not None
+        assert "# BASE MANDATES" in content
+        assert "# OPERATIONS" in content
+        meta, _body = cli.parse_frontmatter(
+            content.replace(cli.CONFIG_HEADER + "\n", "")
+        )
+        assert meta["name"] == "vaultspec-system"
+        assert meta["trigger"] == "always_on"
+
+    def test_excludes_tool_specific_parts(self):
+        """Behavioral rules exclude tool-specific parts."""
+        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+            "---\n---\n\n# BASE", encoding="utf-8"
+        )
+        (TEST_PROJECT / ".vaultspec" / "system" / "gemini-tools.md").write_text(
+            "---\ntool: gemini\n---\n\n# GEMINI ONLY", encoding="utf-8"
+        )
+        (TEST_PROJECT / ".vaultspec" / "system" / "shared.md").write_text(
+            "---\n---\n\n# SHARED", encoding="utf-8"
+        )
+        cfg = cli.TOOL_CONFIGS["claude"]
+        content = cli._generate_system_rules(cfg)
+        assert content is not None
+        assert "# BASE" in content
+        assert "# SHARED" in content
+        assert "# GEMINI ONLY" not in content
+
+    def test_excludes_pipeline_config(self):
+        """Behavioral rules exclude pipeline: config parts."""
+        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+            "---\n---\n\n# BASE", encoding="utf-8"
+        )
+        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+            "---\npipeline: config\n---\n\n# CONFIG ONLY", encoding="utf-8"
+        )
+        cfg = cli.TOOL_CONFIGS["claude"]
+        content = cli._generate_system_rules(cfg)
+        assert content is not None
+        assert "# BASE" in content
+        assert "# CONFIG ONLY" not in content
+
+    def test_returns_none_without_rules_dir(self):
+        """ToolConfig with no rules_dir returns None."""
+        cfg = cli.ToolConfig(
+            name="test", rules_dir=None, agents_dir=None, skills_dir=None
+        )
+        content = cli._generate_system_rules(cfg)
+        assert content is None
+
+    def test_returns_none_for_empty_parts(self):
+        shutil.rmtree(TEST_PROJECT / ".vaultspec" / "system")
+        cfg = cli.TOOL_CONFIGS["claude"]
+        content = cli._generate_system_rules(cfg)
+        assert content is None
+
+    def test_order_frontmatter_respected(self):
+        """Order frontmatter controls assembly order in rules too."""
+        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+            "---\n---\n\n# BASE", encoding="utf-8"
+        )
+        (TEST_PROJECT / ".vaultspec" / "system" / "workflow.md").write_text(
+            "---\norder: 20\n---\n\n# WORKFLOW", encoding="utf-8"
+        )
+        (TEST_PROJECT / ".vaultspec" / "system" / "operations.md").write_text(
+            "---\n---\n\n# OPERATIONS", encoding="utf-8"
+        )
+        cfg = cli.TOOL_CONFIGS["claude"]
+        content = cli._generate_system_rules(cfg)
+        assert content is not None
+        workflow_pos = content.index("# WORKFLOW")
+        operations_pos = content.index("# OPERATIONS")
+        assert workflow_pos < operations_pos

@@ -1,7 +1,7 @@
 ---
 tags:
   - "#adr"
-  - "#provider-parity"
+  - "#protocol"
 date: 2026-02-15
 related:
   - "[[2026-02-08-vault-api-adr]]"

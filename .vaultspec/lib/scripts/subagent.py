@@ -13,7 +13,20 @@ import sys
 import warnings
 from pathlib import Path
 
-from logging_config import configure_logging
+from _paths import ROOT_DIR  # shared path bootstrap
+
+
+def _get_version() -> str:
+    """Read version from pyproject.toml."""
+    toml_path = ROOT_DIR / "pyproject.toml"
+    if toml_path.exists():
+        for line in toml_path.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("version"):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return "unknown"
+
+
+from logging_config import configure_logging  # noqa: E402
 
 try:
     from subagent_server.server import main as server_main
@@ -199,7 +212,10 @@ def command_list(args):
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sub-agent CLI")
     parser.add_argument(
-        "--root", type=Path, required=True, help="Workspace root directory"
+        "--root", type=Path, default=ROOT_DIR, help="Workspace root directory"
+    )
+    parser.add_argument(
+        "--version", "-V", action="version", version=f"%(prog)s {_get_version()}"
     )
     subparsers = parser.add_subparsers(
         dest="command", required=True, help="Command to execute"
@@ -301,7 +317,10 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    if args.debug:
+    if args.root is not None:
+        args.root = args.root.resolve()
+
+    if getattr(args, "debug", False):
         configure_logging(level="DEBUG")
     elif getattr(args, "verbose", False):
         configure_logging(level="INFO")

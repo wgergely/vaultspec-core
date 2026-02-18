@@ -89,7 +89,7 @@ class EmbeddingModel:
     """
 
     MODEL_NAME = "nomic-ai/nomic-embed-text-v1.5"
-    DIMENSION = 768
+    DEFAULT_DIMENSION = 768  # Fallback for schema creation before model loads
     DOCUMENT_PREFIX = "search_document: "
     QUERY_PREFIX = "search_query: "
 
@@ -120,7 +120,9 @@ class EmbeddingModel:
         self.model = SentenceTransformer(
             model_name, device="cuda", trust_remote_code=True
         )
-        logger.info("Embedding model loaded on cuda")
+        # Query actual dimension from the loaded model
+        self.dimension: int = self.model.get_sentence_embedding_dimension()
+        logger.info("Embedding model loaded on cuda (dimension=%d)", self.dimension)
 
     @property
     def device(self) -> str:
@@ -141,7 +143,7 @@ class EmbeddingModel:
                 ``DEFAULT_BATCH_SIZE``.
 
         Returns:
-            numpy array of shape (n, 768) with normalized embeddings,
+            numpy array of shape ``(n, dimension)`` with normalized embeddings,
             in the same order as the input texts.
         """
         import numpy as np
@@ -189,7 +191,7 @@ class EmbeddingModel:
             query: Natural language query string.
 
         Returns:
-            numpy array of shape (768,) with normalized embedding.
+            numpy array of shape ``(dimension,)`` with normalized embedding.
         """
         import numpy as np
 

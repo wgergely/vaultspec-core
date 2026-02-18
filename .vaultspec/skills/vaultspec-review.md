@@ -12,6 +12,10 @@ When to use this skill:
 
 **Announce at start:** "I'm using the `vaultspec-review` skill to audit the implementation."
 
+---
+<!-- Human-readable documentation above | Agent instructions below -->
+---
+
 ## Workflow
 
 ### Context Gathering

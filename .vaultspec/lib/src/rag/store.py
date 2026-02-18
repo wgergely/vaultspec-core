@@ -20,7 +20,7 @@ from rag.embeddings import EmbeddingModel
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_DIM = EmbeddingModel.DIMENSION
+EMBEDDING_DIM = EmbeddingModel.DEFAULT_DIMENSION  # Default for schema creation
 
 
 def _check_rag_deps() -> None:
@@ -69,14 +69,14 @@ class VaultDocument:
 
     id: str  # document stem (e.g., "2026-02-12-rag-plan")
     path: str  # relative path (e.g., "plan/2026-02-12-rag-plan.md")
-    doc_type: str  # "adr", "plan", "exec", "research", "reference"
+    doc_type: str  # "adr", "audit", "exec", "plan", "research", "reference"
     feature: str  # feature tag without # (e.g., "rag")
     date: str  # ISO date from frontmatter
     tags: str  # JSON-serialized list of tags
     related: str  # JSON-serialized list of related wiki-links
     title: str  # H1 heading extracted from body
     content: str  # full markdown body (for BM25 full-text search)
-    vector: list[float] = field(default_factory=list)  # embedding vector[768]
+    vector: list[float] = field(default_factory=list)  # embedding vector
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dict for LanceDB insertion."""
@@ -106,13 +106,15 @@ class VaultStore:
     """LanceDB-backed vector store for vault documents.
 
     Storage lives at ``{root_dir}/.lance/``.  The table ``vault_docs``
-    holds one row per indexed document with a 768-dim embedding vector
+    holds one row per indexed document with an embedding vector
     and full markdown content for Tantivy BM25 search.
     """
 
     TABLE_NAME = "vault_docs"
 
-    def __init__(self, root_dir: pathlib.Path | str) -> None:
+    def __init__(
+        self, root_dir: pathlib.Path | str, embedding_dim: int | None = None
+    ) -> None:
         _check_rag_deps()
         import pathlib as _pathlib
 
@@ -124,6 +126,7 @@ class VaultStore:
         self.root_dir = _pathlib.Path(root_dir)
         self.db_path = self.root_dir / cfg.lance_dir
         self.db = lancedb.connect(str(self.db_path))
+        self._embedding_dim = embedding_dim or EMBEDDING_DIM
         self._table = None
         self._fts_dirty = True  # track whether FTS index needs rebuild
 
@@ -170,7 +173,7 @@ class VaultStore:
                     pa.field("related", pa.string()),
                     pa.field("title", pa.string()),
                     pa.field("content", pa.string()),
-                    pa.field("vector", pa.list_(pa.float32(), EMBEDDING_DIM)),
+                    pa.field("vector", pa.list_(pa.float32(), self._embedding_dim)),
                 ]
             )
             empty = pa.table(
@@ -263,7 +266,7 @@ class VaultStore:
         """Execute hybrid BM25 + ANN search with RRF reranking.
 
         Args:
-            query_vector: Query embedding, shape ``(768,)``.
+            query_vector: Query embedding, shape ``(embedding_dim,)``.
             query_text: Raw text for BM25 full-text matching.
             filters: Optional metadata filters (``doc_type``, ``feature``,
                 ``date`` as prefix match).

@@ -1,5 +1,5 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE - REFERENCE: #adr #exec #plan #reference #research #<feature>
+# ALLOWED TAGS - DO NOT REMOVE - REFERENCE: #adr #audit #exec #plan #reference #research #<feature>
 # Directory tag (hardcoded - DO NOT CHANGE - based on .vault/adr/ location)
 # Feature tag (replace <feature> with your feature name, e.g., #editor-demo)
 tags:

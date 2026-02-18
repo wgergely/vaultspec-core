@@ -357,6 +357,7 @@ async def _poll_agent_files() -> None:
 )
 async def list_agents() -> str:
     """Return a list of all available sub-agents and their tiers."""
+    logger.info("MCP: list_agents called")
     _refresh_fn()
     agents = []
     for name, metadata in _agent_cache.items():
@@ -414,10 +415,33 @@ async def dispatch_agent(
         raise ToolError(f"budget must be non-negative, got {budget}")
 
     effective_mode = _resolve_effective_mode(agent, mode)
+    logger.info(
+        "MCP: dispatch_agent agent=%s mode=%s model=%s", agent, effective_mode, model
+    )
+
     if effective_mode not in ("read-write", "read-only"):
         raise ToolError(
             f"Invalid mode '{effective_mode}'. Use 'read-write' or 'read-only'."
         )
+
+    # Validate effort
+    if effort is not None and effort not in {"low", "medium", "high"}:
+        raise ToolError(f"Invalid effort '{effort}'. Use 'low', 'medium', or 'high'.")
+
+    # Validate output_format
+    if output_format is not None and output_format not in {
+        "text",
+        "json",
+        "stream-json",
+    }:
+        raise ToolError(
+            f"Invalid output_format '{output_format}'."
+            " Use 'text', 'json', or 'stream-json'."
+        )
+
+    max_task_len = 100_000  # 100KB
+    if len(task) > max_task_len:
+        raise ToolError(f"Task too large ({len(task)} chars). Max is {max_task_len}.")
 
     # Pre-acquire advisory lock for .vault/ if read-only
     try:
@@ -521,6 +545,7 @@ async def dispatch_agent(
 )
 async def get_task_status(task_id: str) -> str:
     """Check the status and result of a previously dispatched task."""
+    logger.info("MCP: get_task_status task_id=%s", task_id)
     task = task_engine.get_task(task_id)
     if not task:
         raise ToolError(f"Task '{task_id}' not found or expired.")
@@ -536,7 +561,9 @@ async def get_task_status(task_id: str) -> str:
     if task.result:
         res["result"] = task.result
     if task.error:
-        res["error"] = task.error
+        # Truncate error to avoid leaking sensitive paths
+        error_msg = task.error[:500] if len(task.error) > 500 else task.error
+        res["error"] = error_msg
 
     # Add active lock info if working
     lock = lock_manager.get_lock(task_id)
@@ -561,6 +588,7 @@ async def get_task_status(task_id: str) -> str:
 )
 async def cancel_task(task_id: str) -> str:
     """Cancel a running task and its agent session."""
+    logger.info("MCP: cancel_task task_id=%s", task_id)
     task = task_engine.get_task(task_id)
     if not task:
         raise ToolError(f"Task '{task_id}' not found.")
@@ -595,6 +623,7 @@ async def cancel_task(task_id: str) -> str:
 )
 async def get_locks() -> str:
     """List all active advisory file locks across the workspace."""
+    logger.info("MCP: get_locks called")
     locks = lock_manager.get_locks()
     res = []
     for lock in locks:

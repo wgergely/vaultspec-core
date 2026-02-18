@@ -31,6 +31,7 @@ def get_template_path(root_dir: pathlib.Path, doc_type: DocType) -> pathlib.Path
 
     mapping = {
         DocType.ADR: "adr.md",
+        DocType.AUDIT: "audit.md",
         DocType.PLAN: "plan.md",
         DocType.RESEARCH: "research.md",
         DocType.REFERENCE: "ref-audit.md",

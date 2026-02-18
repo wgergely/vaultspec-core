@@ -14,6 +14,8 @@ import statistics
 import sys
 import time
 
+import pytest
+
 # Standalone bootstrap (only needed when running outside pytest)
 if __name__ == "__main__":
     from pathlib import Path as _Path
@@ -30,7 +32,9 @@ def _hr(char: str = "-", width: int = 72) -> str:
     return char * width
 
 
-def bench_embedding_throughput(model, n_docs: int = 50) -> dict:
+@pytest.mark.benchmark
+@pytest.mark.quality
+def test_bench_embedding_throughput(model, n_docs: int = 50) -> dict:
     """Time embedding N synthetic documents."""
     texts = [
         f"Document {i}: Architecture decision about component {i} "
@@ -49,7 +53,9 @@ def bench_embedding_throughput(model, n_docs: int = 50) -> dict:
     }
 
 
-def bench_full_index(root, model, store_class, indexer_class) -> dict:
+@pytest.mark.benchmark
+@pytest.mark.quality
+def test_bench_full_index(root, model, store_class, indexer_class) -> dict:
     """Time full_index() on the entire vault corpus."""
     lance_dir = root / ".lance"
     if lance_dir.exists():
@@ -70,7 +76,9 @@ def bench_full_index(root, model, store_class, indexer_class) -> dict:
     }
 
 
-def bench_incremental_noop(indexer) -> dict:
+@pytest.mark.benchmark
+@pytest.mark.quality
+def test_bench_incremental_noop(indexer) -> dict:
     """Time incremental_index() when nothing has changed."""
     start = time.perf_counter()
     result = indexer.incremental_index()
@@ -83,7 +91,9 @@ def bench_incremental_noop(indexer) -> dict:
     }
 
 
-def bench_search_latency(searcher, n_queries: int = 20) -> dict:
+@pytest.mark.benchmark
+@pytest.mark.quality
+def test_bench_search_latency(searcher, n_queries: int = 20) -> dict:
     """Measure search latency distribution over N queries."""
     queries = [
         "architecture decision",
@@ -130,7 +140,9 @@ def bench_search_latency(searcher, n_queries: int = 20) -> dict:
     }
 
 
-def bench_memory(root) -> dict:
+@pytest.mark.benchmark
+@pytest.mark.quality
+def test_bench_memory(root) -> dict:
     """Measure GPU VRAM and LanceDB disk size. Requires CUDA GPU."""
     import torch
 
@@ -174,7 +186,7 @@ def main():
     print("1. Embedding Throughput")
     print(_hr())
     for n in [10, 50, 100]:
-        result = bench_embedding_throughput(model, n)
+        result = test_bench_embedding_throughput(model, n)
         print(
             f"  {result['n_docs']:>4d} docs: {result['elapsed_s']:.2f}s "
             f"({result['docs_per_sec']:.1f} docs/sec)"
@@ -185,7 +197,7 @@ def main():
     print(_hr())
     print("2. Full Index Throughput (all vault docs)")
     print(_hr())
-    idx_result = bench_full_index(TEST_PROJECT, model, VaultStore, VaultIndexer)
+    idx_result = test_bench_full_index(TEST_PROJECT, model, VaultStore, VaultIndexer)
     print(
         f"  {idx_result['total_docs']} docs indexed in {idx_result['elapsed_s']:.2f}s "
         f"({idx_result['docs_per_sec']:.1f} docs/sec, device={idx_result['device']})"
@@ -201,7 +213,7 @@ def main():
     print(_hr())
     print("3. Incremental Index (no-op, nothing changed)")
     print(_hr())
-    inc_result = bench_incremental_noop(indexer)
+    inc_result = test_bench_incremental_noop(indexer)
     print(
         f"  Elapsed: {inc_result['elapsed_s'] * 1000:.0f}ms "
         f"(added={inc_result['added']}, removed={inc_result['removed']})"
@@ -212,7 +224,7 @@ def main():
     print(_hr())
     print("4. Search Latency (20 queries)")
     print(_hr())
-    search_result = bench_search_latency(searcher, 20)
+    search_result = test_bench_search_latency(searcher, 20)
     print(f"  p50:  {search_result['p50_ms']:.1f}ms")
     print(f"  p95:  {search_result['p95_ms']:.1f}ms")
     print(f"  p99:  {search_result['p99_ms']:.1f}ms")
@@ -225,7 +237,7 @@ def main():
     print(_hr())
     print("5. Resource Usage")
     print(_hr())
-    mem = bench_memory(TEST_PROJECT)
+    mem = test_bench_memory(TEST_PROJECT)
     print(f"  GPU: {mem['gpu_name']}")
     print(f"  VRAM allocated: {mem['vram_allocated_mb']:.1f}MB")
     print(f"  VRAM reserved:  {mem['vram_reserved_mb']:.1f}MB")

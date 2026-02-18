@@ -27,6 +27,7 @@ class TestVaultIndexer:
     """Tests for the indexing pipeline with real vault data."""
 
     @pytest.mark.index
+    @pytest.mark.timeout(60)
     def test_full_index_counts(self, rag_components):
         result = rag_components["index_result"]
         assert result.total > 0
@@ -35,12 +36,14 @@ class TestVaultIndexer:
         assert result.device == "cuda"
 
     @pytest.mark.index
+    @pytest.mark.timeout(60)
     def test_index_matches_store_count(self, rag_components):
         result = rag_components["index_result"]
         store = rag_components["store"]
         assert result.total == store.count()
 
     @pytest.mark.quality
+    @pytest.mark.timeout(300)
     def test_incremental_index_no_changes(self, rag_components_full):
         """Incremental index with no changes should report zero additions.
 
@@ -63,6 +66,7 @@ class TestDocumentPreparation:
     """Tests for individual document preparation."""
 
     @pytest.mark.index
+    @pytest.mark.timeout(60)
     def test_prepare_real_document(self):
         from rag.indexer import prepare_document
 
@@ -76,10 +80,11 @@ class TestDocumentPreparation:
         assert doc is not None
         assert doc.id
         assert doc.path
-        assert doc.doc_type in ("adr", "exec", "plan", "reference", "research")
+        assert doc.doc_type in ("adr", "audit", "exec", "plan", "reference", "research")
         assert doc.content
 
     @pytest.mark.quality
+    @pytest.mark.timeout(300)
     def test_prepare_all_documents(self):
         from rag.indexer import prepare_document
         from vault.scanner import scan_vault
@@ -104,6 +109,7 @@ class TestIndexEdgeCases:
     """Edge cases for indexing operations."""
 
     @pytest.mark.quality
+    @pytest.mark.timeout(300)
     def test_double_full_index_idempotent(self, rag_components_full):
         """Two full_index() calls should yield the same document count."""
         indexer = rag_components_full["indexer"]
@@ -121,6 +127,7 @@ class TestIndexEdgeCases:
         assert result.total == second_count
 
     @pytest.mark.quality
+    @pytest.mark.timeout(300)
     def test_incremental_after_full_stable(self, rag_components_full):
         """Incremental index after full should report zero changes."""
         indexer = rag_components_full["indexer"]
@@ -131,6 +138,7 @@ class TestIndexEdgeCases:
         assert result.total == rag_components_full["index_result"].total
 
     @pytest.mark.quality
+    @pytest.mark.timeout(300)
     def test_docs_without_frontmatter_counted(self):
         """Verify how many docs in the vault lack frontmatter entirely.
         These should all be in unsupported directories (stories) or have

@@ -15,6 +15,10 @@ Utilize:
 - Code and web discovery capabilities.
 - Relevant tools (domain knowledge tools, language tools, search tools, etc.).
 
+---
+<!-- Human-readable documentation above | Agent instructions below -->
+---
+
 ## Research Domains
 
 Conduct broad and deep research to help make informed technical decisions in these key areas:
@@ -29,11 +33,11 @@ Conduct broad and deep research to help make informed technical decisions in the
 - For solved problems, what are the frontier practices and patterns? Gather links and references.
 - For unsolved problems, what are the leading theories and approaches? Prefer academic papers, RFCs, and deep-dive articles.
 
-### Crate & Library Analysis
+### Package & Library Analysis
 
-- **Crate Evaluation**: Use available search tools to identify potential dependencies. Evaluate them for maintenance status, license compatibility, and features.
-- **Deep Documentation**: Extract precise API usage, code examples, and trait implementation requirements from official sources.
-- **Dependency Graphs**: Analyze how potential crates fit into our existing tree.
+- **Package Evaluation**: Use available search tools to identify potential dependencies. Evaluate them for maintenance status, license compatibility, and features.
+- **Deep Documentation**: Extract precise API usage, code examples, and integration requirements from official sources.
+- **Dependency Analysis**: Analyze how potential packages fit into our existing dependency tree.
 
 ### Community & GitHub Intelligence
 
@@ -42,7 +46,7 @@ Conduct broad and deep research to help make informed technical decisions in the
 
 ## Research Methodology (Autonomous)
 
-- **Identity Phase**: Resolve exact library IDs and repository links using web and crate metadata tools.
+- **Identity Phase**: Resolve exact library IDs and repository links using web and package metadata tools.
 - **Exploration Phase**: Conduct parallel searches across official documentation, technical blogs, and GitHub code.
 - **Synthesis Phase**: Compare findings. Look for consensus in "frontier" practices. Identify tradeoffs between different approaches.
 - **Integration Pass**: Verify how researched information maps to our specific codebase architecture and Design System.

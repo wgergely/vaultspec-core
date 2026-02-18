@@ -18,6 +18,10 @@ When to use this skill:
 
 **Dispatch sub-agent:** Invoke the `vaultspec-subagent` skill with `vaultspec-adr-researcher`. Instruct it to "Conduct research on [topic]. Persist findings to .vault/research/..."
 
+---
+<!-- Human-readable documentation above | Agent instructions below -->
+---
+
 ## Template
 
 - You MUST read and use the template at `.vaultspec/templates/research.md`.

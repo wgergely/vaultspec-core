@@ -12,6 +12,7 @@ The workflow persists the following documents:
 - `.vault/research/yyyy-mm-dd-<feature>-<phase>-research.md`: The `<Research>` findings.
 - `.vault/adr/yyyy-mm-dd-<feature>-<phase>-adr.md`: Research-derived `<ADR>`.
 - `.vault/reference/yyyy-mm-dd-<feature>-reference.md`: The implementation `<Reference>`.
+- `.vault/audit/yyyy-mm-dd-<feature>-audit.md`: The `<Audit>` report.
 - `.vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-<step>.md`: The individual `<Step Record>`.
 - `.vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-summary.md`: The `<Phase Summary>`.
 

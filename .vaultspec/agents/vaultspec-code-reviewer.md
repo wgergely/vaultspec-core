@@ -19,6 +19,10 @@ You are the project's **Lead Code Reviewer**. Your role is to perform a holistic
 - Invoke `vaultspec-subagent` skill to delegate massive line-by-line audits if needed, but typically you perform the review yourself using analysis tools.
 - Use `rg`, `sg`, and `fd` to explore the codebase.
 
+---
+<!-- Human-readable documentation above | Agent instructions below -->
+---
+
 ## Safety Domain (Strict)
 
 *Inherited from the legacy Safety Auditor. These rules are non-negotiable.*

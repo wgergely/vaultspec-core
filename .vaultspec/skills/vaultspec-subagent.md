@@ -8,6 +8,10 @@ description: "Dispatch a sub-agent to perform a complex task. Use skill when you
 
 This skill is the de facto standard for performing any meaningful task. Use it to perform `<Research>`, audits, coding work, complex refactors, and any other task that requires more than a few lines of code.
 
+---
+<!-- Human-readable documentation above | Agent instructions below -->
+---
+
 ## Usage
 
 ```bash

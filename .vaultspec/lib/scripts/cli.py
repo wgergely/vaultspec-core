@@ -12,6 +12,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -89,6 +91,8 @@ except ImportError:
                 lines.append(f"{k}:")
                 for sk, sv in v.items():
                     lines.append(f"  {sk}: {sv}")
+            elif isinstance(v, bool):
+                lines.append(f"{k}: {'true' if v else 'false'}")
             elif isinstance(v, str) and (
                 ":" in v or '"' in v or "'" in v or v != v.strip()
             ):
@@ -215,6 +219,16 @@ def init_paths(root: Path) -> None:
             system_file=None,
         ),
     }
+
+
+def _get_version() -> str:
+    """Read version from pyproject.toml."""
+    toml_path = _PATHS_ROOT_DIR / "pyproject.toml"
+    if toml_path.exists():
+        for line in toml_path.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("version"):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return "unknown"
 
 
 # Default initialisation
@@ -435,10 +449,22 @@ def agents_add(args: argparse.Namespace) -> None:
     description = getattr(args, "description", "") or ""
     tier = getattr(args, "tier", "MEDIUM") or "MEDIUM"
 
+    default_body = f"# Persona: {args.name}\n\nDefine your agent persona here.\n"
+    body = default_body
+    if getattr(args, "template", None):
+        from core.config import get_config
+
+        cfg = get_config()
+        tmpl_path = ROOT_DIR / cfg.framework_dir / "templates" / args.template
+        if not tmpl_path.suffix:
+            tmpl_path = tmpl_path.with_suffix(".md")
+        if tmpl_path.exists():
+            body = tmpl_path.read_text(encoding="utf-8")
+        else:
+            print(f"Warning: Template '{args.template}' not found at {tmpl_path}")
+
     fm = {"description": description, "tier": tier.upper()}
-    scaffold = build_file(
-        fm, f"# Persona: {args.name}\n\nDefine your agent persona here.\n"
-    )
+    scaffold = build_file(fm, body)
 
     if sys.stdin.isatty():
         file_path.write_text(scaffold, encoding="utf-8")
@@ -576,10 +602,22 @@ def skills_add(args: argparse.Namespace) -> None:
         return
 
     description = getattr(args, "description", "") or ""
+    default_body = f"# {skill_name}\n\nDefine your skill instructions here.\n"
+    body = default_body
+    if getattr(args, "template", None):
+        from core.config import get_config as _get_cfg
+
+        cfg = _get_cfg()
+        tmpl_path = ROOT_DIR / cfg.framework_dir / "templates" / args.template
+        if not tmpl_path.suffix:
+            tmpl_path = tmpl_path.with_suffix(".md")
+        if tmpl_path.exists():
+            body = tmpl_path.read_text(encoding="utf-8")
+        else:
+            print(f"Warning: Template '{args.template}' not found at {tmpl_path}")
+
     fm = {"description": description}
-    scaffold = build_file(
-        fm, f"# {skill_name}\n\nDefine your skill instructions here.\n"
-    )
+    scaffold = build_file(fm, body)
 
     if sys.stdin.isatty():
         file_path.write_text(scaffold, encoding="utf-8")
@@ -595,6 +633,148 @@ def skills_add(args: argparse.Namespace) -> None:
     else:
         file_path.write_text(scaffold, encoding="utf-8")
         print(f"Created skill: {file_path}")
+
+
+def resource_show(args: argparse.Namespace, src_dir: Path, label: str) -> None:
+    """Display a single resource file."""
+    name = args.name
+    file_name = name if name.endswith(".md") else f"{name}.md"
+    file_path = src_dir / file_name
+    if not file_path.exists():
+        print(f"Error: {label} '{name}' not found at {file_path}")
+        return
+    content = file_path.read_text(encoding="utf-8")
+    meta, body = parse_frontmatter(content)
+    if meta:
+        print("--- Metadata ---")
+        for k, v in meta.items():
+            print(f"  {k}: {v}")
+        print("---")
+    print(body)
+
+
+def resource_edit(args: argparse.Namespace, src_dir: Path, label: str) -> None:
+    """Open a resource file in the user's editor."""
+    name = args.name
+    file_name = name if name.endswith(".md") else f"{name}.md"
+    file_path = src_dir / file_name
+    if not file_path.exists():
+        print(f"Error: {label} '{name}' not found at {file_path}")
+        return
+    from core.config import get_config
+
+    editor = (
+        os.environ.get("VAULTSPEC_EDITOR")
+        or os.environ.get("VISUAL")
+        or os.environ.get("EDITOR")
+        or get_config().editor
+    )
+    try:
+        subprocess.call([*editor.split(), str(file_path)])
+    except Exception as e:
+        print(f"Error opening editor: {e}")
+
+
+def resource_remove(args: argparse.Namespace, src_dir: Path, label: str) -> None:
+    """Delete a resource file and its synced copies."""
+    name = args.name
+    file_name = name if name.endswith(".md") else f"{name}.md"
+    file_path = src_dir / file_name
+    if not file_path.exists():
+        print(f"Error: {label} '{name}' not found at {file_path}")
+        return
+
+    if not getattr(args, "force", False):
+        confirm = input(f"Remove {label} '{name}'? [y/N] ").strip().lower()
+        if confirm != "y":
+            print("Cancelled.")
+            return
+
+    file_path.unlink()
+    print(f"Removed {file_path}")
+
+    # Prune synced copies
+    removed = 0
+    skill_name = name if not name.endswith(".md") else name[:-3]
+    for _tool_name, cfg in TOOL_CONFIGS.items():
+        dest_dir = None
+        if label == "Rule" and cfg.rules_dir:
+            dest_dir = cfg.rules_dir
+        elif label == "Agent" and cfg.agents_dir:
+            dest_dir = cfg.agents_dir
+        elif label == "Skill" and cfg.skills_dir:
+            dest_dir = cfg.skills_dir
+        if dest_dir:
+            if label == "Skill":
+                synced = skill_dest_path(dest_dir, skill_name)
+            else:
+                synced = dest_dir / file_name
+            if synced.exists():
+                synced.unlink()
+                # Remove parent dir if empty (skill dirs)
+                if (
+                    label == "Skill"
+                    and synced.parent.exists()
+                    and not any(synced.parent.iterdir())
+                ):
+                    synced.parent.rmdir()
+                removed += 1
+    if removed:
+        print(f"  Pruned {removed} synced copies.")
+
+
+def resource_rename(args: argparse.Namespace, src_dir: Path, label: str) -> None:
+    """Rename a resource file and update synced copies."""
+    old_name = args.old_name
+    new_name = args.new_name
+    old_file = old_name if old_name.endswith(".md") else f"{old_name}.md"
+    new_file = new_name if new_name.endswith(".md") else f"{new_name}.md"
+    old_path = src_dir / old_file
+    new_path = src_dir / new_file
+
+    if not old_path.exists():
+        print(f"Error: {label} '{old_name}' not found at {old_path}")
+        return
+    if new_path.exists():
+        print(f"Error: {label} '{new_name}' already exists at {new_path}")
+        return
+
+    old_path.rename(new_path)
+    print(f"Renamed {old_file} -> {new_file}")
+
+    # Update synced copies
+    updated = 0
+    old_skill = old_name if not old_name.endswith(".md") else old_name[:-3]
+    new_skill = new_name if not new_name.endswith(".md") else new_name[:-3]
+    for _tool_name, cfg in TOOL_CONFIGS.items():
+        dest_dir = None
+        if label == "Rule" and cfg.rules_dir:
+            dest_dir = cfg.rules_dir
+        elif label == "Agent" and cfg.agents_dir:
+            dest_dir = cfg.agents_dir
+        elif label == "Skill" and cfg.skills_dir:
+            dest_dir = cfg.skills_dir
+        if dest_dir:
+            if label == "Skill":
+                old_synced = skill_dest_path(dest_dir, old_skill)
+                if old_synced.exists():
+                    new_parent = dest_dir / new_skill
+                    ensure_dir(new_parent)
+                    old_synced.rename(new_parent / "SKILL.md")
+                    # Remove old parent dir if empty
+                    if old_synced.parent.exists() and not any(
+                        old_synced.parent.iterdir()
+                    ):
+                        old_synced.parent.rmdir()
+                    updated += 1
+            else:
+                old_synced = dest_dir / old_file
+                if old_synced.exists():
+                    old_synced.rename(dest_dir / new_file)
+                    updated += 1
+    if updated:
+        print(f"  Updated {updated} synced copies.")
+    print("Run 'sync-all' to ensure all destinations are current.")
 
 
 def skills_sync(args: argparse.Namespace) -> None:
@@ -782,6 +962,71 @@ def _collect_rule_refs(cfg: ToolConfig) -> list[str]:
     return refs
 
 
+def _generate_agents_md(cfg: ToolConfig) -> str | None:
+    """Generate AGENTS.md in the agents.md standard format.
+
+    Produces YAML frontmatter with ``description`` and ``alwaysApply``
+    fields, followed by the framework content as plain Markdown sections
+    (XML tags stripped), project content, and rule references.
+    """
+    if not FRAMEWORK_CONFIG_SRC.exists():
+        return None
+
+    _meta, internal_body = parse_frontmatter(
+        FRAMEWORK_CONFIG_SRC.read_text(encoding="utf-8")
+    )
+    internal_body = internal_body.strip()
+
+    # Strip XML tags (e.g. <identity>, </identity>) — convert to Markdown headings
+    def _xml_to_heading(text: str) -> str:
+        """Convert <tag> ... </tag> blocks to ## Tag sections."""
+        # Replace opening tags with headings
+        text = re.sub(
+            r"<(\w+)>\s*",
+            lambda m: f"## {m.group(1).replace('_', ' ').title()}\n\n",
+            text,
+        )
+        # Remove closing tags
+        text = re.sub(r"</\w+>\s*", "\n", text)
+        return text.strip()
+
+    body_content = _xml_to_heading(internal_body)
+
+    custom_body = ""
+    if PROJECT_CONFIG_SRC.exists():
+        _meta, custom_body = parse_frontmatter(
+            PROJECT_CONFIG_SRC.read_text(encoding="utf-8")
+        )
+        custom_body = custom_body.strip()
+
+    # Build standard agents.md frontmatter
+    fm = {
+        "description": "vaultspec — a governed development framework for AI agents",
+        "alwaysApply": True,
+    }
+
+    # Assemble body
+    body_parts = [body_content]
+
+    if custom_body:
+        body_parts.append("")
+        body_parts.append(custom_body)
+
+    # Add rules
+    refs = _collect_rule_refs(cfg)
+    if refs:
+        body_parts.append("")
+        body_parts.append("## Rules")
+        body_parts.append("")
+        body_parts.append("You MUST respect these rules at all times:")
+        body_parts.append("")
+        for ref in refs:
+            body_parts.append(f"@{ref}")
+
+    body = "\n".join(body_parts)
+    return f"{CONFIG_HEADER}\n{build_file(fm, body)}"
+
+
 def _generate_config(cfg: ToolConfig) -> str | None:
     """Generate config file content."""
     if not FRAMEWORK_CONFIG_SRC.exists():
@@ -885,7 +1130,11 @@ def config_sync(args: argparse.Namespace) -> None:
         if cfg.config_file is None:
             continue
 
-        content = _generate_config(cfg)
+        # Use agents.md standard format for AGENTS.md
+        if cfg.name == "agents":
+            content = _generate_agents_md(cfg)
+        else:
+            content = _generate_config(cfg)
         if content is None:
             result.skipped += 1
             continue
@@ -1005,16 +1254,58 @@ def _generate_system_prompt(cfg: ToolConfig) -> str | None:
         assembled.append(skill_listing)
 
     # 5. Remaining shared parts (no "tool" key, not "base", not config-only)
-    for name, (_path, meta, body) in sorted(parts.items()):
-        if name == "base":
-            continue
-        if meta.get("tool") is not None:
-            continue
-        if meta.get("pipeline") == "config":
-            continue
+    #    Sorted by order frontmatter (default 50), then by name.
+    shared = [
+        (name, _path, meta, body)
+        for name, (_path, meta, body) in parts.items()
+        if name != "base"
+        and meta.get("tool") is None
+        and meta.get("pipeline") != "config"
+    ]
+    shared.sort(key=lambda t: (t[2].get("order", 50), t[0]))
+    for _name, _path, _meta, body in shared:
         assembled.append(body)
 
     return "\n\n".join(assembled)
+
+
+def _generate_system_rules(cfg: ToolConfig) -> str | None:
+    """Assemble shared behavioral content as a rule file.
+
+    For tools without system_file."""
+    if cfg.rules_dir is None:
+        return None
+
+    parts = collect_system_parts()
+    if not parts:
+        return None
+
+    assembled: list[str] = []
+
+    # 1. base.md body first
+    if "base" in parts:
+        _path, _meta, body = parts["base"]
+        assembled.append(body)
+
+    # 2. Shared parts only (no "tool" key, not "base", not config-only)
+    #    Sorted by order frontmatter (default 50), then by name.
+    shared = [
+        (name, _path, meta, body)
+        for name, (_path, meta, body) in parts.items()
+        if name != "base"
+        and meta.get("tool") is None
+        and meta.get("pipeline") != "config"
+    ]
+    shared.sort(key=lambda t: (t[2].get("order", 50), t[0]))
+    for _name, _path, _meta, body in shared:
+        assembled.append(body)
+
+    if not assembled:
+        return None
+
+    content = "\n\n".join(assembled)
+    fm = {"name": "vaultspec-system", "trigger": "always_on"}
+    return f"{CONFIG_HEADER}\n{build_file(fm, content)}"
 
 
 def system_show(_args: argparse.Namespace) -> None:
@@ -1041,46 +1332,66 @@ def system_show(_args: argparse.Namespace) -> None:
 
 
 def system_sync(args: argparse.Namespace) -> None:
-    """Sync assembled system prompts to tool destinations."""
+    """Sync assembled system prompts and behavioral rules to tool destinations."""
     dry_run = getattr(args, "dry_run", False)
     force = getattr(args, "force", False)
 
     result = SyncResult()
 
     for _tool_name, cfg in TOOL_CONFIGS.items():
-        if cfg.system_file is None:
-            continue
+        # Path A: Tool has a system_file -> generate assembled SYSTEM.md
+        if cfg.system_file is not None:
+            content = _generate_system_prompt(cfg)
+            if content is None:
+                result.skipped += 1
+                continue
 
-        content = _generate_system_prompt(cfg)
-        if content is None:
-            result.skipped += 1
-            continue
+            rel = cfg.system_file.relative_to(ROOT_DIR)
 
-        rel = cfg.system_file.relative_to(ROOT_DIR)
+            # Safety guard
+            if (
+                cfg.system_file.exists()
+                and not _is_cli_managed(cfg.system_file)
+                and not force
+            ):
+                print(f"    [SKIP] {rel} - file exists with custom content.")
+                print("           Use --force to overwrite.")
+                result.skipped += 1
+                continue
 
-        # Safety guard
-        if (
-            cfg.system_file.exists()
-            and not _is_cli_managed(cfg.system_file)
-            and not force
-        ):
-            print(f"    [SKIP] {rel} - file exists with custom content.")
-            print("           Use --force to overwrite.")
-            result.skipped += 1
-            continue
+            action = "[UPDATE]" if cfg.system_file.exists() else "[ADD]"
 
-        action = "[UPDATE]" if cfg.system_file.exists() else "[ADD]"
+            if dry_run:
+                print(f"    {action} {rel}")
+            else:
+                ensure_dir(cfg.system_file.parent)
+                atomic_write(cfg.system_file, content)
 
-        if dry_run:
-            print(f"    {action} {rel}")
-        else:
-            ensure_dir(cfg.system_file.parent)
-            atomic_write(cfg.system_file, content)
+            if action == "[ADD]":
+                result.added += 1
+            else:
+                result.updated += 1
 
-        if action == "[ADD]":
-            result.added += 1
-        else:
-            result.updated += 1
+        # Path B: Tool has rules_dir but no system_file -> generate behavioral rule
+        elif cfg.rules_dir is not None:
+            content = _generate_system_rules(cfg)
+            if content is None:
+                continue
+
+            rule_path = cfg.rules_dir / "vaultspec-system.builtin.md"
+            rel = rule_path.relative_to(ROOT_DIR)
+            action = "[UPDATE]" if rule_path.exists() else "[ADD]"
+
+            if dry_run:
+                print(f"    {action} {rel}")
+            else:
+                ensure_dir(cfg.rules_dir)
+                atomic_write(rule_path, content)
+
+            if action == "[ADD]":
+                result.added += 1
+            else:
+                result.updated += 1
 
     print_summary("System", result)
 
@@ -1144,6 +1455,124 @@ def test_run(args: argparse.Namespace) -> None:
     sys.exit(result.returncode)
 
 
+def doctor_run(_args: argparse.Namespace) -> None:
+    """Check prerequisites and system health."""
+    import importlib
+
+    issues = []
+
+    # Python version
+    ver = sys.version_info
+    print(f"Python: {ver.major}.{ver.minor}.{ver.micro}", end="")
+    if ver >= (3, 13):
+        print(" [OK]")
+    else:
+        print(" [WARN] Python 3.13+ recommended")
+        issues.append("Python 3.13+ recommended")
+
+    # CUDA/GPU
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            props = torch.cuda.get_device_properties(0)
+            mem = getattr(props, "total_memory", None) or getattr(props, "total_mem", 0)
+            mem_gb = mem / (1024**3)
+            print(f"CUDA: {torch.version.cuda} [OK]")
+            print(f"GPU: {props.name} ({mem_gb:.1f} GB) [OK]")
+        else:
+            print("CUDA: Not available [FAIL]")
+            issues.append("CUDA not available - GPU required")
+    except ImportError:
+        print("PyTorch: Not installed [FAIL]")
+        issues.append("PyTorch not installed")
+
+    # Optional deps
+    for pkg, group in [
+        ("lancedb", "rag"),
+        ("sentence_transformers", "rag"),
+        ("pytest", "dev"),
+        ("ruff", "dev"),
+    ]:
+        try:
+            importlib.import_module(pkg)
+            print(f"{pkg}: installed [OK]")
+        except ImportError:
+            print(
+                f"{pkg}: not installed [WARN]"
+                f" (install with pip install -e '.[{group}]')"
+            )
+            issues.append(f"{pkg} not installed")
+
+    # .lance directory
+    lance_dir = ROOT_DIR / ".vault" / ".lance"
+    if lance_dir.exists():
+        size = sum(f.stat().st_size for f in lance_dir.rglob("*") if f.is_file())
+        size_mb = size / (1024 * 1024)
+        print(f".lance index: {size_mb:.1f} MB [OK]")
+    else:
+        print(".lance index: not built [INFO] (run 'docs.py index' to build)")
+
+    # Summary
+    if issues:
+        print(f"\n{len(issues)} issue(s) found:")
+        for issue in issues:
+            print(f"  - {issue}")
+    else:
+        print("\nAll checks passed.")
+
+
+def init_run(args: argparse.Namespace) -> None:
+    """Initialize vaultspec in a project."""
+    from core.config import get_config
+
+    cfg = get_config()
+    fw_dir = ROOT_DIR / cfg.framework_dir
+    vault_dir = ROOT_DIR / ".vault"
+
+    if fw_dir.exists() and not getattr(args, "force", False):
+        print(f"Error: {fw_dir} already exists. Use --force to overwrite.")
+        return
+
+    # Create .vaultspec/ structure
+    created = []
+    for subdir in ["agents", "rules", "skills", "templates", "system"]:
+        d = fw_dir / subdir
+        ensure_dir(d)
+        created.append(str(d.relative_to(ROOT_DIR)))
+
+    # Create .vault/ structure
+    for subdir in ["adr", "audit", "exec", "plan", "reference", "research"]:
+        d = vault_dir / subdir
+        ensure_dir(d)
+        created.append(str(d.relative_to(ROOT_DIR)))
+
+    # Create minimal stubs if they don't exist
+    # Stubs go in system/ (canonical location per
+    # FRAMEWORK_CONFIG_SRC / PROJECT_CONFIG_SRC)
+    sys_dir = fw_dir / "system"
+    fw_md = sys_dir / "framework.md"
+    if not fw_md.exists():
+        fw_md.write_text(
+            "# Framework Configuration\n\nAdd framework bootstrap content here.\n",
+            encoding="utf-8",
+        )
+        created.append(str(fw_md.relative_to(ROOT_DIR)))
+
+    proj_md = sys_dir / "project.md"
+    if not proj_md.exists():
+        proj_md.write_text(
+            "# Project Configuration\n\nAdd project-specific content here.\n",
+            encoding="utf-8",
+        )
+        created.append(str(proj_md.relative_to(ROOT_DIR)))
+
+    print("Initialized vaultspec structure:")
+    for path in created:
+        print(f"  {path}")
+    print(f"\nCreated {len(created)} directories/files. Run 'cli.py sync-all' to sync.")
+
+
 def add_sync_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--prune", action="store_true", help="Remove unknown files")
     parser.add_argument("--dry-run", action="store_true", help="Preview changes")
@@ -1166,6 +1595,9 @@ def main() -> None:
     parser.add_argument(
         "--debug", action="store_true", help="Enable debug logging (DEBUG level)"
     )
+    parser.add_argument(
+        "--version", "-V", action="version", version=f"%(prog)s {_get_version()}"
+    )
     resource_parsers = parser.add_subparsers(dest="resource", help="Type")
 
     # --- rules ---
@@ -1178,6 +1610,22 @@ def main() -> None:
     rules_add_parser.add_argument("--name", required=True, help="Rule name")
     rules_add_parser.add_argument("--content", help="Rule content")
     rules_add_parser.add_argument("--force", action="store_true", help="Overwrite")
+
+    rules_show_parser = rules_sub.add_parser("show", help="Show a rule")
+    rules_show_parser.add_argument("name", help="Rule name")
+
+    rules_edit_parser = rules_sub.add_parser("edit", help="Edit a rule")
+    rules_edit_parser.add_argument("name", help="Rule name")
+
+    rules_remove_parser = rules_sub.add_parser("remove", help="Remove a rule")
+    rules_remove_parser.add_argument("name", help="Rule name")
+    rules_remove_parser.add_argument(
+        "--force", action="store_true", help="Skip confirmation"
+    )
+
+    rules_rename_parser = rules_sub.add_parser("rename", help="Rename a rule")
+    rules_rename_parser.add_argument("old_name", help="Current name")
+    rules_rename_parser.add_argument("new_name", help="New name")
 
     rules_sync_parser = rules_sub.add_parser("sync", help="Sync rules")
     add_sync_flags(rules_sync_parser)
@@ -1200,6 +1648,25 @@ def main() -> None:
         help="Capability tier",
     )
     agents_add_parser.add_argument("--force", action="store_true", help="Overwrite")
+    agents_add_parser.add_argument(
+        "--template", help="Template name from .vaultspec/templates/ to pre-populate"
+    )
+
+    agents_show_parser = agents_sub.add_parser("show", help="Show an agent")
+    agents_show_parser.add_argument("name", help="Agent name")
+
+    agents_edit_parser = agents_sub.add_parser("edit", help="Edit an agent")
+    agents_edit_parser.add_argument("name", help="Agent name")
+
+    agents_remove_parser = agents_sub.add_parser("remove", help="Remove an agent")
+    agents_remove_parser.add_argument("name", help="Agent name")
+    agents_remove_parser.add_argument(
+        "--force", action="store_true", help="Skip confirmation"
+    )
+
+    agents_rename_parser = agents_sub.add_parser("rename", help="Rename an agent")
+    agents_rename_parser.add_argument("old_name", help="Current name")
+    agents_rename_parser.add_argument("new_name", help="New name")
 
     agents_sync_parser = agents_sub.add_parser("sync", help="Sync agents")
     add_sync_flags(agents_sync_parser)
@@ -1222,6 +1689,25 @@ def main() -> None:
         "--description", default="", help="Skill description"
     )
     skills_add_parser.add_argument("--force", action="store_true", help="Overwrite")
+    skills_add_parser.add_argument(
+        "--template", help="Template name from .vaultspec/templates/ to pre-populate"
+    )
+
+    skills_show_parser = skills_sub.add_parser("show", help="Show a skill")
+    skills_show_parser.add_argument("name", help="Skill name")
+
+    skills_edit_parser = skills_sub.add_parser("edit", help="Edit a skill")
+    skills_edit_parser.add_argument("name", help="Skill name")
+
+    skills_remove_parser = skills_sub.add_parser("remove", help="Remove a skill")
+    skills_remove_parser.add_argument("name", help="Skill name")
+    skills_remove_parser.add_argument(
+        "--force", action="store_true", help="Skip confirmation"
+    )
+
+    skills_rename_parser = skills_sub.add_parser("rename", help="Rename a skill")
+    skills_rename_parser.add_argument("old_name", help="Current name")
+    skills_rename_parser.add_argument("new_name", help="New name")
 
     skills_sync_parser = skills_sub.add_parser("sync", help="Sync skills")
     add_sync_flags(skills_sync_parser)
@@ -1274,6 +1760,17 @@ def main() -> None:
     )
     test_parser.add_argument("extra_args", nargs="*", help="Extra pytest arguments")
 
+    # --- doctor ---
+    resource_parsers.add_parser("doctor", help="Check prerequisites and system health")
+
+    # --- init ---
+    init_parser = resource_parsers.add_parser(
+        "init", help="Initialize vaultspec in a project"
+    )
+    init_parser.add_argument(
+        "--force", action="store_true", help="Overwrite existing structure"
+    )
+
     args = parser.parse_args()
 
     if args.debug:
@@ -1291,6 +1788,14 @@ def main() -> None:
             rules_list(args)
         elif args.command == "add":
             rules_add(args)
+        elif args.command == "show":
+            resource_show(args, RULES_SRC_DIR, "Rule")
+        elif args.command == "edit":
+            resource_edit(args, RULES_SRC_DIR, "Rule")
+        elif args.command == "remove":
+            resource_remove(args, RULES_SRC_DIR, "Rule")
+        elif args.command == "rename":
+            resource_rename(args, RULES_SRC_DIR, "Rule")
         elif args.command == "sync":
             rules_sync(args)
         else:
@@ -1300,6 +1805,14 @@ def main() -> None:
             agents_list(args)
         elif args.command == "add":
             agents_add(args)
+        elif args.command == "show":
+            resource_show(args, AGENTS_SRC_DIR, "Agent")
+        elif args.command == "edit":
+            resource_edit(args, AGENTS_SRC_DIR, "Agent")
+        elif args.command == "remove":
+            resource_remove(args, AGENTS_SRC_DIR, "Agent")
+        elif args.command == "rename":
+            resource_rename(args, AGENTS_SRC_DIR, "Agent")
         elif args.command == "sync":
             agents_sync(args)
         elif args.command == "set-tier":
@@ -1311,6 +1824,14 @@ def main() -> None:
             skills_list(args)
         elif args.command == "add":
             skills_add(args)
+        elif args.command == "show":
+            resource_show(args, SKILLS_SRC_DIR, "Skill")
+        elif args.command == "edit":
+            resource_edit(args, SKILLS_SRC_DIR, "Skill")
+        elif args.command == "remove":
+            resource_remove(args, SKILLS_SRC_DIR, "Skill")
+        elif args.command == "rename":
+            resource_rename(args, SKILLS_SRC_DIR, "Skill")
         elif args.command == "sync":
             skills_sync(args)
         else:
@@ -1339,6 +1860,10 @@ def main() -> None:
         system_sync(args)
         config_sync(args)
         print("Done.")
+    elif args.resource == "doctor":
+        doctor_run(args)
+    elif args.resource == "init":
+        init_run(args)
     else:
         parser.print_help()
 
