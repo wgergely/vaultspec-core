@@ -37,10 +37,10 @@ classifiers = [
 keywords = ["ai-agents", "governance", "spec-driven-development", "adr", "mcp", "acp", "a2a"]
 
 [project.urls]
-Homepage = "https://github.com/wgergely/task"
-Repository = "https://github.com/wgergely/task"
-Documentation = "https://github.com/wgergely/task/tree/main/docs"
-"Bug Tracker" = "https://github.com/wgergely/task/issues"
+Homepage = "https://github.com/wgergely/vaultspec"
+Repository = "https://github.com/wgergely/vaultspec"
+Documentation = "https://github.com/wgergely/vaultspec/tree/main/docs"
+"Bug Tracker" = "https://github.com/wgergely/vaultspec/issues"
 
 [project.optional-dependencies]
 dev = [
