@@ -36,4 +36,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Stale model assertions in provider tests
 
-[Unreleased]: https://github.com/wgergely/task/compare/HEAD...HEAD
+[Unreleased]: https://github.com/wgergely/vaultspec/compare/HEAD...HEAD

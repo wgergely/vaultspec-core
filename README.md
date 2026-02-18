@@ -1,6 +1,6 @@
 # vaultspec
 
-![CI](https://github.com/wgergely/task/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/wgergely/vaultspec/actions/workflows/ci.yml/badge.svg)
 ![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 ![Status: Alpha](https://img.shields.io/badge/status-alpha-orange)
@@ -45,7 +45,7 @@ the plan that structured it, and the review that approved it.
 
 ```bash
 # Clone and install
-git clone https://github.com/wgergely/task
+git clone https://github.com/wgergely/vaultspec
 cd vaultspec
 python -m venv .venv
 # Linux/macOS:
