@@ -316,7 +316,15 @@ class ClaudeACPBridge:
             "mcp_servers": sdk_mcp,
             "can_use_tool": sandbox_cb,
             "permission_mode": "bypassPermissions",
-            "system_prompt": self._system_prompt,
+            "system_prompt": (
+                {
+                    "type": "preset",
+                    "preset": "claude_code",
+                    "append": self._system_prompt,
+                }
+                if self._system_prompt
+                else {"type": "preset", "preset": "claude_code"}
+            ),
             "include_partial_messages": True,
         }
 
@@ -711,6 +719,15 @@ class ClaudeACPBridge:
 
         if self._debug:
             logger.debug("Session model changed to: %s", model_id)
+
+    async def set_config_option(
+        self, config_id: str, session_id: str, value: str, **_kwargs: Any
+    ) -> None:
+        """Set a session configuration option. No-op for Claude bridge."""
+        _ = session_id  # required by ACP interface
+        if self._debug:
+            logger.debug("set_config_option(%s=%s) -- no-op", config_id, value)
+        return None
 
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         _ = params

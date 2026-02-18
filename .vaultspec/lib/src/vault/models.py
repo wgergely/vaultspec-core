@@ -13,9 +13,9 @@ class DocType(StrEnum):
     """Rigidly defined document types corresponding to .vault/ subdirectories."""
 
     ADR = "adr"
+    AUDIT = "audit"
     EXEC = "exec"
     PLAN = "plan"
-    # NOTE: audits and references are treated as "same"
     REFERENCE = "reference"
     RESEARCH = "research"
 
@@ -55,7 +55,7 @@ class DocumentMetadata:
         if len(dir_tags) != 1:
             msg = (
                 "Vault violation: Exactly one directory tag required "
-                "(#adr, #exec, #plan, #reference, #research). "
+                "(#adr, #audit, #exec, #plan, #reference, #research). "
                 f"Found: {dir_tags}"
             )
             errors.append(msg)
@@ -178,7 +178,7 @@ class VaultConstants:
         # Or for exec: 2026-02-07-feature-name-phase1-step1.md
         pattern = (
             r"^\d{4}-\d{2}-\d{2}-[a-z0-9-]+-"
-            r"(adr|exec|plan|reference|research)(-[a-z0-9-]+)*\.md$"
+            r"(adr|audit|exec|plan|reference|research)(-[a-z0-9-]+)*\.md$"
         )
         if not re.match(pattern, filename):
             msg = (

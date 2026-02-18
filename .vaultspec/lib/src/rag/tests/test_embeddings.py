@@ -34,12 +34,13 @@ class TestEmbeddingModel:
         model = rag_components["model"]
         texts = ["This is a test document about architecture decisions."]
         vectors = model.encode_documents(texts)
-        assert vectors.shape == (1, 768)
+        assert vectors.shape[0] == 1
+        assert vectors.shape[1] == model.dimension
 
     def test_encode_query_shape(self, rag_components):
         model = rag_components["model"]
         vector = model.encode_query("vector database")
-        assert vector.shape == (768,)
+        assert vector.shape == (model.dimension,)
 
     def test_document_query_similarity(self, rag_components):
         """Documents about a topic should be more similar to related queries."""
@@ -69,7 +70,8 @@ class TestEmbeddingModel:
             "Third document about performance.",
         ]
         vectors = model.encode_documents(texts, batch_size=2)
-        assert vectors.shape == (3, 768)
+        assert vectors.shape[0] == 3
+        assert vectors.shape[1] == model.dimension
 
     def test_query_embedding_cache_hit(self, rag_components):
         """Repeated identical queries should hit the LRU cache."""

@@ -6,6 +6,10 @@ description: "Structural search and replace tool (ast-grep). Use for complex cod
 
 **Announce at start:** "I'm using `sg` to manipulate code structure for <pattern>."
 
+---
+<!-- Human-readable documentation above | Agent instructions below -->
+---
+
 ## Best Practices
 
 - **Structural Patterns**: Matches code based on AST, ignoring whitespace and formatting.

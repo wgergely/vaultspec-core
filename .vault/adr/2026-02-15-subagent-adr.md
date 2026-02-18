@@ -1,9 +1,7 @@
 ---
-title: Subagent Architecture Refactor — Protocol Convergence
-status: Proposed
+tags: ["#adr", "#protocol"]
 date: 2026-02-15
-authors: [adr-writer]
-tags: [subagent, acp, claude, gemini, architecture]
+related: []
 ---
 
 ## ADR: Subagent Architecture Refactor — Protocol Convergence

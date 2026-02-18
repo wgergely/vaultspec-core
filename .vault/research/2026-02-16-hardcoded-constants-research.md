@@ -1,3 +1,10 @@
+---
+tags: ["#research", "#framework"]
+date: 2026-02-16
+related:
+  - "[[2026-02-16-environment-variable-research]]"
+---
+
 # Environment Audit Task #2: Hardcoded Constants Report
 
 **Date**: 2026-02-16

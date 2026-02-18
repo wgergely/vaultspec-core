@@ -101,7 +101,7 @@ class TestPerformance:
         vec = model.encode_query("test query for latency")
         elapsed_ms = (time.perf_counter() - start) * 1000
 
-        assert vec.shape == (768,)
+        assert vec.shape == (model.dimension,)
         assert elapsed_ms < 500, (
             f"Query embedding took {elapsed_ms:.0f}ms, expected < 500ms"
         )

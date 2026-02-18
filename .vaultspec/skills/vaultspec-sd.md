@@ -6,6 +6,10 @@ description: "Modern find and replace tool (sd). Use for fast, intuitive text ma
 
 **Announce at start:** "I'm using `sd` to replace <pattern> with <replacement>."
 
+---
+<!-- Human-readable documentation above | Agent instructions below -->
+---
+
 ## Best Practices
 
 - **String Mode**: Use `-s` or `--string-mode` for literal substitutions to avoid escaping regex special characters.

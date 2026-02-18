@@ -4,9 +4,13 @@ description: "Use this skill to audit and clean the .vault vault. Validates fron
 
 # Documentation Curation Skill (vaultspec-curate)
 
-This skill governs the autonomous auditing and maintenance of the `.vault/` documentation vault. It ensures every artifact conforms to the project's documentation standards as defined in `.vaultspec/templates/readme.md`.
+This skill governs the autonomous auditing and maintenance of the `.vault/` documentation vault. It ensures every artifact conforms to the project's documentation standards as defined in `.vaultspec/templates/documentation-standards.md`.
 
 **Announce at start:** "I'm using the `vaultspec-curate` skill to audit and clean the documentation vault."
+
+---
+<!-- Human-readable documentation above | Agent instructions below -->
+---
 
 ## When to Use
 
@@ -48,7 +52,7 @@ Items the curator cannot auto-fix are listed under **Recommendations**. Address 
 Every document MUST strictly adhere to the following schema:
 
 - **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
-  - **Directory Tag**: Exactly one of `#adr`, `#exec`, `#plan`, `#reference`, or `#research` (based on file location).
+  - **Directory Tag**: Exactly one of `#adr`, `#audit`, `#exec`, `#plan`, `#reference`, or `#research` (based on file location).
   - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
   - *Syntax:* `tags: ["#doc-type", "#feature"]` (Must be quoted strings in a list).
 - **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
@@ -60,4 +64,4 @@ Every document MUST strictly adhere to the following schema:
 
 - **Non-destructive**: The curator never deletes files. It renames, edits frontmatter/links, and flags.
 - **Traceability**: Every modification is logged in the audit report.
-- **Standards-first**: All fixes trace back to rules in `.vaultspec/templates/readme.md` and the canonical templates.
+- **Standards-first**: All fixes trace back to rules in `.vaultspec/templates/documentation-standards.md` and the canonical templates.

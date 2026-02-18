@@ -1,8 +1,5 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE - REFERENCE: #adr #exec #plan #reference #research #<feature>
-tags:
-  - "#adr"
-  - "#bootstrap-prompt"
+tags: ["#adr", "#framework"]
 date: 2026-02-17
 related:
   - "[[2026-02-17-bootstrap-prompt-engineering-research]]"

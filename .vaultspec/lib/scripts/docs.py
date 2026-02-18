@@ -5,12 +5,24 @@ import sys
 from datetime import datetime
 
 from _paths import ROOT_DIR  # shared path bootstrap
-from graph.api import VaultGraph
-from logging_config import configure_logging
-from metrics.api import get_vault_metrics
-from vault.hydration import get_template_path, hydrate_template
-from vault.models import DocType
-from verification.api import (
+
+
+def _get_version() -> str:
+    """Read version from pyproject.toml."""
+    toml_path = ROOT_DIR / "pyproject.toml"
+    if toml_path.exists():
+        for line in toml_path.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("version"):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return "unknown"
+
+
+from graph.api import VaultGraph  # noqa: E402
+from logging_config import configure_logging  # noqa: E402
+from metrics.api import get_vault_metrics  # noqa: E402
+from vault.hydration import get_template_path, hydrate_template  # noqa: E402
+from vault.models import DocType  # noqa: E402
+from verification.api import (  # noqa: E402
     get_malformed,
     list_features,
     verify_vertical_integrity,
@@ -28,6 +40,9 @@ def main():
     )
     parser.add_argument(
         "--debug", action="store_true", help="Enable debug logging (DEBUG level)"
+    )
+    parser.add_argument(
+        "--version", "-V", action="version", version=f"%(prog)s {_get_version()}"
     )
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
@@ -80,7 +95,11 @@ def main():
 
     # Index command (RAG)
     index_parser = subparsers.add_parser(
-        "index", help="Index vault documents for semantic search."
+        "index",
+        help="Index vault documents for semantic search.",
+        epilog=(
+            "NOTE: Requires NVIDIA GPU with CUDA. CPU-only systems are not supported."
+        ),
     )
     index_parser.add_argument(
         "--root", type=pathlib.Path, default=None, help="Vault root directory."
@@ -96,7 +115,11 @@ def main():
 
     # Search command (RAG)
     search_parser = subparsers.add_parser(
-        "search", help="Semantic search over vault documents."
+        "search",
+        help="Semantic search over vault documents.",
+        epilog=(
+            "NOTE: Requires NVIDIA GPU with CUDA. CPU-only systems are not supported."
+        ),
     )
     search_parser.add_argument("query", type=str, help="Search query.")
     search_parser.add_argument(

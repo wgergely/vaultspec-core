@@ -52,10 +52,10 @@ class TestRobustness:
                 f"but prepare_document returned a doc"
             )
 
-    def test_audit_nonstandard_frontmatter_skipped(self, rag_components):
+    def test_audit_nonstandard_frontmatter_indexed(self, rag_components):
         """audit/2026-02-07-main-window-safety-audit.md has 'feature:' key
-        instead of 'tags:' array. Since DocType doesn't include 'audit',
-        get_doc_type returns None and the doc is skipped.
+        instead of 'tags:' array. DocType.AUDIT exists, so get_doc_type
+        returns AUDIT and the doc is indexed despite nonstandard frontmatter.
         """
         from rag.indexer import prepare_document
         from vault.scanner import scan_vault
@@ -66,9 +66,10 @@ class TestRobustness:
 
         for path in audit_paths:
             doc = prepare_document(path, root)
-            assert doc is None, (
-                f"Audit doc {path.name} should be skipped (no valid DocType)"
+            assert doc is not None, (
+                f"Audit doc {path.name} should be indexed (DocType.AUDIT is valid)"
             )
+            assert doc.doc_type == "audit"
 
     def test_unicode_content_in_parser(self):
         """French stories have accented chars. Verify parse_vault_metadata

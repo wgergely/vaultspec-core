@@ -16,6 +16,10 @@ When to use this skill:
 
 **Read and link related `<Research>` from:** `.vault/research/yyyy-mm-dd-<feature>-<phase>-research.md`. Terminate if related `<Research>` is not found and prompt user to first invoke `vaultspec-research`.
 
+---
+<!-- Human-readable documentation above | Agent instructions below -->
+---
+
 ## Template
 
 - You MUST read and use the template at `.vaultspec/templates/adr.md`.

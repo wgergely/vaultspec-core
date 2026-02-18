@@ -8,6 +8,10 @@ Use this skill to write task steps for **non-trivial work, such as new features,
 
 This skill MUST be called after `vaultspec-adr` concludes with architectural approval. Do NOT use for trivial tasks.
 
+---
+<!-- Human-readable documentation above | Agent instructions below -->
+---
+
 ## Important
 
 - If part of the `vaultspec-research` -> `vaultspec-adr` flow, this skill **MUST** be provided with the relevant `<Research>` and `<ADR>` documents.

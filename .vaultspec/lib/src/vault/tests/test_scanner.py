@@ -64,8 +64,8 @@ class TestGetDocType:
         )
         assert get_doc_type(path, TEST_PROJECT) == DocType.REFERENCE
 
-    def test_unknown_dir_returns_none(self):
-        # audit/ is not a valid DocType directory
+    def test_audit_dir_returns_audit(self):
+        # audit/ is now a valid DocType directory
         audit_files = list((TEST_PROJECT / ".vault" / "audit").glob("*.md"))
         if audit_files:
-            assert get_doc_type(audit_files[0], TEST_PROJECT) is None
+            assert get_doc_type(audit_files[0], TEST_PROJECT) == DocType.AUDIT

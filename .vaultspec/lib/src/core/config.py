@@ -107,6 +107,7 @@ class VaultSpecConfig:
     embedding_batch_size: int = 64
     max_embed_chars: int = 8000
     embedding_model: str = "nomic-ai/nomic-embed-text-v1.5"
+    embedding_dimension: int = 768
 
     # -- I/O -------------------------------------------------------------------
     io_buffer_size: int = 8192
@@ -544,6 +545,14 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
         var_type=str,
         default="nomic-ai/nomic-embed-text-v1.5",
         description="Sentence-transformer model name for embeddings.",
+    ),
+    ConfigVariable(
+        env_name="VAULTSPEC_EMBEDDING_DIMENSION",
+        attr_name="embedding_dimension",
+        var_type=int,
+        default=768,
+        description="Embedding vector dimension. Auto-detected from model at runtime.",
+        min_value=1,
     ),
     # -- Server ----------------------------------------------------------------
     ConfigVariable(

@@ -242,6 +242,55 @@ class TestSystemSync:
         assert "# Base" in content
 
 
+class TestSystemSyncBehavioralRules:
+    def test_generates_behavioral_rule_for_claude(self):
+        """system_sync generates vaultspec-system.builtin.md for Claude."""
+        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+            "---\n---\n\n# Core mandates", encoding="utf-8"
+        )
+        (TEST_PROJECT / ".vaultspec" / "system" / "operations.md").write_text(
+            "---\n---\n\n# Operations", encoding="utf-8"
+        )
+        args = make_ns()
+        cli.system_sync(args)
+        rule_file = TEST_PROJECT / ".claude" / "rules" / "vaultspec-system.builtin.md"
+        assert rule_file.exists()
+        content = rule_file.read_text(encoding="utf-8")
+        assert content.startswith(cli.CONFIG_HEADER)
+        assert "# Core mandates" in content
+        assert "# Operations" in content
+
+    def test_behavioral_rule_excludes_tool_specific(self):
+        """Claude behavioral rule excludes tool: gemini content."""
+        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+            "---\n---\n\n# BASE", encoding="utf-8"
+        )
+        (TEST_PROJECT / ".vaultspec" / "system" / "gemini-tools.md").write_text(
+            "---\ntool: gemini\n---\n\n# GEMINI SPECIFIC", encoding="utf-8"
+        )
+        args = make_ns()
+        cli.system_sync(args)
+        rule_file = TEST_PROJECT / ".claude" / "rules" / "vaultspec-system.builtin.md"
+        assert rule_file.exists()
+        content = rule_file.read_text(encoding="utf-8")
+        assert "# BASE" in content
+        assert "# GEMINI SPECIFIC" not in content
+
+    def test_system_sync_produces_both_outputs(self):
+        """system_sync generates SYSTEM.md for Gemini AND rule for Claude."""
+        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+            "---\n---\n\n# Base prompt", encoding="utf-8"
+        )
+        args = make_ns()
+        cli.system_sync(args)
+        # Gemini gets SYSTEM.md
+        assert (TEST_PROJECT / ".gemini" / "SYSTEM.md").exists()
+        # Claude gets behavioral rule
+        assert (
+            TEST_PROJECT / ".claude" / "rules" / "vaultspec-system.builtin.md"
+        ).exists()
+
+
 class TestConfigSync:
     def test_generates_from_internal_and_custom(self):
         (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(

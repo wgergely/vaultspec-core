@@ -1,5 +1,5 @@
 ---
-tags: [#research, #configuration]
+tags: ["#research", "#framework"]
 date: 2026-02-16
 related: []
 ---

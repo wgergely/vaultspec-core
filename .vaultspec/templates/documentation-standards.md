@@ -32,11 +32,11 @@ The documentation trail follows a more-or-less strict dependency graph. Artifact
 
 ## Tag Taxonomy
 
-**ALLOWED TAGS - DO NOT REMOVE - REFERENCE:** `#adr` `#exec` `#plan` `#reference` `#research` `#<feature>`
+**ALLOWED TAGS - DO NOT REMOVE - REFERENCE:** `#adr` `#audit` `#exec` `#plan` `#reference` `#research` `#<feature>`
 
 Every document in `.vault/` MUST include **EXACTLY TWO** tags in the frontmatter `tags:` field:
 
-- **Directory Tag**: Based on the `.vault/` subfolder location (`#adr`, `#exec`, `#plan`, `#reference`, `#research`)
+- **Directory Tag**: Based on the `.vault/` subfolder location (`#adr`, `#audit`, `#exec`, `#plan`, `#reference`, `#research`)
 - **Feature Tag**: Groups related documents across the feature lifecycle (kebab-case, e.g., `#editor-demo`)
 
 **CRITICAL:** No structural tags like `#step`, `#summary`, `#phase*`, or `#design` are allowed. Only the 6 tags listed above.
@@ -47,11 +47,12 @@ The directory tag is determined by the file's location in `.vault/`:
 
 | Directory | Directory Tag | Description |
 |---|---|---|
+| `.vault/adr/` | `#adr` | Architecture Decision Records |
+| `.vault/audit/` | `#audit` | Audit reports and assessments |
 | `.vault/exec/` | `#exec` | Execution records (steps & summaries) |
 | `.vault/plan/` | `#plan` | Implementation plans |
-| `.vault/adr/` | `#adr` | Architecture Decision Records |
-| `.vault/research/` | `#research` | Research and brainstorming |
 | `.vault/reference/` | `#reference` | Reference audits and blueprints |
+| `.vault/research/` | `#research` | Research and brainstorming |
 
 ### Tag Format
 
@@ -59,7 +60,7 @@ All documents use YAML list syntax with exactly 2 tags (never single string, nev
 
 ```yaml
 ---
-# ALLOWED TAGS - DO NOT REMOVE - REFERENCE: #adr #exec #plan #reference #research #<feature>
+# ALLOWED TAGS - DO NOT REMOVE - REFERENCE: #adr #audit #exec #plan #reference #research #<feature>
 tags:
   - "#plan"           # directory tag (based on file location)
   - "#feature-name"   # feature tag (kebab-case)

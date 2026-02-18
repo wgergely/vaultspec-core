@@ -79,6 +79,7 @@ def _build_rag_components(
     store.root_dir = root
     store.db_path = lance_dir
     store.db = lancedb.connect(str(lance_dir))
+    store._embedding_dim = model.dimension
     store._table = None
     store._fts_dirty = True
 

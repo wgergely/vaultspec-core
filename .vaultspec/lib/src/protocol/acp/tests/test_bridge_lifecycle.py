@@ -1172,3 +1172,36 @@ class TestBridgeFeatureConfig:
         bridge._build_options(str(TEST_PROJECT), {}, None)
 
         assert "output_format" not in captured
+
+    def test_system_prompt_uses_preset_with_append(self):
+        """_build_options() wraps system_prompt in SystemPromptPreset dict."""
+        bridge, _holder, captured = make_di_bridge(system_prompt="You are a helper.")
+        bridge._build_options(str(TEST_PROJECT), {}, None)
+
+        sp = captured["system_prompt"]
+        assert isinstance(sp, dict)
+        assert sp["type"] == "preset"
+        assert sp["preset"] == "claude_code"
+        assert sp["append"] == "You are a helper."
+
+    def test_system_prompt_none_uses_preset_without_append(self):
+        """_build_options() uses bare preset when system_prompt is falsy."""
+        bridge, _holder, captured = make_di_bridge(system_prompt=None)
+        bridge._build_options(str(TEST_PROJECT), {}, None)
+
+        sp = captured["system_prompt"]
+        assert isinstance(sp, dict)
+        assert sp["type"] == "preset"
+        assert sp["preset"] == "claude_code"
+        assert "append" not in sp
+
+    def test_system_prompt_empty_string_uses_preset_without_append(self):
+        """_build_options() treats empty string as falsy — bare preset."""
+        bridge, _holder, captured = make_di_bridge(system_prompt="")
+        bridge._build_options(str(TEST_PROJECT), {}, None)
+
+        sp = captured["system_prompt"]
+        assert isinstance(sp, dict)
+        assert sp["type"] == "preset"
+        assert sp["preset"] == "claude_code"
+        assert "append" not in sp

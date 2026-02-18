@@ -35,9 +35,9 @@ class TestVerifyVaultStructure:
 
     def test_detects_nonstandard_dirs(self, vault_root):
         errors = verify_vault_structure(vault_root)
-        # test-project has "audit" and "stories" which are not valid DocType dirs
+        # test-project has "stories" which is not a valid DocType dir
         error_strs = [str(e) for e in errors]
-        assert any("audit" in s or "stories" in s for s in error_strs)
+        assert any("stories" in s for s in error_strs)
 
 
 class TestVerifyFile:

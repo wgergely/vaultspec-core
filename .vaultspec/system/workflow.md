@@ -1,3 +1,7 @@
+---
+order: 20
+---
+
 # Primary Workflow
 
 This project follows the vaultspec pipeline defined in `system/framework.md`. The pipeline

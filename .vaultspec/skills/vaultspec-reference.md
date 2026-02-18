@@ -15,6 +15,10 @@ Invoke when a `vaultspec-research` -> `vaultspec-adr` -> `vaultspec-write` workf
 
 **Announce at start:** "I'm using the vaultspec-reference skill to find out how <Reference> implements <Feature>."
 
+---
+<!-- Human-readable documentation above | Agent instructions below -->
+---
+
 ## Workflow
 
 Decide if we're researching:

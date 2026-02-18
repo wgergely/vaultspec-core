@@ -1,13 +1,10 @@
 ---
-title: "Cross-Agent Bidirectional Communication: Gemini-Claude via A2A"
-status: Research Complete
-date: "2026-02-15"
-authors: [team-lead, acp-researcher, a2a-researcher, claude-sdk-researcher, codebase-analyst]
-tags: [adr, a2a, acp, mcp, cross-agent, gemini, claude, bidirectional]
+tags: ["#adr", "#protocol"]
+date: 2026-02-15
 related:
-  - "[[2026-02-15-subagent-architecture-refactor]]"
-  - "[[2026-02-07-a2a-protocol-reference]]"
-  - "[[2026-02-07-protocol-architecture]]"
+  - "[[2026-02-15-subagent-adr]]"
+  - "[[2026-02-07-a2a-research]]"
+  - "[[2026-02-07-protocol-architecture-research]]"
 ---
 
 ## ADR: Cross-Agent Bidirectional Communication — Gemini and Claude via A2A

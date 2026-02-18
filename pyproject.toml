@@ -63,6 +63,7 @@ markers = [
     "timeout: timeout in seconds for individual tests",
     "a2a: A2A protocol interoperability tests",
     "e2e: end-to-end tests requiring real LLM API keys",
+    "benchmark: performance and throughput benchmarks (GPU required)",
 ]
 
 [tool.ruff]

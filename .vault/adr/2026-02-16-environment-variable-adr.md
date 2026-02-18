@@ -1,12 +1,10 @@
 ---
-title: "Environment Variable Standardization Blueprint"
+tags: ["#adr", "#framework"]
 date: 2026-02-16
-status: "Accepted"
-decision: "Implement unified environment variable management via centralized config module and standardized naming conventions"
 related:
-  - ENV_VAR_AUDIT.md
-  - env-audit-task-2-hardcoded-constants.md
-  - 2026-02-16-environment-variable-analysis.md
+  - "[[2026-02-16-env-var-research]]"
+  - "[[2026-02-16-hardcoded-constants-research]]"
+  - "[[2026-02-16-environment-variable-research]]"
 ---
 
 ## Environment Variable Standardization Blueprint
@@ -793,7 +791,7 @@ GPU_FAST_CORPUS_STEMS: FrozenSet[str] = frozenset({
 
     "reference/python-async-patterns",
     "research/2026-01-15-lance-db-performance",
-    "research/2026-02-07-a2a-protocol-reference",
+    "research/2026-02-07-a2a-research",
 })
 
 
