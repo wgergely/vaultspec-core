@@ -122,7 +122,7 @@ class SubagentClient(Client):
         _ = session_id
         _ = kwargs
         if self.debug:
-            logger.debug(f"Auto-approving tool call: {tool_call}")
+            logger.debug("Auto-approving tool call: %s", tool_call)
 
         self._log(
             "permission_request",
@@ -173,18 +173,13 @@ class SubagentClient(Client):
         self._log("session_update", data)
 
         if self.debug:
-            logger.debug(f"Update Received: {type(update).__name__}")
+            logger.debug("Update Received: %s", type(update).__name__)
 
         if isinstance(update, (AgentMessageChunk, AgentThoughtChunk)):
             self._handle_content_chunk(update)
             return
 
         # Delegate UI rendering to callbacks or default to logging
-        if isinstance(update, UserMessageChunk):
-            # content = update.content
-            # logger.info(f"User Message Replay: {content}")
-            pass
-
         if isinstance(update, ToolCallStart):
             if self.on_tool_update:
                 self.on_tool_update(update)
@@ -192,15 +187,6 @@ class SubagentClient(Client):
                 sys.stderr.write(
                     f"\033[94m[Tool] {update.title} ({update.tool_call_id})\033[0m\n"
                 )
-
-        if isinstance(update, ToolCallProgress):
-            # status_str = f" [{update.status}]" if update.status else ""
-            # logger.info(f"[Tool Update] {update.tool_call_id}{status_str}")
-            pass
-
-        if isinstance(update, AgentPlanUpdate):
-            # logger.info("[Plan Update]")
-            pass
 
     def _handle_content_chunk(
         self, update: AgentMessageChunk | AgentThoughtChunk
@@ -348,13 +334,13 @@ class SubagentClient(Client):
                     terminal.output_chunks.append(chunk)
                     terminal.total_bytes += len(chunk)
             except asyncio.CancelledError:
-                pass
+                raise
 
         terminal.reader_task = asyncio.create_task(_reader())
         self._terminals[terminal_id] = terminal
 
         if self.debug:
-            logger.debug(f"Terminal created: {terminal_id} ({command})")
+            logger.debug("Terminal created: %s (%s)", terminal_id, command)
         self._log("create_terminal", {"terminal_id": terminal_id, "command": command})
         return CreateTerminalResponse(terminal_id=terminal_id)
 
@@ -367,6 +353,9 @@ class SubagentClient(Client):
         terminal = self._terminals.get(terminal_id)
 
         if terminal is None:
+            logger.warning(
+                "terminal_output called for unknown terminal_id=%s", terminal_id
+            )
             return TerminalOutputResponse(output="", truncated=False)
 
         raw = b"".join(terminal.output_chunks)
@@ -443,19 +432,37 @@ class SubagentClient(Client):
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         _ = params
         if self.debug:
-            logger.debug(f"Extension method: {method}")
+            logger.debug("Extension method: %s", method)
         return {}
 
     async def ext_notification(self, method: str, params: dict[str, Any]) -> None:
         _ = params
         if self.debug:
-            logger.debug(f"Extension notification: {method}")
+            logger.debug("Extension notification: %s", method)
 
     def on_connect(self, conn: Any) -> None:
         pass
 
+    async def close(self) -> None:
+        """Release all tracked terminals to prevent zombie processes."""
+        for terminal_id in list(self._terminals):
+            terminal = self._terminals.pop(terminal_id, None)
+            if terminal is None:
+                continue
+            if terminal.reader_task and not terminal.reader_task.done():
+                terminal.reader_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await terminal.reader_task
+            if terminal.proc.returncode is None:
+                with contextlib.suppress(ProcessLookupError):
+                    terminal.proc.kill()
+                with contextlib.suppress(Exception):
+                    await terminal.proc.wait()
+
     async def graceful_cancel(self) -> None:
         """Send ACP session/cancel notification before termination."""
         if self._conn and self._session_id:
-            with contextlib.suppress(Exception):
+            try:
                 await self._conn.cancel(session_id=self._session_id)
+            except Exception:
+                logger.warning("Failed to send cancel notification", exc_info=True)

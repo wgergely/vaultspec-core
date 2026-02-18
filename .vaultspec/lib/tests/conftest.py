@@ -18,8 +18,6 @@ from tests.constants import (
     TEST_PROJECT,
 )
 
-from protocol.providers.base import GeminiModels
-
 # CPU is NOT supported.  All tests require CUDA GPU.
 # If running without GPU, tests that need RAG components will be skipped.
 
@@ -195,19 +193,6 @@ def _vault_snapshot_reset():
         cwd=PROJECT_ROOT,
         check=False,
     )
-
-
-@pytest.fixture
-def test_agent_md():
-    return f"""---
-tier: LOW
-model: {GeminiModels.LOW}
-description: "A test agent"
----
-
-# Agent Persona
-You are a helpful French Baker.
-"""
 
 
 @pytest.fixture

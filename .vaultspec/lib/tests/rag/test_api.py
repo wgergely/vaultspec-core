@@ -188,5 +188,4 @@ class TestRAGAPI:
         assert e1 is e2
 
         # Clean up the engine to avoid leaving a competing LanceDB connection
-        e1.close()
-        api_mod._engine = None
+        api_mod.reset_engine()

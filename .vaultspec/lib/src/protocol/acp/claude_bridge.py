@@ -369,12 +369,13 @@ class ClaudeACPBridge:
 
         # Create SDK client
         options = self._build_options(cwd, sdk_mcp, sandbox_cb)
-        self._sdk_client = self._client_factory(options)
+        sdk_client = self._client_factory(options)
 
         # Open the SDK connection without a prompt (streaming mode).
         # This ensures can_use_tool callbacks are active.  The actual
         # prompt is sent later via query() in prompt().
-        await self._sdk_client.connect()
+        await sdk_client.connect()
+        self._sdk_client = sdk_client
 
         # Track session state
         self._sessions[session_id] = _SessionState(
@@ -440,7 +441,7 @@ class ClaudeACPBridge:
                     stop_reason = "refusal"
         except Exception:
             logger.exception("Error streaming SDK messages")
-            stop_reason = "refusal"
+            stop_reason = "refusal"  # closest valid ACP stop_reason for errors
 
         return PromptResponse(stop_reason=stop_reason)
 

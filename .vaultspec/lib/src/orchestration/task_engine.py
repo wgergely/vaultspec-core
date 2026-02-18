@@ -232,12 +232,14 @@ class TaskEngine:
         self,
         ttl_seconds: float | None = None,
         lock_manager: LockManager | None = None,
+        max_working_seconds: float = 600,
     ) -> None:
         """Initialize the task engine.
 
         Args:
             ttl_seconds: Retention period.  Defaults to config value.
             lock_manager: LockManager for automatic release.
+            max_working_seconds: Max time a task may stay in WORKING state.
         """
         if ttl_seconds is None:
             from core.config import get_config
@@ -246,6 +248,7 @@ class TaskEngine:
         self._tasks: dict[str, SubagentTask] = {}
         self._lock = threading.Lock()
         self._ttl_seconds = ttl_seconds
+        self._max_working_seconds = max_working_seconds
         self._lock_manager = lock_manager
         self._expiry: dict[str, float] = {}
         self._events: dict[str, asyncio.Event] = {}
@@ -258,7 +261,7 @@ class TaskEngine:
                 logger.debug(f"Released advisory lock for task {task_id}")
 
     def _cleanup_expired(self) -> None:
-        """Remove tasks that have exceeded their TTL."""
+        """Remove tasks that have exceeded their TTL and evict stuck WORKING tasks."""
         now = time.monotonic()
         expired = [tid for tid, exp in self._expiry.items() if now >= exp]
         for tid in expired:
@@ -266,6 +269,23 @@ class TaskEngine:
             self._tasks.pop(tid, None)
             self._expiry.pop(tid, None)
             self._events.pop(tid, None)
+
+        # Evict WORKING tasks that exceed the maximum allowed duration.
+        stuck = [
+            tid
+            for tid, task in self._tasks.items()
+            if task.status == TaskStatus.WORKING
+            and (now - task.created_at) > self._max_working_seconds
+        ]
+        for tid in stuck:
+            task = self._tasks[tid]
+            task.status = TaskStatus.FAILED
+            task.error = "Task exceeded max working time"
+            task.updated_at = now
+            task.completed_at = now
+            self._expiry[tid] = now + self._ttl_seconds
+            self._release_lock(tid)
+            logger.warning("Evicted stuck WORKING task %s", tid)
 
     def create_task(
         self,
@@ -437,7 +457,11 @@ class TaskEngine:
             await event.wait()
 
     def _notify(self, task_id: str) -> None:
-        """Wake up any coroutine waiting on this task."""
+        """Wake up any coroutine waiting on this task.
+
+        Must be called from the event loop thread
+        (asyncio.Event.set is not thread-safe).
+        """
         with self._lock:
             event = self._events.pop(task_id, None)
         if event is not None:

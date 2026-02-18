@@ -6,7 +6,9 @@ Reuses sandboxing logic from protocol.a2a.executors.base.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -83,6 +85,7 @@ class ClaudeA2AExecutor(AgentExecutor):
         self._client_factory = client_factory or _default_client_factory
         self._options_factory = options_factory or _default_options_factory
         self._active_clients: dict[str, Any] = {}
+        self._clients_lock = asyncio.Lock()
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         task_id = context.task_id or ""
@@ -102,8 +105,12 @@ class ClaudeA2AExecutor(AgentExecutor):
             system_prompt=self._system_prompt,
         )
         sdk_client = self._client_factory(options)
-        self._active_clients[task_id] = sdk_client
+        async with self._clients_lock:
+            self._active_clients[task_id] = sdk_client
 
+        # Strip CLAUDECODE env var so the child claude process doesn't
+        # refuse to start inside an existing Claude Code session.
+        _saved_claudecode = os.environ.pop("CLAUDECODE", None)
         try:
             await sdk_client.connect()
             await sdk_client.query(prompt)
@@ -143,20 +150,24 @@ class ClaudeA2AExecutor(AgentExecutor):
             )
         finally:
             await sdk_client.disconnect()
-            self._active_clients.pop(task_id, None)
+            async with self._clients_lock:
+                self._active_clients.pop(task_id, None)
+            if _saved_claudecode is not None:
+                os.environ["CLAUDECODE"] = _saved_claudecode
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         task_id = context.task_id or ""
         context_id = context.context_id or ""
         updater = TaskUpdater(event_queue, task_id, context_id)
-        client = self._active_clients.pop(task_id, None)
+        async with self._clients_lock:
+            client = self._active_clients.pop(task_id, None)
         if client is not None:
             try:
                 client.interrupt()
             except Exception:
                 logger.exception("Error interrupting SDK client for task %s", task_id)
             try:
-                client.disconnect()
+                await client.disconnect()
             except Exception:
                 logger.exception("Error disconnecting SDK client for task %s", task_id)
         await updater.cancel()

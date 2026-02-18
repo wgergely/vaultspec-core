@@ -72,6 +72,7 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
 
 def parse_vault_metadata(content: str) -> tuple[DocumentMetadata, str]:
     """Parses rigid vault metadata from markdown content."""
+    content = content.lstrip()
     metadata = DocumentMetadata()
     body = content
     match = re.match(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", content, re.DOTALL)

@@ -30,8 +30,8 @@ from verification.api import (  # noqa: E402
 )
 
 
-def main():
-
+def _make_parser() -> argparse.ArgumentParser:
+    """Build the docs.py argument parser."""
     parser = argparse.ArgumentParser(description="Audit and manage the .vault vault.")
     parser.add_argument(
         "--verbose",
@@ -136,6 +136,12 @@ def main():
         "--json", action="store_true", help="Output results as JSON."
     )
 
+    return parser
+
+
+def main():
+
+    parser = _make_parser()
     args = parser.parse_args()
 
     if args.debug:
@@ -176,7 +182,9 @@ def handle_create(args):
 
     # Generate filename: yyyy-mm-dd-<feature>-<type>.md
     filename = f"{date_str}-{feature}-{doc_type.value}.md"
-    target_dir = root_dir / ".vault" / doc_type.value
+    from core.config import get_config
+
+    target_dir = root_dir / get_config().docs_dir / doc_type.value
     target_path = target_dir / filename
 
     if target_path.exists():

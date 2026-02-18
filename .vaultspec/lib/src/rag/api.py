@@ -8,6 +8,7 @@ torch, sentence-transformers, and lancedb.
 from __future__ import annotations
 
 import logging
+import threading
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -26,43 +27,58 @@ class VaultRAG:
 
     def __init__(self, root_dir: pathlib.Path) -> None:
         self.root_dir = root_dir
+        self._lock = threading.Lock()
         self._model = None
         self._store = None
         self._indexer = None
         self._searcher = None
 
-    # -- lazy properties -----------------------------------------------------
+    # -- lazy properties (thread-safe via self._lock) ------------------------
 
     @property
     def model(self) -> EmbeddingModel:
         if self._model is None:
-            from rag.embeddings import EmbeddingModel as _EmbeddingModel
+            with self._lock:
+                if self._model is None:
+                    from rag.embeddings import EmbeddingModel as _EmbeddingModel
 
-            self._model = _EmbeddingModel()
+                    self._model = _EmbeddingModel()
+        assert self._model is not None  # guaranteed by double-check init
         return self._model
 
     @property
     def store(self) -> VaultStore:
         if self._store is None:
-            from rag.store import VaultStore as _VaultStore
+            with self._lock:
+                if self._store is None:
+                    from rag.store import VaultStore as _VaultStore
 
-            self._store = _VaultStore(self.root_dir)
+                    self._store = _VaultStore(self.root_dir)
+        assert self._store is not None  # guaranteed by double-check init
         return self._store
 
     @property
     def indexer(self) -> VaultIndexer:
         if self._indexer is None:
-            from rag.indexer import VaultIndexer as _VaultIndexer
+            with self._lock:
+                if self._indexer is None:
+                    from rag.indexer import VaultIndexer as _VaultIndexer
 
-            self._indexer = _VaultIndexer(self.root_dir, self.model, self.store)
+                    self._indexer = _VaultIndexer(self.root_dir, self.model, self.store)
+        assert self._indexer is not None  # guaranteed by double-check init
         return self._indexer
 
     @property
     def searcher(self) -> VaultSearcher:
         if self._searcher is None:
-            from rag.search import VaultSearcher as _VaultSearcher
+            with self._lock:
+                if self._searcher is None:
+                    from rag.search import VaultSearcher as _VaultSearcher
 
-            self._searcher = _VaultSearcher(self.root_dir, self.model, self.store)
+                    self._searcher = _VaultSearcher(
+                        self.root_dir, self.model, self.store
+                    )
+        assert self._searcher is not None  # guaranteed by double-check init
         return self._searcher
 
     def close(self) -> None:
@@ -76,6 +92,16 @@ class VaultRAG:
 
 
 _engine: VaultRAG | None = None
+_engine_lock = threading.Lock()
+
+
+def reset_engine() -> None:
+    """Release resources and clear the module-level singleton."""
+    global _engine
+    with _engine_lock:
+        if _engine is not None:
+            _engine.close()
+        _engine = None
 
 
 def get_engine(root_dir: pathlib.Path) -> VaultRAG:
@@ -87,18 +113,25 @@ def get_engine(root_dir: pathlib.Path) -> VaultRAG:
     """
     global _engine
     if _engine is None or _engine.root_dir != root_dir:
-        if _engine is not None:
-            _engine.close()
-        _engine = VaultRAG(root_dir)
+        with _engine_lock:
+            # Double-check under lock
+            if _engine is None or _engine.root_dir != root_dir:
+                if _engine is not None:
+                    _engine.close()
+                _engine = VaultRAG(root_dir)
 
-        # Fail fast if GPU is unavailable
-        try:
-            from rag.embeddings import _require_cuda
+                # Fail fast if GPU is unavailable
+                try:
+                    from rag.embeddings import _require_cuda
 
-            _require_cuda()
-        except ImportError:
-            pass
+                    _require_cuda()
+                except ImportError:
+                    pass
+                except Exception:
+                    _engine = None
+                    raise
 
+    assert _engine is not None  # guaranteed by init block above
     return _engine
 
 
@@ -165,16 +198,14 @@ def get_document(root_dir: pathlib.Path, doc_id: str) -> dict | None:
     """Retrieve a single document by ID, or ``None`` if not found."""
     # Try the vector store first (fast, already parsed)
     try:
-        from rag.store import VaultStore
-
-        store = VaultStore(root_dir)
+        store = get_engine(root_dir).store
         result = store.get_by_id(doc_id)
         if result:
             return result
     except ImportError:
         logger.debug("RAG dependencies not available, falling back to filesystem")
     except (FileNotFoundError, OSError) as e:
-        logger.debug(f"Vector store lookup failed: {e}")
+        logger.warning("Vector store lookup failed: %s", e)
 
     # Fallback: scan the vault filesystem
     from vault.models import DocType
@@ -285,9 +316,8 @@ def get_status(root_dir: pathlib.Path) -> dict:
     # Try to get index info if RAG deps are available
     try:
         from rag.embeddings import get_device_info
-        from rag.store import VaultStore
 
-        store = VaultStore(root_dir)
+        store = get_engine(root_dir).store
         result["index"]["indexed_count"] = store.count()
         result["index"]["exists"] = result["index"]["indexed_count"] > 0
         device_info = get_device_info()
@@ -296,7 +326,7 @@ def get_status(root_dir: pathlib.Path) -> dict:
     except ImportError:
         logger.debug("RAG dependencies not available, skipping index info")
     except (FileNotFoundError, OSError) as e:
-        logger.debug(f"Could not read index info: {e}")
+        logger.debug("Could not read index info: %s", e)
 
     return result
 

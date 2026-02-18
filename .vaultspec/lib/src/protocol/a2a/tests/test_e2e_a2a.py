@@ -15,7 +15,6 @@ Markers:
 
 from __future__ import annotations
 
-import os
 import shutil
 import time
 import uuid
@@ -31,8 +30,8 @@ from protocol.a2a.tests.conftest import EchoExecutor, PrefixExecutor, _make_card
 from protocol.providers.base import ClaudeModels, GeminiModels
 
 requires_anthropic = pytest.mark.skipif(
-    not shutil.which("claude") or bool(os.environ.get("CLAUDECODE")),
-    reason="Claude CLI not on PATH or running inside Claude Code session",
+    not shutil.which("claude"),
+    reason="Claude CLI not on PATH",
 )
 
 requires_gemini = pytest.mark.skipif(

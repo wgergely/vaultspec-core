@@ -329,7 +329,7 @@ class VaultStore:
             return
         table = self.ensure_table()
         # Escape single quotes in ids to prevent injection
-        escaped = ", ".join(f"'{i.replace(chr(39), '')}'" for i in ids)
+        escaped = ", ".join(f"'{_sanitize_filter_value(i)}'" for i in ids)
         table.delete(f"id IN ({escaped})")
 
     _FilterKey = Literal["doc_type", "feature", "date"]

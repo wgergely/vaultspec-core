@@ -184,6 +184,7 @@ class VaultSearcher:
                 self._graph_built_at = now
             except Exception as e:
                 logger.error("Search failed: %s", e, exc_info=True)
+                self._graph_built_at = now
                 return None
         return self._cached_graph
 
