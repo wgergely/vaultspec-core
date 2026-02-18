@@ -26,6 +26,27 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: python -m pytest .vaultspec/lib/src -m unit --tb=short -q
 
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install pip-audit
+      - run: pip install -e ".[dev]"
+      - run: pip-audit
+
+  type-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -e ".[dev]"
+      - run: ty check .vaultspec/lib/src .vaultspec/lib/scripts
+
   # GPU tests require self-hosted runner with CUDA
   # integration-tests:
   #   runs-on: [self-hosted, gpu]

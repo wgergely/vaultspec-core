@@ -24,6 +24,23 @@ dependencies = [
     "mcp>=1.20.0",
     "PyYAML>=6.0",
 ]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Documentation",
+    "Typing :: Typed",
+]
+keywords = ["ai-agents", "governance", "spec-driven-development", "adr", "mcp", "acp", "a2a"]
+
+[project.urls]
+Homepage = "https://github.com/wgergely/task"
+Repository = "https://github.com/wgergely/task"
+Documentation = "https://github.com/wgergely/task/tree/main/docs"
+"Bug Tracker" = "https://github.com/wgergely/task/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -90,6 +107,9 @@ unfixable = ["B"]
 [tool.ruff.lint.isort]
 known-first-party = ["orchestration", "protocol"]
 known-third-party = ["acp"]
+
+[tool.setuptools.packages.find]
+where = [".vaultspec/lib/src"]
 
 [tool.ty.environment]
 python-version = "3.13"

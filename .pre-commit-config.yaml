@@ -17,7 +17,7 @@ repos:
 
       - id: ty
         name: ty
-        entry: .venv/Scripts/python.exe -m ty check
+        entry: .venv/Scripts/python.exe -m ty check .vaultspec/lib/src .vaultspec/lib/scripts
         language: system
         types: [python]
         pass_filenames: false

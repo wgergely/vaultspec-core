@@ -8,13 +8,11 @@ Covers: argument parsing for all subcommands (audit, create, index, search),
 
 from __future__ import annotations
 
-import argparse
 import json
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from tests.constants import PROJECT_ROOT, TEST_PROJECT
@@ -143,60 +141,10 @@ class TestArgumentParsing:
 
     @pytest.fixture()
     def parser(self):
-        """Build the docs.py argument parser without running main()."""
+        """Return the real docs.py argument parser."""
         import docs
 
-        p = argparse.ArgumentParser(description="Audit and manage the .vault vault.")
-        p.add_argument("--verbose", "-v", action="store_true")
-        p.add_argument("--debug", action="store_true")
-        p.add_argument(
-            "--version",
-            "-V",
-            action="version",
-            version=f"%(prog)s {docs._get_version()}",
-        )
-        subs = p.add_subparsers(dest="command", help="Commands")
-
-        # Audit
-        audit_p = subs.add_parser("audit")
-        audit_p.add_argument("--summary", action="store_true")
-        audit_p.add_argument("--features", action="store_true")
-        audit_p.add_argument("--verify", action="store_true")
-        audit_p.add_argument("--graph", action="store_true")
-        audit_p.add_argument("--root", type=Path, default=None)
-        audit_p.add_argument("--limit", type=int, default=10)
-        audit_p.add_argument("--type", type=str)
-        audit_p.add_argument("--feature", type=str)
-        audit_p.add_argument("--json", action="store_true")
-
-        # Create
-        from vault.models import DocType
-
-        create_p = subs.add_parser("create")
-        create_p.add_argument(
-            "--type",
-            type=str,
-            required=True,
-            choices=[dt.value for dt in DocType],
-        )
-        create_p.add_argument("--feature", type=str, required=True)
-        create_p.add_argument("--title", type=str)
-        create_p.add_argument("--root", type=Path, default=None)
-
-        # Index
-        idx_p = subs.add_parser("index")
-        idx_p.add_argument("--root", type=Path, default=None)
-        idx_p.add_argument("--full", action="store_true")
-        idx_p.add_argument("--json", action="store_true")
-
-        # Search
-        search_p = subs.add_parser("search")
-        search_p.add_argument("query", type=str)
-        search_p.add_argument("--root", type=Path, default=None)
-        search_p.add_argument("--limit", type=int, default=5)
-        search_p.add_argument("--json", action="store_true")
-
-        return p
+        return docs._make_parser()
 
     def test_audit_summary_flag(self, parser):
         args = parser.parse_args(["audit", "--summary"])
@@ -423,11 +371,11 @@ class TestCreateSubcommand:
 
     def test_create_generates_correct_filename(self, tmp_path):
         """Create should generate yyyy-mm-dd-<feature>-<type>.md filename."""
-        # Set up a minimal vault structure with a template
-        vault_dir = tmp_path / ".vault" / "adr"
-        vault_dir.mkdir(parents=True)
+        import argparse
 
-        # Create a minimal .vaultspec/templates directory with a template
+        import docs
+
+        # Set up a minimal .vaultspec/templates directory with a template
         template_dir = tmp_path / ".vaultspec" / "templates"
         template_dir.mkdir(parents=True)
         (template_dir / "adr.md").write_text(
@@ -435,16 +383,18 @@ class TestCreateSubcommand:
             encoding="utf-8",
         )
 
-        # We test the path logic without actually running the full CLI
-        # because it needs config initialization.
-        date_str = datetime.now().strftime("%Y-%m-%d")
-        feature = "my-feature"
-        doc_type_value = "adr"
-        filename = f"{date_str}-{feature}-{doc_type_value}.md"
-        target_path = tmp_path / ".vault" / doc_type_value / filename
+        args = argparse.Namespace(
+            type="adr", feature="my-feature", title="Test ADR", root=tmp_path
+        )
+        docs.handle_create(args)
 
-        assert target_path.name == f"{date_str}-my-feature-adr.md"
-        assert target_path.parent.name == "adr"
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        expected = tmp_path / ".vault" / "adr" / f"{date_str}-my-feature-adr.md"
+        assert expected.exists()
+        content = expected.read_text(encoding="utf-8")
+        assert "#my-feature" in content
+        assert date_str in content
+        assert "Test ADR" in content
 
     def test_create_strips_hash_from_feature(self):
         """Feature name should have leading # stripped."""
@@ -505,39 +455,35 @@ class TestNoCommand:
 class TestLoggingDispatch:
     """Test that --verbose and --debug correctly dispatch to configure_logging."""
 
-    def test_verbose_configures_info(self):
+    def test_verbose_configures_info(self, monkeypatch):
         """--verbose should call configure_logging(level='INFO')."""
-        with patch("docs.configure_logging") as mock_log:
-            import docs
+        import docs
 
-            # Simulate running main with --verbose audit --summary
-            with (
-                patch("sys.argv", ["docs.py", "--verbose", "audit", "--summary"]),
-                patch("docs.handle_audit"),
-            ):
-                docs.main()
-            mock_log.assert_called_once_with(level="INFO")
+        calls = []
+        monkeypatch.setattr(docs, "configure_logging", lambda **kw: calls.append(kw))
+        monkeypatch.setattr("sys.argv", ["docs.py", "--verbose", "audit", "--summary"])
+        monkeypatch.setattr(docs, "handle_audit", lambda *_args: None)
+        docs.main()
+        assert calls == [{"level": "INFO"}]
 
-    def test_debug_configures_debug(self):
+    def test_debug_configures_debug(self, monkeypatch):
         """--debug should call configure_logging(level='DEBUG')."""
-        with patch("docs.configure_logging") as mock_log:
-            import docs
+        import docs
 
-            with (
-                patch("sys.argv", ["docs.py", "--debug", "audit", "--summary"]),
-                patch("docs.handle_audit"),
-            ):
-                docs.main()
-            mock_log.assert_called_once_with(level="DEBUG")
+        calls = []
+        monkeypatch.setattr(docs, "configure_logging", lambda **kw: calls.append(kw))
+        monkeypatch.setattr("sys.argv", ["docs.py", "--debug", "audit", "--summary"])
+        monkeypatch.setattr(docs, "handle_audit", lambda *_args: None)
+        docs.main()
+        assert calls == [{"level": "DEBUG"}]
 
-    def test_default_configures_no_args(self):
+    def test_default_configures_no_args(self, monkeypatch):
         """No verbose/debug should call configure_logging() with no args."""
-        with patch("docs.configure_logging") as mock_log:
-            import docs
+        import docs
 
-            with (
-                patch("sys.argv", ["docs.py", "audit", "--summary"]),
-                patch("docs.handle_audit"),
-            ):
-                docs.main()
-            mock_log.assert_called_once_with()
+        calls = []
+        monkeypatch.setattr(docs, "configure_logging", lambda **kw: calls.append(kw))
+        monkeypatch.setattr("sys.argv", ["docs.py", "audit", "--summary"])
+        monkeypatch.setattr(docs, "handle_audit", lambda *_args: None)
+        docs.main()
+        assert calls == [{}]
