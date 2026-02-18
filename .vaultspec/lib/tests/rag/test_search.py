@@ -201,14 +201,8 @@ class TestSearchEdgeCases:
             "feature:test' UNION SELECT * FROM vault_docs --",
         ]
         for q in adversarial_queries:
-            # Should not raise an unhandled exception
-            try:
-                results = searcher.search(q, top_k=3)
-                assert isinstance(results, list)
-            except Exception:
-                # If it raises, that's acceptable - the important thing
-                # is it doesn't corrupt the store or crash the process
-                pass
+            results = searcher.search(q, top_k=3)
+            assert isinstance(results, list)
 
         # Verify the store is still functional after adversarial queries
         results = searcher.search("architecture", top_k=3)

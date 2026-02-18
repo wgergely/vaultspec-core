@@ -191,12 +191,17 @@ class TestFixViolations:
         assert not content.startswith("\ufeff")
         assert "#reference" in content
 
-    def test_no_fixes_for_valid_file(self, vault_root):
+    def test_no_fixes_for_valid_file(self, tmp_path):
         """Test that valid files are not modified."""
-        # Run fix on test-project which has some valid files
-        fixes = fix_violations(vault_root)
+        vault_dir = tmp_path / ".vault" / "adr"
+        vault_dir.mkdir(parents=True)
 
-        # There should be some files that don't need fixing
-        # (we know test-project has valid files)
-        # Just verify it returns a list and doesn't crash
+        valid_file = vault_dir / "2026-02-18-test-valid-adr.md"
+        valid_file.write_text(
+            '---\ntags: ["#adr", "#test"]\ndate: 2026-02-18\n---\n\n# Test Valid\n',
+            encoding="utf-8",
+        )
+
+        fixes = fix_violations(tmp_path)
         assert isinstance(fixes, list)
+        assert len(fixes) == 0

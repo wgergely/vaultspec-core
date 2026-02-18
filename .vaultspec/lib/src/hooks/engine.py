@@ -21,13 +21,12 @@ Supported events:
 from __future__ import annotations
 
 import logging
+import shlex
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +104,7 @@ def load_hooks(hooks_dir: Path) -> list[Hook]:
             if hook is not None:
                 hooks.append(hook)
         except Exception:
-            logger.warning("Failed to parse hook: %s", path.name)
+            logger.warning("Failed to parse hook: %s", path.name, exc_info=True)
 
     for path in sorted(hooks_dir.glob("*.yml")):
         try:
@@ -114,7 +113,7 @@ def load_hooks(hooks_dir: Path) -> list[Hook]:
             if hook is not None:
                 hooks.append(hook)
         except Exception:
-            logger.warning("Failed to parse hook: %s", path.name)
+            logger.warning("Failed to parse hook: %s", path.name, exc_info=True)
 
     return hooks
 
@@ -229,8 +228,8 @@ def _execute_shell(
     cmd = _interpolate(action.command, ctx)
     try:
         result = subprocess.run(
-            cmd,
-            shell=True,
+            shlex.split(cmd),
+            shell=False,
             capture_output=True,
             text=True,
             timeout=60,
@@ -266,10 +265,10 @@ def _execute_agent(
     """Execute an agent dispatch (delegates to subagent CLI)."""
     task_text = _interpolate(action.task, ctx)
     try:
-        from pathlib import Path as _Path
+        from core.config import get_config
 
-        scripts = _Path(__file__).resolve().parent.parent.parent
-        subagent_script = scripts / "scripts" / "subagent.py"
+        fw = Path(get_config().framework_dir)
+        subagent_script = fw / "lib" / "scripts" / "subagent.py"
 
         result = subprocess.run(
             [

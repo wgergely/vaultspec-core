@@ -106,8 +106,6 @@ class VaultConstants:
 
         return get_config().docs_dir
 
-    DOCS_DIR = ".vault"  # Backwards-compat default; prefer _get_docs_dir()
-
     # Supported directories within .vault/
     SUPPORTED_DIRECTORIES: ClassVar[set[str]] = {dt.value for dt in DocType}
 

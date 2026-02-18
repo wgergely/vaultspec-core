@@ -66,6 +66,7 @@ mcp = FastMCP(
 )
 
 # Globals — must be initialized via initialize_server() before use.
+# Thread-safe: single-event-loop assumption (one asyncio loop per process).
 ROOT_DIR: pathlib.Path
 AGENTS_DIR: pathlib.Path
 lock_manager: LockManager
@@ -280,14 +281,14 @@ def _has_changes() -> bool:
 def _build_agent_cache() -> dict[str, dict[str, object]]:
     cache: dict[str, dict[str, object]] = {}
     if not AGENTS_DIR.is_dir():
-        logger.warning(f"Agents directory not found: {AGENTS_DIR}")
+        logger.warning("Agents directory not found: %s", AGENTS_DIR)
         return cache
     for agent_path in sorted(AGENTS_DIR.glob("*.md")):
         try:
             metadata = _parse_agent_metadata(agent_path)
             cache[str(metadata["name"])] = metadata
         except Exception as exc:
-            logger.warning(f"Failed to parse agent {agent_path.name}: {exc}")
+            logger.warning("Failed to parse agent %s: %s", agent_path.name, exc)
     return cache
 
 
@@ -343,8 +344,11 @@ async def _send_list_changed() -> None:
 async def _poll_agent_files() -> None:
     while True:
         await asyncio.sleep(_poll_interval())
-        if _refresh_fn():
-            await _send_list_changed()
+        try:
+            if _refresh_fn():
+                await _send_list_changed()
+        except Exception:
+            logger.exception("Error in agent file poll loop")
 
 
 @mcp.tool(
@@ -511,6 +515,9 @@ async def dispatch_agent(
                     "artifacts": final_artifacts,
                 },
             )
+        except asyncio.CancelledError:
+            task_engine.cancel_task(task_id)
+            raise
         except SubagentError as e:
             task_engine.fail_task(task_id, str(e))
         except Exception as e:

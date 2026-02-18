@@ -144,17 +144,6 @@ class AgentProvider(abc.ABC):
     def models(self) -> ModelRegistry:
         """The model registry class for this provider."""
 
-    @property
-    def supported_models(self) -> list[str]:
-        return self.models.ALL
-
-    def get_model_capability(self, model: str) -> CapabilityLevel:
-        """Look up capability level from the registry. Defaults to MEDIUM."""
-        for level, name in self.models.BY_LEVEL.items():
-            if name == model:
-                return level
-        return CapabilityLevel.MEDIUM
-
     def get_best_model_for_capability(self, level: CapabilityLevel) -> str:
         """Look up best model from the registry. Defaults to MEDIUM."""
         return self.models.BY_LEVEL.get(level, self.models.MEDIUM)
@@ -167,7 +156,6 @@ class AgentProvider(abc.ABC):
     def load_rules(self, root_dir: pathlib.Path) -> str:
         """Load and resolve provider-specific rules."""
 
-    @abc.abstractmethod
     def construct_system_prompt(
         self,
         persona: str,
@@ -175,6 +163,14 @@ class AgentProvider(abc.ABC):
         system_instructions: str = "",
     ) -> str:
         """Combine system instructions, persona, and rules."""
+        parts = []
+        if system_instructions.strip():
+            parts.append(f"# SYSTEM INSTRUCTIONS\n{system_instructions}")
+        if persona.strip():
+            parts.append(f"# AGENT PERSONA\n{persona}")
+        if rules.strip():
+            parts.append(f"# SYSTEM RULES & CONTEXT\n{rules}")
+        return "\n\n".join(parts)
 
     def _validate_include_dirs(
         self,

@@ -193,7 +193,9 @@ class TestDispatchAgent:
         """Successful dispatch returns taskId and 'working' status."""
 
         async def _noop(**_kw):
-            pass
+            from protocol.acp.types import SubagentResult
+
+            return SubagentResult(response_text="ok", written_files=[], session_id=None)
 
         srv._agent_cache = baker_cache
 
@@ -241,7 +243,9 @@ class TestDispatchAgent:
         """Model override is included in the dispatch response."""
 
         async def _noop(**_kw):
-            pass
+            from protocol.acp.types import SubagentResult
+
+            return SubagentResult(response_text="ok", written_files=[], session_id=None)
 
         srv._agent_cache = baker_cache
 
@@ -263,7 +267,9 @@ class TestDispatchAgent:
         """dispatch_agent creates a task in the engine."""
 
         async def _noop(**_kw):
-            pass
+            from protocol.acp.types import SubagentResult
+
+            return SubagentResult(response_text="ok", written_files=[], session_id=None)
 
         srv._agent_cache = baker_cache
 
@@ -288,7 +294,9 @@ class TestDispatchAgent:
         """When no mode is passed, uses agent's default_mode from cache."""
 
         async def _noop(**_kw):
-            pass
+            from protocol.acp.types import SubagentResult
+
+            return SubagentResult(response_text="ok", written_files=[], session_id=None)
 
         srv._agent_cache = baker_cache
 

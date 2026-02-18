@@ -24,7 +24,7 @@ from vault.parser import parse_frontmatter
 
 from orchestration.utils import safe_read_text
 from protocol.acp.client import SessionLogger, SubagentClient
-from protocol.acp.types import SubagentResult
+from protocol.acp.types import SubagentError, SubagentResult
 from protocol.providers.claude import ClaudeProvider
 from protocol.providers.gemini import GeminiProvider
 
@@ -137,7 +137,7 @@ async def _interactive_loop(
 
         try:
             # Using loop.run_in_executor for non-blocking input
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             user_input = await loop.run_in_executor(None, input, "\nUser: ")
             if user_input.lower() in ("exit", "quit", "bye"):
                 break
@@ -218,7 +218,7 @@ async def run_subagent(
         mode=mode,
     )
     # 4. Spawn and Connect
-    session_id = resume_session_id or str(asyncio.get_event_loop().time())
+    session_id = resume_session_id or str(asyncio.get_running_loop().time())
     logger_instance = SessionLogger(session_id, root_dir)
 
     client = client_class(
@@ -319,16 +319,14 @@ async def run_subagent(
                     written_files=client.written_files,
                 )
 
-    except Exception:
+    except Exception as exc:
         logger.exception("Subagent execution failed")
-        return SubagentResult(
-            session_id=session_id,
-            response_text=client.response_text,
-            written_files=client.written_files,
-        )
+        raise SubagentError(f"Subagent execution failed: {exc}") from exc
 
     finally:
         # Cleanup
+        await client.close()
+
         if "spec" in locals():
             for path in spec.cleanup_paths:
                 if path.exists():

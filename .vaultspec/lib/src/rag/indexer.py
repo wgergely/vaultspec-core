@@ -136,8 +136,13 @@ class VaultIndexer:
         path_by_stem: dict[str, pathlib.Path] = {p.stem: p for p in paths}
         docs = []
         with ThreadPoolExecutor() as pool:
-            results = pool.map(lambda p: prepare_document(p, self.root_dir), paths)
-            for doc in results:
+            futures = [pool.submit(prepare_document, p, self.root_dir) for p in paths]
+            for future in futures:
+                try:
+                    doc = future.result()
+                except Exception:
+                    logger.warning("Worker failed to prepare document", exc_info=True)
+                    continue
                 if doc is not None:
                     docs.append(doc)
 
@@ -167,7 +172,11 @@ class VaultIndexer:
             if existing_ids:
                 self.store.delete_documents(list(existing_ids))
         except OSError:
-            logger.warning("Failed to delete existing documents during full re-index")
+            logger.error(
+                "Failed to delete existing documents during full "
+                "re-index — aborting to prevent duplicates"
+            )
+            raise
 
         self.store.upsert_documents(docs)
 

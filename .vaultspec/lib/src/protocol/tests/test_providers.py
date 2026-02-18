@@ -56,18 +56,6 @@ class TestGeminiProvider:
     def test_name(self, provider):
         assert provider.name == "gemini"
 
-    def test_supported_models(self, provider):
-        models = provider.supported_models
-        assert GeminiModels.LOW in models
-        assert GeminiModels.HIGH in models
-
-    def test_capability_pro_is_high(self, provider):
-        assert provider.get_model_capability(GeminiModels.HIGH) == CapabilityLevel.HIGH
-
-    def test_capability_flash_is_low(self, provider):
-        cap = provider.get_model_capability(GeminiModels.LOW)
-        assert cap == CapabilityLevel.LOW
-
     def test_best_model_high(self, provider):
         assert (
             provider.get_best_model_for_capability(CapabilityLevel.HIGH)
@@ -79,12 +67,6 @@ class TestGeminiProvider:
             provider.get_best_model_for_capability(CapabilityLevel.LOW)
             == GeminiModels.LOW
         )
-
-    def test_no_circular_fallback(self, provider):
-        low_model = provider.get_best_model_for_capability(CapabilityLevel.LOW)
-        assert provider.get_model_capability(low_model) == CapabilityLevel.LOW
-        high_model = provider.get_best_model_for_capability(CapabilityLevel.HIGH)
-        assert provider.get_model_capability(high_model) == CapabilityLevel.HIGH
 
     def test_prepare_process_returns_spec(self, provider):
         spec = provider.prepare_process(
@@ -216,19 +198,6 @@ class TestClaudeProvider:
 
     def test_name(self, provider):
         assert provider.name == "claude"
-
-    def test_supported_models(self, provider):
-        models = provider.supported_models
-        assert ClaudeModels.MEDIUM in models
-        assert ClaudeModels.HIGH in models
-
-    def test_capability_opus_is_high(self, provider):
-        assert provider.get_model_capability(ClaudeModels.HIGH) == CapabilityLevel.HIGH
-
-    def test_capability_sonnet_is_medium(self, provider):
-        assert (
-            provider.get_model_capability(ClaudeModels.MEDIUM) == CapabilityLevel.MEDIUM
-        )
 
     def test_best_model_high(self, provider):
         assert (
@@ -586,7 +555,6 @@ class TestProviderAPIParity:
         for method in (
             "load_system_prompt",
             "load_rules",
-            "construct_system_prompt",
             "prepare_process",
         ):
             assert method in abstracts

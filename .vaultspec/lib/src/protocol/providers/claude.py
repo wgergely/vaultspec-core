@@ -55,22 +55,6 @@ class ClaudeProvider(AgentProvider):
 
         return "\n\n".join(all_rules)
 
-    def construct_system_prompt(
-        self,
-        persona: str,
-        rules: str,
-        system_instructions: str = "",
-    ) -> str:
-        """Combines system instructions, persona, and rules."""
-        parts = []
-        if system_instructions.strip():
-            parts.append(f"# SYSTEM INSTRUCTIONS\n{system_instructions}")
-        if persona.strip():
-            parts.append(f"# AGENT PERSONA\n{persona}")
-        if rules.strip():
-            parts.append(f"# SYSTEM RULES & CONTEXT\n{rules}")
-        return "\n\n".join(parts)
-
     def prepare_process(
         self,
         agent_name: str,
