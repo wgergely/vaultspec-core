@@ -1,8 +1,19 @@
 # vaultspec
 
-> A governed development framework for AI agents
+![CI](https://github.com/wgergely/task/actions/workflows/ci.yml/badge.svg)
+![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue)
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+![Status: Alpha](https://img.shields.io/badge/status-alpha-orange)
+
+> The accountability layer for AI coding agents
 
 vaultspec enforces a **Research -> Specify -> Plan -> Execute -> Verify** workflow that turns AI coding assistants into accountable engineering partners.
+
+## The Problem
+
+AI coding agents write code fast — but they lose context between sessions, skip architectural decisions, produce inconsistent output, and leave no audit trail. When your CTO asks *why* the AI changed that function, all you have is a git blame. Regulated industries need more. Teams that ship quality need more.
+
+vaultspec adds the missing layer: a governed pipeline where every code change is traceable to the research that justified it, the ADR that formalized it, the plan that structured it, and the review that approved it.
 
 ## Why vaultspec?
 
@@ -22,10 +33,14 @@ vaultspec enforces a **Research -> Specify -> Plan -> Execute -> Verify** workfl
 
 ```bash
 # Clone and install
-git clone <repository-url>
+git clone https://github.com/wgergely/task
 cd vaultspec
-pip install -e ".[rag,dev]"
+pip install -e ".[rag,dev]" --extra-index-url https://download.pytorch.org/whl/cu130
+```
 
+> **Note:** The `[rag]` extras require an NVIDIA GPU with CUDA 13.0+. Core governance features (Research → Specify → Plan → Execute → Verify) work without GPU.
+
+```bash
 # List available agents
 python .vaultspec/lib/scripts/cli.py agents list
 
@@ -97,5 +112,4 @@ Version 0.1.0 -- active development.
 
 ## Development
 
-> [!CAUTION]
-> **Framework Development:** This repository is for the development of the framework itself. **DO NOT** run `cli.py config sync` or similar commands to "install" the framework into this root directory. The `.vaultspec/` folder here is the source of truth, and syncing it to the root (e.g., creating a root `AGENTS.md`) will cause recursive context issues and potential data loss during development.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and warnings.
