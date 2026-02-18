@@ -23,13 +23,13 @@ class TestVaultGraph:
 
     def test_node_doc_types(self, vault_root):
         graph = VaultGraph(vault_root)
-        node = graph.nodes["2026-02-05-editor-demo-architecture"]
+        node = graph.nodes["2026-02-05-editor-demo-architecture-adr"]
         assert node.doc_type == DocType.ADR
 
     def test_out_links_populated(self, vault_root):
         graph = VaultGraph(vault_root)
         # This ADR has related: links to research and reference docs
-        node = graph.nodes["2026-02-05-editor-demo-architecture"]
+        node = graph.nodes["2026-02-05-editor-demo-architecture-adr"]
         assert len(node.out_links) > 0
 
     def test_in_links_populated(self, vault_root):

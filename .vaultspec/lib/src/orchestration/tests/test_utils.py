@@ -26,7 +26,10 @@ class TestSafeReadText:
 
     def test_reads_nested_file(self):
         path = (
-            TEST_PROJECT / ".vault" / "adr" / "2026-02-05-editor-demo-architecture.md"
+            TEST_PROJECT
+            / ".vault"
+            / "adr"
+            / "2026-02-05-editor-demo-architecture-adr.md"
         )
         result = safe_read_text(path, TEST_PROJECT)
         assert "editor" in result.lower()

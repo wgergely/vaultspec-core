@@ -146,6 +146,8 @@ SKILLS_SRC_DIR: Path = Path()
 SYSTEM_SRC_DIR: Path = Path()
 FRAMEWORK_CONFIG_SRC: Path = Path()
 PROJECT_CONFIG_SRC: Path = Path()
+CONSTITUTION_SRC: Path = Path()
+HOOKS_DIR: Path = Path()
 TOOL_CONFIGS: dict[str, ToolConfig] = {}
 
 
@@ -153,7 +155,8 @@ def init_paths(root: Path) -> None:
     """(Re-)initialise all path globals from *root*."""
     global ROOT_DIR, RULES_SRC_DIR, AGENTS_SRC_DIR
     global SKILLS_SRC_DIR, SYSTEM_SRC_DIR
-    global FRAMEWORK_CONFIG_SRC, PROJECT_CONFIG_SRC, TOOL_CONFIGS
+    global FRAMEWORK_CONFIG_SRC, PROJECT_CONFIG_SRC
+    global CONSTITUTION_SRC, HOOKS_DIR, TOOL_CONFIGS
 
     from core.config import get_config
 
@@ -167,6 +170,8 @@ def init_paths(root: Path) -> None:
     SYSTEM_SRC_DIR = root / fw_dir / "system"
     FRAMEWORK_CONFIG_SRC = SYSTEM_SRC_DIR / "framework.md"
     PROJECT_CONFIG_SRC = SYSTEM_SRC_DIR / "project.md"
+    CONSTITUTION_SRC = root / fw_dir / "constitution.md"
+    HOOKS_DIR = root / fw_dir / "hooks"
 
     # Backward compatibility: warn if old filenames still exist
     for old_name, new_path in [
@@ -930,6 +935,15 @@ def sync_skills(
     return result
 
 
+def _read_constitution() -> str | None:
+    """Read constitution body content if it exists."""
+    if not CONSTITUTION_SRC.exists():
+        return None
+    content = CONSTITUTION_SRC.read_text(encoding="utf-8")
+    _meta, body = parse_frontmatter(content)
+    return body.strip() if body else None
+
+
 def _collect_rule_refs(cfg: ToolConfig) -> list[str]:
     """Collect rule file references."""
     if cfg.rules_dir is None or cfg.config_file is None:
@@ -1012,6 +1026,16 @@ def _generate_agents_md(cfg: ToolConfig) -> str | None:
         body_parts.append("")
         body_parts.append(custom_body)
 
+    # Add constitution
+    constitution_body = _read_constitution()
+    if constitution_body:
+        body_parts.append("")
+        body_parts.append("## Constitution")
+        body_parts.append("")
+        body_parts.append("The following principles are immutable:")
+        body_parts.append("")
+        body_parts.append(constitution_body)
+
     # Add rules
     refs = _collect_rule_refs(cfg)
     if refs:
@@ -1050,6 +1074,17 @@ def _generate_config(cfg: ToolConfig) -> str | None:
     if custom_body:
         body_parts.append(custom_body)
 
+    # Add constitution
+    constitution_body = _read_constitution()
+    if constitution_body:
+        if body_parts:
+            body_parts.append("")
+        body_parts.append("## Constitution")
+        body_parts.append("")
+        body_parts.append("The following principles are immutable:")
+        body_parts.append("")
+        body_parts.append(constitution_body)
+
     # Add rules
     refs = _collect_rule_refs(cfg)
     if refs:
@@ -1075,6 +1110,51 @@ def _is_cli_managed(path: Path) -> bool:
         return content.startswith(CONFIG_HEADER)
     except Exception:
         return False
+
+
+def constitution_show(_args: argparse.Namespace) -> None:
+    """Display current constitution content."""
+    if not CONSTITUTION_SRC.exists():
+        rel = CONSTITUTION_SRC.relative_to(ROOT_DIR)
+        print(f"No constitution found at {rel}")
+        print("Run 'constitution init' to create from template.")
+        return
+
+    print(f"Constitution: {CONSTITUTION_SRC.relative_to(ROOT_DIR)}")
+    print("-" * 60)
+    content = CONSTITUTION_SRC.read_text(encoding="utf-8")
+    meta, body = parse_frontmatter(content)
+    if meta:
+        print("--- Metadata ---")
+        for k, v in meta.items():
+            print(f"  {k}: {v}")
+        print("---")
+    print(body.strip())
+    print("-" * 60)
+
+
+def constitution_init(args: argparse.Namespace) -> None:
+    """Create constitution.md from template."""
+    from core.config import get_config
+
+    cfg = get_config()
+    template_path = ROOT_DIR / cfg.framework_dir / "templates" / "constitution.md"
+
+    if not template_path.exists():
+        print(f"Error: Template not found at {template_path.relative_to(ROOT_DIR)}")
+        return
+
+    if CONSTITUTION_SRC.exists() and not getattr(args, "force", False):
+        rel = CONSTITUTION_SRC.relative_to(ROOT_DIR)
+        print(f"Error: Constitution already exists at {rel}. Use --force to overwrite.")
+        return
+
+    template_content = template_path.read_text(encoding="utf-8")
+    ensure_dir(CONSTITUTION_SRC.parent)
+    atomic_write(CONSTITUTION_SRC, template_content)
+    rel = CONSTITUTION_SRC.relative_to(ROOT_DIR)
+    print(f"Created constitution at {rel}")
+    print("Run 'config sync' to propagate to tool configurations.")
 
 
 def config_show(_args: argparse.Namespace) -> None:
@@ -1573,6 +1653,416 @@ def init_run(args: argparse.Namespace) -> None:
     print(f"\nCreated {len(created)} directories/files. Run 'cli.py sync-all' to sync.")
 
 
+def readiness_run(args: argparse.Namespace) -> None:
+    """Assess codebase governance readiness across 6 dimensions."""
+    import json
+
+    from core.config import get_config
+
+    cfg = get_config()
+    fw_dir = ROOT_DIR / cfg.framework_dir
+    vault_dir = ROOT_DIR / ".vault"
+
+    # Dimension 1: Documentation (.vault/ health)
+    doc_score = 1
+    doc_detail = "No .vault/ directory"
+    if vault_dir.exists():
+        # Count docs across all doc_types
+        doc_types = ["adr", "plan", "research", "reference", "exec"]
+        all_docs = list(vault_dir.rglob("*.md"))
+        doc_count = len(all_docs)
+        present_types = {
+            dt
+            for dt in doc_types
+            if (vault_dir / dt).exists() and any((vault_dir / dt).glob("*.md"))
+        }
+
+        if doc_count < 5:
+            doc_score = 2
+            doc_detail = f"{doc_count} docs, needs more coverage"
+        elif doc_count < 20:
+            doc_score = 3
+            missing = set(doc_types) - present_types
+            if missing:
+                doc_detail = f"{doc_count} docs, missing: {', '.join(missing)}"
+            else:
+                doc_detail = f"{doc_count} docs, all types present"
+        elif doc_count < 50:
+            doc_score = 4
+            doc_detail = f"{doc_count} docs, all types present"
+        else:
+            doc_score = 5
+            doc_detail = f"{doc_count} docs, comprehensive coverage"
+
+    # Dimension 2: Framework (.vaultspec/ structure)
+    fw_score = 1
+    fw_detail = "No .vaultspec/ directory"
+    if fw_dir.exists():
+        has_agents = (fw_dir / "agents").exists() and any(
+            (fw_dir / "agents").glob("*.md")
+        )
+        has_skills = (fw_dir / "skills").exists() and any(
+            (fw_dir / "skills").glob("*.md")
+        )
+        has_rules = (fw_dir / "rules").exists() and any((fw_dir / "rules").glob("*.md"))
+        has_system = (fw_dir / "system").exists()
+        has_templates = (fw_dir / "templates").exists()
+
+        if any([has_agents, has_skills, has_rules]):
+            fw_score = 3
+            parts = []
+            if has_agents:
+                parts.append("agents")
+            if has_skills:
+                parts.append("skills")
+            if has_rules:
+                parts.append("rules")
+            fw_detail = f"Has {', '.join(parts)}"
+        else:
+            fw_score = 2
+            fw_detail = ".vaultspec/ exists but minimal content"
+
+        if has_agents and has_skills and has_rules and has_system:
+            fw_score = 4
+            fw_detail = "Complete structure with system/"
+
+        if fw_score == 4 and has_templates:
+            # Check for custom content (non-builtin)
+            custom_count = 0
+            for d in [fw_dir / "agents", fw_dir / "skills", fw_dir / "rules"]:
+                if d.exists():
+                    custom_count += len(
+                        [
+                            f
+                            for f in d.glob("*.md")
+                            if not f.name.endswith(".builtin.md")
+                        ]
+                    )
+            if custom_count > 0:
+                fw_score = 5
+                fw_detail = f"Complete + {custom_count} custom resources"
+
+    # Dimension 3: Rules & Governance
+    rules_score = 1
+    rules_detail = "No rules defined"
+    if (fw_dir / "rules").exists():
+        all_rules = list((fw_dir / "rules").glob("*.md"))
+        builtin = [r for r in all_rules if r.name.endswith(".builtin.md")]
+        custom = [r for r in all_rules if not r.name.endswith(".builtin.md")]
+        total_rules = len(all_rules)
+
+        if total_rules == 0:
+            rules_score = 1
+            rules_detail = "No rules defined"
+        elif total_rules <= 2:
+            rules_score = 2
+            rules_detail = f"{total_rules} rule(s)"
+        elif len(custom) == 0:
+            rules_score = 3
+            rules_detail = f"{total_rules} builtin rules"
+        elif len(custom) > 0:
+            rules_score = 4
+            rules_detail = f"{len(builtin)} builtin + {len(custom)} custom"
+
+        # Check if synced to all tool destinations
+        if rules_score >= 4:
+            synced_count = 0
+            for cfg_item in TOOL_CONFIGS.values():
+                if (
+                    cfg_item.rules_dir
+                    and cfg_item.rules_dir.exists()
+                    and any(cfg_item.rules_dir.glob("*.md"))
+                ):
+                    synced_count += 1
+            if synced_count >= 3:  # claude, gemini, antigravity
+                rules_score = 5
+                rules_detail += ", synced to all tools"
+
+    # Dimension 4: Agent Coverage
+    agent_score = 1
+    agent_detail = "No agents"
+    if (fw_dir / "agents").exists():
+        agents = list((fw_dir / "agents").glob("*.md"))
+        agent_count = len(agents)
+
+        if agent_count == 0:
+            agent_score = 1
+            agent_detail = "No agents"
+        elif agent_count <= 2:
+            agent_score = 2
+            agent_detail = f"{agent_count} agent(s)"
+        elif agent_count <= 5:
+            agent_score = 3
+            agent_detail = f"{agent_count} agents covering basic roles"
+        else:
+            # Check tier assignments
+            tier_count = 0
+            for agent_file in agents:
+                content = agent_file.read_text(encoding="utf-8")
+                meta, _body = parse_frontmatter(content)
+                if "tier" in meta:
+                    tier_count += 1
+
+            agent_score = 4
+            agent_detail = f"{agent_count} agents with tier assignments"
+
+            # Check if synced
+            synced_count = 0
+            for cfg_item in TOOL_CONFIGS.values():
+                if (
+                    cfg_item.agents_dir
+                    and cfg_item.agents_dir.exists()
+                    and any(cfg_item.agents_dir.glob("*.md"))
+                ):
+                    synced_count += 1
+            if synced_count >= 2 and tier_count == agent_count:
+                agent_score = 5
+                agent_detail = f"{agent_count} agents, all synced"
+
+    # Dimension 5: Test Infrastructure
+    test_score = 1
+    test_detail = "No test files found"
+    test_dirs = [
+        ROOT_DIR / ".vaultspec" / "lib" / "tests",
+        ROOT_DIR / ".vaultspec" / "lib" / "src",
+    ]
+    test_files = []
+    for test_dir in test_dirs:
+        if test_dir.exists():
+            test_files.extend(list(test_dir.rglob("test_*.py")))
+
+    if test_files:
+        test_score = 2
+        test_detail = f"{len(test_files)} test files"
+
+        # Check for pytest markers
+        has_markers = False
+        for tf in test_files[:10]:  # Sample first 10
+            content = tf.read_text(encoding="utf-8")
+            if "@pytest.mark." in content:
+                has_markers = True
+                break
+
+        if has_markers:
+            test_score = 3
+            test_detail = f"{len(test_files)} tests with pytest markers"
+
+        # Check for conftest.py (organized fixtures)
+        conftest_files = []
+        for test_dir in test_dirs:
+            if test_dir.exists():
+                conftest_files.extend(list(test_dir.rglob("conftest.py")))
+        if conftest_files:
+            test_score = 4
+            test_detail = f"{len(test_files)} tests, {len(conftest_files)} fixtures"
+
+        # Check for CI pipeline or benchmarks
+        ci_files = [
+            ROOT_DIR / ".github" / "workflows",
+            ROOT_DIR / ".vaultspec" / "lib" / "tests" / "benchmarks",
+        ]
+        has_ci = any(d.exists() for d in ci_files)
+        if has_ci:
+            test_score = 5
+            test_detail = f"{len(test_files)} tests + CI/benchmarks"
+
+    # Dimension 6: Environment (GPU/deps)
+    env_score = 1
+    env_detail = "Missing Python or critical deps"
+
+    try:
+        # Python OK
+        env_score = 2
+        py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
+        env_detail = f"Python {py_ver}, no GPU detected"
+
+        # Check GPU
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                env_score = 3
+                props = torch.cuda.get_device_properties(0)
+                gpu_name = props.name
+                env_detail = f"GPU: {gpu_name}"
+
+                # Check for optional deps
+                try:
+                    import lancedb  # noqa: F401
+                    import sentence_transformers  # noqa: F401
+
+                    env_score = 4
+                    env_detail = f"GPU + all deps, {gpu_name}"
+                except ImportError:
+                    env_detail = f"GPU: {gpu_name}, missing optional deps"
+
+                # Check for .lance index
+                lance_dir = ROOT_DIR / ".vault" / ".lance"
+                if lance_dir.exists():
+                    env_score = 5
+                    env_detail = f"Full env + .lance index, {gpu_name}"
+        except ImportError:
+            pass  # No torch, stay at score 2
+    except Exception:
+        env_score = 1
+        env_detail = "Environment check failed"
+
+    # Build results
+    dimensions: dict[str, dict[str, int | str]] = {
+        "documentation": {"score": doc_score, "max": 5, "detail": doc_detail},
+        "framework": {"score": fw_score, "max": 5, "detail": fw_detail},
+        "rules_governance": {
+            "score": rules_score,
+            "max": 5,
+            "detail": rules_detail,
+        },
+        "agent_coverage": {
+            "score": agent_score,
+            "max": 5,
+            "detail": agent_detail,
+        },
+        "test_infrastructure": {
+            "score": test_score,
+            "max": 5,
+            "detail": test_detail,
+        },
+        "environment": {"score": env_score, "max": 5, "detail": env_detail},
+    }
+
+    total_score = sum(int(d["score"]) for d in dimensions.values())
+    max_total = sum(int(d["max"]) for d in dimensions.values())
+    overall = total_score / max_total * 5 if max_total > 0 else 0
+
+    # Generate recommendations
+    recommendations = []
+    if doc_score < 4:
+        recommendations.append(
+            "Add more documentation across ADRs, plans, research, references"
+        )
+    if fw_score < 4:
+        recommendations.append("Complete .vaultspec/ structure with system/")
+    if rules_score < 4:
+        recommendations.append("Create custom rules for project conventions")
+    if rules_score == 4:
+        recommendations.append("Run 'cli.py sync-all' to sync rules to all tools")
+    if agent_score < 4:
+        recommendations.append("Add more agents with tier assignments")
+    if agent_score == 4:
+        recommendations.append("Run 'cli.py agents sync' to sync agents")
+    if test_score < 5:
+        recommendations.append("Add CI pipeline for automated testing")
+    if env_score < 4:
+        recommendations.append("Install optional dependencies (lancedb, etc.)")
+    if env_score == 4:
+        recommendations.append("Run 'docs.py index' to build .lance index")
+
+    # Output
+    if getattr(args, "json", False):
+        result = {
+            "dimensions": dimensions,
+            "overall": round(overall, 1),
+            "total": total_score,
+            "max_total": max_total,
+            "recommendations": recommendations,
+        }
+        print(json.dumps(result, indent=2))
+    else:
+        # Text output
+        print("vaultspec Readiness Assessment")
+        print("=" * 62)
+        print()
+
+        # Progress bar helper
+        def _bar(score: int, max_score: int = 5) -> str:
+            filled = "#" * score
+            empty = "-" * (max_score - score)
+            return filled + empty
+
+        # Print dimensions
+        labels = [
+            ("Documentation", "documentation"),
+            ("Framework", "framework"),
+            ("Rules & Governance", "rules_governance"),
+            ("Agent Coverage", "agent_coverage"),
+            ("Test Infrastructure", "test_infrastructure"),
+            ("Environment", "environment"),
+        ]
+        for label, key in labels:
+            dim = dimensions[key]
+            bar = _bar(int(dim["score"]), int(dim["max"]))
+            score_str = f"{dim['score']}/{dim['max']}"
+            detail = dim["detail"]
+            print(f"{label:<22} {bar} {score_str:>3}  ({detail})")
+
+        print()
+        print(f"Overall: {overall:.1f}/5 ({total_score}/{max_total})")
+
+        if recommendations:
+            print()
+            print("Recommendations:")
+            for rec in recommendations:
+                print(f"  - {rec}")
+
+
+# ---------------------------------------------------------------
+# Hooks
+# ---------------------------------------------------------------
+
+
+def hooks_list(_args: argparse.Namespace) -> None:
+    """List all defined hooks."""
+    from hooks.engine import SUPPORTED_EVENTS, load_hooks
+
+    hooks = load_hooks(HOOKS_DIR)
+    if not hooks:
+        print("No hooks defined.")
+        print(f"  Add .yaml files to {HOOKS_DIR.relative_to(ROOT_DIR)}/")
+        print(f"\nSupported events: {', '.join(sorted(SUPPORTED_EVENTS))}")
+        return
+
+    for hook in hooks:
+        status = "enabled" if hook.enabled else "disabled"
+        print(f"  {hook.name} [{status}]")
+        print(f"    event: {hook.event}")
+        for action in hook.actions:
+            if action.action_type == "shell":
+                print(f"    -> shell: {action.command}")
+            elif action.action_type == "agent":
+                print(f"    -> agent: {action.agent_name}")
+
+
+def hooks_run(args: argparse.Namespace) -> None:
+    """Manually trigger hooks for a given event."""
+    from hooks.engine import SUPPORTED_EVENTS, load_hooks, trigger
+
+    event = args.event
+    if event not in SUPPORTED_EVENTS:
+        print(f"Unknown event: {event}")
+        print(f"Supported: {', '.join(sorted(SUPPORTED_EVENTS))}")
+        return
+
+    hooks = load_hooks(HOOKS_DIR)
+    matching = [h for h in hooks if h.event == event and h.enabled]
+    if not matching:
+        print(f"No enabled hooks for event: {event}")
+        return
+
+    ctx = {"root": str(ROOT_DIR), "event": event}
+    if hasattr(args, "path") and args.path:
+        ctx["path"] = args.path
+
+    print(f"Triggering {len(matching)} hook(s) for '{event}'...")
+    results = trigger(hooks, event, ctx)
+    for r in results:
+        icon = "[OK]" if r.success else "[FAIL]"
+        print(f"  {r.hook_name} ({r.action_type}): {icon}")
+        if r.output:
+            for line in r.output.splitlines()[:5]:
+                print(f"    {line}")
+        if r.error:
+            print(f"    error: {r.error}")
+
+
 def add_sync_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--prune", action="store_true", help="Remove unknown files")
     parser.add_argument("--dry-run", action="store_true", help="Preview changes")
@@ -1712,6 +2202,21 @@ def main() -> None:
     skills_sync_parser = skills_sub.add_parser("sync", help="Sync skills")
     add_sync_flags(skills_sync_parser)
 
+    # --- constitution ---
+    constitution_parser = resource_parsers.add_parser(
+        "constitution", help="Manage constitution"
+    )
+    constitution_sub = constitution_parser.add_subparsers(dest="command")
+
+    constitution_sub.add_parser("show", help="Display constitution")
+
+    constitution_init_parser = constitution_sub.add_parser(
+        "init", help="Create constitution from template"
+    )
+    constitution_init_parser.add_argument(
+        "--force", action="store_true", help="Overwrite existing"
+    )
+
     # --- config ---
     config_parser = resource_parsers.add_parser(
         "config", help="Manage tool configs (CLAUDE.md, GEMINI.md)"
@@ -1770,6 +2275,22 @@ def main() -> None:
     init_parser.add_argument(
         "--force", action="store_true", help="Overwrite existing structure"
     )
+
+    # --- readiness ---
+    readiness_parser = resource_parsers.add_parser(
+        "readiness", help="Assess codebase governance readiness"
+    )
+    readiness_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # --- hooks ---
+    hooks_parser = resource_parsers.add_parser(
+        "hooks", help="Manage event-driven hooks"
+    )
+    hooks_sub = hooks_parser.add_subparsers(dest="command")
+    hooks_sub.add_parser("list", help="List all hooks")
+    hooks_run_parser = hooks_sub.add_parser("run", help="Trigger hooks for an event")
+    hooks_run_parser.add_argument("event", help="Event name")
+    hooks_run_parser.add_argument("--path", help="Context path variable")
 
     args = parser.parse_args()
 
@@ -1836,6 +2357,13 @@ def main() -> None:
             skills_sync(args)
         else:
             skills_parser.print_help()
+    elif args.resource == "constitution":
+        if args.command == "show":
+            constitution_show(args)
+        elif args.command == "init":
+            constitution_init(args)
+        else:
+            constitution_parser.print_help()
     elif args.resource == "config":
         if args.command == "show":
             config_show(args)
@@ -1864,6 +2392,15 @@ def main() -> None:
         doctor_run(args)
     elif args.resource == "init":
         init_run(args)
+    elif args.resource == "readiness":
+        readiness_run(args)
+    elif args.resource == "hooks":
+        if args.command == "list":
+            hooks_list(args)
+        elif args.command == "run":
+            hooks_run(args)
+        else:
+            hooks_parser.print_help()
     else:
         parser.print_help()
 

@@ -29,7 +29,7 @@ class TestScanVault:
 
     def test_includes_known_adr(self):
         names = {p.name for p in scan_vault(TEST_PROJECT)}
-        assert "2026-02-05-editor-demo-architecture.md" in names
+        assert "2026-02-05-editor-demo-architecture-adr.md" in names
 
     def test_includes_known_plan(self):
         names = {p.name for p in scan_vault(TEST_PROJECT)}
@@ -39,7 +39,10 @@ class TestScanVault:
 class TestGetDocType:
     def test_adr_dir(self):
         path = (
-            TEST_PROJECT / ".vault" / "adr" / "2026-02-05-editor-demo-architecture.md"
+            TEST_PROJECT
+            / ".vault"
+            / "adr"
+            / "2026-02-05-editor-demo-architecture-adr.md"
         )
         assert get_doc_type(path, TEST_PROJECT) == DocType.ADR
 

@@ -67,11 +67,14 @@ class TestIndexResult:
 class TestPrepareDocument:
     def test_prepares_valid_document(self):
         doc_path = (
-            TEST_PROJECT / ".vault" / "adr" / "2026-02-05-editor-demo-architecture.md"
+            TEST_PROJECT
+            / ".vault"
+            / "adr"
+            / "2026-02-05-editor-demo-architecture-adr.md"
         )
         doc = prepare_document(doc_path, TEST_PROJECT)
         assert doc is not None
-        assert doc.id == "2026-02-05-editor-demo-architecture"
+        assert doc.id == "2026-02-05-editor-demo-architecture-adr"
         assert doc.doc_type == "adr"
         assert doc.feature == "editor-demo"
         assert len(doc.title) > 0

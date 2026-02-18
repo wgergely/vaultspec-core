@@ -23,6 +23,7 @@ from metrics.api import get_vault_metrics  # noqa: E402
 from vault.hydration import get_template_path, hydrate_template  # noqa: E402
 from vault.models import DocType  # noqa: E402
 from verification.api import (  # noqa: E402
+    fix_violations,
     get_malformed,
     list_features,
     verify_vertical_integrity,
@@ -72,6 +73,9 @@ def main():
     )
     audit_parser.add_argument(
         "--json", action="store_true", help="Output results in JSON format."
+    )
+    audit_parser.add_argument(
+        "--fix", action="store_true", help="Auto-repair common violations."
     )
 
     # Create command
@@ -231,6 +235,28 @@ def handle_audit(args):
             else:
                 print("Verification Passed.")
             print()
+
+        # Auto-fix violations if requested
+        if args.fix and errors:
+            if not args.json:
+                print("Running auto-repair...")
+            fixes = fix_violations(root_dir)
+            results["fixes"] = [
+                {
+                    "path": str(f.path),
+                    "action": f.action,
+                    "detail": f.detail,
+                }
+                for f in fixes
+            ]
+            if not args.json:
+                if fixes:
+                    print(f"\nApplied {len(fixes)} fixes:")
+                    for fix in fixes:
+                        print(f"  {fix}")
+                else:
+                    print("\nNo auto-fixable violations found.")
+                print()
 
     if args.graph:
         graph = VaultGraph(root_dir)

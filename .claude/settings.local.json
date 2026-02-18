@@ -201,7 +201,19 @@
       "Bash(/tmp/logging_audit_summary.txt:*)",
       "Bash(.venvScriptspython.exe -c \"from claude_agent_sdk.types import ToolPermissionContext; import inspect; print\\(inspect.signature\\(ToolPermissionContext\\)\\); print\\(inspect.getsource\\(ToolPermissionContext\\)\\)\")",
       "Bash(source:*)",
-      "Bash(.venvScriptspython.exe -c \"import pytest; print\\(pytest.__version__\\)\")"
+      "Bash(.venvScriptspython.exe -c \"import pytest; print\\(pytest.__version__\\)\")",
+      "WebFetch(domain:martinfowler.com)",
+      "Bash(if not exist \"Y:\\\\code\\\\task-worktrees\\\\main\\\\.vault\\\\audit\" mkdir \"Y:\\\\code\\\\task-worktrees\\\\main\\\\.vault\\\\audit\")",
+      "WebFetch(domain:cookbook.openai.com)",
+      "WebFetch(domain:developers.openai.com)",
+      "WebFetch(domain:arxiv.org)",
+      "WebFetch(domain:01.me)",
+      "Bash(Y:/code/task-worktrees/main/.venv/Scripts/python.exe:*)",
+      "Bash(npx markdownlint-cli:*)",
+      "Bash(npx markdownlint-cli2:*)",
+      "Bash(ren:*)",
+      "Bash(node_modules/.bin/markdownlint:*)",
+      "Bash(.venvScriptspython.exe .vaultspeclibscriptscli.py config sync --dry-run)"
     ]
   }
 }
