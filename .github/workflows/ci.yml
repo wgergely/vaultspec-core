@@ -17,7 +17,10 @@ jobs:
       - run: ruff check .vaultspec/lib/src .vaultspec/lib/scripts .vaultspec/lib/tests
 
   unit-tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

@@ -1,108 +1,132 @@
 # Spec-Driven Development (SDD)
 
-This folder contains the rule and template collection mandating the research, reference, ADR, and sub-agent based development process.
+This folder contains the rule and template collection mandating the research,
+reference, ADR, and sub-agent based development process.
 The rules are compatible with Google Antigravity, Gemini CLI and Claude Code.
 
 ## User Manual
 
 ### The Workflow
 
-The system enforces a strict **Research -> Specify -> Plan -> Execute -> Verify** cycle. You do not simply "write code"; you build a trail of documentation that ensures quality and context preservation.
+The system enforces a strict **Research -> Specify -> Plan -> Execute ->
+Verify** cycle. You do not simply "write code"; you build a trail of
+documentation that ensures quality and context preservation.
 
 **High-Level Summary:**
 
-* **Research (`vaultspec-research`)** & **Reference (`vaultspec-reference`)** gather the data.
-* **Specify (`vaultspec-adr`)** formalizes the choice.
-* **Plan (`vaultspec-write`)** defines the steps.
-* **Execute (`vaultspec-execute`)** builds it.
-* **Verify (`vaultspec-review`)** validates it.
-* **Curate (`vaultspec-docs-curator`)** cleans up.
+- **Research (`vaultspec-research`)** & **Reference (`vaultspec-reference`)**
+  gather the data.
+- **Specify (`vaultspec-adr`)** formalizes the choice.
+- **Plan (`vaultspec-write`)** defines the steps.
+- **Execute (`vaultspec-execute`)** builds it.
+- **Verify (`vaultspec-review`)** validates it.
+- **Curate (`vaultspec-docs-curator`)** cleans up.
 
 #### Detailed Steps
 
-* **Research (`vaultspec-research`)**:
-  * **Goal:** Understand the problem, explore libraries, and find "frontier" patterns.
-  * **Agent:** `vaultspec-adr-researcher` (High Tier).
-  * **Output:** `.vault/research/...` artifact.
-  * *Usage:* "Activate `vaultspec-research` to investigate [topic]."
+- **Research (`vaultspec-research`)**:
+  - **Goal:** Understand the problem, explore libraries, and find "frontier"
+    patterns.
+  - **Agent:** `vaultspec-adr-researcher` (High Tier).
+  - **Output:** `.vault/research/...` artifact.
+  - *Usage:* "Activate `vaultspec-research` to investigate `{topic}`."
 
-* **Specify (`vaultspec-adr`)**:
-  * **Goal:** Make binding technical decisions based on your research.
-  * **Output:** `.vault/adr/...` artifact.
-  * *Usage:* "Activate `vaultspec-adr` to formalize our decision on [topic]."
+- **Specify (`vaultspec-adr`)**:
+  - **Goal:** Make binding technical decisions based on your research.
+  - **Output:** `.vault/adr/...` artifact.
+  - *Usage:* "Activate `vaultspec-adr` to formalize our decision on
+    `{topic}`."
 
-* **Plan (`vaultspec-write`)**:
-  * **Goal:** Convert the ADR into a step-by-step implementation plan.
-  * **Agent:** `vaultspec-writer` (High Tier).
-  * **Output:** `.vault/plan/...` artifact.
-  * *Usage:* "Activate `vaultspec-write` to create a plan for [feature]."
+- **Plan (`vaultspec-write`)**:
+  - **Goal:** Convert the ADR into a step-by-step implementation plan.
+  - **Agent:** `vaultspec-writer` (High Tier).
+  - **Output:** `.vault/plan/...` artifact.
+  - *Usage:* "Activate `vaultspec-write` to create a plan for `{feature}`."
 
-* **Execute (`vaultspec-execute`)**:
-  * **Goal:** Implement the plan using specialized sub-agents.
-  * **Agent:** Orchestrator (You) + Executors (`vaultspec-simple-executor`, `vaultspec-complex-executor`).
-  * **Output:** Code changes + `.vault/exec/...` logs.
-  * *Usage:* "Activate `vaultspec-execute` to implement the plan."
+- **Execute (`vaultspec-execute`)**:
+  - **Goal:** Implement the plan using specialized sub-agents.
+  - **Agent:** Orchestrator (You) + Executors (`vaultspec-simple-executor`,
+    `vaultspec-complex-executor`).
+  - **Output:** Code changes + `.vault/exec/...` logs.
+  - *Usage:* "Activate `vaultspec-execute` to implement the plan."
 
-* **Verify (`vaultspec-review`)**:
-  * **Goal:** Validate the implementation against the plan and safety standards.
-  * **Agent:** `vaultspec-code-reviewer` (High Tier).
-  * *Usage:* "Activate `vaultspec-review` to audit the implementation."
+- **Verify (`vaultspec-review`)**:
+  - **Goal:** Validate the implementation against the plan and safety
+    standards.
+  - **Agent:** `vaultspec-code-reviewer` (High Tier).
+  - *Usage:* "Activate `vaultspec-review` to audit the implementation."
 
-* **Curate (`vaultspec-docs-curator`)**:
-  * **Goal:** Maintain the hygiene of the `.vault/` vault.
-  * **Agent:** `vaultspec-docs-curator` (Medium Tier).
-  * *Usage:* "Run the `vaultspec-docs-curator` agent to audit the vault."
+- **Curate (`vaultspec-docs-curator`)**:
+  - **Goal:** Maintain the hygiene of the `.vault/` vault.
+  - **Agent:** `vaultspec-docs-curator` (Medium Tier).
+  - *Usage:* "Run the `vaultspec-docs-curator` agent to audit the vault."
 
 ### Agent Reference
 
 | Agent | Tier | Role | When to use |
 | :--- | :--- | :--- | :--- |
-| **`vaultspec-adr-researcher`** | HIGH | Lead Researcher | When exploring new technologies, libraries, or complex architectural problems. |
-| **`vaultspec-writer`** | HIGH | Planner | After an ADR is approved. Converts decisions into actionable steps. |
-| **`vaultspec-docs-curator`** | MEDIUM | Librarian & Orchestrator | To fix broken links, bad tags, and strictly enforce documentation schema rules. |
-| **`vaultspec-reference-auditor`** | MEDIUM | Code Auditor | To scan the codebase or reference implementations (e.g., Zed) for patterns to copy. |
-| **`vaultspec-complex-executor`** | HIGH | Senior Engineer | For difficult logic, refactors, or "blank slate" implementations requiring deep reasoning. |
-| **`vaultspec-standard-executor`** | MEDIUM | Engineer | For typical feature work, component implementation, and standard logic. |
-| **`vaultspec-simple-executor`** | LOW | Junior Engineer | For rote tasks, text updates, simple fixes, and menial labor dispatched by other agents. |
-| **`vaultspec-code-reviewer`** | HIGH | Reviewer & Safety Officer | To audit code for safety, intent compliance, and quality. |
+| `vaultspec-adr-researcher` | HIGH | Researcher | New tech, architecture |
+| `vaultspec-writer` | HIGH | Planner | After ADR approval |
+| `vaultspec-docs-curator` | MED | Librarian | Links, tags, schema |
+| `vaultspec-reference-auditor` | MED | Auditor | Codebase patterns |
+| `vaultspec-complex-executor` | HIGH | Sr. Engineer | Refactors, new logic |
+| `vaultspec-standard-executor` | MED | Engineer | Feature work |
+| `vaultspec-simple-executor` | LOW | Jr. Engineer | Rote tasks, fixes |
+| `vaultspec-code-reviewer` | HIGH | Reviewer | Safety, quality |
 
 ## Context Management
 
-The system context (what the AI knows about the project and its goals) is managed through config sync and system prompt assembly in `.vaultspec/`:
+The system context is managed through config sync and system prompt assembly
+in `.vaultspec/`:
 
-* **`system/framework.md` (Bootstrap Prompt):** The XML-structured bootstrap prompt that cold-starts an LLM agent with operational knowledge of vaultspec — identity, pipeline phases, intent-to-skill mapping, dispatch references, and folder conventions. Lives in `system/` with `pipeline: config` frontmatter so it feeds into `config sync` output only (not `system sync`).
-* **`system/project.md` (User-Editable):** A placeholder for project-specific instructions, extra context, or user preferences. This content is appended verbatim to the generated config files.
-* **`cli.py config sync`:** This command synchronizes `system/framework.md` and `system/project.md` into the root `AGENTS.md` and tool-specific files (`CLAUDE.md`, `GEMINI.md`).
-* **`cli.py system show`:** Displays the composable system prompt parts and their generation targets.
-* **`cli.py system sync`:** Assembles parts from `system/` into `SYSTEM.md` and syncs it to tool destinations (e.g., `.gemini/SYSTEM.md`).
+- **`system/framework.md` (Bootstrap Prompt):** The XML-structured bootstrap
+  prompt that cold-starts an LLM agent with operational knowledge of
+  vaultspec — identity, pipeline phases, intent-to-skill mapping, dispatch
+  references, and folder conventions. Lives in `system/` with
+  `pipeline: config` frontmatter so it feeds into `config sync` output only
+  (not `system sync`).
+- **`system/project.md` (User-Editable):** A placeholder for
+  project-specific instructions, extra context, or user preferences. This
+  content is appended verbatim to the generated config files.
+- **`cli.py config sync`:** This command synchronizes `system/framework.md`
+  and `system/project.md` into the root `AGENTS.md` and tool-specific files
+  (`CLAUDE.md`, `GEMINI.md`).
+- **`cli.py system show`:** Displays the composable system prompt parts and
+  their generation targets.
+- **`cli.py system sync`:** Assembles parts from `system/` into `SYSTEM.md`
+  and syncs it to tool destinations (e.g., `.gemini/SYSTEM.md`).
 
 **Syntactic Stability:**
-Framework context is stored in the **YAML frontmatter** (under the `system_framework` key) of the generated files to ensure it remains syntactically stable and separated from user-provided content.
+Framework context is stored in the **YAML frontmatter** (under the
+`system_framework` key) of the generated files to ensure it remains
+syntactically stable and separated from user-provided content.
 
 ### File Responsibilities
 
-| File | Location | Purpose | Managed By |
-| :--- | :--- | :--- | :--- |
-| `system/framework.md` | `.vaultspec/system/framework.md` | Bootstrap prompt (pipeline, dispatch, conventions) | `config sync` |
-| `system/project.md` | `.vaultspec/system/project.md` | Project-specific context | User |
-| `AGENTS.md` | `./AGENTS.md` | Root-level AI entry point | `cli.py` |
-| `CLAUDE.md` | `.claude/CLAUDE.md` | Claude Code config | `cli.py` |
-| `GEMINI.md` | `.gemini/GEMINI.md` | Gemini CLI config | `cli.py` |
-| `system/` | `.vaultspec/system/` | Composable system prompt parts | Developer |
-| `SYSTEM.md` | `.gemini/SYSTEM.md` | Assembled Gemini system prompt | `cli.py` |
+| File | Purpose | Managed By |
+| :--- | :--- | :--- |
+| `system/framework.md` | Bootstrap prompt | `config sync` |
+| `system/project.md` | Project context | User |
+| `AGENTS.md` | Root AI entry point | `cli.py` |
+| `CLAUDE.md` | Claude Code config | `cli.py` |
+| `GEMINI.md` | Gemini CLI config | `cli.py` |
+| `system/` | Composable prompts | Developer |
+| `SYSTEM.md` | Gemini system prompt | `cli.py` |
 
 ## Overview Diagram
 
-> **Note:** The `vaultspec-subagent` skill is a **utility task** used internally by other agents. It should **not** be called directly by the user.
+> **Note:** The `vaultspec-subagent` skill is a **utility task** used
+> internally by other agents. It should **not** be called directly by the
+> user.
 
 ```mermaid
 flowchart TD
     %% Core Nodes
     Feature["&lt;Feature&gt;<br/>The glue that binds them all"]
     Research["&lt;Research&gt;<br/>Brainstorming & research<br/>(no routes)"]
-    Reference["&lt;Reference&gt;<br/>Technical implementation<br/>from specialist source"]
-    ADR["&lt;ADR&gt;<br/>Conclusion based on<br/>&lt;Research&gt; + &lt;Reference&gt;"]
-    Plan{"**&lt;Plan&gt;**<br/>Actionable Steps based on codebase and &lt;ADR&gt;, &lt;Research&gt;, &lt;Reference&gt;"}
+    Reference["&lt;Reference&gt;<br/>Technical audit"]
+    ADR["&lt;ADR&gt;<br/>Decision record"]
+    Plan{"**&lt;Plan&gt;**<br/>Actionable steps"}
     StepRecord["&lt;Step Record&gt;<br/>&lt;Plan&gt; execution artifact"]
     PhaseSummary["&lt;Phase Summary&gt;<br/>Summary after &lt;Steps&gt;"]
     TaskSummary["&lt;Task Summary&gt;<br/>Summary after &lt;Phases&gt;"]
@@ -124,12 +148,15 @@ flowchart TD
 
 ## Markdown Files
 
-Workflows, agents, skills, and templates are defined in their respective subfolders without any tool specific yaml configuration headers or metadata.
-Tools reference relatively the `.vaultspec` folder. and define their tool specific yaml configuration headers.
+Workflows, agents, skills, and templates are defined in their respective
+subfolders without any tool specific yaml configuration headers or metadata.
+Tools reference relatively the `.vaultspec` folder and define their own
+tool-specific yaml configuration headers.
 
 ## Example Workflow
 
-A possible workflow might look something like this disregarding loopbacks and descision reversals:
+A possible workflow might look something like this, disregarding loopbacks
+and decision reversals:
 
 ```mermaid
 flowchart TD

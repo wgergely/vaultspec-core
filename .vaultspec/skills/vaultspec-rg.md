@@ -1,21 +1,29 @@
 ---
-description: "High-performance search tool (ripgrep). Use for finding patterns across the codebase and feeding matches into manipulation tools like `sd`."
+description: >-
+  High-performance search tool (ripgrep). Use for finding patterns across
+  the codebase and feeding matches into manipulation tools like `sd`.
 ---
 
 # Search Skill (rg)
 
-**Announce at start:** "I'm using `rg` to search for <pattern>."
+**Announce at start:** "I'm using `rg` to search for `{pattern}`."
 
 ---
+
 <!-- Human-readable documentation above | Agent instructions below -->
+
 ---
 
 ## Best Practices
 
-- **Pre-flight Check**: Always run `rg --files` first to verify which files your script will target.
-- **Testing Surgery**: Use `rg -r "replacement" --passthru` to preview changes in the terminal without modifying files.
-- **Fixed Strings**: Use `-F` for literal searches to improve speed and avoid regex character interpretation.
-- **Language Detection**: Use `--type` (e.g., `-t py`, `-t rust`) instead of globs to include all relevant file extensions.
+- **Pre-flight Check**: Always run `rg --files` first to verify which files
+  your script will target.
+- **Testing Surgery**: Use `rg -r "replacement" --passthru` to preview
+  changes in the terminal without modifying files.
+- **Fixed Strings**: Use `-F` for literal searches to improve speed and avoid
+  regex character interpretation.
+- **Language Detection**: Use `--type` (e.g., `-t py`, `-t rust`) instead of
+  globs to include all relevant file extensions.
 - **Precision Flags**:
   - `-l`: List files only (essential for piping).
   - `-0`: Use NUL byte as separator (safest for filenames with spaces).
@@ -34,9 +42,9 @@ description: "High-performance search tool (ripgrep). Use for finding patterns a
 
 ```powershell
 #  Identify files with specific language types
-rg "DeprecatedAPI" -l0 --type ts | ForEach-Object { 
+rg "DeprecatedAPI" -l0 --type ts | ForEach-Object {
     #  Perform atomic replacement
-    sd 'DeprecatedAPI' 'NewAPI' $_ 
+    sd 'DeprecatedAPI' 'NewAPI' $_
 }
 
 # Standard replacement pipe

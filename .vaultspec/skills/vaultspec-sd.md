@@ -1,21 +1,30 @@
 ---
-description: "Modern find and replace tool (sd). Use for fast, intuitive text manipulation and in-place file modifications."
+description: >-
+  Modern find and replace tool (sd). Use for fast, intuitive text
+  manipulation and in-place file modifications.
 ---
 
 # Search and Displace Skill (sd)
 
-**Announce at start:** "I'm using `sd` to replace <pattern> with <replacement>."
+**Announce at start:** "I'm using `sd` to replace `{pattern}` with
+`{replacement}`."
 
 ---
+
 <!-- Human-readable documentation above | Agent instructions below -->
+
 ---
 
 ## Best Practices
 
-- **String Mode**: Use `-s` or `--string-mode` for literal substitutions to avoid escaping regex special characters.
-- **Preview First**: Use `-p` or `--preview` to see changes before they are applied in-place.
-- **Regex Syntax**: Uses familiar JavaScript/Python flavor; use capture groups like `$1`, `$2`.
-- **In-place by Default**: `sd` modifies files directly; ensure you have a "Pre-flight" check or backup if unsure.
+- **String Mode**: Use `-s` or `--string-mode` for literal substitutions to
+  avoid escaping regex special characters.
+- **Preview First**: Use `-p` or `--preview` to see changes before they are
+  applied in-place.
+- **Regex Syntax**: Uses familiar JavaScript/Python flavor; use capture groups
+  like `$1`, `$2`.
+- **In-place by Default**: `sd` modifies files directly; ensure you have a
+  "Pre-flight" check or backup if unsure.
 
 ## When to use
 
@@ -27,7 +36,7 @@ description: "Modern find and replace tool (sd). Use for fast, intuitive text ma
 
 ## Shell Usage
 
-### PowerShell (Validated Pipeline: fd ➔ sd)
+### PowerShell (Validated Pipeline: fd -> sd)
 
 ```powershell
 # Preferred: Handles quoting and parallelization natively
@@ -46,4 +55,5 @@ rg -l0 'pattern' | xargs -0 sd 'pattern' 'replacement'
 
 ## Related Skills
 
-- `rg`: Use for high-performance searching and filtering files to be processed by `sd`.
+- `rg`: Use for high-performance searching and filtering files to be
+  processed by `sd`.

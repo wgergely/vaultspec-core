@@ -1,18 +1,24 @@
 ---
-description: "Structural search and replace tool (ast-grep). Use for complex code manipulation based on abstract syntax trees."
+description: >-
+  Structural search and replace tool (ast-grep). Use for complex code
+  manipulation based on abstract syntax trees.
 ---
 
 # Manipulation Skill (sg)
 
-**Announce at start:** "I'm using `sg` to manipulate code structure for <pattern>."
+**Announce at start:** "I'm using `sg` to manipulate code structure for
+`{pattern}`."
 
 ---
+
 <!-- Human-readable documentation above | Agent instructions below -->
+
 ---
 
 ## Best Practices
 
-- **Structural Patterns**: Matches code based on AST, ignoring whitespace and formatting.
+- **Structural Patterns**: Matches code based on AST, ignoring whitespace
+  and formatting.
 - **Rules**: Use YAML rules for complex linting or refactoring logic.
 - **In-place**: Use `-r` or `--rewrite` to perform structural replacements.
 - **Preview**: Use `--interactive` to review changes before applying.
@@ -40,8 +46,8 @@ sg run --pattern '$A && $A()' --rewrite '$A?.()' --lang ts -U
 #  SCOPE: Find files modified in the last 24h
 #  SURGERY: Use ast-grep to block 'eval' usage
 # --stdin: tells ast-grep to read the file path from the pipe
-fd --changed-within 24h -e js | ForEach-Object { 
-    sg run -p 'eval($CODE)' -r 'console.error("Blocked eval")' --stdin $_ -U 
+fd --changed-within 24h -e js | ForEach-Object {
+    sg run -p 'eval($CODE)' -r 'console.error("Blocked eval")' --stdin $_ -U
 }
 ```
 
@@ -73,9 +79,9 @@ $targets = fd -e tsx "LegacyComponent"
 $targets | xargs rg -c "LegacyComponent"
 
 #  SURGERY: Structural rewrite using ast-grep
-# Changes <LegacyComponent prop={val} /> to <NewComponent data={val} />
 $targets | ForEach-Object {
-    sg run -p '<LegacyComponent prop={$V} />' -r '<NewComponent data={$V} />' --stdin $_ -U
+    sg run -p '<LegacyComponent prop={$V} />' \
+           -r '<NewComponent data={$V} />' --stdin $_ -U
 }
 
 #  FINAL POLISH: Update comments using sd
@@ -86,5 +92,7 @@ $targets | ForEach-Object {
 
 ## Related Skills
 
-- `rg`: Use for initial text-based reconnaissance before performing structural surgery.
-- `sd`: Use for simpler, text-based replacements when AST-awareness is not required.
+- `rg`: Use for initial text-based reconnaissance before performing
+  structural surgery.
+- `sd`: Use for simpler, text-based replacements when AST-awareness is not
+  required.
