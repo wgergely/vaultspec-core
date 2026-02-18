@@ -1,5 +1,8 @@
 ---
-description: "Use it when unsure about how to proceed with a complex feature, refactor, or debugging task and need to explore options before implementation, structured research and brainstorm."
+description: >-
+  Use it when unsure about how to proceed with a complex feature, refactor,
+  or debugging task and need to explore options before implementation,
+  structured research and brainstorm.
 ---
 
 # Research & Brainstorm Skill (vaultspec-research)
@@ -12,14 +15,20 @@ When to use this skill:
 - Before debugging complex issues.
 - When you need user input on design options.
 
-**Announce at start:** "I'm using the `vaultspec-research` skill to conduct structured research and brainstorming."
+**Announce at start:** "I'm using the `vaultspec-research` skill to conduct
+structured research and brainstorming."
 
-**Save findings to:** `<Research>` (`.vault/research/yyyy-mm-dd-<feature>-<phase>-research.md`)
+**Save findings to:** Research artifact at
+`.vault/research/yyyy-mm-dd-{feature}-{phase}-research.md`
 
-**Dispatch sub-agent:** Invoke the `vaultspec-subagent` skill with `vaultspec-adr-researcher`. Instruct it to "Conduct research on [topic]. Persist findings to .vault/research/..."
+**Dispatch sub-agent:** Invoke the `vaultspec-subagent` skill with
+`vaultspec-adr-researcher`. Instruct it to "Conduct research on `{topic}`.
+Persist findings to `.vault/research/...`"
 
 ---
+
 <!-- Human-readable documentation above | Agent instructions below -->
+
 ---
 
 ## Template
@@ -32,8 +41,9 @@ Every document MUST strictly adhere to the following schema:
 
 - **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
   - **Directory Tag**: Exactly `#research`.
-  - **Feature Tag**: Exactly one kebab-case `#<feature>` tag.
-  - *Syntax:* `tags: ["#research", "#feature"]` (Must be quoted strings in a list).
+  - **Feature Tag**: Exactly one kebab-case `#{feature}` tag.
+  - *Syntax:* `tags: ["#research", "#feature"]` (Must be quoted strings in a
+    list).
 - **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
   - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
 - **`date`**: MUST use `yyyy-mm-dd` format.
@@ -42,11 +52,12 @@ Every document MUST strictly adhere to the following schema:
 ## Workflow
 
 - Research & brainstorm might be followed by:
-  - User approval -> proceed with `vaultspec-adr` to create and persist `<ADR>`.
+  - User approval -> proceed with `vaultspec-adr` to create and persist ADR.
   - No approval -> prompt user to refine goal/constraints and re-run research.
 
 ## Artifact Linking
 
-- Any persisted markdown files must be linked against other persisted documents using `[[wiki-links]]`.
+- Any persisted markdown files must be linked against other persisted
+  documents using `[[wiki-links]]`.
 - DO NOT use `@ref` style links.
 - DO NOT use `[label](path)` style links for internal wiki pages.

@@ -1,26 +1,36 @@
 ---
-description: "Simple, fast and user-friendly alternative to `find`. Use for discovering files and feeding them into other tools."
+description: >-
+  Simple, fast and user-friendly alternative to `find`. Use for discovering
+  files and feeding them into other tools.
 ---
 
 # Discovery Skill (fd)
 
-**Announce at start:** "I'm using `fd` to find files matching <pattern>."
+**Announce at start:** "I'm using `fd` to find files matching `{pattern}`."
 
 ---
+
 <!-- Human-readable documentation above | Agent instructions below -->
+
 ---
 
 ## Best Practices
 
-- **Smart Defaults**: `fd` ignores hidden files and directories, and respects `.gitignore` by default.
-- **Extension Filtering**: Use `-e` (e.g., `-e ts`) for faster filtering by file extension.
-- **Execution**: Use `-x` or `--exec` to run a command on every search result. Use `-X` (exec-batch) to run the command once with all results as arguments. These are **preferred over manual pipes** in PowerShell as they handle quoting and parallelization natively.
+- **Smart Defaults**: `fd` ignores hidden files and directories, and respects
+  `.gitignore` by default.
+- **Extension Filtering**: Use `-e` (e.g., `-e ts`) for faster filtering by
+  file extension.
+- **Execution**: Use `-x` or `--exec` to run a command on every search
+  result. Use `-X` (exec-batch) to run the command once with all results as
+  arguments. These are **preferred over manual pipes** in PowerShell as they
+  handle quoting and parallelization natively.
 - **Path Placeholders**:
   - `{}`: Full path (e.g., `src/main.js`)
   - `{/}`: Basename only (e.g., `main.js`)
   - `{//}`: Parent directory (e.g., `src`)
   - `{.}`: Path without extension (e.g., `src/main`)
-- **Case Sensitivity**: Use `-i` for case-insensitive or `-s` for case-sensitive (defaults to smart case).
+- **Case Sensitivity**: Use `-i` for case-insensitive or `-s` for
+  case-sensitive (defaults to smart case).
 
 ## When to use
 
@@ -37,14 +47,14 @@ description: "Simple, fast and user-friendly alternative to `find`. Use for disc
 
 ```powershell
 # Find all python files in cwd and run a command
-fd -e py | ForEach-Object { <command> $_ }
+fd -e py | ForEach-Object { {command} $_ }
 ```
 
 ### Unix/Shell
 
 ```bash
 # Find all python files and run a command
-fd -e py -x <command>
+fd -e py -x {command}
 ```
 
 ## Related Skills
