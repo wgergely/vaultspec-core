@@ -146,7 +146,6 @@ SKILLS_SRC_DIR: Path = Path()
 SYSTEM_SRC_DIR: Path = Path()
 FRAMEWORK_CONFIG_SRC: Path = Path()
 PROJECT_CONFIG_SRC: Path = Path()
-CONSTITUTION_SRC: Path = Path()
 HOOKS_DIR: Path = Path()
 TOOL_CONFIGS: dict[str, ToolConfig] = {}
 
@@ -156,7 +155,7 @@ def init_paths(root: Path) -> None:
     global ROOT_DIR, RULES_SRC_DIR, AGENTS_SRC_DIR
     global SKILLS_SRC_DIR, SYSTEM_SRC_DIR
     global FRAMEWORK_CONFIG_SRC, PROJECT_CONFIG_SRC
-    global CONSTITUTION_SRC, HOOKS_DIR, TOOL_CONFIGS
+    global HOOKS_DIR, TOOL_CONFIGS
 
     from core.config import get_config
 
@@ -164,14 +163,13 @@ def init_paths(root: Path) -> None:
 
     ROOT_DIR = root
     fw_dir = cfg.framework_dir
-    RULES_SRC_DIR = root / fw_dir / "rules"
-    AGENTS_SRC_DIR = root / fw_dir / "agents"
-    SKILLS_SRC_DIR = root / fw_dir / "skills"
-    SYSTEM_SRC_DIR = root / fw_dir / "system"
+    RULES_SRC_DIR = root / fw_dir / "rules" / "rules"
+    AGENTS_SRC_DIR = root / fw_dir / "rules" / "agents"
+    SKILLS_SRC_DIR = root / fw_dir / "rules" / "skills"
+    SYSTEM_SRC_DIR = root / fw_dir / "rules" / "system"
     FRAMEWORK_CONFIG_SRC = SYSTEM_SRC_DIR / "framework.md"
     PROJECT_CONFIG_SRC = SYSTEM_SRC_DIR / "project.md"
-    CONSTITUTION_SRC = root / fw_dir / "constitution.md"
-    HOOKS_DIR = root / fw_dir / "hooks"
+    HOOKS_DIR = root / fw_dir / "rules" / "hooks"
 
     # Backward compatibility: warn if old filenames still exist
     for old_name, new_path in [
@@ -380,7 +378,7 @@ def rules_sync(args: argparse.Namespace) -> None:
 
 
 def collect_agents() -> dict[str, tuple[Path, dict[str, Any], str]]:
-    """Collect agent definitions from .vaultspec/agents/."""
+    """Collect agent definitions from .vaultspec/rules/agents/."""
     sources: dict[str, tuple[Path, dict[str, Any], str]] = {}
     if not AGENTS_SRC_DIR.exists():
         return sources
@@ -460,7 +458,7 @@ def agents_add(args: argparse.Namespace) -> None:
         from core.config import get_config
 
         cfg = get_config()
-        tmpl_path = ROOT_DIR / cfg.framework_dir / "templates" / args.template
+        tmpl_path = ROOT_DIR / cfg.framework_dir / "rules" / "templates" / args.template
         if not tmpl_path.suffix:
             tmpl_path = tmpl_path.with_suffix(".md")
         if tmpl_path.exists():
@@ -554,7 +552,7 @@ def agents_sync(
 
 
 def collect_skills() -> dict[str, tuple[Path, dict[str, Any], str]]:
-    """Collect vaultspec-* skill definitions from .vaultspec/skills/."""
+    """Collect vaultspec-* skill definitions from .vaultspec/rules/skills/."""
     sources: dict[str, tuple[Path, dict[str, Any], str]] = {}
     if not SKILLS_SRC_DIR.exists():
         return sources
@@ -613,7 +611,7 @@ def skills_add(args: argparse.Namespace) -> None:
         from core.config import get_config as _get_cfg
 
         cfg = _get_cfg()
-        tmpl_path = ROOT_DIR / cfg.framework_dir / "templates" / args.template
+        tmpl_path = ROOT_DIR / cfg.framework_dir / "rules" / "templates" / args.template
         if not tmpl_path.suffix:
             tmpl_path = tmpl_path.with_suffix(".md")
         if tmpl_path.exists():
@@ -935,15 +933,6 @@ def sync_skills(
     return result
 
 
-def _read_constitution() -> str | None:
-    """Read constitution body content if it exists."""
-    if not CONSTITUTION_SRC.exists():
-        return None
-    content = CONSTITUTION_SRC.read_text(encoding="utf-8")
-    _meta, body = parse_frontmatter(content)
-    return body.strip() if body else None
-
-
 def _collect_rule_refs(cfg: ToolConfig) -> list[str]:
     """Collect rule file references."""
     if cfg.rules_dir is None or cfg.config_file is None:
@@ -1026,16 +1015,6 @@ def _generate_agents_md(cfg: ToolConfig) -> str | None:
         body_parts.append("")
         body_parts.append(custom_body)
 
-    # Add constitution
-    constitution_body = _read_constitution()
-    if constitution_body:
-        body_parts.append("")
-        body_parts.append("## Constitution")
-        body_parts.append("")
-        body_parts.append("The following principles are immutable:")
-        body_parts.append("")
-        body_parts.append(constitution_body)
-
     # Add rules
     refs = _collect_rule_refs(cfg)
     if refs:
@@ -1074,17 +1053,6 @@ def _generate_config(cfg: ToolConfig) -> str | None:
     if custom_body:
         body_parts.append(custom_body)
 
-    # Add constitution
-    constitution_body = _read_constitution()
-    if constitution_body:
-        if body_parts:
-            body_parts.append("")
-        body_parts.append("## Constitution")
-        body_parts.append("")
-        body_parts.append("The following principles are immutable:")
-        body_parts.append("")
-        body_parts.append(constitution_body)
-
     # Add rules
     refs = _collect_rule_refs(cfg)
     if refs:
@@ -1110,51 +1078,6 @@ def _is_cli_managed(path: Path) -> bool:
         return content.startswith(CONFIG_HEADER)
     except Exception:
         return False
-
-
-def constitution_show(_args: argparse.Namespace) -> None:
-    """Display current constitution content."""
-    if not CONSTITUTION_SRC.exists():
-        rel = CONSTITUTION_SRC.relative_to(ROOT_DIR)
-        print(f"No constitution found at {rel}")
-        print("Run 'constitution init' to create from template.")
-        return
-
-    print(f"Constitution: {CONSTITUTION_SRC.relative_to(ROOT_DIR)}")
-    print("-" * 60)
-    content = CONSTITUTION_SRC.read_text(encoding="utf-8")
-    meta, body = parse_frontmatter(content)
-    if meta:
-        print("--- Metadata ---")
-        for k, v in meta.items():
-            print(f"  {k}: {v}")
-        print("---")
-    print(body.strip())
-    print("-" * 60)
-
-
-def constitution_init(args: argparse.Namespace) -> None:
-    """Create constitution.md from template."""
-    from core.config import get_config
-
-    cfg = get_config()
-    template_path = ROOT_DIR / cfg.framework_dir / "templates" / "constitution.md"
-
-    if not template_path.exists():
-        print(f"Error: Template not found at {template_path.relative_to(ROOT_DIR)}")
-        return
-
-    if CONSTITUTION_SRC.exists() and not getattr(args, "force", False):
-        rel = CONSTITUTION_SRC.relative_to(ROOT_DIR)
-        print(f"Error: Constitution already exists at {rel}. Use --force to overwrite.")
-        return
-
-    template_content = template_path.read_text(encoding="utf-8")
-    ensure_dir(CONSTITUTION_SRC.parent)
-    atomic_write(CONSTITUTION_SRC, template_content)
-    rel = CONSTITUTION_SRC.relative_to(ROOT_DIR)
-    print(f"Created constitution at {rel}")
-    print("Run 'config sync' to propagate to tool configurations.")
 
 
 def config_show(_args: argparse.Namespace) -> None:
@@ -1251,7 +1174,7 @@ def config_sync(args: argparse.Namespace) -> None:
 
 
 def collect_system_parts() -> dict[str, tuple[Path, dict[str, Any], str]]:
-    """Collect system prompt parts from .vaultspec/system/."""
+    """Collect system prompt parts from .vaultspec/rules/system/."""
     sources: dict[str, tuple[Path, dict[str, Any], str]] = {}
     if not SYSTEM_SRC_DIR.exists():
         return sources
@@ -1270,7 +1193,8 @@ def _collect_agent_listing() -> str:
     lines = [
         "## Available Sub-Agents",
         "",
-        "Sub-agents are specialized expert agents available in `.vaultspec/agents/`.",
+        "Sub-agents are specialized expert agents available"
+        " in `.vaultspec/rules/agents/`.",
         "Dispatch using the `vaultspec-subagent` skill.",
         "",
     ]
@@ -1300,7 +1224,7 @@ def _collect_skill_listing() -> str:
 
 
 def _generate_system_prompt(cfg: ToolConfig) -> str | None:
-    """Assemble system prompt for a tool from .vaultspec/system/ parts."""
+    """Assemble system prompt for a tool from .vaultspec/rules/system/ parts."""
     if cfg.system_file is None:
         return None
 
@@ -1392,7 +1316,7 @@ def system_show(_args: argparse.Namespace) -> None:
     """Display system parts table and generation targets."""
     parts = collect_system_parts()
     if not parts:
-        print("No system parts found in .vaultspec/system/")
+        print("No system parts found in .vaultspec/rules/system/")
         return
 
     print(f"{'Name':<25} {'Tool Filter':<15} {'Lines':<8}")
@@ -1616,7 +1540,13 @@ def init_run(args: argparse.Namespace) -> None:
 
     # Create .vaultspec/ structure
     created = []
-    for subdir in ["agents", "rules", "skills", "templates", "system"]:
+    for subdir in [
+        "rules/rules",
+        "rules/agents",
+        "rules/skills",
+        "rules/templates",
+        "rules/system",
+    ]:
         d = fw_dir / subdir
         ensure_dir(d)
         created.append(str(d.relative_to(ROOT_DIR)))
@@ -1630,7 +1560,7 @@ def init_run(args: argparse.Namespace) -> None:
     # Create minimal stubs if they don't exist
     # Stubs go in system/ (canonical location per
     # FRAMEWORK_CONFIG_SRC / PROJECT_CONFIG_SRC)
-    sys_dir = fw_dir / "system"
+    sys_dir = fw_dir / "rules" / "system"
     fw_md = sys_dir / "framework.md"
     if not fw_md.exists():
         fw_md.write_text(
@@ -1698,15 +1628,17 @@ def readiness_run(args: argparse.Namespace) -> None:
     fw_score = 1
     fw_detail = "No .vaultspec/ directory"
     if fw_dir.exists():
-        has_agents = (fw_dir / "agents").exists() and any(
-            (fw_dir / "agents").glob("*.md")
+        has_agents = (fw_dir / "rules" / "agents").exists() and any(
+            (fw_dir / "rules" / "agents").glob("*.md")
         )
-        has_skills = (fw_dir / "skills").exists() and any(
-            (fw_dir / "skills").glob("*.md")
+        has_skills = (fw_dir / "rules" / "skills").exists() and any(
+            (fw_dir / "rules" / "skills").glob("*.md")
         )
-        has_rules = (fw_dir / "rules").exists() and any((fw_dir / "rules").glob("*.md"))
-        has_system = (fw_dir / "system").exists()
-        has_templates = (fw_dir / "templates").exists()
+        has_rules = (fw_dir / "rules" / "rules").exists() and any(
+            (fw_dir / "rules" / "rules").glob("*.md")
+        )
+        has_system = (fw_dir / "rules" / "system").exists()
+        has_templates = (fw_dir / "rules" / "templates").exists()
 
         if any([has_agents, has_skills, has_rules]):
             fw_score = 3
@@ -1729,7 +1661,11 @@ def readiness_run(args: argparse.Namespace) -> None:
         if fw_score == 4 and has_templates:
             # Check for custom content (non-builtin)
             custom_count = 0
-            for d in [fw_dir / "agents", fw_dir / "skills", fw_dir / "rules"]:
+            for d in [
+                fw_dir / "rules" / "agents",
+                fw_dir / "rules" / "skills",
+                fw_dir / "rules" / "rules",
+            ]:
                 if d.exists():
                     custom_count += len(
                         [
@@ -1745,8 +1681,8 @@ def readiness_run(args: argparse.Namespace) -> None:
     # Dimension 3: Rules & Governance
     rules_score = 1
     rules_detail = "No rules defined"
-    if (fw_dir / "rules").exists():
-        all_rules = list((fw_dir / "rules").glob("*.md"))
+    if (fw_dir / "rules" / "rules").exists():
+        all_rules = list((fw_dir / "rules" / "rules").glob("*.md"))
         builtin = [r for r in all_rules if r.name.endswith(".builtin.md")]
         custom = [r for r in all_rules if not r.name.endswith(".builtin.md")]
         total_rules = len(all_rules)
@@ -1781,8 +1717,8 @@ def readiness_run(args: argparse.Namespace) -> None:
     # Dimension 4: Agent Coverage
     agent_score = 1
     agent_detail = "No agents"
-    if (fw_dir / "agents").exists():
-        agents = list((fw_dir / "agents").glob("*.md"))
+    if (fw_dir / "rules" / "agents").exists():
+        agents = list((fw_dir / "rules" / "agents").glob("*.md"))
         agent_count = len(agents)
 
         if agent_count == 0:
@@ -2139,7 +2075,8 @@ def main() -> None:
     )
     agents_add_parser.add_argument("--force", action="store_true", help="Overwrite")
     agents_add_parser.add_argument(
-        "--template", help="Template name from .vaultspec/templates/ to pre-populate"
+        "--template",
+        help="Template name from .vaultspec/rules/templates/ to pre-populate",
     )
 
     agents_show_parser = agents_sub.add_parser("show", help="Show an agent")
@@ -2180,7 +2117,8 @@ def main() -> None:
     )
     skills_add_parser.add_argument("--force", action="store_true", help="Overwrite")
     skills_add_parser.add_argument(
-        "--template", help="Template name from .vaultspec/templates/ to pre-populate"
+        "--template",
+        help="Template name from .vaultspec/rules/templates/ to pre-populate",
     )
 
     skills_show_parser = skills_sub.add_parser("show", help="Show a skill")
@@ -2201,21 +2139,6 @@ def main() -> None:
 
     skills_sync_parser = skills_sub.add_parser("sync", help="Sync skills")
     add_sync_flags(skills_sync_parser)
-
-    # --- constitution ---
-    constitution_parser = resource_parsers.add_parser(
-        "constitution", help="Manage constitution"
-    )
-    constitution_sub = constitution_parser.add_subparsers(dest="command")
-
-    constitution_sub.add_parser("show", help="Display constitution")
-
-    constitution_init_parser = constitution_sub.add_parser(
-        "init", help="Create constitution from template"
-    )
-    constitution_init_parser.add_argument(
-        "--force", action="store_true", help="Overwrite existing"
-    )
 
     # --- config ---
     config_parser = resource_parsers.add_parser(
@@ -2357,13 +2280,6 @@ def main() -> None:
             skills_sync(args)
         else:
             skills_parser.print_help()
-    elif args.resource == "constitution":
-        if args.command == "show":
-            constitution_show(args)
-        elif args.command == "init":
-            constitution_init(args)
-        else:
-            constitution_parser.print_help()
     elif args.resource == "config":
         if args.command == "show":
             config_show(args)
