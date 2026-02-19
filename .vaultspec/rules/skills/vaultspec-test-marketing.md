@@ -1,18 +1,44 @@
-# Marketing Audit
+---
+description: >-
+  Begin a comprehensive marketing audit using a supervised team of agents.
+  Assesses release readiness, packaging, competitive positioning, and feature
+  gap analysis.
+---
 
-Begin a comprehensive audit of the project as the marketing lead. The goal
-is to assess the maturity and release readiness of the project based on these
-aspects:
+# Marketing Audit Skill (vaultspec-test-marketing)
 
-- **Packaging and Distribution**: Evaluate the current state of packaging and
-  distribution. Does it exist? Is there a clear CI/CD pipeline for releases?
-  Are there any issues with the current packaging and distribution process
-  that could hinder the project's ability to reach a wider audience? What
-  dependencies does the project have? Do we provide an installer? Is there a
-  docker image? Is there a clear release process? Are there any blockers to
-  releasing the project to the public?
+When to use this skill:
 
-## Marketing Materials
+- When assessing the maturity and release readiness of the project.
+- When evaluating packaging, distribution, and CI/CD pipeline completeness.
+- When conducting competitive analysis or feature gap identification.
+- Before public releases to ensure marketing materials and documentation are
+  adequate.
+
+**Announce at start:** "I'm using the `vaultspec-test-marketing` skill to
+conduct a marketing audit."
+
+**Save findings to:**
+`.vault/audit/yyyy-mm-dd-marketing-audit-{scope}.md`
+
+---
+
+<!-- Human-readable documentation above | Agent instructions below -->
+
+---
+
+## Audit Focus
+
+### Packaging and Distribution
+
+Evaluate the current state of packaging and distribution. Does it exist? Is
+there a clear CI/CD pipeline for releases? Are there any issues with the
+current packaging and distribution process that could hinder the project's
+ability to reach a wider audience? What dependencies does the project have?
+Do we provide an installer? Is there a docker image? Is there a clear release
+process? Are there any blockers to releasing the project to the public?
+
+### Marketing Materials
 
 The audit will include an assessment of the marketability and positioning of
 the project. The audit must address:
@@ -62,13 +88,6 @@ the project. The audit must address:
   marketing team to ensure that the project's value proposition is clear and
   compelling.
 
-## Lifecycle
-
-The team is to be kept alive, even after the audit is complete as the user
-might request new work or ask follow up questions. The team should be ready to
-respond to any new requests or questions from the user, and should continue
-to provide support and assistance as needed.
-
 The team lead must never itself perform any heavy lifting and must instead
 only focus on managing the work and flow of the team, stepping in when agents
 are stuck, in a loop, or in need of further instructions. The team lead is the
@@ -77,17 +96,24 @@ communication is clear, concise, and informative. The team lead is also
 responsible for ensuring that all agents are working effectively and
 efficiently, and that the overall goals of the audit are being met.
 
-## Artefacts
+## Lifecycle
 
-Every agent must persist their report to disk so that user and other agents
-have access to the information. The team lead must ensure that all reports are
-organized and easily accessible for review and reference. The team lead should
-also maintain a clear record of all communications and decisions made during
-the audit process, to ensure transparency and accountability.
+The team is to be kept alive, even after the audit is complete as the user
+might request new work or ask follow up questions. The team should be ready to
+respond to any new requests or questions from the user, and should continue
+to provide support and assistance as needed.
+
+## Persistence
+
+- Every agent must persist their report to disk so that user and other agents
+  have access to the information.
+- The team lead must ensure that all reports are organized and easily
+  accessible for review and reference.
+- The team lead should maintain a clear record of all communications and
+  decisions made during the audit process, to ensure transparency and
+  accountability.
 
 ## Implementation
-
-The implementation of the marketing audit will involve the following steps:
 
 - User approved shutdown of the team. Verify that every research, decision,
   and ADR report is persisted to disk and organized in a way that they can be
@@ -119,3 +145,23 @@ The implementation of the marketing audit will involve the following steps:
   of the audit are being met. The team lead will always delegate work to the
   coding agents and test runners, and will step in to provide guidance and
   support as needed.
+
+## Artifact Linking
+
+- Any persisted markdown files must be linked against other persisted
+  documents using quoted `"[[wiki-links]]"`.
+- DO NOT use `@ref` style links or `[label](path)` style links.
+
+### Frontmatter & Tagging Mandate
+
+Every document MUST strictly adhere to the following schema:
+
+- **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
+  - **Directory Tag**: Exactly `#audit`.
+  - **Feature Tag**: Exactly one kebab-case `#{feature}` tag.
+  - *Syntax:* `tags: ["#audit", "#feature"]` (Must be quoted strings in a
+    list).
+- **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
+  - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
+- **`date`**: MUST use `yyyy-mm-dd` format.
+- **No `feature` key**: Use `tags:` exclusively for feature identification.
