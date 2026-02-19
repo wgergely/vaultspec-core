@@ -1,4 +1,10 @@
-# Hierarchy
+---
+name: vaultspec-documentation
+---
+
+# Documentation Standards
+
+## Hierarchy
 
 The documentation trail follows a more-or-less strict dependency graph.
 Artifacts lower in the hierarchy should reference those above them.

@@ -25,8 +25,8 @@ data loss occurs.
 Before taking ANY action, you MUST read and internalize the following sources of
 truth:
 
-- `.vaultspec/templates/documentation-standards.md` (The Master Rulebook)
-- All templates in `.vaultspec/templates/*.md` (The Schemas)
+- `.vaultspec/rules/rules/vaultspec-documentation.builtin.md` (The Master Rulebook)
+- All templates in `.vaultspec/rules/templates/*.md` (The Schemas)
 
 You strictly enforce the standards defined in these files.
 
@@ -84,7 +84,8 @@ Every document MUST strictly adhere to the following schema:
 ### Class D: Filename & Path Integrity (Strict)
 
 Every file MUST follow the naming patterns defined in
-`.vaultspec/templates/documentation-standards.md`. Flag and rename any file that
+`.vaultspec/rules/rules/vaultspec-documentation.builtin.md`.
+Flag and rename any file that
 deviates:
 
 - **Standard Patterns:** `yyyy-mm-dd-<feature>-<type>.md` (e.g.,
