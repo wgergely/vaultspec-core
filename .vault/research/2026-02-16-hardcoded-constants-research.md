@@ -415,7 +415,7 @@ VAULTSPEC_TERMINAL_OUTPUT_LIMIT=1000000     # Terminal output cap (default: 1MB)
 
 VAULTSPEC_CLAUDE_DIR=.claude                # Claude config path (default: .claude)
 VAULTSPEC_GEMINI_DIR=.gemini                # Gemini config path (default: .gemini)
-VAULTSPEC_ANTIGRAVITY_DIR=.antigravity      # Antigravity config path (default: .antigravity)
+VAULTSPEC_AGENT_DIR=.agent                   # Agent config path (default: .agent)
 ```
 
 ### Tier 4: LOW (Reference, test configuration)
@@ -452,7 +452,7 @@ VAULTSPEC_TEST_LANCE_SUFFIX=-fast           # Test vector DB suffix
 ### Phase 3: Framework Restructuring
 
 1. Support `VAULTSPEC_FRAMEWORK_DIR` for relocatable framework
-2. Support tool-specific directory env vars (`.claude`, `.gemini`, `.antigravity`)
+2. Support tool-specific directory env vars (`.claude`, `.gemini`, `.agent`)
 3. Update CLI to use environment variables as fallback for all paths
 
 ### Phase 4: Documentation & Testing

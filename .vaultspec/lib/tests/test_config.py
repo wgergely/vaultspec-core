@@ -179,9 +179,9 @@ class TestDefaults:
         cfg = VaultSpecConfig()
         assert cfg.gemini_dir == ".gemini"
 
-    def test_antigravity_dir(self):
+    def test_agent_dir(self):
         cfg = VaultSpecConfig()
-        assert cfg.antigravity_dir == ".antigravity"
+        assert cfg.agent_dir == ".agent"
 
     def test_task_engine_ttl_seconds(self):
         cfg = VaultSpecConfig()

@@ -115,8 +115,8 @@ class TestTransformRule:
         assert meta["trigger"] == "always_on"
         assert "Body text" in body
 
-    def test_antigravity_no_name(self):
-        out = cli.transform_rule("antigravity", "my-rule.md", {}, "Body")
+    def test_agent_no_name(self):
+        out = cli.transform_rule("agent", "my-rule.md", {}, "Body")
         meta, _body = cli.parse_frontmatter(out)
         assert "name" not in meta
         assert meta["trigger"] == "always_on"

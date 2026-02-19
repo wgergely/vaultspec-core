@@ -216,8 +216,8 @@ def init_paths(root: Path) -> None:
             config_file=root / "AGENTS.md",
             system_file=None,
         ),
-        "antigravity": ToolConfig(
-            name="antigravity",
+        "agent": ToolConfig(
+            name="agent",
             rules_dir=root / ".agent" / "rules",
             agents_dir=None,
             skills_dir=root / ".agent" / "skills",
@@ -299,7 +299,7 @@ def collect_rules() -> dict[str, tuple[Path, dict[str, Any], str]]:
 def transform_rule(tool: str, name: str, _meta: dict[str, Any], body: str) -> str:
     """Transform a rule for a specific tool destination."""
     fm: dict[str, Any] = {}
-    if tool != "antigravity":
+    if tool != "agent":
         fm["name"] = Path(name).stem
     fm["trigger"] = "always_on"
     return build_file(fm, body)
@@ -1774,7 +1774,7 @@ def readiness_run(args: argparse.Namespace) -> None:
                     and any(cfg_item.rules_dir.glob("*.md"))
                 ):
                     synced_count += 1
-            if synced_count >= 3:  # claude, gemini, antigravity
+            if synced_count >= 3:  # claude, gemini, agent
                 rules_score = 5
                 rules_detail += ", synced to all tools"
 

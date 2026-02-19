@@ -102,7 +102,7 @@ This is the canonical table of **ALL environment variables that SHOULD exist** i
 
 | `VAULTSPEC_CLAUDE_DIR` | Tools | ".claude" | Path | ".claude" | Claude tool configuration directory | MEDIUM | LOW | NEW (hardcoded) |
 | `VAULTSPEC_GEMINI_DIR` | Tools | ".gemini" | Path | ".gemini" | Gemini tool configuration directory | MEDIUM | LOW | NEW (hardcoded) |
-| `VAULTSPEC_ANTIGRAVITY_DIR` | Tools | ".antigravity" | Path | ".antigravity" | Antigravity tool configuration directory | LOW | LOW | NEW (hardcoded) |
+| `VAULTSPEC_AGENT_DIR` | Tools | ".agent" | Path | ".agent" | Agent tool configuration directory | LOW | LOW | NEW (hardcoded) |
 | `VAULTSPEC_TASK_ENGINE_TTL_SECONDS` | Orchestration | 3600.0 | Float | 3600.0 | Task engine cleanup TTL in seconds | MEDIUM | MEDIUM | NEW (hardcoded) |
 | `VAULTSPEC_GRAPH_TTL_SECONDS` | RAG | 300.0 | Float | 300.0 | VaultGraph cache TTL in seconds | MEDIUM | LOW | NEW (hardcoded) |
 
@@ -339,11 +339,11 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
         default=".gemini",
         description="Gemini tool configuration directory",
     ),
-    "VAULTSPEC_ANTIGRAVITY_DIR": ConfigVariable(
-        name="VAULTSPEC_ANTIGRAVITY_DIR",
+    "VAULTSPEC_AGENT_DIR": ConfigVariable(
+        name="VAULTSPEC_AGENT_DIR",
         var_type=Path,
-        default=".antigravity",
-        description="Antigravity tool configuration directory",
+        default=".agent",
+        description="Agent tool configuration directory",
     ),
 
     # Orchestration variables
@@ -489,7 +489,7 @@ class VaultSpecConfig:
     # Tool directories
     claude_dir: Path = field(default_factory=lambda: Path(".claude"))
     gemini_dir: Path = field(default_factory=lambda: Path(".gemini"))
-    antigravity_dir: Path = field(default_factory=lambda: Path(".antigravity"))
+    agent_dir: Path = field(default_factory=lambda: Path(".agent"))
 
     # Orchestration configuration
     task_engine_ttl_seconds: float = 3600.0
@@ -1700,7 +1700,7 @@ def _load_legacy_vs_var(var_name: str):
 | `VAULTSPEC_CLAUDE_DIR` | cli.py | Hardcoded ".claude" | Use config property | LOW | Search/replace back |
 
 | `VAULTSPEC_GEMINI_DIR` | cli.py, discovery.py | Hardcoded ".gemini" | Use config property | LOW | Search/replace back |
-| `VAULTSPEC_ANTIGRAVITY_DIR` | cli.py | Hardcoded ".antigravity" | Use config property | LOW | Search/replace back |
+| `VAULTSPEC_AGENT_DIR` | cli.py | Hardcoded ".agent" | Use config property | LOW | Search/replace back |
 
 | `VAULTSPEC_INDEX_METADATA_FILE` | indexer.py | Hardcoded filename | Use config property | LOW | Hardcode back |
 
