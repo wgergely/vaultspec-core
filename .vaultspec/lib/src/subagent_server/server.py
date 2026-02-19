@@ -68,6 +68,7 @@ mcp = FastMCP(
 # Globals — must be initialized via initialize_server() before use.
 # Thread-safe: single-event-loop assumption (one asyncio loop per process).
 ROOT_DIR: pathlib.Path
+CONTENT_ROOT: pathlib.Path
 AGENTS_DIR: pathlib.Path
 lock_manager: LockManager
 task_engine: TaskEngine
@@ -84,6 +85,7 @@ def initialize_server(
     root_dir: pathlib.Path,
     ttl_seconds: float | None = None,
     *,
+    content_root: pathlib.Path | None = None,
     refresh_callback: Callable[[], bool] | None = None,
     run_subagent_fn: Callable[..., Awaitable[Any]] | None = None,
 ) -> None:
@@ -92,6 +94,8 @@ def initialize_server(
     Args:
         root_dir: Workspace root directory (required).
         ttl_seconds: Task TTL in seconds (default 3600).
+        content_root: Content source root.  When ``None``, falls back to
+            ``root_dir / framework_dir``.
         refresh_callback: Override for ``_refresh_if_changed`` (testing).
         run_subagent_fn: Override for ``run_subagent`` (testing).
     """
@@ -99,11 +103,14 @@ def initialize_server(
 
     cfg = get_config()
 
-    global ROOT_DIR, AGENTS_DIR, lock_manager, task_engine
+    global ROOT_DIR, CONTENT_ROOT, AGENTS_DIR, lock_manager, task_engine
     global _refresh_fn, _run_subagent_fn
 
     ROOT_DIR = root_dir
-    AGENTS_DIR = ROOT_DIR / cfg.framework_dir / "agents"
+    CONTENT_ROOT = (
+        content_root if content_root is not None else (root_dir / cfg.framework_dir)
+    )
+    AGENTS_DIR = CONTENT_ROOT / "rules" / "agents"
     lock_manager = LockManager()
     task_engine = TaskEngine(ttl_seconds=ttl_seconds, lock_manager=lock_manager)
     _refresh_fn = refresh_callback or _refresh_if_changed
@@ -487,6 +494,7 @@ async def dispatch_agent(
                 budget=budget,
                 effort=effort,
                 output_format=output_format,
+                content_root=CONTENT_ROOT,
             )
 
             # Record session ID for potential resume
@@ -647,11 +655,15 @@ async def get_locks() -> str:
     return json.dumps({"locks": res, "count": len(res)}, indent=2)
 
 
-def main(root_dir: pathlib.Path | None = None) -> None:
+def main(
+    root_dir: pathlib.Path | None = None,
+    content_root: pathlib.Path | None = None,
+) -> None:
     """Start the MCP server.
 
     Args:
         root_dir: Workspace root.  Falls back to ``VAULTSPEC_MCP_ROOT_DIR`` env var.
+        content_root: Content source root for agent discovery.
     """
     from core.config import get_config
 
@@ -662,7 +674,11 @@ def main(root_dir: pathlib.Path | None = None) -> None:
             raise RuntimeError("MCP server requires root_dir or VAULTSPEC_MCP_ROOT_DIR")
         root_dir = cfg.mcp_root_dir
 
-    initialize_server(root_dir=root_dir, ttl_seconds=cfg.mcp_ttl_seconds)
+    initialize_server(
+        root_dir=root_dir,
+        ttl_seconds=cfg.mcp_ttl_seconds,
+        content_root=content_root,
+    )
     mcp.run()
 
 

@@ -5,6 +5,8 @@ import sys
 from datetime import datetime
 
 from _paths import ROOT_DIR  # shared path bootstrap
+from _paths import _layout as _paths_layout
+from core.workspace import resolve_workspace
 
 
 def _get_version() -> str:
@@ -65,6 +67,12 @@ def _make_parser() -> argparse.ArgumentParser:
         "--root", type=pathlib.Path, default=None, help="Vault root directory."
     )
     audit_parser.add_argument(
+        "--content-dir",
+        type=pathlib.Path,
+        default=None,
+        help="Content source directory (rules, agents, skills).",
+    )
+    audit_parser.add_argument(
         "--limit", type=int, default=10, help="Limit number of items in reports."
     )
     audit_parser.add_argument("--type", type=str, help="Filter hotspots by DocType.")
@@ -96,6 +104,12 @@ def _make_parser() -> argparse.ArgumentParser:
     create_parser.add_argument(
         "--root", type=pathlib.Path, default=None, help="Vault root directory."
     )
+    create_parser.add_argument(
+        "--content-dir",
+        type=pathlib.Path,
+        default=None,
+        help="Content source directory (rules, agents, skills).",
+    )
 
     # Index command (RAG)
     index_parser = subparsers.add_parser(
@@ -107,6 +121,12 @@ def _make_parser() -> argparse.ArgumentParser:
     )
     index_parser.add_argument(
         "--root", type=pathlib.Path, default=None, help="Vault root directory."
+    )
+    index_parser.add_argument(
+        "--content-dir",
+        type=pathlib.Path,
+        default=None,
+        help="Content source directory (rules, agents, skills).",
     )
     index_parser.add_argument(
         "--full",
@@ -128,6 +148,12 @@ def _make_parser() -> argparse.ArgumentParser:
     search_parser.add_argument("query", type=str, help="Search query.")
     search_parser.add_argument(
         "--root", type=pathlib.Path, default=None, help="Vault root directory."
+    )
+    search_parser.add_argument(
+        "--content-dir",
+        type=pathlib.Path,
+        default=None,
+        help="Content source directory (rules, agents, skills).",
     )
     search_parser.add_argument(
         "--limit", type=int, default=5, help="Number of results."
@@ -165,8 +191,29 @@ def main():
         handle_search(args)
 
 
+def _resolve_root(args) -> "pathlib.Path":
+    """Resolve output root from args, using workspace resolution if needed.
+
+    When only ``--root`` is provided, it is used directly (backwards
+    compat — docs.py treats ``--root`` as the project root for vault
+    operations, NOT as a full workspace override).  ``resolve_workspace``
+    is only invoked when ``--content-dir`` is explicitly set.
+    """
+    content_dir = getattr(args, "content_dir", None)
+    if content_dir is not None:
+        layout = resolve_workspace(
+            root_override=args.root,
+            content_override=content_dir,
+            framework_root=_paths_layout.framework_root,
+        )
+        return layout.output_root
+    if args.root is not None:
+        return args.root
+    return ROOT_DIR
+
+
 def handle_create(args):
-    root_dir = args.root if args.root is not None else ROOT_DIR
+    root_dir = _resolve_root(args)
     doc_type = DocType(args.type)
     feature = args.feature.strip("#")
     date_str = datetime.now().strftime("%Y-%m-%d")
@@ -197,7 +244,7 @@ def handle_create(args):
 
 
 def handle_audit(args):
-    root_dir = args.root if args.root is not None else ROOT_DIR
+    root_dir = _resolve_root(args)
     results = {}
 
     if args.summary:
@@ -328,7 +375,7 @@ def handle_index(args):
         print("Run: pip install -e '.[rag]'")
         sys.exit(1)
 
-    root_dir = args.root if args.root is not None else ROOT_DIR
+    root_dir = _resolve_root(args)
 
     # Report device info
     device_info = get_device_info()
@@ -379,7 +426,7 @@ def handle_search(args):
         print("Run: pip install -e '.[rag]'")
         sys.exit(1)
 
-    root_dir = args.root if args.root is not None else ROOT_DIR
+    root_dir = _resolve_root(args)
     results = search(root_dir, args.query, limit=args.limit)
 
     if args.json:

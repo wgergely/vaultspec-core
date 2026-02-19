@@ -158,7 +158,9 @@ class GeminiProvider(AgentProvider):
 
         # Write system prompt to temp file for GEMINI_SYSTEM_MD
         if system_prompt:
-            tmp_dir = root_dir / ".vaultspec" / ".tmp"
+            from core.config import get_config
+
+            tmp_dir = root_dir / get_config().framework_dir / ".tmp"
             tmp_dir.mkdir(parents=True, exist_ok=True)
             system_file = tmp_dir / f"system-{uuid.uuid4().hex[:8]}.md"
             system_file.write_text(system_prompt, encoding="utf-8")

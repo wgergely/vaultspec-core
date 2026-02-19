@@ -67,6 +67,7 @@ class VaultSpecConfig:
 
     # -- Agent -----------------------------------------------------------------
     root_dir: Path = field(default_factory=Path.cwd)
+    content_dir: Path | None = None
     agent_mode: str = "read-write"
     system_prompt: str | None = None
     max_turns: int | None = None
@@ -93,6 +94,7 @@ class VaultSpecConfig:
     framework_dir: str = ".vaultspec"
     lance_dir: str = ".lance"
     index_metadata_file: str = "index_meta.json"
+    logs_dir: str = "logs"
 
     # -- Tool directories ------------------------------------------------------
     claude_dir: str = ".claude"
@@ -101,6 +103,9 @@ class VaultSpecConfig:
 
     # -- Orchestration ---------------------------------------------------------
     task_engine_ttl_seconds: float = 3600.0
+
+    # -- Logging ---------------------------------------------------------------
+    log_retention_days: int = 30
 
     # -- RAG -------------------------------------------------------------------
     graph_ttl_seconds: float = 300.0
@@ -314,6 +319,13 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
         description="Workspace root directory.",
     ),
     ConfigVariable(
+        env_name="VAULTSPEC_CONTENT_DIR",
+        attr_name="content_dir",
+        var_type=Path,
+        default=None,
+        description="Content source directory override.",
+    ),
+    ConfigVariable(
         env_name="VAULTSPEC_AGENT_MODE",
         attr_name="agent_mode",
         var_type=str,
@@ -465,6 +477,13 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
         default="index_meta.json",
         description="Index metadata filename within lance directory.",
     ),
+    ConfigVariable(
+        env_name="VAULTSPEC_LOGS_DIR",
+        attr_name="logs_dir",
+        var_type=str,
+        default="logs",
+        description="Log subdirectory name within the documentation vault.",
+    ),
     # -- Tool directories ------------------------------------------------------
     ConfigVariable(
         env_name="VAULTSPEC_CLAUDE_DIR",
@@ -495,6 +514,15 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
         default=3600.0,
         description="Task engine TTL in seconds.",
         min_value=0,
+    ),
+    # -- Logging ---------------------------------------------------------------
+    ConfigVariable(
+        env_name="VAULTSPEC_LOG_RETENTION_DAYS",
+        attr_name="log_retention_days",
+        var_type=int,
+        default=30,
+        description="Number of days to retain session log files.",
+        min_value=1,
     ),
     # -- RAG -------------------------------------------------------------------
     ConfigVariable(

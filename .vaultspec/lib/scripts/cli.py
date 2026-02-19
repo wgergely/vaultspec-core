@@ -104,6 +104,8 @@ except ImportError:
 
 from _paths import LIB_SRC_DIR  # noqa: F401
 from _paths import ROOT_DIR as _PATHS_ROOT_DIR  # shared path bootstrap
+from _paths import _layout as _paths_layout  # resolved workspace layout
+from core.workspace import WorkspaceLayout, resolve_workspace
 from logging_config import configure_logging
 
 try:
@@ -144,16 +146,22 @@ RULES_SRC_DIR: Path = Path()
 AGENTS_SRC_DIR: Path = Path()
 SKILLS_SRC_DIR: Path = Path()
 SYSTEM_SRC_DIR: Path = Path()
+TEMPLATES_DIR: Path = Path()
 FRAMEWORK_CONFIG_SRC: Path = Path()
 PROJECT_CONFIG_SRC: Path = Path()
 HOOKS_DIR: Path = Path()
 TOOL_CONFIGS: dict[str, ToolConfig] = {}
 
 
-def init_paths(root: Path) -> None:
-    """(Re-)initialise all path globals from *root*."""
+def init_paths(layout: WorkspaceLayout | Path) -> None:
+    """(Re-)initialise all path globals from a workspace layout.
+
+    Accepts either a :class:`WorkspaceLayout` (preferred) or a plain
+    :class:`Path` for backwards compatibility (treated as output root
+    with content at ``root / framework_dir``).
+    """
     global ROOT_DIR, RULES_SRC_DIR, AGENTS_SRC_DIR
-    global SKILLS_SRC_DIR, SYSTEM_SRC_DIR
+    global SKILLS_SRC_DIR, SYSTEM_SRC_DIR, TEMPLATES_DIR
     global FRAMEWORK_CONFIG_SRC, PROJECT_CONFIG_SRC
     global HOOKS_DIR, TOOL_CONFIGS
 
@@ -161,15 +169,25 @@ def init_paths(root: Path) -> None:
 
     cfg = get_config()
 
+    if isinstance(layout, Path):
+        # Legacy path: treat as output root, derive content from it
+        root = layout
+        content = root / cfg.framework_dir
+    else:
+        root = layout.output_root
+        content = layout.content_root
+
     ROOT_DIR = root
-    fw_dir = cfg.framework_dir
-    RULES_SRC_DIR = root / fw_dir / "rules" / "rules"
-    AGENTS_SRC_DIR = root / fw_dir / "rules" / "agents"
-    SKILLS_SRC_DIR = root / fw_dir / "rules" / "skills"
-    SYSTEM_SRC_DIR = root / fw_dir / "rules" / "system"
+    RULES_SRC_DIR = content / "rules" / "rules"
+    AGENTS_SRC_DIR = content / "rules" / "agents"
+    SKILLS_SRC_DIR = content / "rules" / "skills"
+    SYSTEM_SRC_DIR = content / "rules" / "system"
+    TEMPLATES_DIR = content / "rules" / "templates"
     FRAMEWORK_CONFIG_SRC = SYSTEM_SRC_DIR / "framework.md"
     PROJECT_CONFIG_SRC = SYSTEM_SRC_DIR / "project.md"
-    HOOKS_DIR = root / fw_dir / "rules" / "hooks"
+    HOOKS_DIR = content / "rules" / "hooks"
+
+    fw_dir = cfg.framework_dir
 
     # Backward compatibility: warn if old filenames still exist
     for old_name, new_path in [
@@ -178,7 +196,7 @@ def init_paths(root: Path) -> None:
         ("CUSTOM.md", PROJECT_CONFIG_SRC),
         ("PROJECT.md", PROJECT_CONFIG_SRC),
     ]:
-        old = root / fw_dir / old_name
+        old = content / old_name
         if old.exists() and not new_path.exists():
             print(
                 f"Warning: {fw_dir}/{old_name} is deprecated."
@@ -235,7 +253,7 @@ def _get_version() -> str:
 
 
 # Default initialisation
-init_paths(_PATHS_ROOT_DIR)
+init_paths(_paths_layout)
 
 
 @dataclass
@@ -455,10 +473,7 @@ def agents_add(args: argparse.Namespace) -> None:
     default_body = f"# Persona: {args.name}\n\nDefine your agent persona here.\n"
     body = default_body
     if getattr(args, "template", None):
-        from core.config import get_config
-
-        cfg = get_config()
-        tmpl_path = ROOT_DIR / cfg.framework_dir / "rules" / "templates" / args.template
+        tmpl_path = TEMPLATES_DIR / args.template
         if not tmpl_path.suffix:
             tmpl_path = tmpl_path.with_suffix(".md")
         if tmpl_path.exists():
@@ -608,10 +623,7 @@ def skills_add(args: argparse.Namespace) -> None:
     default_body = f"# {skill_name}\n\nDefine your skill instructions here.\n"
     body = default_body
     if getattr(args, "template", None):
-        from core.config import get_config as _get_cfg
-
-        cfg = _get_cfg()
-        tmpl_path = ROOT_DIR / cfg.framework_dir / "rules" / "templates" / args.template
+        tmpl_path = TEMPLATES_DIR / args.template
         if not tmpl_path.suffix:
             tmpl_path = tmpl_path.with_suffix(".md")
         if tmpl_path.exists():
@@ -2013,6 +2025,12 @@ def main() -> None:
         "--root", type=Path, default=None, help="Override workspace root"
     )
     parser.add_argument(
+        "--content-dir",
+        type=Path,
+        default=None,
+        help="Content source directory (rules, agents, skills)",
+    )
+    parser.add_argument(
         "--verbose",
         "-v",
         action="store_true",
@@ -2224,8 +2242,13 @@ def main() -> None:
     else:
         configure_logging()
 
-    if args.root is not None:
-        init_paths(args.root.resolve())
+    if args.root is not None or getattr(args, "content_dir", None) is not None:
+        layout = resolve_workspace(
+            root_override=args.root,
+            content_override=getattr(args, "content_dir", None),
+            framework_root=_paths_layout.framework_root,
+        )
+        init_paths(layout)
 
     if args.resource == "rules":
         if args.command == "list":
