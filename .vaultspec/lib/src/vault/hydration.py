@@ -23,11 +23,22 @@ def hydrate_template(
     return hydrated
 
 
-def get_template_path(root_dir: pathlib.Path, doc_type: DocType) -> pathlib.Path | None:
-    """Maps DocType to its corresponding template file."""
-    from core.config import get_config
+def get_template_path(
+    root_dir: pathlib.Path,
+    doc_type: DocType,
+    *,
+    content_root: pathlib.Path | None = None,
+) -> pathlib.Path | None:
+    """Maps DocType to its corresponding template file.
 
-    cfg = get_config()
+    Parameters
+    ----------
+    content_root:
+        Explicit content root (e.g. ``.vaultspec/``).  Templates live in
+        the content tree.  When ``None``, falls back to
+        ``root_dir / framework_dir``.
+    """
+    from core.config import get_config
 
     mapping = {
         DocType.ADR: "adr.md",
@@ -42,5 +53,11 @@ def get_template_path(root_dir: pathlib.Path, doc_type: DocType) -> pathlib.Path
     if not name:
         return None
 
-    path = root_dir / cfg.framework_dir / "templates" / name
+    if content_root is not None:
+        base = content_root
+    else:
+        cfg = get_config()
+        base = root_dir / cfg.framework_dir
+
+    path = base / "rules" / "templates" / name
     return path if path.exists() else None

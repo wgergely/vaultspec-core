@@ -14,6 +14,8 @@ import warnings
 from pathlib import Path
 
 from _paths import ROOT_DIR  # shared path bootstrap
+from _paths import _layout as _paths_layout
+from core.workspace import resolve_workspace
 
 
 def _get_version() -> str:
@@ -39,11 +41,17 @@ except ImportError as e:
     sys.exit(1)
 
 
-def list_available_agents(root: Path):
-    """List all agents found in the workspace."""
-    from core.config import get_config
+def list_available_agents(content_root: Path):
+    """List all agents found in the workspace.
 
-    agents_dir = root / get_config().framework_dir / "agents"
+    Parameters
+    ----------
+    content_root:
+        The content root directory (e.g. ``.vaultspec/``).  In split-root
+        mode this differs from the output root; agents always live under
+        the content tree.
+    """
+    agents_dir = content_root / "rules" / "agents"
     if not agents_dir.exists():
         print("No agents found.", file=sys.stderr)
         return
@@ -148,7 +156,7 @@ def command_run(args):
 
 def command_serve(args):
     """Handle 'serve' subcommand."""
-    server_main(root_dir=args.root)
+    server_main(root_dir=args.root, content_root=args.content_root)
 
 
 def command_a2a_serve(args):
@@ -159,13 +167,12 @@ def command_a2a_serve(args):
     from protocol.a2a.server import create_app
 
     root = args.root
+    content_root = args.content_root
     agent_name = args.agent or "vaultspec-researcher"
     port = args.port or 10010
 
     # Load agent metadata (minimal — just name + description)
-    from core.config import get_config
-
-    agents_dir = root / get_config().framework_dir / "agents"
+    agents_dir = content_root / "rules" / "agents"
     agent_file = agents_dir / f"{agent_name}.md"
     agent_meta = {"name": agent_name, "description": f"Vaultspec agent: {agent_name}"}
     if agent_file.exists():
@@ -206,13 +213,19 @@ def command_a2a_serve(args):
 
 def command_list(args):
     """Handle 'list' subcommand."""
-    list_available_agents(args.root)
+    list_available_agents(args.content_root)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sub-agent CLI")
     parser.add_argument(
-        "--root", type=Path, default=ROOT_DIR, help="Workspace root directory"
+        "--root", type=Path, default=None, help="Workspace root directory"
+    )
+    parser.add_argument(
+        "--content-dir",
+        type=Path,
+        default=None,
+        help="Content source directory (rules, agents, skills)",
     )
     parser.add_argument(
         "--version", "-V", action="version", version=f"%(prog)s {_get_version()}"
@@ -317,8 +330,21 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    if args.root is not None:
-        args.root = args.root.resolve()
+    # Resolve workspace layout when overrides are provided
+    if args.root is not None or getattr(args, "content_dir", None) is not None:
+        _layout = resolve_workspace(
+            root_override=args.root,
+            content_override=getattr(args, "content_dir", None),
+            framework_root=_paths_layout.framework_root,
+        )
+        args.root = _layout.output_root
+        args.content_root = _layout.content_root
+    else:
+        args.root = ROOT_DIR
+        args.content_root = _paths_layout.content_root
+
+    args.root = args.root.resolve()
+    args.content_root = args.content_root.resolve()
 
     if getattr(args, "debug", False):
         configure_logging(level="DEBUG")

@@ -41,24 +41,40 @@ class AgentNotFoundError(Exception):
 
 
 def load_agent(
-    agent_name: str, root_dir: pathlib.Path, provider_name: str | None = None
+    agent_name: str,
+    root_dir: pathlib.Path,
+    provider_name: str | None = None,
+    *,
+    content_root: pathlib.Path | None = None,
 ) -> tuple[dict[str, str], str]:
     """Loads an agent definition, searching provider-specific then
-    canonical directories."""
+    canonical directories.
+
+    Parameters
+    ----------
+    content_root:
+        Explicit content root (e.g. ``.vaultspec/``).  In split-root mode
+        agents live under the content tree, not ``root_dir``.  When
+        ``None``, falls back to ``root_dir / framework_dir``.
+    """
     from core.config import get_config
 
-    fw_dir = get_config().framework_dir
+    if content_root is not None:
+        agents_base = content_root / "rules" / "agents"
+    else:
+        fw_dir = get_config().framework_dir
+        agents_base = root_dir / fw_dir / "rules" / "agents"
 
     searched = []
-    # 1. Provider-specific: <fw_dir>/agents/<provider>/<name>.md
+    # 1. Provider-specific: agents/<provider>/<name>.md
     if provider_name:
-        p_path = root_dir / fw_dir / "agents" / provider_name / f"{agent_name}.md"
+        p_path = agents_base / provider_name / f"{agent_name}.md"
         searched.append(p_path)
         if p_path.exists():
             return parse_frontmatter(p_path.read_text(encoding="utf-8"))
 
-    # 2. Canonical: <fw_dir>/agents/<name>.md
-    c_path = root_dir / fw_dir / "agents" / f"{agent_name}.md"
+    # 2. Canonical: agents/<name>.md
+    c_path = agents_base / f"{agent_name}.md"
     searched.append(c_path)
     if c_path.exists():
         return parse_frontmatter(c_path.read_text(encoding="utf-8"))
@@ -166,6 +182,7 @@ async def run_subagent(
     budget: float | None = None,
     effort: str | None = None,
     output_format: str | None = None,
+    content_root: pathlib.Path | None = None,
 ) -> SubagentResult:
     """Orchestrates the agent lifecycle with fallback support."""
     if max_turns is not None and max_turns <= 0:
@@ -188,11 +205,18 @@ async def run_subagent(
         provider = get_provider_for_model(current_model)
     try:
         agent_meta, agent_persona = load_agent(
-            agent_name, root_dir, provider_name=provider.name
+            agent_name,
+            root_dir,
+            provider_name=provider.name,
+            content_root=content_root,
         )
     except AgentNotFoundError:
         # Fallback if provider-specific fails
-        agent_meta, agent_persona = load_agent(agent_name, root_dir)
+        agent_meta, agent_persona = load_agent(
+            agent_name,
+            root_dir,
+            content_root=content_root,
+        )
 
     # 1b. Apply runtime overrides (take precedence over YAML defaults)
     if max_turns is not None:
