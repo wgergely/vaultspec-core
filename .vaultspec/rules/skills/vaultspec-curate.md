@@ -10,7 +10,7 @@ description: >-
 This skill governs the autonomous auditing and maintenance of the `.vault/`
 documentation vault. It ensures every artifact conforms to the project's
 documentation standards as defined in
-`.vaultspec/templates/documentation-standards.md`.
+`.vaultspec/rules/rules/vaultspec-documentation.builtin.md`.
 
 **Announce at start:** "I'm using the `vaultspec-curate` skill to audit and
 clean the documentation vault."
@@ -87,5 +87,5 @@ Every document MUST strictly adhere to the following schema:
   frontmatter/links, and flags.
 - **Traceability**: Every modification is logged in the audit report.
 - **Standards-first**: All fixes trace back to rules in
-  `.vaultspec/templates/documentation-standards.md` and the canonical
+  `.vaultspec/rules/rules/vaultspec-documentation.builtin.md` and the canonical
   templates.
