@@ -72,7 +72,7 @@ class TestDefaults:
         cfg = VaultSpecConfig()
         assert cfg.claude_dir == ".claude"
         assert cfg.gemini_dir == ".gemini"
-        assert cfg.antigravity_dir == ".antigravity"
+        assert cfg.agent_dir == ".agent"
 
     def test_orchestration_defaults(self):
         cfg = VaultSpecConfig()
@@ -98,7 +98,7 @@ class TestDefaults:
             "index_metadata_file",
             "claude_dir",
             "gemini_dir",
-            "antigravity_dir",
+            "agent_dir",
         ):
             assert isinstance(getattr(cfg, attr), str), f"{attr} should be str"
 

@@ -97,7 +97,7 @@ class VaultSpecConfig:
     # -- Tool directories ------------------------------------------------------
     claude_dir: str = ".claude"
     gemini_dir: str = ".gemini"
-    antigravity_dir: str = ".antigravity"
+    agent_dir: str = ".agent"
 
     # -- Orchestration ---------------------------------------------------------
     task_engine_ttl_seconds: float = 3600.0
@@ -481,11 +481,11 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
         description="Gemini tool directory name.",
     ),
     ConfigVariable(
-        env_name="VAULTSPEC_ANTIGRAVITY_DIR",
-        attr_name="antigravity_dir",
+        env_name="VAULTSPEC_AGENT_DIR",
+        attr_name="agent_dir",
         var_type=str,
-        default=".antigravity",
-        description="Antigravity tool directory name.",
+        default=".agent",
+        description="Agent tool directory name.",
     ),
     # -- Orchestration ---------------------------------------------------------
     ConfigVariable(

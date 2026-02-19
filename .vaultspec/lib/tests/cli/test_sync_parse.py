@@ -136,7 +136,7 @@ class TestInitPaths:
         cli.init_paths(TEST_PROJECT)
         assert "claude" in cli.TOOL_CONFIGS
         assert "gemini" in cli.TOOL_CONFIGS
-        assert "antigravity" in cli.TOOL_CONFIGS
+        assert "agent" in cli.TOOL_CONFIGS
         assert "agents" in cli.TOOL_CONFIGS
         assert (
             cli.TOOL_CONFIGS["claude"].rules_dir == TEST_PROJECT / ".claude" / "rules"
