@@ -1,14 +1,41 @@
-# Product Health Audit (Team)
+---
+description: >-
+  Start a product health audit using a supervised team of agents. Assesses code
+  quality, maintainability, test integrity, and adherence to project standards.
+---
 
-Start a code health audit. Do NOT trust tests as a valid indicator for code
-health. Tests can be written in a way that they pass without actually
-revealing the true functionality and behavior of the codebase. Instead, focus
-on the quality of the code itself, its maintainability, readability, and how
-well it adheres to the project mission goals. Is it well structured? Does it
-follow best practices? Is it easy to understand and modify? These are the
-indicators of code health that we should focus on.
+# Product Health Audit Skill (vaultspec-test-health)
 
-## Identify
+When to use this skill:
+
+- When you need a comprehensive assessment of codebase health beyond test
+  pass/fail metrics.
+- When you suspect tests are masking underlying code quality issues (false
+  positives, over-mocking, narrow coverage).
+- Before major refactors or releases to establish a quality baseline.
+- When `conftest.py` hygiene or test organization needs auditing.
+
+**Announce at start:** "I'm using the `vaultspec-test-health` skill to conduct
+a product health audit."
+
+**Save findings to:**
+`.vault/audit/yyyy-mm-dd-health-audit-{scope}.md`
+
+---
+
+<!-- Human-readable documentation above | Agent instructions below -->
+
+---
+
+## Audit Focus
+
+Do NOT trust tests as a valid indicator for code health. Tests can be written
+in a way that they pass without actually revealing the true functionality and
+behavior of the codebase. Instead, focus on the quality of the code itself, its
+maintainability, readability, and how well it adheres to the project mission
+goals.
+
+### Identify
 
 - Tests that do not provide insight into the actual integration and production
   flow. This includes tests that are too narrowly focused, do not cover edge
@@ -26,7 +53,7 @@ indicators of code health that we should focus on.
   NOT allow tests to try to solve issues individually that should be
   centralized.
 
-## Verify
+### Verify
 
 - Python and rust unit tests that do not reside in their source module's test
   directory.
@@ -73,17 +100,17 @@ might request new work or ask follow up questions. The team should be ready to
 respond to any new requests or questions from the user, and should continue
 to provide support and assistance as needed.
 
-## Artefacts
+## Persistence
 
-Every agent must persist their report to disk so that user and other agents
-have access to the information. The team lead must ensure that all reports are
-organized and easily accessible for review and reference. The team lead should
-also maintain a clear record of all communications and decisions made during
-the audit process, to ensure transparency and accountability.
+- Every agent must persist their report to disk so that user and other agents
+  have access to the information.
+- The team lead must ensure that all reports are organized and easily
+  accessible for review and reference.
+- The team lead should maintain a clear record of all communications and
+  decisions made during the audit process, to ensure transparency and
+  accountability.
 
 ## Implementation
-
-The implementation of the code health audit will involve the following steps:
 
 - User approved shutdown of the team. Verify that every research, decision,
   and ADR report is persisted to disk and organized in a way that they can be
@@ -115,3 +142,23 @@ The implementation of the code health audit will involve the following steps:
   of the audit are being met. The team lead will always delegate work to the
   coding agents and test runners, and will step in to provide guidance and
   support as needed.
+
+## Artifact Linking
+
+- Any persisted markdown files must be linked against other persisted
+  documents using quoted `"[[wiki-links]]"`.
+- DO NOT use `@ref` style links or `[label](path)` style links.
+
+### Frontmatter & Tagging Mandate
+
+Every document MUST strictly adhere to the following schema:
+
+- **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
+  - **Directory Tag**: Exactly `#audit`.
+  - **Feature Tag**: Exactly one kebab-case `#{feature}` tag.
+  - *Syntax:* `tags: ["#audit", "#feature"]` (Must be quoted strings in a
+    list).
+- **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
+  - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
+- **`date`**: MUST use `yyyy-mm-dd` format.
+- **No `feature` key**: Use `tags:` exclusively for feature identification.
