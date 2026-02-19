@@ -67,14 +67,14 @@ system_framework: |-
 
   | Folder     | Role                                                     |
   |------------|----------------------------------------------------------|
-  | rules/     | Persistent behavioral rules, always loaded into sessions |
-  | skills/    | Activatable workflow recipes, invoked by name            |
-  | agents/    | Sub-agent persona definitions, dispatched by skills      |
-  | templates/ | Structural schemas for .vault/ artifacts                 |
-  | system/    | Composable system prompt fragments                       |
+  | rules/     | Persistent behavioral rules, always loaded into sessions   |
+  | rules/skills/    | Activatable workflow recipes, invoked by name         |
+  | rules/agents/    | Sub-agent persona definitions, dispatched by skills   |
+  | rules/templates/ | Structural schemas for .vault/ artifacts              |
+  | rules/system/    | Composable system prompt fragments                    |
 
   Artifacts are persisted in `.vault/` (adr/, audit/, exec/, plan/, reference/, research/). Each
-  artifact follows a template from `.vaultspec/templates/` with YAML frontmatter,
+  artifact follows a template from `.vaultspec/rules/templates/` with YAML frontmatter,
   wiki-links, and a two-tag taxonomy.
 
   The user must approve plans before execution proceeds. Code review via vaultspec-review
@@ -82,23 +82,6 @@ system_framework: |-
 
   </conventions>
 ---
-
-## Constitution
-
-The following principles are immutable:
-
-# Constitution
-
-Immutable principles that constrain all development within this project.
-These cannot be overridden by rules, skills, or agent instructions.
-
-## Principles
-
-1. All significant decisions must be documented in `.vault/adr/`
-2. Code changes require review via vaultspec-review
-3. User approval is required before plan execution
-4. Agent outputs must be traceable to source artifacts
-5. Sensitive data must never appear in vault documents
 
 ## Rules
 
