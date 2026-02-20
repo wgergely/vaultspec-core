@@ -1,0 +1,7 @@
+{"timestamp": "2026-02-20T10:29:47.897376+00:00", "type": "session_start", "data": {"agent_name": "vaultspec-researcher", "task_id": "949df45a-df89-40f0-bff3-de422cbdd845", "start_time": "2026-02-20T10:29:47.897224+00:00", "root_dir": "Y:\\code\\task-worktrees\\main"}}
+{"timestamp": "2026-02-20T10:29:47.905526+00:00", "type": "handshake_start", "data": {"agent": "vaultspec-researcher"}}
+{"timestamp": "2026-02-20T10:30:09.166766+00:00", "type": "handshake_complete", "data": {"agent": "vaultspec-researcher", "elapsed": 21.260931199998595}}
+{"timestamp": "2026-02-20T10:30:09.167095+00:00", "type": "session_create_start", "data": {"agent": "vaultspec-researcher"}}
+{"timestamp": "2026-02-20T10:30:10.041248+00:00", "type": "session_created", "data": {"agent": "vaultspec-researcher", "session_id": "01425f57-3ccc-4a1e-9057-0cff72d3edd2", "elapsed": 0.8741333999205381}}
+{"timestamp": "2026-02-20T10:30:10.041594+00:00", "type": "prompt_sent", "data": {"agent": "vaultspec-researcher", "turn": 1, "prompt_length": 43}}
+{"timestamp": "2026-02-20T10:30:14.466649+00:00", "type": "run_failed", "data": {"agent": "vaultspec-researcher", "error": "Verify your account to continue.", "total_elapsed": 32.21455709997099}}

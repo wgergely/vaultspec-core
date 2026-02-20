@@ -1,0 +1,11 @@
+{"timestamp": "2026-02-19T20:58:33.024271+00:00", "type": "session_start", "data": {"agent_name": "vaultspec-researcher", "task_id": "a433e09e-b34a-4778-9b6d-0254072f4a00", "start_time": "2026-02-19T20:58:33.024107+00:00", "root_dir": "Y:\\code\\task-worktrees\\main"}}
+{"timestamp": "2026-02-19T20:58:33.028298+00:00", "type": "handshake_start", "data": {"agent": "vaultspec-researcher"}}
+{"timestamp": "2026-02-19T20:58:48.270358+00:00", "type": "handshake_complete", "data": {"agent": "vaultspec-researcher", "elapsed": 15.241693599964492}}
+{"timestamp": "2026-02-19T20:58:48.270701+00:00", "type": "session_create_start", "data": {"agent": "vaultspec-researcher"}}
+{"timestamp": "2026-02-19T20:58:48.964815+00:00", "type": "session_created", "data": {"agent": "vaultspec-researcher", "session_id": "c61bb737-1e13-4cba-9f00-89e6dadd29cc", "elapsed": 0.6939147999510169}}
+{"timestamp": "2026-02-19T20:58:48.965137+00:00", "type": "prompt_sent", "data": {"agent": "vaultspec-researcher", "turn": 1, "prompt_length": 52}}
+{"timestamp": "2026-02-19T20:58:50.379724+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "**Responding Concisely**\n\nI am thinking about the specific task: to respond with a single word. My thought process is narrowing; the parameters are clear. The constraints are straightforward, focusing solely on output. I am ready to comply.\n\n\n", "type": "text"}, "session_update": "agent_thought_chunk"}}
+{"timestamp": "2026-02-19T20:58:50.400194+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "GEMINI_CONFIRMED", "type": "text"}, "session_update": "agent_message_chunk"}}
+{"timestamp": "2026-02-19T20:58:50.412559+00:00", "type": "prompt_completed", "data": {"agent": "vaultspec-researcher", "turn": 1, "elapsed": 1.4472301000496373}}
+{"timestamp": "2026-02-19T20:58:50.412978+00:00", "type": "session_cancelled", "data": {"agent": "vaultspec-researcher", "elapsed": 0.00013689999468624592}}
+{"timestamp": "2026-02-19T20:58:50.413334+00:00", "type": "run_complete", "data": {"agent": "vaultspec-researcher", "total_elapsed": 22.361416300060228, "handshake_elapsed": 15.241693599964492, "session_elapsed": 0.6939147999510169, "cancel_elapsed": 0.00013689999468624592}}

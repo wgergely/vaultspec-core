@@ -1,0 +1,11 @@
+{"timestamp": "2026-02-19T22:46:28.638007+00:00", "type": "session_start", "data": {"agent_name": "tester", "task_id": "3fc1e685-cc67-4317-a72c-98bd628cdf1e", "start_time": "2026-02-19T22:46:28.637743+00:00", "root_dir": "Y:\\code\\task-worktrees\\main\\test-project"}}
+{"timestamp": "2026-02-19T22:46:28.642448+00:00", "type": "handshake_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T22:46:44.947402+00:00", "type": "handshake_complete", "data": {"agent": "tester", "elapsed": 16.304552600020543}}
+{"timestamp": "2026-02-19T22:46:44.947698+00:00", "type": "session_create_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T22:46:45.333486+00:00", "type": "session_created", "data": {"agent": "tester", "session_id": "d7b245a8-def5-447f-b157-ff86d4815ca1", "elapsed": 0.3855930999852717}}
+{"timestamp": "2026-02-19T22:46:45.333974+00:00", "type": "prompt_sent", "data": {"agent": "tester", "turn": 1, "prompt_length": 52}}
+{"timestamp": "2026-02-19T22:46:46.482157+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "**Defining the Identity**\n\nMy name is Bard.\n\n\n", "type": "text"}, "session_update": "agent_thought_chunk"}}
+{"timestamp": "2026-02-19T22:46:46.504591+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "Bonjour, je m'appelle Jean-Claude.", "type": "text"}, "session_update": "agent_message_chunk"}}
+{"timestamp": "2026-02-19T22:46:46.514279+00:00", "type": "prompt_completed", "data": {"agent": "tester", "turn": 1, "elapsed": 1.1800949999596924}}
+{"timestamp": "2026-02-19T22:46:46.514680+00:00", "type": "session_cancelled", "data": {"agent": "tester", "elapsed": 0.0001404000213369727}}
+{"timestamp": "2026-02-19T22:46:46.515068+00:00", "type": "run_complete", "data": {"agent": "tester", "total_elapsed": 22.945903500076383, "handshake_elapsed": 16.304552600020543, "session_elapsed": 0.3855930999852717, "cancel_elapsed": 0.0001404000213369727}}

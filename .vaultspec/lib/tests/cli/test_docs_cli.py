@@ -453,37 +453,61 @@ class TestNoCommand:
 
 
 class TestLoggingDispatch:
-    """Test that --verbose and --debug correctly dispatch to configure_logging."""
+    """Test that --verbose and --debug configure real logging levels.
 
-    def test_verbose_configures_info(self, monkeypatch):
-        """--verbose should call configure_logging(level='INFO')."""
+    Each test resets the logging_config idempotency guard, calls real
+    docs.main() with a temporary vault root, and verifies the actual
+    root logger level.
+    """
+
+    def test_verbose_configures_info(self, monkeypatch, tmp_path):
+        """--verbose sets root logger to INFO."""
+        import logging
+
+        import logging_config
+
         import docs
 
-        calls = []
-        monkeypatch.setattr(docs, "configure_logging", lambda **kw: calls.append(kw))
-        monkeypatch.setattr("sys.argv", ["docs.py", "--verbose", "audit", "--summary"])
-        monkeypatch.setattr(docs, "handle_audit", lambda *_args: None)
+        monkeypatch.setattr(logging_config, "_logging_configured", False)
+        (tmp_path / ".vault").mkdir(exist_ok=True)
+        monkeypatch.setattr(
+            "sys.argv",
+            ["docs.py", "--verbose", "audit", "--summary", "--root", str(tmp_path)],
+        )
         docs.main()
-        assert calls == [{"level": "INFO"}]
+        assert logging.getLogger().level == logging.INFO
 
-    def test_debug_configures_debug(self, monkeypatch):
-        """--debug should call configure_logging(level='DEBUG')."""
+    def test_debug_configures_debug(self, monkeypatch, tmp_path):
+        """--debug sets root logger to DEBUG."""
+        import logging
+
+        import logging_config
+
         import docs
 
-        calls = []
-        monkeypatch.setattr(docs, "configure_logging", lambda **kw: calls.append(kw))
-        monkeypatch.setattr("sys.argv", ["docs.py", "--debug", "audit", "--summary"])
-        monkeypatch.setattr(docs, "handle_audit", lambda *_args: None)
+        monkeypatch.setattr(logging_config, "_logging_configured", False)
+        (tmp_path / ".vault").mkdir(exist_ok=True)
+        monkeypatch.setattr(
+            "sys.argv",
+            ["docs.py", "--debug", "audit", "--summary", "--root", str(tmp_path)],
+        )
         docs.main()
-        assert calls == [{"level": "DEBUG"}]
+        assert logging.getLogger().level == logging.DEBUG
 
-    def test_default_configures_no_args(self, monkeypatch):
-        """No verbose/debug should call configure_logging() with no args."""
+    def test_default_configures_info_fallback(self, monkeypatch, tmp_path):
+        """No verbose/debug defaults to INFO (from env default)."""
+        import logging
+
+        import logging_config
+
         import docs
 
-        calls = []
-        monkeypatch.setattr(docs, "configure_logging", lambda **kw: calls.append(kw))
-        monkeypatch.setattr("sys.argv", ["docs.py", "audit", "--summary"])
-        monkeypatch.setattr(docs, "handle_audit", lambda *_args: None)
+        monkeypatch.setattr(logging_config, "_logging_configured", False)
+        monkeypatch.delenv("VAULTSPEC_LOG_LEVEL", raising=False)
+        (tmp_path / ".vault").mkdir(exist_ok=True)
+        monkeypatch.setattr(
+            "sys.argv",
+            ["docs.py", "audit", "--summary", "--root", str(tmp_path)],
+        )
         docs.main()
-        assert calls == [{}]
+        assert logging.getLogger().level == logging.INFO

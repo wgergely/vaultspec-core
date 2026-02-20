@@ -1,0 +1,11 @@
+{"timestamp": "2026-02-19T22:29:03.556903+00:00", "type": "session_start", "data": {"agent_name": "vaultspec-researcher", "task_id": "c394104b-c28b-417b-89e0-c5b51c206b9e", "start_time": "2026-02-19T22:29:03.556734+00:00", "root_dir": "Y:\\code\\task-worktrees\\main"}}
+{"timestamp": "2026-02-19T22:29:03.561032+00:00", "type": "handshake_start", "data": {"agent": "vaultspec-researcher"}}
+{"timestamp": "2026-02-19T22:29:18.919782+00:00", "type": "handshake_complete", "data": {"agent": "vaultspec-researcher", "elapsed": 15.358379799989052}}
+{"timestamp": "2026-02-19T22:29:18.920092+00:00", "type": "session_create_start", "data": {"agent": "vaultspec-researcher"}}
+{"timestamp": "2026-02-19T22:29:19.436065+00:00", "type": "session_created", "data": {"agent": "vaultspec-researcher", "session_id": "dfa84b53-5276-47f1-acaf-e316e6b30ca8", "elapsed": 0.5157754000974819}}
+{"timestamp": "2026-02-19T22:29:19.436367+00:00", "type": "prompt_sent", "data": {"agent": "vaultspec-researcher", "turn": 1, "prompt_length": 112}}
+{"timestamp": "2026-02-19T22:29:21.028672+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "**Acknowledging the Input**\n\nI see the instruction. The task is straightforward: confirm receipt of `CLAUDE_CONFIRMED` with `GEMINI_RECEIVED_CLAUDE`. I'm ready to proceed.\n\n\n", "type": "text"}, "session_update": "agent_thought_chunk"}}
+{"timestamp": "2026-02-19T22:29:21.040320+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "GEMINI_RECEIVED_CLAUDE", "type": "text"}, "session_update": "agent_message_chunk"}}
+{"timestamp": "2026-02-19T22:29:21.052382+00:00", "type": "prompt_completed", "data": {"agent": "vaultspec-researcher", "turn": 1, "elapsed": 1.6158207000698894}}
+{"timestamp": "2026-02-19T22:29:21.052799+00:00", "type": "session_cancelled", "data": {"agent": "vaultspec-researcher", "elapsed": 0.00014260003808885813}}
+{"timestamp": "2026-02-19T22:29:21.053109+00:00", "type": "run_complete", "data": {"agent": "vaultspec-researcher", "total_elapsed": 22.471844500047155, "handshake_elapsed": 15.358379799989052, "session_elapsed": 0.5157754000974819, "cancel_elapsed": 0.00014260003808885813}}

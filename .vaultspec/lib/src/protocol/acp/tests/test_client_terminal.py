@@ -5,6 +5,8 @@ Covers: create_terminal read-only guard in SubagentClient.
 
 from __future__ import annotations
 
+import shutil
+
 import pytest
 from tests.constants import TEST_PROJECT
 
@@ -28,12 +30,25 @@ class TestCreateTerminalReadOnly:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
+    @pytest.mark.skipif(
+        not shutil.which("bash"),
+        reason="bash not on PATH",
+    )
     async def test_create_terminal_allowed_readwrite(self):
-        """Terminal creation succeeds in read-write mode.
-
-        Integration: requires real subprocess creation.
-        """
-        pytest.skip("requires real subprocess for terminal creation")
+        """Terminal creation succeeds in read-write mode (requires bash on PATH)."""
+        client = SubagentClient(root_dir=TEST_PROJECT, mode="read-write")
+        # create_terminal should not raise in read-write mode
+        # The actual subprocess may fail for other reasons, but the
+        # read-write permission check must pass
+        try:
+            await client.create_terminal(
+                command="bash",
+                session_id="test-session",
+            )
+        except ValueError:
+            pytest.fail(
+                "create_terminal should not raise ValueError in read-write mode"
+            )
 
     @pytest.mark.asyncio
     async def test_create_terminal_denied_message_mentions_readonly(self):

@@ -1,39 +1,42 @@
-# vaultspec
+# VaultSpec
 
 ![CI](https://github.com/wgergely/vaultspec/actions/workflows/ci.yml/badge.svg)
 ![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 ![Status: Alpha](https://img.shields.io/badge/status-alpha-orange)
 
-> The accountability layer for AI coding agents
+The workflow leaves a managed document trail, **the vault**. The vault is
+traceable and trackable: developers and agents can find the research that
+justified decisions, the ADR that formalized them, the plan the agents
+executed, and the individual agent summaries who coded them. It is a living
+knowledge base that grows with your codebase, ensuring that every decision
+is documented and auditable.
 
-vaultspec enforces a **Research -> Specify -> Plan -> Execute -> Verify**
-workflow that turns AI coding assistants into accountable engineering partners.
+ValutSpec enforces a **Research → Specify → Plan → Execute → Verify**
+workflow with a governed document trail.
 
-## The Problem
+---
 
-AI coding agents write code fast — but they lose context between sessions,
-skip architectural decisions, produce inconsistent output, and leave no audit
-trail. When your CTO asks *why* the AI changed that function, all you have is
-a git blame. Regulated industries need more. Teams that ship quality need more.
+## The Workflow
 
-vaultspec adds the missing layer: a governed pipeline where every code change
-is traceable to the research that justified it, the ADR that formalized it,
-the plan that structured it, and the review that approved it.
+VaultSpec enformces the following workflow for major features:
 
-## Why vaultspec?
+- **Research**: Gathers information, evidence and references for anchoring.
+  - Skills: `vaultspec-research`, `vaultspec-reference`
+  - Agents: `vaultspec-researcher`, `vaultspec-reference-auditor`
+- **Specify**: Uses gathered evidence to make architectural decisions.
+  These are considered formal and binding.
+  - Skills: `vaultspec-adr`, `vaultspec-adr-researcher`
+  - Agents:
+- **Plan**: Convert ADRs into step-by-step implementation plans.
+  - Skills: `vaultspec-write` | Agents: `vaultspec-writer`
+- **Execute**: Implement the plan with specialized sub-agents.
+  - Skills: `vaultspec-execute` | Agents: `vaultspec-*-executor`
+- **Verify**: Audit the implementation for safety and intent compliance.
+  - Skills: `vaultspec-review` | Agents: `vaultspec-code-reviewer`
 
-- **Governance over speed** -- AI agents write code fast but lose context,
-  skip steps, and produce inconsistent output. vaultspec adds structure: every
-  change is researched, specified, planned, executed, and verified.
-- **Documentation-first** -- the `.vault/` knowledge base creates a persistent
-  trail of ADRs, research, plans, and execution records that survives context
-  windows.
-- **Multi-agent** -- specialized agents (researcher, planner, executor,
-  reviewer) with tiered capability levels handle different kinds of work.
-- **Multi-protocol** -- MCP for tool access, ACP for orchestration, A2A for
-  agent-to-agent communication. Full stack.
-- **Multi-tool** -- works with Claude Code, Gemini CLI, and Google Antigravity.
+Each phase produces artifacts in `.vault/` that form a traceable chain from
+research to code.
 
 ## Prerequisites
 
@@ -60,6 +63,9 @@ pip install -e ".[rag,dev]" --extra-index-url https://download.pytorch.org/whl/c
 > without GPU.
 
 ```bash
+# Verify your installation
+python .vaultspec/lib/scripts/cli.py doctor
+
 # List available agents
 python .vaultspec/lib/scripts/cli.py agents list
 
@@ -73,37 +79,31 @@ python .vaultspec/lib/scripts/docs.py index
 python .vaultspec/lib/scripts/docs.py search "my query"
 ```
 
-## The Workflow
+## Worked Example
+
+Here is what a governed feature looks like end to end. Each phase invokes
+a skill; each skill produces an artifact in `.vault/`.
 
 ```text
-Research  ->  Specify  ->  Plan  ->  Execute  ->  Verify
-   |             |           |          |           |
-research/     adr/        plan/      exec/      review
+/vaultspec-research   →  .vault/research/2026-02-18-health-endpoint-research.md
+/vaultspec-adr        →  .vault/adr/2026-02-18-health-endpoint-adr.md
+/vaultspec-write      →  .vault/plan/2026-02-18-health-endpoint-phase1-plan.md
+/vaultspec-execute    →  .vault/exec/2026-02-18-health-endpoint/step1..N.md
+/vaultspec-review     →  .vault/exec/2026-02-18-health-endpoint/review.md
 ```
 
-1. **Research** (`vaultspec-research`) -- explore the problem space, find
-   patterns and libraries
-2. **Specify** (`vaultspec-adr`) -- formalize decisions in Architecture
-   Decision Records
-3. **Plan** (`vaultspec-write`) -- convert ADRs into step-by-step
-   implementation plans
-4. **Execute** (`vaultspec-execute`) -- implement the plan with specialized
-   sub-agents
-5. **Verify** (`vaultspec-review`) -- audit the implementation for safety and
-   intent compliance
-
-Each phase produces artifacts in `.vault/` that form a traceable chain from
-research to code.
+Every decision is traceable from research to code. See the
+[Concepts & Tutorial](.vaultspec/docs/concepts.md) for the full worked example
+with sample artifact output at each phase.
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md) -- step-by-step setup and first
-  workflow
-- [Concepts](docs/concepts.md) -- SDD methodology, agents, protocols,
-  architecture
-- [Configuration](docs/configuration.md) -- environment variables and settings
-- [Search Guide](docs/search-guide.md) -- RAG search syntax and GPU
-  requirements
+- [Concepts & Tutorial](.vaultspec/docs/concepts.md) -- worked example,
+  SDD methodology, agents, and protocols
+- [CLI Reference](.vaultspec/docs/cli-reference.md) -- all commands and
+  configuration variables
+- [Search Guide](.vaultspec/docs/search-guide.md) -- RAG search syntax,
+  filter tokens, and GPU requirements
 - [Framework Manual](.vaultspec/README.md) -- detailed workflow, agent
   reference, and diagrams
 
@@ -117,7 +117,7 @@ research to code.
   templates/         # Document templates for .vault/ artifacts
   lib/               # Python library, CLI scripts, and test suite
 .vault/              # Knowledge vault: ADRs, research, plans, exec records, audits
-docs/                # Human documentation
+  .vaultspec/docs/   # Deployed documentation: concepts, CLI reference, search guide
 ```
 
 ## Agent Reference

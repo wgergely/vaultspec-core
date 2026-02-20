@@ -1,0 +1,11 @@
+{"timestamp": "2026-02-19T20:28:28.643323+00:00", "type": "session_start", "data": {"agent_name": "vaultspec-researcher", "task_id": "6d92caf0-78d3-4a46-bbc9-a6973d453ea5", "start_time": "2026-02-19T20:28:28.643103+00:00", "root_dir": "Y:\\code\\task-worktrees\\main"}}
+{"timestamp": "2026-02-19T20:28:28.652528+00:00", "type": "handshake_start", "data": {"agent": "vaultspec-researcher"}}
+{"timestamp": "2026-02-19T20:28:43.625816+00:00", "type": "handshake_complete", "data": {"agent": "vaultspec-researcher", "elapsed": 14.973102699965239}}
+{"timestamp": "2026-02-19T20:28:43.626145+00:00", "type": "session_create_start", "data": {"agent": "vaultspec-researcher"}}
+{"timestamp": "2026-02-19T20:28:44.209042+00:00", "type": "session_created", "data": {"agent": "vaultspec-researcher", "session_id": "d4bf84e2-5d55-4741-ac2b-207a846aeb2b", "elapsed": 0.582883800030686}}
+{"timestamp": "2026-02-19T20:28:44.209361+00:00", "type": "prompt_sent", "data": {"agent": "vaultspec-researcher", "turn": 1, "prompt_length": 43}}
+{"timestamp": "2026-02-19T20:28:45.686292+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "**Issuing a Directive**\n\nI'm now tasked with a specific output. The instruction is crystal clear: to respond with \"HELLO_A2A_GEMINI\". My process is complete; the generation is straightforward.\n\n\n", "type": "text"}, "session_update": "agent_thought_chunk"}}
+{"timestamp": "2026-02-19T20:28:45.705547+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "HELLO_A2A_GEMINI", "type": "text"}, "session_update": "agent_message_chunk"}}
+{"timestamp": "2026-02-19T20:28:45.714329+00:00", "type": "prompt_completed", "data": {"agent": "vaultspec-researcher", "turn": 1, "elapsed": 1.5049460999434814}}
+{"timestamp": "2026-02-19T20:28:45.714768+00:00", "type": "session_cancelled", "data": {"agent": "vaultspec-researcher", "elapsed": 0.0001639999682083726}}
+{"timestamp": "2026-02-19T20:28:45.715084+00:00", "type": "run_complete", "data": {"agent": "vaultspec-researcher", "total_elapsed": 22.136544000008143, "handshake_elapsed": 14.973102699965239, "session_elapsed": 0.582883800030686, "cancel_elapsed": 0.0001639999682083726}}

@@ -15,6 +15,7 @@ class DocType(StrEnum):
     ADR = "adr"
     AUDIT = "audit"
     EXEC = "exec"
+    LOGS = "logs"
     PLAN = "plan"
     REFERENCE = "reference"
     RESEARCH = "research"
