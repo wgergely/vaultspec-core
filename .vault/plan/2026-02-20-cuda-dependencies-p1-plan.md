@@ -41,7 +41,8 @@ embeddings + store), a documentation phase, and a verification phase.
     1. `Add compute capability requirement to docs` — Add a "GPU: compute capability >= 7.5 (Turing+)" line to the prerequisites sections of `README.md`, `docs/getting-started.md`, and `docs/search-guide.md`.
     2. `Add nvcc vs nvidia-smi note to getting-started.md` — In the prerequisites section, clarify that `nvidia-smi` shows the driver CUDA compatibility version, and `nvcc --version` shows the toolkit version.
     3. `Standardize --extra-index-url in all install references` — Audit `README.md`, `docs/getting-started.md`, `docs/search-guide.md`, and `docs/guides/individual-developer.md` for any occurrence of `--index-url` (without the `extra-` prefix) and replace with `--extra-index-url`. Add a prominent warning callout in `docs/getting-started.md` explaining why `--extra-index-url` is required.
-    4. `Add VAULTSPEC_RAG_ENABLED to search-guide.md config table` — Document the new config variable in the Configuration section of the search guide.
+    4. `Strengthen README Quick Start note` — Expand the `> **Note:**` block after the install command in `README.md` to explicitly warn that omitting `--extra-index-url` installs CPU-only PyTorch, which will fail at runtime. Mention compute capability >= 7.5 and the raised dependency floors (torch >= 2.9.0, CUDA 13.0+) so the README serves as the authoritative first-contact for CUDA install requirements.
+    5. `Add VAULTSPEC_RAG_ENABLED to search-guide.md config table` — Document the new config variable in the Configuration section of the search guide.
 
 - `Phase 4: Verification`
     1. `Run test suite` — Execute `pytest` to confirm no regressions. The store import decoupling and config addition should not break existing tests.
