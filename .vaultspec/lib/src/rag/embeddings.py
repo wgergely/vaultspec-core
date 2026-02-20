@@ -15,6 +15,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+CUDA_INDEX_TAG = "cu130"
+CUDA_INDEX_URL = f"https://download.pytorch.org/whl/{CUDA_INDEX_TAG}"
+
 
 class GPUNotAvailableError(RuntimeError):
     """Raised when CUDA GPU is required but not available."""
@@ -48,8 +51,9 @@ def _require_cuda() -> None:
         raise GPUNotAvailableError(
             f"CUDA GPU required but not available. "
             f"Torch version: {torch_version}, CUDA compiled: {cuda_version}. "
-            f"If you have an NVIDIA GPU, install CUDA-enabled PyTorch: "
-            f"pip install torch --index-url https://download.pytorch.org/whl/cu124"
+            f"vaultspec requires CUDA 13.0+ with compute capability >= 7.5. "
+            f"Install CUDA-enabled PyTorch: "
+            f"pip install torch --extra-index-url {CUDA_INDEX_URL}"
         )
 
 

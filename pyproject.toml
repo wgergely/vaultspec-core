@@ -55,10 +55,10 @@ dev = [
     "nodeenv>=1.0.0",
 ]
 rag = [
-    "torch>=2.5.0",
-    "sentence-transformers>=3.0.0",
-    "lancedb>=0.15.0",
-    "einops>=0.7.0",
+    "torch>=2.9.0",
+    "sentence-transformers>=5.0.0",
+    "lancedb>=0.27.0",
+    "einops>=0.8.0",  # transitive dep of nomic-embed-text-v1.5 (trust_remote_code)
 ]
 dev-rag = [
     "vaultspec[dev,rag]",

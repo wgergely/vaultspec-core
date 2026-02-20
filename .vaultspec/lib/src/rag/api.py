@@ -120,6 +120,15 @@ def get_engine(root_dir: pathlib.Path) -> VaultRAG:
                     _engine.close()
                 _engine = VaultRAG(root_dir)
 
+                # Fail fast if RAG is disabled by configuration
+                from core.config import get_config
+
+                if not get_config().rag_enabled:
+                    _engine = None
+                    raise ImportError(
+                        "RAG disabled by configuration (VAULTSPEC_RAG_ENABLED=false)"
+                    )
+
                 # Fail fast if GPU is unavailable
                 try:
                     from rag.embeddings import _require_cuda
