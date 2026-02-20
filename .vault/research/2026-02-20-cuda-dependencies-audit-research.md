@@ -11,15 +11,15 @@ related:
 
 # `cuda-dependencies` research: RAG CUDA Environment Audit
 
-Full audit of the CUDA dependency stack powering the RAG subsystem. Covers documentation accuracy, in-code warnings, CUDA/Python version compatibility, graceful degradation, and pip install correctness.
+Full audit of the CUDA dependency stack powering the RAG subsystem. The project mandates **Python 3.13+** and **CUDA 13.0+** as a deliberate frontier stance. This audit identifies where dependency floors, documentation, and in-code messages fail to align with that mandate.
 
 ## Findings
 
 ### 1. Documentation State
 
-**Verdict: Contains critical errors that will break user installs.**
+**Verdict: Documentation correctly states CUDA 13.0+ and Python 3.13+. The install URL and troubleshooting guidance are sound. Minor gaps remain.**
 
-All documentation references **CUDA 13.0+** and the `cu130` index URL, which is factually correct (CUDA 13.0 was released August 2025, cu130 wheels exist on `download.pytorch.org`). However, there are several issues:
+All documentation references **CUDA 13.0+** and the `cu130` index URL. CUDA 13.0 was released August 2025; CUDA 13.1 shipped December 2025. The cu130 PyTorch wheels are live on `download.pytorch.org`.
 
 #### Files audited
 
@@ -27,20 +27,19 @@ All documentation references **CUDA 13.0+** and the `cu130` index URL, which is 
 |------|-----------|-----------------|
 | `README.md:44` | "CUDA 13.0+" | `pip install -e ".[rag,dev]" --extra-index-url https://download.pytorch.org/whl/cu130` |
 | `docs/getting-started.md:9` | "CUDA 13.0+" | Same cu130 URL |
-| `docs/getting-started.md:244` | Troubleshooting section | `pip install torch --extra-index-url https://download.pytorch.org/whl/cu130` |
+| `docs/getting-started.md:244` | Troubleshooting | `pip install torch --extra-index-url https://download.pytorch.org/whl/cu130` |
 | `docs/search-guide.md:78` | "CUDA: 13.0+" | N/A |
 
 #### Issues found
 
-- **A1 - Overly narrow CUDA floor.** Requiring CUDA 13.0+ excludes users on CUDA 12.x (12.1, 12.4, 12.6, 12.8, 12.9), which remain extremely common in production. The `nomic-embed-text-v1.5` model runs on any GPU with compute capability >= 7.5 and CUDA >= 11.8. The `pyproject.toml` specifies `torch>=2.5.0`, but PyTorch 2.5 shipped with cu118 and cu124 wheels — not cu130 (which requires PyTorch >= 2.9). There is a mismatch: the floor version `torch>=2.5.0` doesn't have cu130 builds.
-- **A2 - No mention of compute capability requirement.** The `nomic-embed-text-v1.5` model requires compute capability >= 7.5 (Turing or newer). Users with older GPUs (Pascal, Volta) will get cryptic CUDA errors with no guidance.
-- **A3 - No `nvcc --version` vs `nvidia-smi` distinction.** Documentation tells users to run `nvidia-smi` to verify CUDA, but `nvidia-smi` shows the driver's CUDA compatibility version, not the toolkit version. This is a common source of confusion.
-- **A4 - `pyproject.toml` uses `--extra-index-url` in docs but specifies no index in the dependency spec.** The `[project.optional-dependencies] rag` section lists `torch>=2.5.0` without constraining the index URL. A bare `pip install -e ".[rag]"` will pull the CPU-only torch from PyPI, then the user gets `GPUNotAvailableError` at runtime. This is the #1 installation footgun.
-- **A5 - `extension.toml` installs only `.[dev]`.** The runtime install command (`pip install -e '.[dev]'`) does not include `[rag]` extras at all. Users relying on extension-based installs will never get RAG deps.
+- **A1 - No mention of compute capability requirement.** The `nomic-embed-text-v1.5` model requires compute capability >= 7.5 (Turing or newer: RTX 2000+, T4+). Users with older GPUs (Pascal, Volta) will get cryptic CUDA errors. Docs should state this explicitly.
+- **A2 - No `nvcc --version` vs `nvidia-smi` distinction.** Documentation tells users to run `nvidia-smi` to verify CUDA, but `nvidia-smi` shows the driver's CUDA compatibility version, not the toolkit version. This is a common source of confusion. Docs should mention both.
+- **A3 - `pyproject.toml` dependency spec doesn't enforce the CUDA index.** The `[project.optional-dependencies] rag` section lists `torch>=2.5.0` without constraining the index URL. A bare `pip install -e ".[rag]"` pulls the CPU-only torch from PyPI, then the user gets `GPUNotAvailableError` at runtime. This is the **#1 installation footgun**. The torch floor must be raised to match the cu130 mandate.
+- **A4 - `extension.toml` installs only `.[dev]`.** The runtime install command (`pip install -e '.[dev]'`) does not include `[rag]` extras. Users relying on extension-based installs will never get RAG deps.
 
 ### 2. In-Code Warning Messages
 
-**Verdict: Good structure, but messages reference a hardcoded cu124 URL that contradicts docs.**
+**Verdict: Good structure. The `_require_cuda()` error message is stale and must be updated to cu130.**
 
 #### Warning/error inventory
 
@@ -48,7 +47,7 @@ All documentation references **CUDA 13.0+** and the `cu130` index URL, which is 
 |----------|------|----------------|
 | `embeddings.py:19-23` | `GPUNotAvailableError` class | Clear custom exception |
 | `embeddings.py:25-33` | `_check_rag_deps()` | Clear: tells user to run `pip install -e '.[rag]'` |
-| `embeddings.py:36-53` | `_require_cuda()` | **Problem**: hardcodes `cu124` in install hint |
+| `embeddings.py:36-53` | `_require_cuda()` | **Stale**: hardcodes `cu124` in install hint |
 | `embeddings.py:63-66` | `get_device_info()` | Calls both checks, good |
 | `embeddings.py:112-114` | `EmbeddingModel.__init__` | Calls both checks, good |
 | `api.py:107-132` | `get_engine()` | Calls `_require_cuda()`, catches exceptions, good |
@@ -60,63 +59,65 @@ All documentation references **CUDA 13.0+** and the `cu130` index URL, which is 
 
 #### Issues found
 
-- **B1 - `_require_cuda()` hardcodes `cu124`.** Line 52 says `pip install torch --index-url https://download.pytorch.org/whl/cu124`. This contradicts all documentation which says `cu130`. Neither is universally correct — the user's install URL depends on their local CUDA toolkit version.
-- **B2 - No runtime detection of CUDA toolkit version.** The code checks `torch.cuda.is_available()` and reports `torch.version.cuda` (the version torch was compiled against), but never checks what CUDA toolkit is actually installed on the system. A mismatch between these causes silent failures.
-- **B3 - `store.py:20` imports `EmbeddingModel` at module level.** This triggers the full torch import chain just to read `DEFAULT_DIMENSION = 768`. If torch isn't installed, importing `rag.store` fails even though the store itself only needs `lancedb`.
+- **B1 - `_require_cuda()` hardcodes `cu124`.** Line 52 says `pip install torch --index-url https://download.pytorch.org/whl/cu124`. Must be updated to `cu130` to match the project mandate. Should also use `--extra-index-url` (not `--index-url`) to avoid the `cuda-bindings` resolution bug.
+- **B2 - `store.py:20` imports `EmbeddingModel` at module level.** This triggers the full torch import chain just to read `DEFAULT_DIMENSION = 768`. If torch isn't installed, importing `rag.store` fails even though the store itself only needs `lancedb`. The constant should be inlined or lazily resolved.
 
 ### 3. CUDA Version Audit
 
-**Verdict: The cu130 pin is too aggressive; the torch>=2.5.0 floor is inconsistent with it.**
+**Verdict: CUDA 13.0 mandate is correct. Dependency floors are far too low and must be raised to frontier versions.**
 
-| Component | Version claimed | Actual compatibility |
-|-----------|----------------|---------------------|
-| CUDA Toolkit | 13.0+ required | CUDA 11.8+ works for nomic-embed-text-v1.5 |
-| PyTorch | `>=2.5.0` | 2.5.x ships cu118/cu124. cu130 requires >=2.9.0 |
-| sentence-transformers | `>=3.0.0` | Latest is 5.2. Requires PyTorch >= 1.11 |
-| lancedb | `>=0.15.0` | Latest is 0.29.2. Uses stable ABI from Python 3.9+ |
-| einops | `>=0.7.0` | Pure Python, no CUDA dependency |
-| nomic-embed-text-v1.5 | Not pinned | ~262MB model, compute capability >= 7.5 |
+#### Current state vs required state
 
-#### Issues found
+| Component | Current floor | Latest stable | Required floor | Rationale |
+|-----------|--------------|---------------|----------------|-----------|
+| CUDA Toolkit | 13.0+ (docs) | 13.1.1 (Jan 2026) | **13.0+** | Mandate — correct |
+| PyTorch | `>=2.5.0` | 2.10.0 (Jan 2026) | **`>=2.9.0`** | cu130 wheels start at 2.9.0. torch 2.5 has no cu130 build. |
+| sentence-transformers | `>=3.0.0` | 5.2 (Feb 2026) | **`>=5.0.0`** | 3.0 is 2+ years old. 5.x has Python 3.13 improvements and Transformers v5 support. |
+| lancedb | `>=0.15.0` | 0.29.2 (Feb 2026) | **`>=0.27.0`** | 0.15 is ancient. RRFReranker, hybrid search stability, and float32 fixes landed in 0.20+. |
+| einops | `>=0.7.0` | 0.8.1 | **`>=0.8.0`** | Minor bump for Python 3.13 compat. |
+| Python | `>=3.13` (pyproject) | 3.13 | **`>=3.13`** | Mandate — correct |
 
-- **C1 - torch>=2.5.0 + cu130 is contradictory.** If a user installs `torch==2.5.0` (the minimum), there is no cu130 wheel for it. cu130 starts at torch 2.9.0. Either raise the torch floor to `>=2.9.0` to match the cu130 documentation, or lower the CUDA requirement to support cu118/cu124 which work with torch 2.5+.
-- **C2 - No upper bound on torch.** sentence-transformers sometimes breaks with new torch major versions. No cap means a future torch release could silently break the RAG pipeline.
-- **C3 - lancedb 0.15 is ancient.** Current stable is 0.29.2. Version 0.15 may have float32 bugs and missing hybrid search features that the code depends on (e.g., `RRFReranker`). The floor should be raised.
+#### Key issues
+
+- **C1 - `torch>=2.5.0` is contradictory to the cu130 mandate.** There is no cu130 wheel for torch 2.5, 2.6, 2.7, or 2.8. The cu130 index starts at torch 2.9.0. A user on Python 3.13 literally cannot install torch 2.5.0 anyway (no wheel exists). The floor must be `>=2.9.0`.
+- **C2 - `sentence-transformers>=3.0.0` is stale.** Version 3.0 predates Python 3.13 support in PyTorch. The current stable line is 5.x with Transformers v5 compatibility. Raise to `>=5.0.0`.
+- **C3 - `lancedb>=0.15.0` is ancient.** The code uses `RRFReranker`, `create_fts_index(replace=True)`, and hybrid search patterns that stabilized in 0.20+. Version 0.15 may lack these or have float32 bugs ([GitHub #2090](https://github.com/lancedb/lancedb/issues/2090)). Raise to `>=0.27.0`.
+- **C4 - `einops>=0.7.0` should be `>=0.8.0`.** Minor bump to stay current.
 
 ### 4. Python Version Audit
 
-**Verdict: Python 3.13 requirement is valid but creates friction.**
+**Verdict: Python 3.13 mandate is correct. All dependencies support it when floors are raised.**
 
 | Component | Python 3.13 support |
 |-----------|-------------------|
-| PyTorch | Supported since 2.6 (Jan 2025). 2.10.0 officially supports 3.10-3.14. |
-| sentence-transformers | Supports `>=3.9`. Works on 3.13 when PyTorch is installed. |
-| lancedb | Stable ABI `cp39-abi3`, works on 3.13. |
-| einops | Pure Python, works on 3.13. |
+| PyTorch >= 2.9.0 | Fully supported (since 2.6, Jan 2025) |
+| sentence-transformers >= 5.0.0 | Supported (requires PyTorch with 3.13 support) |
+| lancedb >= 0.27.0 | Supported (stable ABI `cp39-abi3`) |
+| einops >= 0.8.0 | Pure Python, fully supported |
 
-- **D1 - pyproject.toml requires `>=3.13`.** This is stricter than any dependency requires. PyTorch 2.6+ supports 3.13, but the torch floor is 2.5.0 which didn't support 3.13 yet. This creates another inconsistency: a user on Python 3.13 cannot install torch 2.5.0 (no wheel exists), so the effective minimum is torch 2.6+ anyway.
+The Python 3.13 mandate is self-consistent **once the torch floor is raised to >=2.9.0**. With the current `torch>=2.5.0`, there is no Python 3.13 wheel for torch 2.5, making the spec unsatisfiable in edge cases where pip resolves to an old torch version.
 
 ### 5. Graceful Degradation / Disconnect
 
-**Verdict: RAG correctly disables when deps are missing, but GPU absence is a hard fatal.**
+**Verdict: RAG correctly disables when deps are missing. GPU absence is a deliberate hard fatal — this is the correct design for a CUDA 13 mandate.**
 
 #### What works
 
 - Tier 1 functions (`list_documents`, `get_document` filesystem fallback, `get_related`, `get_status`) work without RAG deps via `ImportError` catches.
-- `get_document()` falls back to filesystem scan when store lookup fails.
+- `get_document()` falls back to filesystem scan when vector store lookup fails.
 - `get_status()` returns `index.exists=False` and `index.device=None` when RAG is unavailable.
 - Tests use `pytest.mark.skipif(not HAS_RAG, ...)` to skip RAG tests cleanly.
 - CLI commands (`docs.py index`, `docs.py search`) catch `ImportError` and print actionable install instructions.
 
-#### What doesn't work
+#### What should be improved
 
-- **E1 - `GPUNotAvailableError` is fatal with no bypass.** If torch is installed but CUDA isn't available (e.g., CPU-only machine that happens to have torch), `get_engine()` raises `GPUNotAvailableError` with no way to disable RAG at the config level. There should be a `VAULTSPEC_RAG_ENABLED=false` or `VAULTSPEC_DEVICE=cpu` override.
-- **E2 - No CPU fallback path.** The codebase explicitly forbids CPU: "CPU is NOT supported." While this is a valid design decision for performance, it means users on cloud instances without GPU, WSL without GPU passthrough, or CI environments cannot use any RAG features at all. A degraded CPU mode (slow but functional) would improve accessibility.
-- **E3 - `store.py` module-level import of `EmbeddingModel`.** This means importing `rag.store` (even to check if the store exists) pulls in torch. If torch is installed but CUDA isn't available, this import succeeds but later operations crash.
+- **E1 - `GPUNotAvailableError` message should reference CUDA 13.0 mandate.** The current message is generic. It should clearly state that vaultspec requires CUDA 13.0+ and point users to the correct install URL.
+- **E2 - `store.py` module-level import of `EmbeddingModel`.** Importing `rag.store` (even to check if the store exists) pulls in torch. If torch is installed but CUDA isn't available, this import succeeds but later operations crash. The `EMBEDDING_DIM = EmbeddingModel.DEFAULT_DIMENSION` constant should be inlined as `EMBEDDING_DIM = 768` to decouple the store from the embedding model at import time.
+- **E3 - Consider a `VAULTSPEC_RAG_ENABLED=false` config override.** For CI environments or development machines where torch is installed (as a transitive dep of other tools) but no GPU is present, a config-level disable would prevent `GPUNotAvailableError` from crashing unrelated operations.
 
 ### 6. pip Install Correctness
 
-**Verdict: The install command works for the happy path but has multiple footguns.**
+**Verdict: The happy-path install works. The bare install path is a footgun. No lock file exists.**
 
 #### Happy path (works)
 
@@ -125,41 +126,44 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[rag,dev]" --extra-index-url https://download.pytorch.org/whl/cu130
 ```
 
-This installs torch with CUDA 13.0 bindings, sentence-transformers, lancedb, einops, and dev tools.
-
 #### Footguns
 
-- **F1 - Bare `pip install -e ".[rag]"` installs CPU torch.** Without `--extra-index-url`, pip resolves `torch>=2.5.0` from PyPI, which is the CPU-only build. User gets `GPUNotAvailableError` at runtime with no indication of what went wrong.
-- **F2 - `--index-url` vs `--extra-index-url` confusion.** With `torch>=2.10.0+cu130`, using `--index-url` fails because `cuda-bindings==13.0.3` isn't mirrored to the cu130 index. `--extra-index-url` is correct. README uses `--extra-index-url` (correct), but `_require_cuda()` error message says `--index-url` (incorrect).
-- **F3 - No requirements.txt or lock file.** The only dependency spec is `pyproject.toml` optional-dependencies. There's no `requirements-rag.txt` or lock file that pins exact versions known to work together.
-- **F4 - einops is listed but may not be needed.** The codebase doesn't directly import einops. It's a transitive dependency of nomic-embed-text-v1.5's `trust_remote_code=True` execution. This should be documented or the model should be loaded without `trust_remote_code`.
+- **F1 - Bare `pip install -e ".[rag]"` installs CPU torch.** Without `--extra-index-url`, pip resolves torch from PyPI (CPU-only build). User gets `GPUNotAvailableError` at runtime with no indication of what went wrong. The documentation must make the `--extra-index-url` requirement unmissable.
+- **F2 - `--index-url` vs `--extra-index-url`.** The `_require_cuda()` error message says `--index-url`. For torch 2.10+, using `--index-url` fails because `cuda-bindings==13.0.3` isn't mirrored to the cu130 index ([GitHub pytorch #172926](https://github.com/pytorch/pytorch/issues/172926)). `--extra-index-url` is the correct flag. All references must use `--extra-index-url`.
+- **F3 - No requirements lock file.** The only dependency spec is `pyproject.toml` optional-dependencies. A `requirements-rag.txt` with pinned, tested versions would prevent version drift from breaking installs.
+- **F4 - einops is an implicit dependency.** The codebase doesn't import einops directly. It's a transitive dependency of `nomic-embed-text-v1.5` via `trust_remote_code=True`. This should be documented in a comment in pyproject.toml.
 
 ### 7. Online Research: Known Stack Issues
 
 | Issue | Source | Impact |
 |-------|--------|--------|
 | GPU overclocking causes `CUBLAS_STATUS_EXECUTION_FAILED` with nomic-embed-text-v1.5 | [PyTorch Forums](https://discuss.pytorch.org/t/cuda-error-when-trying-to-run-nomic-embed-text-v1-5/206384) | Users with OC'd GPUs get cryptic errors |
-| LanceDB float32 type errors in v0.18+ | [GitHub #2090](https://github.com/lancedb/lancedb/issues/2090) | Vector search fails silently |
+| LanceDB float32 type errors in v0.18+ | [GitHub #2090](https://github.com/lancedb/lancedb/issues/2090) | Fixed in later versions — raising floor avoids this |
 | `torch.utils.data.DataLoader` with fork hangs Lance | [GitHub lance-format #2405](https://github.com/lance-format/lance/issues/2405) | Relevant if indexer ever uses DataLoader |
-| `cuda-bindings==13.0.3` missing from cu130 index | [GitHub pytorch #172926](https://github.com/pytorch/pytorch/issues/172926) | `--index-url` installs fail for torch 2.10+ |
-| nomic model requires compute capability >= 7.5 | [HuggingFace TEI docs](https://huggingface.co/docs/text-embeddings-inference/en/supported_models) | Pascal/Volta GPUs fail |
+| `cuda-bindings==13.0.3` missing from cu130 index | [GitHub pytorch #172926](https://github.com/pytorch/pytorch/issues/172926) | Must use `--extra-index-url` not `--index-url` |
+| nomic model requires compute capability >= 7.5 | [HuggingFace TEI docs](https://huggingface.co/docs/text-embeddings-inference/en/supported_models) | Pascal/Volta GPUs fail — should be documented |
 
 ## Executive Summary
 
-The RAG subsystem has **sound architecture** — lazy imports, proper exception hierarchy, graceful degradation for Tier 1 operations. However, the **dependency specification and documentation contain multiple inconsistencies** that will cause installation failures for most users:
+The project's **CUDA 13.0+ and Python 3.13+ mandates are correct and deliberate**. The frontier stance is sound — all dependencies support this stack when properly versioned. The core problem is that **dependency floors in `pyproject.toml` are stale** and lag far behind the mandate:
 
-- The CUDA 13.0 / cu130 requirement excludes the majority of current GPU setups (CUDA 12.x)
-- The `torch>=2.5.0` floor contradicts the cu130 requirement (cu130 starts at torch 2.9.0)
-- The hardcoded `cu124` URL in `_require_cuda()` contradicts the `cu130` in all docs
-- Bare `pip install -e ".[rag]"` silently installs CPU torch
-- No way to disable RAG via config when CUDA is unavailable but torch is installed
-- `lancedb>=0.15.0` floor is far too low for the hybrid search features used
+- `torch>=2.5.0` has no cu130 wheel — must be `>=2.9.0`
+- `sentence-transformers>=3.0.0` is 2+ years old — must be `>=5.0.0`
+- `lancedb>=0.15.0` is ancient and may lack features used — must be `>=0.27.0`
+- `einops>=0.7.0` should be `>=0.8.0`
+
+Secondary issues:
+
+- `_require_cuda()` error message hardcodes stale `cu124` URL — must say `cu130`
+- `_require_cuda()` uses `--index-url` — must use `--extra-index-url`
+- `store.py` module-level import of `EmbeddingModel` is unnecessary coupling
+- Documentation should mention compute capability >= 7.5 and the `nvcc`/`nvidia-smi` distinction
 
 ### Recommended decisions for ADR
 
-- **Decision 1**: Lower CUDA floor to 12.1+ (or 11.8+) and make install docs version-agnostic, or raise torch floor to `>=2.9.0` to match cu130.
-- **Decision 2**: Add `VAULTSPEC_RAG_ENABLED` env var to allow explicit disable.
-- **Decision 3**: Fix the `_require_cuda()` error message to be dynamic (detect `torch.version.cuda` and suggest matching index URL).
-- **Decision 4**: Raise `lancedb` floor to `>=0.20.0` minimum (for RRFReranker support).
-- **Decision 5**: Add a `requirements-rag.txt` with pinned, tested versions.
-- **Decision 6**: Decouple `store.py`'s module-level `EmbeddingModel` import from the constant it needs.
+- **Decision 1**: Raise all dependency floors to frontier versions (`torch>=2.9.0`, `sentence-transformers>=5.0.0`, `lancedb>=0.27.0`, `einops>=0.8.0`).
+- **Decision 2**: Fix `_require_cuda()` to reference `cu130` and use `--extra-index-url`.
+- **Decision 3**: Decouple `store.py` module-level import — inline `EMBEDDING_DIM = 768`.
+- **Decision 4**: Add compute capability >= 7.5 requirement to docs.
+- **Decision 5**: Add `--extra-index-url` warning to all install instructions to prevent the CPU-torch footgun.
+- **Decision 6**: Consider adding `VAULTSPEC_RAG_ENABLED` config override for GPU-less environments.
