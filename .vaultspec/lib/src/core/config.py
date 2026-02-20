@@ -113,6 +113,7 @@ class VaultSpecConfig:
     max_embed_chars: int = 8000
     embedding_model: str = "nomic-ai/nomic-embed-text-v1.5"
     embedding_dimension: int = 768
+    rag_enabled: bool = True
 
     # -- I/O -------------------------------------------------------------------
     io_buffer_size: int = 8192
@@ -581,6 +582,13 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
         default=768,
         description="Embedding vector dimension. Auto-detected from model at runtime.",
         min_value=1,
+    ),
+    ConfigVariable(
+        env_name="VAULTSPEC_RAG_ENABLED",
+        attr_name="rag_enabled",
+        var_type=bool,
+        default=True,
+        description="Enable/disable RAG features. Set to false in GPU-less environments.",
     ),
     # -- Server ----------------------------------------------------------------
     ConfigVariable(

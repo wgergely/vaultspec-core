@@ -73,9 +73,10 @@ This produces a final ranking that balances keyword precision with semantic reca
 
 ## GPU Requirements
 
-The search engine requires an NVIDIA GPU with CUDA support:
+The search engine (RAG index backend) requires an NVIDIA GPU with CUDA support:
 
 - **CUDA**: 13.0+
+- **Compute capability**: >= 7.5 (Turing architecture or newer: RTX 2000+, T4+, A-series, H-series)
 - **VRAM**: ~539MB allocated for the embedding model
 - **Model**: `nomic-ai/nomic-embed-text-v1.5` (768-dimensional embeddings)
 
@@ -116,6 +117,7 @@ Search behavior can be tuned with environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `VAULTSPEC_RAG_ENABLED` | `true` | Enable/disable RAG features |
 | `VAULTSPEC_EMBEDDING_MODEL` | `nomic-ai/nomic-embed-text-v1.5` | Embedding model |
 | `VAULTSPEC_EMBEDDING_BATCH_SIZE` | `64` | GPU batch size for embedding |
 | `VAULTSPEC_MAX_EMBED_CHARS` | `8000` | Max characters per document |

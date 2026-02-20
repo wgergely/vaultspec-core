@@ -41,8 +41,8 @@ research to code.
 ## Prerequisites
 
 - Python 3.13+
-- NVIDIA GPU with CUDA 13.0+ (required for RAG/search features)
 - pip
+- **NVIDIA GPU** with CUDA 13.0+ and compute capability >= 7.5 (Turing+: RTX 2000+, T4+, A-series, H-series) -- required only for the RAG index backend (the `[rag]` optional dependency group that powers semantic search). Core governance features (Research → Specify → Plan → Execute → Verify) work without a GPU.
 
 ## Quick Start
 
@@ -58,9 +58,12 @@ source .venv/bin/activate
 pip install -e ".[rag,dev]" --extra-index-url https://download.pytorch.org/whl/cu130
 ```
 
-> **Note:** The `[rag]` extras require an NVIDIA GPU with CUDA 13.0+. Core
-> governance features (Research → Specify → Plan → Execute → Verify) work
-> without GPU.
+> **Note:** The `[rag]` optional dependency group powers the semantic search index
+> (torch >= 2.9.0, CUDA 13.0+, compute capability >= 7.5). Core governance features
+> (Research → Specify → Plan → Execute → Verify) work without a GPU — omit `[rag]`
+> and skip the `docs.py index` step. Always use `--extra-index-url` (not `--index-url`)
+> when installing `[rag]` dependencies: without it, pip installs CPU-only PyTorch from
+> PyPI, which fails at runtime with `GPUNotAvailableError`.
 
 ```bash
 # Verify your installation

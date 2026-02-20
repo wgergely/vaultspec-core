@@ -16,11 +16,9 @@ if TYPE_CHECKING:
 
     import numpy as np
 
-from rag.embeddings import EmbeddingModel
-
 logger = logging.getLogger(__name__)
 
-EMBEDDING_DIM = EmbeddingModel.DEFAULT_DIMENSION  # Default for schema creation
+EMBEDDING_DIM = 768  # nomic-embed-text-v1.5 default; matches EmbeddingModel.DEFAULT_DIMENSION
 
 
 def _check_rag_deps() -> None:
