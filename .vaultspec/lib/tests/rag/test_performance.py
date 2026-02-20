@@ -149,7 +149,7 @@ class TestPerformance:
     @pytest.mark.quality
     def test_document_count_matches_vault(self, rag_components_full):
         """Indexed count should match scannable docs with valid DocType."""
-        from vault.scanner import get_doc_type, scan_vault
+        from vaultcore.scanner import get_doc_type, scan_vault
 
         root = rag_components_full["root"]
         store = rag_components_full["store"]

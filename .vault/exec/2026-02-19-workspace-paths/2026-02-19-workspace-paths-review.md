@@ -22,7 +22,7 @@ related:
   - `.vaultspec/lib/scripts/_paths.py` (modified)
   - `.vaultspec/lib/scripts/cli.py` (modified)
   - `.vaultspec/lib/scripts/subagent.py` (modified)
-  - `.vaultspec/lib/scripts/docs.py` (modified)
+  - `.vaultspec/lib/scripts/vault.py` (modified)
   - `requirements.txt` (modified)
   - `extension.toml` (new)
 
@@ -41,7 +41,7 @@ related:
   )
   ```
 
-  Fix: pass `framework_root=_PATHS_LAYOUT.framework_root` in all three CLI `main()` call sites (cli.py, subagent.py, docs.py `_resolve_root()`).
+  Fix: pass `framework_root=_PATHS_LAYOUT.framework_root` in all three CLI `main()` call sites (cli.py, subagent.py, vault.py `_resolve_root()`).
 
 - **[HIGH]** `subagent.py:331-336` — `resolve_workspace()` called without `framework_root`, same issue as cli.py. Additionally, `args.root` is already `.resolve()`'d on line 328, but `args.root` still defaults to `ROOT_DIR` (the `_paths.py` bootstrap output). When only `--content-dir` is provided and `--root` defaults to `ROOT_DIR`, the intent (EXPLICIT mode) requires both overrides to be explicitly set. The current code silently enters EXPLICIT mode with the bootstrapped `ROOT_DIR` as `root_override`, which may produce a non-obvious layout. This diverges from the ADR's principle of "explicit env vars override everything" — the user intended only to override content, not both.
 
@@ -75,7 +75,7 @@ related:
 | 2 | `core/config.py` — `content_dir` + registry | PASS |
 | 3 | `_paths.py` — two-step bootstrap | PASS |
 | 4 | `cli.py` — `init_paths(WorkspaceLayout)` + `--content-dir` | PASS (with HIGH caveat) |
-| 5 | `subagent.py`, `docs.py` — `--content-dir` | PASS (with HIGH caveat) |
+| 5 | `subagent.py`, `vault.py` — `--content-dir` | PASS (with HIGH caveat) |
 | 6 | `core/tests/test_workspace.py` — all 6 matrix rows | PASS (coverage gap noted) |
 | 7 | `requirements.txt` — aligned to pyproject.toml | PASS |
 | 8 | `extension.toml` — companion manifest | PASS (LOW concern) |
@@ -112,7 +112,7 @@ The two HIGH findings represent an architectural correctness gap: the `framework
 
 1. In `cli.py` `main()` (line 2249): add `framework_root=_PATHS_LAYOUT.framework_root` to the `resolve_workspace()` call.
 2. In `subagent.py` `main()` (line 332): same fix.
-3. In `docs.py` `_resolve_root()` (line 203): same fix.
+3. In `vault.py` `_resolve_root()` (line 203): same fix.
 4. Add a test case for EXPLICIT mode without `framework_root` to confirm the validation error message is actionable.
 5. Consider the `extension.toml` install command (LOW) before companion project integration.
 

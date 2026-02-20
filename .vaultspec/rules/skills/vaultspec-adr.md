@@ -33,7 +33,7 @@ Terminate if related Research is not found and prompt user to first invoke
 
 ## Template
 
-- You MUST read and use the template at `.vaultspec/templates/adr.md`.
+- You MUST read and use the template at `.vaultspec/rules/templates/adr.md`.
 
 ### Frontmatter & Tagging Mandate
 
@@ -56,7 +56,7 @@ Every document MUST strictly adhere to the following schema:
 - **Dispatch Sub-Agent:** Invoke the `vaultspec-subagent` skill with
   `vaultspec-writer`. Instruct it to "Draft an ADR for `{feature}` based on
   the findings in `[[...-research.md]]`. Use the template at
-  `.vaultspec/templates/adr.md`."
+  `.vaultspec/rules/templates/adr.md`."
   - *Alternatives:* `vaultspec-adr-researcher` (if the research phase was
     skipped or needs synthesis).
 - **Linking:** Use `[[wiki-links]]` for references. DO NOT use `@ref` or

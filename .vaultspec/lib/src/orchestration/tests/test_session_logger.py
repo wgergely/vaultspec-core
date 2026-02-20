@@ -144,13 +144,13 @@ class TestDocTypeLogs:
     """Verify LOGS is recognized in vault structure."""
 
     def test_logs_is_valid_doctype(self):
-        from vault.models import DocType, VaultConstants
+        from vaultcore.models import DocType, VaultConstants
 
         assert DocType.LOGS == "logs"
         assert "logs" in VaultConstants.SUPPORTED_DIRECTORIES
 
     def test_validate_vault_structure_accepts_logs(self, tmp_path: Path):
-        from vault.models import VaultConstants
+        from vaultcore.models import VaultConstants
 
         logs_dir = tmp_path / ".vault" / "logs"
         logs_dir.mkdir(parents=True)

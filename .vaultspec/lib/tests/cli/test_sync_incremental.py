@@ -23,7 +23,7 @@ class TestIncrementalRules:
 
     def test_add_modify_remove_loop(self):
         """Full lifecycle: add/sync/modify/prune."""
-        rules_dir = TEST_PROJECT / ".vaultspec" / "rules"
+        rules_dir = TEST_PROJECT / ".vaultspec" / "rules" / "rules"
         args = make_ns()
         args_prune = make_ns(prune=True)
 
@@ -68,7 +68,7 @@ class TestIncrementalRules:
 
     def test_idempotent_resync(self):
         """Syncing twice with no changes keeps files identical."""
-        (TEST_PROJECT / ".vaultspec" / "rules" / "stable.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "rules" / "stable.md").write_text(
             "---\nname: stable\n---\n\nstable content", encoding="utf-8"
         )
         args = make_ns()
@@ -84,7 +84,7 @@ class TestIncrementalRules:
 
     def test_cross_destination_consistency(self):
         """All tool destinations get the same body content after sync."""
-        (TEST_PROJECT / ".vaultspec" / "rules" / "shared.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "rules" / "shared.md").write_text(
             "---\nname: shared\n---\n\nshared content here", encoding="utf-8"
         )
         cli.rules_sync(make_ns())
@@ -101,7 +101,7 @@ class TestIncrementalRules:
 
     def test_five_pass_churn(self):
         """Simulate 5 sync passes with different mutations each time."""
-        rules_dir = TEST_PROJECT / ".vaultspec" / "rules"
+        rules_dir = TEST_PROJECT / ".vaultspec" / "rules" / "rules"
         args = make_ns()
         args_prune = make_ns(prune=True)
 
@@ -151,7 +151,7 @@ class TestIncrementalAgents:
     """Agent add/modify/remove across sync passes."""
 
     def test_agent_lifecycle(self):
-        agents_dir = TEST_PROJECT / ".vaultspec" / "agents"
+        agents_dir = TEST_PROJECT / ".vaultspec" / "rules" / "agents"
         args = make_ns()
         args_prune = make_ns(prune=True)
 
@@ -183,7 +183,7 @@ class TestIncrementalAgents:
 
     def test_agent_tier_change(self):
         """Changing an agent's tier changes the resolved model in output."""
-        agents_dir = TEST_PROJECT / ".vaultspec" / "agents"
+        agents_dir = TEST_PROJECT / ".vaultspec" / "rules" / "agents"
         args = make_ns()
 
         (agents_dir / "flex.md").write_text(
@@ -212,7 +212,7 @@ class TestIncrementalSkills:
     """Skill add/modify/remove across sync passes."""
 
     def test_skill_lifecycle(self):
-        skills_dir = TEST_PROJECT / ".vaultspec" / "skills"
+        skills_dir = TEST_PROJECT / ".vaultspec" / "rules" / "skills"
         args = make_ns()
         args_prune = make_ns(prune=True)
 
@@ -254,7 +254,7 @@ class TestIncrementalSystem:
     """System prompt incremental changes across sync passes."""
 
     def test_system_add_modify_cycle(self):
-        system_dir = TEST_PROJECT / ".vaultspec" / "system"
+        system_dir = TEST_PROJECT / ".vaultspec" / "rules" / "system"
         args = make_ns(force=True)
 
         # Pass 1: single base part
@@ -291,7 +291,7 @@ class TestIncrementalSystem:
 
     def test_system_idempotent(self):
         """Syncing system twice with no changes produces identical output."""
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Stable base", encoding="utf-8"
         )
         args = make_ns(force=True)
@@ -312,14 +312,14 @@ class TestIncrementalConfig:
     def test_framework_content_change_propagates(self):
         args = make_ns(force=True)
 
-        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "v1 framework", encoding="utf-8"
         )
         cli.config_sync(args)
         c1 = (TEST_PROJECT / ".claude" / "CLAUDE.md").read_text(encoding="utf-8")
         assert "v1 framework" in c1
 
-        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "v2 framework", encoding="utf-8"
         )
         cli.config_sync(args)
@@ -330,17 +330,17 @@ class TestIncrementalConfig:
     def test_project_content_change_propagates(self):
         args = make_ns(force=True)
 
-        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "framework", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "system" / "project.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "project.md").write_text(
             "project v1", encoding="utf-8"
         )
         cli.config_sync(args)
         c1 = (TEST_PROJECT / ".claude" / "CLAUDE.md").read_text(encoding="utf-8")
         assert "project v1" in c1
 
-        (TEST_PROJECT / ".vaultspec" / "system" / "project.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "project.md").write_text(
             "project v2", encoding="utf-8"
         )
         cli.config_sync(args)
@@ -354,10 +354,10 @@ class TestMixedOperations:
 
     def test_full_mixed_lifecycle(self):
         """Add rules+agents+skills, sync, modify+remove some, resync."""
-        rules_dir = TEST_PROJECT / ".vaultspec" / "rules"
-        agents_dir = TEST_PROJECT / ".vaultspec" / "agents"
-        skills_dir = TEST_PROJECT / ".vaultspec" / "skills"
-        system_dir = TEST_PROJECT / ".vaultspec" / "system"
+        rules_dir = TEST_PROJECT / ".vaultspec" / "rules" / "rules"
+        agents_dir = TEST_PROJECT / ".vaultspec" / "rules" / "agents"
+        skills_dir = TEST_PROJECT / ".vaultspec" / "rules" / "skills"
+        system_dir = TEST_PROJECT / ".vaultspec" / "rules" / "system"
         args = make_ns()
         args_prune = make_ns(prune=True)
 
@@ -378,7 +378,7 @@ class TestMixedOperations:
         (system_dir / "base.md").write_text(
             "---\n---\n\n# System base", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Framework content", encoding="utf-8"
         )
 

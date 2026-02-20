@@ -21,11 +21,11 @@ pytestmark = [pytest.mark.unit]
 
 class TestCollectRules:
     def test_builtin_and_custom(self):
-        """Both .builtin.md and plain .md files are collected from rules/."""
-        (TEST_PROJECT / ".vaultspec" / "rules" / "a.builtin.md").write_text(
+        """Both .builtin.md and plain .md files are collected from rules/rules/."""
+        (TEST_PROJECT / ".vaultspec" / "rules" / "rules" / "a.builtin.md").write_text(
             "---\nname: a\n---\n\nBuilt-in A", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "rules" / "b.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "rules" / "b.md").write_text(
             "---\nname: b\n---\n\nCustom B", encoding="utf-8"
         )
         sources = cli.collect_rules()
@@ -44,10 +44,10 @@ class TestCollectRules:
 
     def test_builtin_suffix_detected(self):
         """Builtin rules use .builtin.md suffix; custom rules use plain .md."""
-        (TEST_PROJECT / ".vaultspec" / "rules" / "core.builtin.md").write_text(
-            "---\nname: core\n---\n\nBuilt-in content", encoding="utf-8"
-        )
-        (TEST_PROJECT / ".vaultspec" / "rules" / "custom.md").write_text(
+        (
+            TEST_PROJECT / ".vaultspec" / "rules" / "rules" / "core.builtin.md"
+        ).write_text("---\nname: core\n---\n\nBuilt-in content", encoding="utf-8")
+        (TEST_PROJECT / ".vaultspec" / "rules" / "rules" / "custom.md").write_text(
             "---\nname: custom\n---\n\nCustom content", encoding="utf-8"
         )
         sources = cli.collect_rules()
@@ -57,7 +57,7 @@ class TestCollectRules:
 
 class TestCollectAgents:
     def test_valid_frontmatter(self):
-        (TEST_PROJECT / ".vaultspec" / "agents" / "coder.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "agents" / "coder.md").write_text(
             "---\ndescription: A coder\ntier: HIGH\n---\n\n# Coder",
             encoding="utf-8",
         )
@@ -68,18 +68,18 @@ class TestCollectAgents:
         assert meta["description"] == "A coder"
 
     def test_missing_agents_dir(self):
-        shutil.rmtree(TEST_PROJECT / ".vaultspec" / "agents")
+        shutil.rmtree(TEST_PROJECT / ".vaultspec" / "rules" / "agents")
         assert cli.collect_agents() == {}
 
 
 class TestCollectSkills:
     def test_filters_task_prefix(self):
-        (TEST_PROJECT / ".vaultspec" / "skills" / "vaultspec-deploy.md").write_text(
-            "---\ndescription: Deploy\n---\n\n# Deploy", encoding="utf-8"
-        )
-        (TEST_PROJECT / ".vaultspec" / "skills" / "utility-helper.md").write_text(
-            "---\ndescription: Helper\n---\n\n# Helper", encoding="utf-8"
-        )
+        (
+            TEST_PROJECT / ".vaultspec" / "rules" / "skills" / "vaultspec-deploy.md"
+        ).write_text("---\ndescription: Deploy\n---\n\n# Deploy", encoding="utf-8")
+        (
+            TEST_PROJECT / ".vaultspec" / "rules" / "skills" / "utility-helper.md"
+        ).write_text("---\ndescription: Helper\n---\n\n# Helper", encoding="utf-8")
         skills = cli.collect_skills()
         assert "vaultspec-deploy" in skills
         assert "utility-helper" not in skills
@@ -90,12 +90,12 @@ class TestCollectSkills:
 
 class TestCollectSystemParts:
     def test_with_tool_filter(self):
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Base prompt", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "system" / "gemini-extra.md").write_text(
-            "---\ntool: gemini\n---\n\n# Gemini only", encoding="utf-8"
-        )
+        (
+            TEST_PROJECT / ".vaultspec" / "rules" / "system" / "gemini-extra.md"
+        ).write_text("---\ntool: gemini\n---\n\n# Gemini only", encoding="utf-8")
         parts = cli.collect_system_parts()
         assert "base" in parts
         assert "gemini-extra" in parts
@@ -103,7 +103,7 @@ class TestCollectSystemParts:
         assert meta["tool"] == "gemini"
 
     def test_missing_dir(self):
-        shutil.rmtree(TEST_PROJECT / ".vaultspec" / "system")
+        shutil.rmtree(TEST_PROJECT / ".vaultspec" / "rules" / "system")
         assert cli.collect_system_parts() == {}
 
 
@@ -169,7 +169,7 @@ class TestTransformSkill:
 
 class TestListings:
     def test_agent_listing_format(self):
-        (TEST_PROJECT / ".vaultspec" / "agents" / "coder.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "agents" / "coder.md").write_text(
             "---\ndescription: Writes code\ntier: HIGH\n---\n\nbody",
             encoding="utf-8",
         )
@@ -184,7 +184,9 @@ class TestListings:
         assert listing == ""
 
     def test_skill_listing_format(self):
-        (TEST_PROJECT / ".vaultspec" / "skills" / "vaultspec-deploy.md").write_text(
+        (
+            TEST_PROJECT / ".vaultspec" / "rules" / "skills" / "vaultspec-deploy.md"
+        ).write_text(
             "---\ndescription: Deploy things\n---\n\nbody",
             encoding="utf-8",
         )
@@ -200,10 +202,10 @@ class TestListings:
 
 class TestGenerateConfig:
     def test_internal_and_custom(self):
-        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal body", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "system" / "project.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "project.md").write_text(
             "Custom body", encoding="utf-8"
         )
         cfg = cli.TOOL_CONFIGS["claude"]
@@ -213,7 +215,7 @@ class TestGenerateConfig:
         assert "Custom body" in content
 
     def test_internal_only(self):
-        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal body", encoding="utf-8"
         )
         cfg = cli.TOOL_CONFIGS["claude"]
@@ -227,7 +229,7 @@ class TestGenerateConfig:
         assert content is None
 
     def test_includes_rule_references(self):
-        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal", encoding="utf-8"
         )
         # Create a synced rule in the destination
@@ -243,15 +245,15 @@ class TestGenerateConfig:
 class TestGenerateSystemPrompt:
     def test_assembly_order(self):
         # base comes first
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE CONTENT", encoding="utf-8"
         )
         # tool-specific next
-        (TEST_PROJECT / ".vaultspec" / "system" / "gemini-tools.md").write_text(
-            "---\ntool: gemini\n---\n\n# GEMINI TOOLS", encoding="utf-8"
-        )
+        (
+            TEST_PROJECT / ".vaultspec" / "rules" / "system" / "gemini-tools.md"
+        ).write_text("---\ntool: gemini\n---\n\n# GEMINI TOOLS", encoding="utf-8")
         # shared last
-        (TEST_PROJECT / ".vaultspec" / "system" / "zzz-shared.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "zzz-shared.md").write_text(
             "---\n---\n\n# SHARED CONTENT", encoding="utf-8"
         )
 
@@ -267,7 +269,7 @@ class TestGenerateSystemPrompt:
 
     def test_missing_base(self):
         # Only a shared part, no base.md
-        (TEST_PROJECT / ".vaultspec" / "system" / "extra.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "extra.md").write_text(
             "---\n---\n\n# Extra", encoding="utf-8"
         )
         cfg = cli.TOOL_CONFIGS["gemini"]
@@ -276,13 +278,13 @@ class TestGenerateSystemPrompt:
         assert "# Extra" in content
 
     def test_multiple_tool_specific_parts(self):
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Base", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "system" / "gemini-a.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "gemini-a.md").write_text(
             "---\ntool: gemini\n---\n\n# Gemini A", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "system" / "gemini-b.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "gemini-b.md").write_text(
             "---\ntool: gemini\n---\n\n# Gemini B", encoding="utf-8"
         )
         cfg = cli.TOOL_CONFIGS["gemini"]
@@ -297,22 +299,22 @@ class TestGenerateSystemPrompt:
         assert content is None
 
     def test_returns_none_for_empty_parts(self):
-        shutil.rmtree(TEST_PROJECT / ".vaultspec" / "system")
+        shutil.rmtree(TEST_PROJECT / ".vaultspec" / "rules" / "system")
         cfg = cli.TOOL_CONFIGS["gemini"]
         content = cli._generate_system_prompt(cfg)
         assert content is None
 
     def test_order_frontmatter_respected(self):
         """Files with lower order appear before files with higher/default order."""
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE", encoding="utf-8"
         )
         # workflow has order: 20 (should appear first among shared)
-        (TEST_PROJECT / ".vaultspec" / "system" / "workflow.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "workflow.md").write_text(
             "---\norder: 20\n---\n\n# WORKFLOW", encoding="utf-8"
         )
         # operations has no order (defaults to 50, should appear after workflow)
-        (TEST_PROJECT / ".vaultspec" / "system" / "operations.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "operations.md").write_text(
             "---\n---\n\n# OPERATIONS", encoding="utf-8"
         )
         cfg = cli.TOOL_CONFIGS["gemini"]
@@ -324,10 +326,10 @@ class TestGenerateSystemPrompt:
 
     def test_pipeline_config_excluded(self):
         """Parts with pipeline: config are excluded from system prompt."""
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "---\npipeline: config\n---\n\n# FRAMEWORK CONFIG", encoding="utf-8"
         )
         cfg = cli.TOOL_CONFIGS["gemini"]
@@ -337,10 +339,10 @@ class TestGenerateSystemPrompt:
         assert "# FRAMEWORK CONFIG" not in content
 
     def test_includes_agent_listing(self):
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Base", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "agents" / "coder.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "agents" / "coder.md").write_text(
             "---\ndescription: Writes code\ntier: HIGH\n---\n\nbody",
             encoding="utf-8",
         )
@@ -351,10 +353,12 @@ class TestGenerateSystemPrompt:
         assert "**coder**" in content
 
     def test_includes_skill_listing(self):
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Base", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "skills" / "vaultspec-deploy.md").write_text(
+        (
+            TEST_PROJECT / ".vaultspec" / "rules" / "skills" / "vaultspec-deploy.md"
+        ).write_text(
             "---\ndescription: Deploy service\n---\n\n# Deploy",
             encoding="utf-8",
         )
@@ -368,10 +372,10 @@ class TestGenerateSystemPrompt:
 class TestGenerateSystemRules:
     def test_generates_for_tool_without_system_file(self):
         """Claude (rules_dir but no system_file) gets behavioral rules."""
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE MANDATES", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "system" / "operations.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "operations.md").write_text(
             "---\n---\n\n# OPERATIONS", encoding="utf-8"
         )
         cfg = cli.TOOL_CONFIGS["claude"]
@@ -387,13 +391,13 @@ class TestGenerateSystemRules:
 
     def test_excludes_tool_specific_parts(self):
         """Behavioral rules exclude tool-specific parts."""
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "system" / "gemini-tools.md").write_text(
-            "---\ntool: gemini\n---\n\n# GEMINI ONLY", encoding="utf-8"
-        )
-        (TEST_PROJECT / ".vaultspec" / "system" / "shared.md").write_text(
+        (
+            TEST_PROJECT / ".vaultspec" / "rules" / "system" / "gemini-tools.md"
+        ).write_text("---\ntool: gemini\n---\n\n# GEMINI ONLY", encoding="utf-8")
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "shared.md").write_text(
             "---\n---\n\n# SHARED", encoding="utf-8"
         )
         cfg = cli.TOOL_CONFIGS["claude"]
@@ -405,10 +409,10 @@ class TestGenerateSystemRules:
 
     def test_excludes_pipeline_config(self):
         """Behavioral rules exclude pipeline: config parts."""
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "---\npipeline: config\n---\n\n# CONFIG ONLY", encoding="utf-8"
         )
         cfg = cli.TOOL_CONFIGS["claude"]
@@ -426,20 +430,20 @@ class TestGenerateSystemRules:
         assert content is None
 
     def test_returns_none_for_empty_parts(self):
-        shutil.rmtree(TEST_PROJECT / ".vaultspec" / "system")
+        shutil.rmtree(TEST_PROJECT / ".vaultspec" / "rules" / "system")
         cfg = cli.TOOL_CONFIGS["claude"]
         content = cli._generate_system_rules(cfg)
         assert content is None
 
     def test_order_frontmatter_respected(self):
         """Order frontmatter controls assembly order in rules too."""
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "system" / "workflow.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "workflow.md").write_text(
             "---\norder: 20\n---\n\n# WORKFLOW", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "system" / "operations.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "operations.md").write_text(
             "---\n---\n\n# OPERATIONS", encoding="utf-8"
         )
         cfg = cli.TOOL_CONFIGS["claude"]

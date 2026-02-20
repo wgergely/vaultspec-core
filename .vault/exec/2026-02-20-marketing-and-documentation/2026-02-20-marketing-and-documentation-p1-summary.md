@@ -33,7 +33,7 @@ framework in production. All operational documentation was moved to
   artifact output at each phase) followed by the SDD methodology reference,
   agents/skills/rules explanation, protocol stack, and Mermaid diagrams.
   Sourced from `docs/tutorials/first-governed-feature.md` + `docs/concepts.md`.
-- `cli-reference.md` — all three CLIs (`cli.py`, `docs.py`, `subagent.py`)
+- `cli-reference.md` — all three CLIs (`cli.py`, `vault.py`, `subagent.py`)
   plus a `## Configuration Reference` appendix consolidating all
   `VAULTSPEC_*` env vars. Sourced from `docs/cli-reference.md` +
   `docs/configuration.md`.

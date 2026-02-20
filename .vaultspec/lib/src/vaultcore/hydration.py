@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from vault.models import DocType
+from vaultcore.models import DocType
 
 if TYPE_CHECKING:
     import pathlib

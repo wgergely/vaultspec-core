@@ -322,14 +322,14 @@ failures are entirely silent.
 Checking the hooks invocation sites:
 
 ```python
-# Typical invocation pattern (from docs.py / cli.py — callers of trigger()):
+# Typical invocation pattern (from vault.py / cli.py — callers of trigger()):
 trigger(hooks, "vault.document.created", {"path": str(path)})
 # Return value discarded
 ```
 
 Even if callers DO check results, there is no mechanism to propagate a hook failure
 back to the user or halt the operation that triggered the hook. A failed hook after
-`docs.py create` leaves the document created but the hook silently didn't run.
+`vault.py create` leaves the document created but the hook silently didn't run.
 
 **Severity: MEDIUM** — hooks are advisory but the system provides no feedback.
 

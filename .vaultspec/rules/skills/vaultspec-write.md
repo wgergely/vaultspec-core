@@ -45,7 +45,7 @@ approval. Do NOT use for trivial tasks.
 
 ## Template
 
-- You MUST read and use the template at `.vaultspec/templates/plan.md`.
+- You MUST read and use the template at `.vaultspec/rules/templates/plan.md`.
 
 ### Frontmatter & Tagging Mandate
 
@@ -67,7 +67,7 @@ Every document MUST strictly adhere to the following schema:
 - **Linking**: Ensure the Plan uses `[[wiki-links]]`.
 - **Drafting**: Invoke the `vaultspec-subagent` skill with `vaultspec-writer`.
   Instruct it to "Create an implementation plan for `{feature}` based on
-  `[[...-adr.md]]`. Use the template at `.vaultspec/templates/plan.md`."
+  `[[...-adr.md]]`. Use the template at `.vaultspec/rules/templates/plan.md`."
 - **Review**: Present the saved Plan to the user.
 - **Provide an absolute link** and prompt user:
 

@@ -373,7 +373,7 @@ ADR. It evaluates LanceDB, ChromaDB, and Qdrant, ultimately selecting LanceDB fo
 |------|--------|
 | `.vaultspec/lib/src/rag/api.py` | NEW - Python API facade (~150 lines) |
 | `.vaultspec/lib/src/rag/store.py` | Add `get_by_id()` method |
-| `.vaultspec/scripts/docs.py` | Simplify to use `rag.api` functions |
+| `.vaultspec/scripts/vault.py` | Simplify to use `rag.api` functions |
 | `tests/test_rag_integration.py` | Add `TestRAGAPI` class (~10 tests) |
 
 ### Future: MCP Server

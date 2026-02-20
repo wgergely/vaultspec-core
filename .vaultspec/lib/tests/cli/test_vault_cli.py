@@ -1,4 +1,4 @@
-"""Tests for the docs.py CLI entry point.
+"""Tests for the vault.py CLI entry point.
 
 Covers: argument parsing for all subcommands (audit, create, index, search),
         --version flag, --help text with GPU/CUDA note, audit --summary,
@@ -19,17 +19,17 @@ from tests.constants import PROJECT_ROOT, TEST_PROJECT
 
 pytestmark = [pytest.mark.unit]
 
-# Path to the docs.py script
-DOCS_SCRIPT = PROJECT_ROOT / ".vaultspec" / "lib" / "scripts" / "docs.py"
+# Path to the vault.py script
+DOCS_SCRIPT = PROJECT_ROOT / ".vaultspec" / "lib" / "scripts" / "vault.py"
 
 
 # ---------------------------------------------------------------------------
-# Helper: run docs.py as subprocess
+# Helper: run vault.py as subprocess
 # ---------------------------------------------------------------------------
 
 
-def run_docs(*args: str, check: bool = False) -> subprocess.CompletedProcess[str]:
-    """Run docs.py as subprocess and return the result."""
+def run_vault(*args: str, check: bool = False) -> subprocess.CompletedProcess[str]:
+    """Run vault.py as subprocess and return the result."""
     return subprocess.run(
         [sys.executable, str(DOCS_SCRIPT), *args],
         capture_output=True,
@@ -49,32 +49,32 @@ class TestGetVersion:
 
     def test_reads_version_from_pyproject(self):
         """_get_version() should read version from pyproject.toml."""
-        result = run_docs("--version")
+        result = run_vault("--version")
         # --version causes SystemExit(0) and prints to stdout
         assert result.returncode == 0
         assert "0.1.0" in result.stdout
 
     def test_version_flag_short(self):
         """-V flag should print version."""
-        result = run_docs("-V")
+        result = run_vault("-V")
         assert result.returncode == 0
         assert "0.1.0" in result.stdout
 
     def test_get_version_returns_string(self):
         """Import _get_version and verify it returns a string."""
-        import docs
+        import vault
 
-        version = docs._get_version()
+        version = vault._get_version()
         assert isinstance(version, str)
         assert version == "0.1.0"
 
     def test_get_version_missing_pyproject(self, monkeypatch, tmp_path):
         """_get_version returns 'unknown' when pyproject.toml is missing."""
-        import docs
+        import vault
 
         # Temporarily redirect ROOT_DIR to a path with no pyproject.toml
-        monkeypatch.setattr(docs, "ROOT_DIR", tmp_path)
-        version = docs._get_version()
+        monkeypatch.setattr(vault, "ROOT_DIR", tmp_path)
+        version = vault._get_version()
         assert version == "unknown"
 
 
@@ -87,12 +87,12 @@ class TestHelpText:
     """Tests for --help output across subcommands."""
 
     def test_main_help(self):
-        result = run_docs("--help")
+        result = run_vault("--help")
         assert result.returncode == 0
         assert "Audit and manage the .vault vault" in result.stdout
 
     def test_audit_help(self):
-        result = run_docs("audit", "--help")
+        result = run_vault("audit", "--help")
         assert result.returncode == 0
         assert "--summary" in result.stdout
         assert "--features" in result.stdout
@@ -102,7 +102,7 @@ class TestHelpText:
         assert "--root" in result.stdout
 
     def test_create_help(self):
-        result = run_docs("create", "--help")
+        result = run_vault("create", "--help")
         assert result.returncode == 0
         assert "--type" in result.stdout
         assert "--feature" in result.stdout
@@ -110,23 +110,23 @@ class TestHelpText:
 
     def test_index_help_has_gpu_note(self):
         """Index subcommand epilog should mention GPU/CUDA requirement."""
-        result = run_docs("index", "--help")
+        result = run_vault("index", "--help")
         assert result.returncode == 0
         assert "NVIDIA GPU" in result.stdout or "CUDA" in result.stdout
 
     def test_search_help_has_gpu_note(self):
         """Search subcommand epilog should mention GPU/CUDA requirement."""
-        result = run_docs("search", "--help")
+        result = run_vault("search", "--help")
         assert result.returncode == 0
         assert "NVIDIA GPU" in result.stdout or "CUDA" in result.stdout
 
     def test_index_help_has_full_flag(self):
-        result = run_docs("index", "--help")
+        result = run_vault("index", "--help")
         assert result.returncode == 0
         assert "--full" in result.stdout
 
     def test_search_help_has_query_arg(self):
-        result = run_docs("search", "--help")
+        result = run_vault("search", "--help")
         assert result.returncode == 0
         assert "query" in result.stdout
 
@@ -141,10 +141,10 @@ class TestArgumentParsing:
 
     @pytest.fixture()
     def parser(self):
-        """Return the real docs.py argument parser."""
-        import docs
+        """Return the real vault.py argument parser."""
+        import vault
 
-        return docs._make_parser()
+        return vault._make_parser()
 
     def test_audit_summary_flag(self, parser):
         args = parser.parse_args(["audit", "--summary"])
@@ -276,7 +276,7 @@ class TestAuditSummary:
 
     def test_audit_summary_text(self):
         """audit --summary should print vault summary stats."""
-        result = run_docs("audit", "--summary", "--root", str(TEST_PROJECT))
+        result = run_vault("audit", "--summary", "--root", str(TEST_PROJECT))
         assert result.returncode == 0
         assert "Vault Summary" in result.stdout
         assert "Total Documents" in result.stdout
@@ -285,7 +285,7 @@ class TestAuditSummary:
 
     def test_audit_summary_json(self):
         """audit --summary --json should print valid JSON."""
-        result = run_docs("audit", "--summary", "--json", "--root", str(TEST_PROJECT))
+        result = run_vault("audit", "--summary", "--json", "--root", str(TEST_PROJECT))
         assert result.returncode == 0
         data = json.loads(result.stdout)
         assert "summary" in data
@@ -297,7 +297,7 @@ class TestAuditSummary:
 
     def test_audit_summary_counts_types(self):
         """Summary counts should include known doc types."""
-        result = run_docs("audit", "--summary", "--json", "--root", str(TEST_PROJECT))
+        result = run_vault("audit", "--summary", "--json", "--root", str(TEST_PROJECT))
         data = json.loads(result.stdout)
         types = data["summary"]["counts_by_type"]
         # The test-project vault has at least adr and plan docs
@@ -310,13 +310,13 @@ class TestAuditFeatures:
 
     def test_audit_features_text(self):
         """audit --features should list features."""
-        result = run_docs("audit", "--features", "--root", str(TEST_PROJECT))
+        result = run_vault("audit", "--features", "--root", str(TEST_PROJECT))
         assert result.returncode == 0
         assert "Features" in result.stdout
 
     def test_audit_features_json(self):
         """audit --features --json should produce a features list."""
-        result = run_docs("audit", "--features", "--json", "--root", str(TEST_PROJECT))
+        result = run_vault("audit", "--features", "--json", "--root", str(TEST_PROJECT))
         assert result.returncode == 0
         data = json.loads(result.stdout)
         assert "features" in data
@@ -329,14 +329,14 @@ class TestAuditVerify:
 
     def test_audit_verify_text(self):
         """audit --verify should print verification results."""
-        result = run_docs("audit", "--verify", "--root", str(TEST_PROJECT))
+        result = run_vault("audit", "--verify", "--root", str(TEST_PROJECT))
         assert result.returncode == 0
         # Should contain either "Passed" or "Failed" depending on vault state
         assert "Verification" in result.stdout or "errors" in result.stdout.lower()
 
     def test_audit_verify_json(self):
         """audit --verify --json should produce verification results."""
-        result = run_docs("audit", "--verify", "--json", "--root", str(TEST_PROJECT))
+        result = run_vault("audit", "--verify", "--json", "--root", str(TEST_PROJECT))
         assert result.returncode == 0
         data = json.loads(result.stdout)
         assert "verification" in data
@@ -347,7 +347,7 @@ class TestAuditVerify:
 
     def test_audit_combined_summary_and_features(self):
         """audit --summary --features should output both sections."""
-        result = run_docs(
+        result = run_vault(
             "audit",
             "--summary",
             "--features",
@@ -373,10 +373,10 @@ class TestCreateSubcommand:
         """Create should generate yyyy-mm-dd-<feature>-<type>.md filename."""
         import argparse
 
-        import docs
+        import vault
 
-        # Set up a minimal .vaultspec/templates directory with a template
-        template_dir = tmp_path / ".vaultspec" / "templates"
+        # Set up a minimal .vaultspec/rules/templates directory with a template
+        template_dir = tmp_path / ".vaultspec" / "rules" / "templates"
         template_dir.mkdir(parents=True)
         (template_dir / "adr.md").write_text(
             "---\ntags: [#adr, #<feature>]\ndate: <yyyy-mm-dd>\n---\n# <title>\n",
@@ -386,7 +386,7 @@ class TestCreateSubcommand:
         args = argparse.Namespace(
             type="adr", feature="my-feature", title="Test ADR", root=tmp_path
         )
-        docs.handle_create(args)
+        vault.handle_create(args)
 
         date_str = datetime.now().strftime("%Y-%m-%d")
         expected = tmp_path / ".vault" / "adr" / f"{date_str}-my-feature-adr.md"
@@ -404,22 +404,22 @@ class TestCreateSubcommand:
 
     def test_create_missing_type_errors_subprocess(self):
         """create without --type should fail."""
-        result = run_docs("create", "--feature", "test-feat")
+        result = run_vault("create", "--feature", "test-feat")
         assert result.returncode != 0
 
     def test_create_missing_feature_errors_subprocess(self):
         """create without --feature should fail."""
-        result = run_docs("create", "--type", "adr")
+        result = run_vault("create", "--type", "adr")
         assert result.returncode != 0
 
     def test_create_valid_doc_types_accepted(self):
         """All DocType values should be accepted by create --type."""
-        from vault.models import DocType
+        from vaultcore.models import DocType
 
         for dt in DocType:
             # Just test that parsing accepts the type (will fail at execution
             # stage due to missing vault, but argparse should not reject it)
-            result = run_docs(
+            result = run_vault(
                 "create",
                 "--type",
                 dt.value,
@@ -441,8 +441,8 @@ class TestNoCommand:
     """Test behavior when no subcommand is given."""
 
     def test_no_command_prints_help(self):
-        """Running docs.py with no arguments should print help and exit 0."""
-        result = run_docs()
+        """Running vault.py with no arguments should print help and exit 0."""
+        result = run_vault()
         assert result.returncode == 0
         assert "usage:" in result.stdout.lower() or "audit" in result.stdout
 
@@ -456,7 +456,7 @@ class TestLoggingDispatch:
     """Test that --verbose and --debug configure real logging levels.
 
     Each test resets the logging_config idempotency guard, calls real
-    docs.main() with a temporary vault root, and verifies the actual
+    vault.main() with a temporary vault root, and verifies the actual
     root logger level.
     """
 
@@ -465,16 +465,15 @@ class TestLoggingDispatch:
         import logging
 
         import logging_config
-
-        import docs
+        import vault
 
         monkeypatch.setattr(logging_config, "_logging_configured", False)
         (tmp_path / ".vault").mkdir(exist_ok=True)
         monkeypatch.setattr(
             "sys.argv",
-            ["docs.py", "--verbose", "audit", "--summary", "--root", str(tmp_path)],
+            ["vault.py", "--verbose", "audit", "--summary", "--root", str(tmp_path)],
         )
-        docs.main()
+        vault.main()
         assert logging.getLogger().level == logging.INFO
 
     def test_debug_configures_debug(self, monkeypatch, tmp_path):
@@ -482,16 +481,15 @@ class TestLoggingDispatch:
         import logging
 
         import logging_config
-
-        import docs
+        import vault
 
         monkeypatch.setattr(logging_config, "_logging_configured", False)
         (tmp_path / ".vault").mkdir(exist_ok=True)
         monkeypatch.setattr(
             "sys.argv",
-            ["docs.py", "--debug", "audit", "--summary", "--root", str(tmp_path)],
+            ["vault.py", "--debug", "audit", "--summary", "--root", str(tmp_path)],
         )
-        docs.main()
+        vault.main()
         assert logging.getLogger().level == logging.DEBUG
 
     def test_default_configures_info_fallback(self, monkeypatch, tmp_path):
@@ -499,15 +497,14 @@ class TestLoggingDispatch:
         import logging
 
         import logging_config
-
-        import docs
+        import vault
 
         monkeypatch.setattr(logging_config, "_logging_configured", False)
         monkeypatch.delenv("VAULTSPEC_LOG_LEVEL", raising=False)
         (tmp_path / ".vault").mkdir(exist_ok=True)
         monkeypatch.setattr(
             "sys.argv",
-            ["docs.py", "audit", "--summary", "--root", str(tmp_path)],
+            ["vault.py", "audit", "--summary", "--root", str(tmp_path)],
         )
-        docs.main()
+        vault.main()
         assert logging.getLogger().level == logging.INFO

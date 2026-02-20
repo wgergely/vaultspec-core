@@ -4,8 +4,8 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from vault.models import DocType
-from vault.scanner import get_doc_type, scan_vault
+from vaultcore.models import DocType
+from vaultcore.scanner import get_doc_type, scan_vault
 
 if TYPE_CHECKING:
     import pathlib

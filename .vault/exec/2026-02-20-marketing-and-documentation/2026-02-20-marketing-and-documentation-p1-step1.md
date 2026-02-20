@@ -24,7 +24,7 @@ merges all content from `docs/concepts.md` — SDD definition, governance mechan
 `.vault/` knowledge base table, agents/skills/rules, protocol stack, and Mermaid diagrams.
 Redundant 5-phase overview tables were consolidated rather than duplicated.
 
-**cli-reference.md** (~14KB): All content from `docs/cli-reference.md` (cli.py, docs.py,
+**cli-reference.md** (~14KB): All content from `docs/cli-reference.md` (cli.py, vault.py,
 subagent.py with flags and examples) followed by a `## Configuration Reference` appendix
 consolidating all content from `docs/configuration.md`. Variables restructured into a
 single table per category (Agent, MCP Server, A2A, Storage, Tool Directory, RAG,

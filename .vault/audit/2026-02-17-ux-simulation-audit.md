@@ -39,7 +39,7 @@ The top-level `README.md` (7 lines) is extremely terse. It describes vaultspec a
 ### Specific Issues
 
 1. **No installation instructions at all.** A new user has no idea they need Python 3.13, PyTorch with CUDA, or what optional dependencies exist (`rag`, `dev`, `dev-rag` from pyproject.toml).
-2. **No quickstart.** What is the first command I should run? `cli.py sync-all`? `docs.py create`? I have to discover this myself.
+2. **No quickstart.** What is the first command I should run? `cli.py sync-all`? `vault.py create`? I have to discover this myself.
 3. **No "What is this?" section.** The tagline doesn't explain the problem being solved. Compare: "vaultspec enforces documentation-backed decision trails for AI-assisted development, ensuring every code change is traceable to research, architectural decisions, and approved plans."
 4. **CAUTION block is confusing for newcomers.** If I'm reading the README for the first time, I don't yet understand what `cli.py config sync` does or why it would be dangerous.
 
@@ -127,7 +127,7 @@ cli.py agents set-tier <name> --tier {LOW,MEDIUM,HIGH}
 
 ```
 
-### 3.2 Docs CLI (`docs.py`)
+### 3.2 Docs CLI (`vault.py`)
 
 **Available subcommands:** audit, create, index, search
 
@@ -137,9 +137,9 @@ cli.py agents set-tier <name> --tier {LOW,MEDIUM,HIGH}
 cs.py audit --summary     -> Clean stats (22 docs, 16 features)
 cs.py audit --features    -> Lists all feature tags
 
-docs.py audit --verify      -> Full validation (93 errors found!)
+vault.py audit --verify      -> Full validation (93 errors found!)
 
-docs.py audit --graph       -> Graph hotspots, orphan detection, invalid links
+vault.py audit --graph       -> Graph hotspots, orphan detection, invalid links
 
 ```
 
@@ -147,13 +147,13 @@ docs.py audit --graph       -> Graph hotspots, orphan detection, invalid links
 
 **Issue noted:** Running `--verify` against the project's own `.vault/` directory shows 93 errors, meaning the framework's own documentation doesn't pass its own validation. This is concerning for first impressions.
 
-> **Cross-reference for TechTester (03-test-verification.md):** Run `docs.py audit --verify` and confirm the 93 error count. Verify whether these are real violations or false positives.
+> **Cross-reference for TechTester (03-test-verification.md):** Run `vault.py audit --verify` and confirm the 93 error count. Verify whether these are real violations or false positives.
 
 #### Create -- Well-Designed
 
 ```
 
-docs.py create --type {adr,exec,plan,reference,research} --feature FEATURE [--title TITLE]
+vault.py create --type {adr,exec,plan,reference,research} --feature FEATURE [--title TITLE]
 
 **Verdict: 8/10.** Creates properly templated files with correct frontmatter, dates, and directory placement. The generated template includes helpful inline comments explaining each field.
 
@@ -161,9 +161,9 @@ docs.py create --type {adr,exec,plan,reference,research} --feature FEATURE [--ti
 
 The index and search commands require the `rag` optional dependency (PyTorch, sentence-transformers, lancedb) which in turn requires an NVIDIA GPU with CUDA. This is not documented in the CLI help.
 
-**Verdict: 5/10 (for documentation).** Running `docs.py index` without the RAG dependencies installed would presumably fail, but the help text doesn't mention this prerequisite.
+**Verdict: 5/10 (for documentation).** Running `vault.py index` without the RAG dependencies installed would presumably fail, but the help text doesn't mention this prerequisite.
 
-> **Cross-reference for TechTester (03-test-verification.md):** Attempt `docs.py index` and `docs.py search "test"` to verify they work with proper GPU setup.
+> **Cross-reference for TechTester (03-test-verification.md):** Attempt `vault.py index` and `vault.py search "test"` to verify they work with proper GPU setup.
 
 ### 3.3 Subagent CLI (`subagent.py`)
 
@@ -263,7 +263,7 @@ All 8 templates follow a consistent pattern:
 
 6. **No `init` or `bootstrap` command** for setting up a new project. Users must manually create the `.vaultspec/` and `.vault/` directory structures, or copy them from somewhere undocumented.
 
-7. **`docs.py index` and `docs.py search` require GPU/CUDA** but this prerequisite is not documented in the CLI help text or anywhere user-facing.
+7. **`vault.py index` and `vault.py search` require GPU/CUDA** but this prerequisite is not documented in the CLI help text or anywhere user-facing.
 
 ### Minor
 
@@ -281,7 +281,7 @@ All 8 templates follow a consistent pattern:
 
 ## 8. Highlights (What Works Well)
 
-1. **`docs.py audit` is excellent.** The `--verify`, `--graph`, and `--summary` flags provide genuine value. The graph hotspot analysis with orphan detection and invalid link reporting is a standout feature.
+1. **`vault.py audit` is excellent.** The `--verify`, `--graph`, and `--summary` flags provide genuine value. The graph hotspot analysis with orphan detection and invalid link reporting is a standout feature.
 
 2. **Agent tier system with model mapping** is well-designed. The `agents list` output showing both Claude and Gemini model assignments per tier is immediately useful.
 
@@ -291,7 +291,7 @@ All 8 templates follow a consistent pattern:
 
 5. **Multi-tool support** (Claude, Gemini, Antigravity) with clean separation. The sync system properly handles tool-specific paths (`.claude/`, `.gemini/`, `.agent/`).
 
-6. **`docs.py create` generates ready-to-use files** with correct dates, directory placement, and pre-filled frontmatter.
+6. **`vault.py create` generates ready-to-use files** with correct dates, directory placement, and pre-filled frontmatter.
 
 7. **The mermaid diagrams** in `.vaultspec/README.md` effectively communicate the workflow architecture.
 
@@ -322,7 +322,7 @@ All 8 templates follow a consistent pattern:
 11. Interactive mode for `agents add` with guided prompts.
 12. Tab completion for CLI commands.
 13. Colored output for audit results (errors in red, warnings in yellow).
-14. `docs.py audit --fix` to auto-repair common violations (missing tags, wrong suffixes).
+14. `vault.py audit --fix` to auto-repair common violations (missing tags, wrong suffixes).
 
 ---
 
@@ -333,7 +333,7 @@ All 8 templates follow a consistent pattern:
 | Documentation (top-level) | 3/10 | Missing installation, setup, quickstart |
 | Documentation (framework) | 8/10 | Excellent user manual, just poorly discoverable |
 | CLI: cli.py | 7/10 | Good list/add/sync, missing remove/rename/show |
-| CLI: docs.py | 9/10 | Standout feature, especially audit |
+| CLI: vault.py | 9/10 | Standout feature, especially audit |
 | CLI: subagent.py | 1/10 | Broken on import |
 | Templates | 8/10 | Consistent, self-documenting |
 | Agent definitions | 8/10 | Well-structured with clear personas |

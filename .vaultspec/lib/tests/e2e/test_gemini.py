@@ -42,7 +42,7 @@ def _cleanup_test_project(root: Path) -> None:
 def test_project_root() -> Iterator[Path]:
     """Set up test-project as workspace root for integration tests."""
     root = TEST_PROJECT
-    (root / ".vaultspec" / "agents").mkdir(parents=True, exist_ok=True)
+    (root / ".vaultspec" / "rules" / "agents").mkdir(parents=True, exist_ok=True)
     (root / ".claude" / "rules").mkdir(parents=True, exist_ok=True)
     (root / ".gemini" / "rules").mkdir(parents=True, exist_ok=True)
     (root / ".gemini" / "settings.json").write_text("{}", encoding="utf-8")
@@ -120,7 +120,7 @@ def test_gemini_process_spec_complete(test_project_root):
 @pytest.mark.timeout(60)
 async def test_gemini_dispatch_lifecycle(test_project_root):
     """Verify run_subagent with real Gemini CLI returns a valid result."""
-    (test_project_root / ".vaultspec" / "agents" / "tester.md").write_text(
+    (test_project_root / ".vaultspec" / "rules" / "agents" / "tester.md").write_text(
         "---\ntier: LOW\n---\n\n# Persona\n"
         "You are Jean-Claude, a helpful assistant.\n"
         "Your name is Jean-Claude. Always introduce yourself by name.\n"
@@ -152,7 +152,7 @@ async def test_gemini_dispatch_lifecycle(test_project_root):
 @pytest.mark.timeout(60)
 async def test_gemini_rule_fingerprint(test_project_root):
     """Verify Gemini picks up rules from .gemini/rules/ via system prompt."""
-    (test_project_root / ".vaultspec" / "agents" / "tester.md").write_text(
+    (test_project_root / ".vaultspec" / "rules" / "agents" / "tester.md").write_text(
         "---\ntier: LOW\n---\n\n# Persona\n"
         "You are a helpful assistant.\n"
         "Keep your responses extremely short.\n",

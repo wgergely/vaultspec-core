@@ -5,6 +5,7 @@ import contextlib
 import json
 import logging
 import re
+import sys
 import time
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
@@ -19,7 +20,7 @@ from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.fastmcp.resources.types import FunctionResource
 from mcp.types import ToolAnnotations
 from pydantic import AnyUrl
-from vault.parser import parse_frontmatter
+from vaultcore.parser import parse_frontmatter
 
 from orchestration.constants import (
     READONLY_PERMISSION_PROMPT as _READONLY_PERMISSION_PROMPT,
@@ -679,6 +680,8 @@ def main(
         ttl_seconds=cfg.mcp_ttl_seconds,
         content_root=content_root,
     )
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
     mcp.run()
 
 

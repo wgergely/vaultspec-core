@@ -17,7 +17,7 @@ tags:
 
 ## Executive Summary
 
-The codebase has a well-organized layer structure with clear module boundaries. The most significant findings are: `VaultConstants.DOCS_DIR` is dead code replaced by `_get_docs_dir()` but never removed; `handle_create` in `docs.py` hardcodes `".vault"` rather than using `get_config().docs_dir`; `_delete_by_ids` uses a different and weaker escaping strategy than `_sanitize_filter_value`; `get_document` and `get_status` create bare `VaultStore` instances that violate the singleton principle; `supported_models` and `get_model_capability` are defined on the `AgentProvider` base but never called from production code; and `construct_system_prompt` is abstract in the base but has identical implementations in both concrete providers — a copy-paste abstraction. The CLI test issues are non-trivial: `TestArgumentParsing` is genuinely divergent from production (missing `--fix` on audit), and `test_create_generates_correct_filename` exercises zero production code paths.
+The codebase has a well-organized layer structure with clear module boundaries. The most significant findings are: `VaultConstants.DOCS_DIR` is dead code replaced by `_get_docs_dir()` but never removed; `handle_create` in `vault.py` hardcodes `".vault"` rather than using `get_config().docs_dir`; `_delete_by_ids` uses a different and weaker escaping strategy than `_sanitize_filter_value`; `get_document` and `get_status` create bare `VaultStore` instances that violate the singleton principle; `supported_models` and `get_model_capability` are defined on the `AgentProvider` base but never called from production code; and `construct_system_prompt` is abstract in the base but has identical implementations in both concrete providers — a copy-paste abstraction. The CLI test issues are non-trivial: `TestArgumentParsing` is genuinely divergent from production (missing `--fix` on audit), and `test_create_generates_correct_filename` exercises zero production code paths.
 
 ---
 
@@ -108,9 +108,9 @@ escaped = ", ".join(f"'{i.replace(chr(39), '')}'" for i in ids)
 
 `_sanitize_filter_value` correctly escapes `'` as `''` (standard SQL escape). `_delete_by_ids` instead **removes** single quotes entirely by replacing them with empty string. This is inconsistent and, while it prevents injection, it silently corrupts document IDs containing apostrophes (e.g., a doc named `it's-a-test` becomes `its-a-test` in the DELETE predicate, potentially matching the wrong row or matching nothing). Since document IDs come from file stems, apostrophes are unlikely in practice, but the inconsistency represents a design flaw. `_delete_by_ids` should call `_sanitize_filter_value` for consistency.
 
-### 2.2 `handle_create` in `docs.py` hardcodes `".vault"`
+### 2.2 `handle_create` in `vault.py` hardcodes `".vault"`
 
-**File:** `lib/scripts/docs.py:179`
+**File:** `lib/scripts/vault.py:179`
 
 ```python
 target_dir = root_dir / ".vault" / doc_type.value
@@ -212,15 +212,15 @@ No circular imports were found. The `metrics.api` importing from `verification.a
 
 `rag/api.py` uses deferred imports inside function bodies for all `torch`, `lancedb`, and `sentence-transformers` usage. This correctly implements the Tier 1/2 split: `list_documents`, `get_related`, `get_status` work without RAG deps. The pattern is intentional and correct.
 
-### 4.3 `docs.py` top-level imports include `VaultGraph` — eager load risk
+### 4.3 `vault.py` top-level imports include `VaultGraph` — eager load risk
 
-**File:** `lib/scripts/docs.py:20`
+**File:** `lib/scripts/vault.py:20`
 
 ```python
 from graph.api import VaultGraph  # noqa: E402
 ```
 
-This is a top-level import in `docs.py`. `VaultGraph` imports `vault.links`, `vault.models`, `vault.parser`, `vault.scanner` — all stdlib-safe. This is fine. However, it means that `docs.py index` and `docs.py search` incur the graph module load even though those subcommands don't use the graph. This is a minor startup cost, not a correctness issue.
+This is a top-level import in `vault.py`. `VaultGraph` imports `vault.links`, `vault.models`, `vault.parser`, `vault.scanner` — all stdlib-safe. This is fine. However, it means that `vault.py index` and `vault.py search` incur the graph module load even though those subcommands don't use the graph. This is a minor startup cost, not a correctness issue.
 
 ### 4.4 `rag/store.py` imports `EmbeddingModel` at module top level
 
@@ -238,13 +238,13 @@ from rag.embeddings import EmbeddingModel
 
 ### 5.1 `TestArgumentParsing` — divergence from production confirmed
 
-**Problem:** The `parser` fixture in `TestArgumentParsing` (lines 148-198) manually reconstructs the argparse configuration by copying it from `docs.py`. The reconstructed parser is **missing `--fix`** on the `audit` subcommand (present in production at `docs.py:79`).
+**Problem:** The `parser` fixture in `TestArgumentParsing` (lines 148-198) manually reconstructs the argparse configuration by copying it from `vault.py`. The reconstructed parser is **missing `--fix`** on the `audit` subcommand (present in production at `vault.py:79`).
 
 **Production `audit` parser includes:**
 
 
-**Impact:** Any future `--fix`-related argument changes in `docs.py` would not be caught by `TestArgumentParsing`. More fundamentally, testing argparse configuration by re-implementing it is the wrong approach. The correct fix is to extract `_make_parser()` from `main()` in `docs.py` and import it directly in the test:
-# docs.py — extract parser construction
+**Impact:** Any future `--fix`-related argument changes in `vault.py` would not be caught by `TestArgumentParsing`. More fundamentally, testing argparse configuration by re-implementing it is the wrong approach. The correct fix is to extract `_make_parser()` from `main()` in `vault.py` and import it directly in the test:
+# vault.py — extract parser construction
 def _make_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(...)
     # ... all parser setup ...
@@ -282,9 +282,9 @@ def test_create_generates_correct_filename(self, tmp_path):
     assert target_path.parent.name == "adr"
 ```
 
-This test constructs a `Path` object in pure Python and asserts on the string it produces. It never calls `handle_create`, `docs.py` as a subprocess, or any production code. The assertions are tautologically true — they merely verify that Python f-string interpolation works.
+This test constructs a `Path` object in pure Python and asserts on the string it produces. It never calls `handle_create`, `vault.py` as a subprocess, or any production code. The assertions are tautologically true — they merely verify that Python f-string interpolation works.
 
-**What `handle_create` actually does** (lines 162-188 in `docs.py`):
+**What `handle_create` actually does** (lines 162-188 in `vault.py`):
 
 2. Calls `get_template_path(root_dir, doc_type)` — can return `None` if template missing
 3. Reads template content and calls `hydrate_template(content, feature, date_str, args.title)`
@@ -356,7 +356,7 @@ The return type correctly reflects the implementation (returns `None` when no fi
 
 ### 6.3 `get_template_path` return — dead code path after None check
 
-**File:** `lib/scripts/docs.py:169-173`
+**File:** `lib/scripts/vault.py:169-173`
 
 ```python
 template_path = get_template_path(root_dir, doc_type)
@@ -383,7 +383,7 @@ content = template_path.read_text(encoding="utf-8")  # type checker knows not No
 | # | Severity | Location | Finding |
 |---|----------|----------|---------|
 | 1 | High | `rag/store.py:332` | `_delete_by_ids` strips quotes rather than escaping them — inconsistent with `_sanitize_filter_value`, silently corrupts IDs containing apostrophes |
-| 2 | High | `docs.py:179` | `handle_create` hardcodes `".vault"` instead of using `get_config().docs_dir` — configuration bypass |
+| 2 | High | `vault.py:179` | `handle_create` hardcodes `".vault"` instead of using `get_config().docs_dir` — configuration bypass |
 | 3 | Medium | `rag/api.py:170,290` | `get_document` and `get_status` create raw `VaultStore` instances, bypassing the singleton and risking concurrent LanceDB connections |
 | 4 | Medium | `vault/models.py:109` | `VaultConstants.DOCS_DIR` is dead code with zero production callers — misleading to future developers |
 | 5 | Medium | `protocol/providers/base.py:171` | `construct_system_prompt` is abstract but both implementations are identical — should be concrete on base |

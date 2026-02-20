@@ -17,20 +17,20 @@ related:
 
 ## Goal
 
-Formalize the markdown rule system into a Python backend API and provide a unified CLI tool (`docs.py`) for auditing and managing the `.vault/` universe.
+Formalize the markdown rule system into a Python backend API and provide a unified CLI tool (`vault.py`) for auditing and managing the `.vault/` universe.
 
 ## Phase 1: Core API and Auditing (Completed)
 
 - [x] **Modular Structure**: Implement `vault`, `verification`, `graph`, and `metrics` modules.
 - [x] **Frontmatter Parsing**: Implement robust YAML extraction and validation.
 - [x] **Connectivity Analysis**: Build Graph API to find hotspots, orphans, and invalid links.
-- [x] **Reporting CLI**: Implement `docs.py audit` with `--summary`, `--verify`, and `--graph`.
+- [x] **Reporting CLI**: Implement `vault.py audit` with `--summary`, `--verify`, and `--graph`.
 - [x] **JSON Output**: Add `--json` flag for machine readability.
 
 ## Phase 2: Write API and Scaffolding (Completed)
 
 - [x] **Template Logic**: Implement hydration system for `.vaultspec/templates/`.
-- [x] **Doc Scaffolding**: Implement `docs.py create` to generate compliant files with correct naming and metadata.
+- [x] **Doc Scaffolding**: Implement `vault.py create` to generate compliant files with correct naming and metadata.
 
 ## Phase 3: Vertical Integrity (Pending)
 

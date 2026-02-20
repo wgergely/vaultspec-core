@@ -15,6 +15,7 @@ from .base import (
     GeminiModels,
     ModelRegistry,
     ProcessSpec,
+    resolve_executable,
     resolve_includes,
 )
 
@@ -89,9 +90,10 @@ class GeminiProvider(AgentProvider):
             return _cached_version
 
         _run = run_fn or subprocess.run
+        exe, prefix = resolve_executable(executable)
         try:
             res = _run(
-                [executable, "--version"],
+                [exe, *prefix, "--version"],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -140,8 +142,9 @@ class GeminiProvider(AgentProvider):
                 )
 
         #  Locate executable and check version
-        executable = _which_fn("gemini") or "gemini"
-        self.check_version(executable)
+        _raw_executable = _which_fn("gemini") or "gemini"
+        self.check_version(_raw_executable)
+        executable, prefix_args = resolve_executable("gemini", _which_fn)
 
         #  Load system instructions, rules, and construct full prompt
         system_instructions = self.load_system_prompt(root_dir)
@@ -202,7 +205,7 @@ class GeminiProvider(AgentProvider):
 
         return ProcessSpec(
             executable=executable,
-            args=args,
+            args=prefix_args + args,
             env=env,
             cleanup_paths=cleanup_paths,
             initial_prompt_override=task_context,

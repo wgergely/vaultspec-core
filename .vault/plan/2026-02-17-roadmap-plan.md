@@ -79,7 +79,7 @@ Six Opus agents conducted a comprehensive audit of vaultspec on 2026-02-17, prod
 | 3.6 | `--version` flag | All 3 CLIs |
 | 3.7 | `doctor` command | `cli.py doctor` |
 | 3.8 | `--template` flag | `cli.py {agents,skills} add` |
-| 3.9 | GPU/CUDA in help text | `docs.py index/search --help` |
+| 3.9 | GPU/CUDA in help text | `vault.py index/search --help` |
 
 ---
 
@@ -102,7 +102,7 @@ Six Opus agents conducted a comprehensive audit of vaultspec on 2026-02-17, prod
 
 | # | Item |
 |---|------|
-| 5.1 | docs.py CLI tests |
+| 5.1 | vault.py CLI tests |
 | 5.2 | logging_config tests |
 | 5.3 | Fix RAG test timeouts |
 | 5.4 | Metrics test expansion |
@@ -123,7 +123,7 @@ Six Opus agents conducted a comprehensive audit of vaultspec on 2026-02-17, prod
 | 6.3 | Constitution layer | GitHub Spec Kit |
 | 6.4 | Register in ACP Registry | Zed/JetBrains |
 | 6.5 | Interactive add modes | UX best practice |
-| 6.6 | `docs.py audit --fix` | UX best practice |
+| 6.6 | `vault.py audit --fix` | UX best practice |
 
 ---
 

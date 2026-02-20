@@ -33,7 +33,7 @@ Persist findings to `.vault/research/...`"
 
 ## Template
 
-- You MUST read and use the template at `.vaultspec/templates/research.md`.
+- You MUST read and use the template at `.vaultspec/rules/templates/research.md`.
 
 ### Frontmatter & Tagging Mandate
 

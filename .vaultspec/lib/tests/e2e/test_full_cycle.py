@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from tests.constants import TEST_PROJECT
-from vault.parser import parse_frontmatter
+from vaultcore.parser import parse_frontmatter
 
 from orchestration.subagent import run_subagent
 from protocol.acp.types import SubagentResult
@@ -52,9 +52,9 @@ def pipeline_root():
     """Set up test-project for full pipeline execution."""
     root = TEST_PROJECT
     # Create workspace structure
-    (root / ".vaultspec" / "agents").mkdir(parents=True, exist_ok=True)
+    (root / ".vaultspec" / "rules" / "agents").mkdir(parents=True, exist_ok=True)
     (root / ".vaultspec" / "rules").mkdir(parents=True, exist_ok=True)
-    (root / ".vaultspec" / "templates").mkdir(parents=True, exist_ok=True)
+    (root / ".vaultspec" / "rules" / "templates").mkdir(parents=True, exist_ok=True)
     (root / ".claude" / "rules").mkdir(parents=True, exist_ok=True)
     (root / ".gemini" / "rules").mkdir(parents=True, exist_ok=True)
     (root / ".gemini" / "settings.json").write_text("{}", encoding="utf-8")
@@ -92,7 +92,7 @@ def _validate_frontmatter(doc_path: Path):
 
 def _write_researcher_agent(root: Path) -> None:
     """Write the researcher agent definition to the workspace."""
-    agent_file = root / ".vaultspec" / "agents" / "vaultspec-researcher.md"
+    agent_file = root / ".vaultspec" / "rules" / "agents" / "vaultspec-researcher.md"
     agent_file.write_text(
         "---\n"
         "tier: MEDIUM\n"
@@ -367,9 +367,9 @@ def test_cleanup_preserves_vault(tmp_path):
 def test_researcher_agent_written(tmp_path):
     """Verify _write_researcher_agent creates the agent definition file."""
     root = tmp_path / "project"
-    (root / ".vaultspec" / "agents").mkdir(parents=True)
+    (root / ".vaultspec" / "rules" / "agents").mkdir(parents=True)
     _write_researcher_agent(root)
-    agent_file = root / ".vaultspec" / "agents" / "vaultspec-researcher.md"
+    agent_file = root / ".vaultspec" / "rules" / "agents" / "vaultspec-researcher.md"
     assert agent_file.exists()
     content = agent_file.read_text(encoding="utf-8")
     assert "Jean-Claude" in content

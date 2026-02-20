@@ -39,7 +39,7 @@ class TestRobustness:
         and prepare_document returns None. Verify they are gracefully skipped.
         """
         from rag.indexer import prepare_document
-        from vault.scanner import scan_vault
+        from vaultcore.scanner import scan_vault
 
         root = rag_components["root"]
         story_paths = [p for p in scan_vault(root) if "stories" in p.parts]
@@ -58,7 +58,7 @@ class TestRobustness:
         returns AUDIT and the doc is indexed despite nonstandard frontmatter.
         """
         from rag.indexer import prepare_document
-        from vault.scanner import scan_vault
+        from vaultcore.scanner import scan_vault
 
         root = rag_components["root"]
         audit_paths = [p for p in scan_vault(root) if "audit" in p.parts]
@@ -75,7 +75,7 @@ class TestRobustness:
         """French stories have accented chars. Verify parse_vault_metadata
         handles unicode content without crashing.
         """
-        from vault.parser import parse_vault_metadata
+        from vaultcore.parser import parse_vault_metadata
 
         # Simulate content with accented French characters
         french_content = (
@@ -93,7 +93,7 @@ class TestRobustness:
         """Documents using 'feature:' key (Pattern B) instead of 'tags:' array
         should not crash the parser. The feature value is stored differently.
         """
-        from vault.parser import parse_vault_metadata
+        from vaultcore.parser import parse_vault_metadata
 
         content = (
             "---\n"
@@ -115,7 +115,7 @@ class TestRobustness:
         """Documents with --- inside content (not frontmatter) should parse
         correctly. The regex anchors to ^--- so internal --- is not confused.
         """
-        from vault.parser import parse_vault_metadata
+        from vaultcore.parser import parse_vault_metadata
 
         content = (
             "# Some Research Doc\n\n"
@@ -133,7 +133,7 @@ class TestRobustness:
 
     def test_content_with_code_block_yaml_separators(self):
         """Documents with --- inside code blocks should not confuse the parser."""
-        from vault.parser import parse_vault_metadata
+        from vaultcore.parser import parse_vault_metadata
 
         content = (
             "---\n"

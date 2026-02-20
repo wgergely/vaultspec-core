@@ -234,7 +234,7 @@ def _validate(layout: WorkspaceLayout) -> None:
             f"content_root does not exist or is not a directory: "
             f"{layout.content_root}\n"
             f"Set VAULTSPEC_CONTENT_DIR to the directory containing "
-            f"rules/, agents/, skills/."
+            f"rules/agents/, rules/skills/."
         )
 
     if not layout.output_root.parent.exists():

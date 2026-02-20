@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from vault.parser import parse_frontmatter
+from vaultcore.parser import parse_frontmatter
 
 from protocol.providers.base import GeminiModels
 

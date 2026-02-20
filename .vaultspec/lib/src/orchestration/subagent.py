@@ -21,7 +21,7 @@ from acp.schema import (
     Implementation,
     TextContentBlock,
 )
-from vault.parser import parse_frontmatter
+from vaultcore.parser import parse_frontmatter
 
 from orchestration.utils import safe_read_text
 from protocol.acp.client import SessionLogger, SubagentClient

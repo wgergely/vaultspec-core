@@ -29,9 +29,10 @@ def setup_rules_dir(root: Path) -> None:
     """Create the .vaultspec/ directory structure needed by cli.py."""
     for d in [
         ".vaultspec/rules",
-        ".vaultspec/agents",
-        ".vaultspec/skills",
-        ".vaultspec/system",
+        ".vaultspec/rules/rules",
+        ".vaultspec/rules/agents",
+        ".vaultspec/rules/skills",
+        ".vaultspec/rules/system",
         ".claude/rules",
         ".claude/agents",
         ".claude/skills",

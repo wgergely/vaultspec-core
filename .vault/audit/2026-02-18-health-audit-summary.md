@@ -44,7 +44,7 @@ Full Python codebase under `.vaultspec/lib/src/` (10 modules) and `.vaultspec/li
 | 18 | MED | `asyncio.Lock` for `_active_clients` in `ClaudeA2AExecutor` |
 | 19 | MED | `_delete_by_ids` now uses `_sanitize_filter_value` (store.py) |
 | 20 | MED | `handle_create` uses `get_config().docs_dir` instead of hardcoded `".vault"` |
-| 21 | MED | `_make_parser()` extracted from `docs.py main()` |
+| 21 | MED | `_make_parser()` extracted from `vault.py main()` |
 | 22 | MED | `get_document()`/`get_status()` routed through `get_engine()` singleton |
 | 23 | MED | `VaultConstants.DOCS_DIR` dead code removed from `vault/models.py` |
 | 24 | MED | `construct_system_prompt` made concrete on `AgentProvider` base class |

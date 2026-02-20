@@ -42,13 +42,9 @@ def _seed_gemini_version_cache():
     from protocol.providers import gemini as gmod
 
     orig_cached = gmod._cached_version
-    orig_which = gmod._which_fn
-
     gmod._cached_version = (0, 27, 0)
-    gmod._which_fn = lambda _name: "/usr/bin/gemini"
     yield
     gmod._cached_version = orig_cached
-    gmod._which_fn = orig_which
 
 
 def _gemini_spec(

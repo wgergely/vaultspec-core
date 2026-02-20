@@ -4,7 +4,7 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any
 
-from vault.models import DocumentMetadata
+from vaultcore.models import DocumentMetadata
 
 if TYPE_CHECKING:
     from collections.abc import Callable

@@ -30,7 +30,7 @@ python .vaultspec/lib/scripts/subagent.py run \
   --goal "{task_description|plan_document}"
 ```
 
-> `--agent`: The name of the agent to load from `.vaultspec/agents/`
+> `--agent`: The name of the agent to load from `.vaultspec/rules/agents/`
 > `--goal`: A clear, natural language description of the task or a Plan path.
 > `--model` (Optional): Override the model defined in the agentfile.
 
@@ -68,5 +68,4 @@ python .vaultspec/lib/scripts/subagent.py run \
 ## Behavior
 
 - The script will spawn the sub-agent process and stream output to stdout.
-- Session logs are written to
-  `.vaultspec/logs/yyyy-mm-dd-{session_id}.log`.
+- Session logs are written to a log file for the current session.

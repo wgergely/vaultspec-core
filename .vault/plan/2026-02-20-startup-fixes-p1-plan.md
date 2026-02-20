@@ -39,13 +39,13 @@ for 30 seconds before failing. Two sub-fixes:
   is warm when the first real `dispatch_agent` call arrives.
 
 **Fix 3 — `torch` initialization guard**
-`docs.py index` and `docs.py search` call `from rag.api import index` which
+`vault.py index` and `vault.py search` call `from rag.api import index` which
 transitively imports `torch`. On CUDA 13.0 + PyTorch 2.10+cu130, `import torch`
 hangs indefinitely (observed: never returns after 26+ minutes). Wrap the RAG
 import in a subprocess with a configurable timeout (default 60s). If the
 subprocess fails or times out, surface a clear error message pointing the user
 to environment requirements, rather than hanging silently.
-Files: `docs.py` (index handler ~line 371, search handler ~line 423),
+Files: `vault.py` (index handler ~line 371, search handler ~line 423),
 `rag/embeddings.py` (GPU init logic).
 
 **Fix 4 — Documentation: `[rag]` as explicit opt-in**
@@ -86,7 +86,7 @@ absent. No code changes.
     7. Write/update unit tests in `subagent_server/tests/` covering timeout path.
 
 - `Fix 3: torch initialization guard`
-    1. In `docs.py`, replace the bare `from rag.api import index` with a
+    1. In `vault.py`, replace the bare `from rag.api import index` with a
        subprocess-based probe: run `python -c "import torch"` via
        `asyncio.create_subprocess_exec` with a 60-second timeout.
     2. If the probe times out or exits non-zero, print a user-friendly error
@@ -139,7 +139,7 @@ a minimal agent task and observe `handshake_timeout` NOT appearing in the JSONL
 log (i.e., a successful handshake completes in time after pre-warm).
 
 **Fix 3**: Unit test: mock `import torch` to hang for > 60s; assert the
-timeout path produces the expected error output. Manual: run `docs.py index`
+timeout path produces the expected error output. Manual: run `vault.py index`
 and confirm it fails fast with a clear error rather than hanging indefinitely.
 
 **Fix 4**: Visual review of rendered `README.md`. Confirm `pip install

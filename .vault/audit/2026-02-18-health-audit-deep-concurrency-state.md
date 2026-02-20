@@ -87,7 +87,7 @@ The `ctx` dict values are literal replacements — no shell escaping is applied.
 Hook context values come from caller-controlled data. For example:
 
 ```python
-# In docs.py or cli.py:
+# In vault.py or cli.py:
 trigger(hooks, "vault.document.created", {"path": str(doc_path)})
 ```
 
@@ -312,7 +312,7 @@ Two concurrent calls to `get_engine()` with the same `root_dir` can both
 enter the `if _engine is None` branch and create two `VaultRAG` objects.
 
 **Current usage context:** The RAG system is called from the CLI (single
-thread) and from docs.py (single thread). The MCP server is single-threaded
+thread) and from vault.py (single thread). The MCP server is single-threaded
 asyncio, so this is NOT currently a problem in production. However, if a
 future MCP tool calls `search()` and `index()` concurrently, or if the
 `get_status()` function creates a standalone `VaultStore` (CC-8) while

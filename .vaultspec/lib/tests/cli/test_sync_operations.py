@@ -206,7 +206,7 @@ class TestSyncSkills:
 
 class TestSystemSync:
     def test_generates_from_parts(self):
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Base system prompt", encoding="utf-8"
         )
         args = make_ns()
@@ -219,7 +219,7 @@ class TestSystemSync:
         assert "# Base system prompt" in content
 
     def test_skips_custom_file(self):
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Base", encoding="utf-8"
         )
         system_file = TEST_PROJECT / ".gemini" / "SYSTEM.md"
@@ -230,7 +230,7 @@ class TestSystemSync:
         assert content == "# My custom system prompt"
 
     def test_force_overwrites_custom(self):
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Base", encoding="utf-8"
         )
         system_file = TEST_PROJECT / ".gemini" / "SYSTEM.md"
@@ -245,10 +245,10 @@ class TestSystemSync:
 class TestSystemSyncBehavioralRules:
     def test_generates_behavioral_rule_for_claude(self):
         """system_sync generates vaultspec-system.builtin.md for Claude."""
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Core mandates", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "system" / "operations.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "operations.md").write_text(
             "---\n---\n\n# Operations", encoding="utf-8"
         )
         args = make_ns()
@@ -262,12 +262,12 @@ class TestSystemSyncBehavioralRules:
 
     def test_behavioral_rule_excludes_tool_specific(self):
         """Claude behavioral rule excludes tool: gemini content."""
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "system" / "gemini-tools.md").write_text(
-            "---\ntool: gemini\n---\n\n# GEMINI SPECIFIC", encoding="utf-8"
-        )
+        (
+            TEST_PROJECT / ".vaultspec" / "rules" / "system" / "gemini-tools.md"
+        ).write_text("---\ntool: gemini\n---\n\n# GEMINI SPECIFIC", encoding="utf-8")
         args = make_ns()
         cli.system_sync(args)
         rule_file = TEST_PROJECT / ".claude" / "rules" / "vaultspec-system.builtin.md"
@@ -278,7 +278,7 @@ class TestSystemSyncBehavioralRules:
 
     def test_system_sync_produces_both_outputs(self):
         """system_sync generates SYSTEM.md for Gemini AND rule for Claude."""
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Base prompt", encoding="utf-8"
         )
         args = make_ns()
@@ -293,10 +293,10 @@ class TestSystemSyncBehavioralRules:
 
 class TestConfigSync:
     def test_generates_from_internal_and_custom(self):
-        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal instructions here", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "system" / "project.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "project.md").write_text(
             "Custom user content", encoding="utf-8"
         )
         args = make_ns()
@@ -308,7 +308,7 @@ class TestConfigSync:
         assert "Custom user content" in content
 
     def test_generates_with_internal_only(self):
-        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal only", encoding="utf-8"
         )
         args = make_ns()
@@ -323,7 +323,7 @@ class TestConfigSync:
         assert not config_file.exists()
 
     def test_skips_custom_dest_without_force(self):
-        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal", encoding="utf-8"
         )
         config_file = TEST_PROJECT / ".claude" / "CLAUDE.md"
@@ -334,7 +334,7 @@ class TestConfigSync:
         assert content == "# Hand-written config"
 
     def test_force_overwrites_custom_dest(self):
-        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal", encoding="utf-8"
         )
         config_file = TEST_PROJECT / ".claude" / "CLAUDE.md"
@@ -349,20 +349,20 @@ class TestEndToEnd:
     def test_full_sync_cycle(self):
         """Create sources -> sync -> verify destinations."""
         # Set up source files
-        (TEST_PROJECT / ".vaultspec" / "rules" / "no-swear.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "rules" / "no-swear.md").write_text(
             "---\nname: no-swear\n---\n\nDo not swear.", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "agents" / "reviewer.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "agents" / "reviewer.md").write_text(
             "---\ndescription: Reviews code\ntier: MEDIUM\n---\n\n# Reviewer",
             encoding="utf-8",
         )
-        (TEST_PROJECT / ".vaultspec" / "skills" / "vaultspec-lint.md").write_text(
-            "---\ndescription: Run linter\n---\n\n# Lint", encoding="utf-8"
-        )
-        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+        (
+            TEST_PROJECT / ".vaultspec" / "rules" / "skills" / "vaultspec-lint.md"
+        ).write_text("---\ndescription: Run linter\n---\n\n# Lint", encoding="utf-8")
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Be helpful.", encoding="utf-8"
         )
-        (TEST_PROJECT / ".vaultspec" / "system" / "base.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# You are an assistant.", encoding="utf-8"
         )
 
@@ -396,7 +396,7 @@ class TestEndToEnd:
 
     def test_modify_resync_cycle(self):
         """Sync -> modify source -> sync -> verify update."""
-        rule_src = TEST_PROJECT / ".vaultspec" / "rules" / "rule1.md"
+        rule_src = TEST_PROJECT / ".vaultspec" / "rules" / "rules" / "rule1.md"
         rule_src.write_text("---\nname: rule1\n---\n\nOriginal body.", encoding="utf-8")
         args = make_ns()
         cli.rules_sync(args)
@@ -415,7 +415,7 @@ class TestEndToEnd:
 
     def test_prune_cycle(self):
         """Sync -> delete source -> sync --prune -> verify deletion."""
-        rule_src = TEST_PROJECT / ".vaultspec" / "rules" / "ephemeral.md"
+        rule_src = TEST_PROJECT / ".vaultspec" / "rules" / "rules" / "ephemeral.md"
         rule_src.write_text("---\nname: ephemeral\n---\n\nGone soon.", encoding="utf-8")
         args = make_ns()
         cli.rules_sync(args)
@@ -431,7 +431,7 @@ class TestEndToEnd:
 
     def test_force_overwrite_cycle(self):
         """Create custom dest -> sync (skip) -> sync --force (overwrite)."""
-        (TEST_PROJECT / ".vaultspec" / "system" / "framework.md").write_text(
+        (TEST_PROJECT / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal content", encoding="utf-8"
         )
 

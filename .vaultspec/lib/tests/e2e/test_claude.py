@@ -42,7 +42,7 @@ def _cleanup_test_project(root: Path) -> None:
 def test_project_root() -> Iterator[Path]:
     """Set up test-project as workspace root for integration tests."""
     root = TEST_PROJECT
-    (root / ".vaultspec" / "agents").mkdir(parents=True, exist_ok=True)
+    (root / ".vaultspec" / "rules" / "agents").mkdir(parents=True, exist_ok=True)
     (root / ".claude" / "rules").mkdir(parents=True, exist_ok=True)
     yield root
     _cleanup_test_project(root)
@@ -95,7 +95,7 @@ def test_claude_process_spec_complete(test_project_root):
 @pytest.mark.timeout(60)
 async def test_claude_dispatch_lifecycle(test_project_root):
     """Verify run_subagent with real Claude CLI returns a valid result."""
-    (test_project_root / ".vaultspec" / "agents" / "tester.md").write_text(
+    (test_project_root / ".vaultspec" / "rules" / "agents" / "tester.md").write_text(
         "---\ntier: MEDIUM\n---\n\n# Persona\n"
         "You are Jean-Claude, a helpful assistant.\n"
         "Your name is Jean-Claude. Always introduce yourself by name.\n"
@@ -128,7 +128,7 @@ async def test_claude_dispatch_lifecycle(test_project_root):
 async def test_claude_rule_fingerprint(test_project_root):
     """Verify Claude picks up rules from .claude/rules/ directory."""
     # Create agent (minimal, no persona fingerprint)
-    (test_project_root / ".vaultspec" / "agents" / "tester.md").write_text(
+    (test_project_root / ".vaultspec" / "rules" / "agents" / "tester.md").write_text(
         "---\ntier: LOW\n---\n\n# Persona\n"
         "You are a helpful assistant.\n"
         "Keep your responses extremely short.\n",

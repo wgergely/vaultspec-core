@@ -38,7 +38,7 @@ architectural decisions (`<ADR>`s), and requirements of the current codebase.
 
 ## Plan Formulation
 
-You must use the template at `.vaultspec/templates/plan.md` and persist `<Plan>`
+You must use the template at `.vaultspec/rules/templates/plan.md` and persist `<Plan>`
 to `.vault/plan/yyyy-mm-dd-<feature>-<phase>-plan.md`.
 
 ### Frontmatter & Tagging Mandate
@@ -57,7 +57,7 @@ Every document MUST strictly adhere to the following schema:
 - **No `feature` key**: Use `tags:` exclusively for feature identification.
 
 **Linking**: Use `[[wiki-links]]` for all file and artifact references.
-**Template**: Read `.vaultspec/templates/plan.md` and populate the YAML
+**Template**: Read `.vaultspec/rules/templates/plan.md` and populate the YAML
 frontmatter correctly.
 
 ### Step Template

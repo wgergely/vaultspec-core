@@ -195,7 +195,7 @@ subagent.py team-dissolve --name <id>
 ```
 
 Or as a separate `team.py` script following the same CLI conventions as `subagent.py`
-and `docs.py` (all accept `--root`, type=Path, ROOT_DIR fallback).
+and `vault.py` (all accept `--root`, type=Path, ROOT_DIR fallback).
 
 MCP additions to `vs-subagent-mcp` (5 new tools):
 

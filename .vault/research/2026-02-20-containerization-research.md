@@ -57,7 +57,7 @@ longer) overhead — not MCP server startup per se.
 **Where does torch get imported from the CLI?**
 - `cli.py`: `import torch` inside `health` and `status` subcommands — always
   deferred, never at module level
-- `docs.py`: `from rag.api import index` / `from rag.api import search` — deferred
+- `vault.py`: `from rag.api import index` / `from rag.api import search` — deferred
   inside command handlers only
 - `subagent_server/server.py`: **zero** PyTorch imports, direct or transitive
 - `subagent.py`: **zero** PyTorch imports
@@ -66,7 +66,7 @@ longer) overhead — not MCP server startup per se.
 60-second overhead is most likely the ACP handshake timeout (30s default) when
 the `dispatch_agent` tool attempts to spawn a `claude --experimental-acp` child
 process that fails to respond. This is an ACP protocol issue, not a PyTorch issue.
-When RAG tooling IS triggered (e.g., `docs.py index`), torch initialization hangs
+When RAG tooling IS triggered (e.g., `vault.py index`), torch initialization hangs
 indefinitely on this CUDA 13.0 system.
 
 ---
@@ -125,12 +125,12 @@ recommended.
 
 #### b. Pre-warmed RAG service (long-running HTTP server)
 
-**Concept**: `docs.py` gains a `serve` mode — an HTTP microservice that loads the
+**Concept**: `vault.py` gains a `serve` mode — an HTTP microservice that loads the
 embedding model once, keeps it warm, and accepts `/index` and `/search` requests.
 CLI and MCP tools call this service instead of importing RAG directly.
 
 **Pro:**
-- No Docker required — runs as a native process (`python docs.py serve`)
+- No Docker required — runs as a native process (`python vault.py serve`)
 - Model loads once; subsequent searches in the same session are sub-100ms
 - Clean separation: MCP server stays lightweight, RAG is a separate concern
 - Could be managed by a systemd/launchctl service or started on demand
@@ -192,7 +192,7 @@ win is documentation: clearly communicate that `pip install vaultspec` (without
 
 #### e. Retire RAG from the MCP surface entirely
 
-**Concept**: RAG (indexing/search) is already exclusively in `docs.py`. Remove any
+**Concept**: RAG (indexing/search) is already exclusively in `vault.py`. Remove any
 remaining references to RAG from the MCP server and subagent dispatch path. The
 MCP surface covers only: agent dispatch, task management, lock management.
 
@@ -206,7 +206,7 @@ server path. Confirm and document this boundary explicitly.
 | Option                  | Code changes      | User impact         | Maintenance cost |
 |-------------------------|-------------------|---------------------|------------------|
 | Docker image            | High (Dockerfile, HTTP bridge, CLI wrappers) | High (requires Docker) | High |
-| Pre-warmed RAG service  | Medium (add `serve` mode to docs.py, HTTP client in RAG callers) | Medium (start service manually) | Medium |
+| Pre-warmed RAG service  | Medium (add `serve` mode to vault.py, HTTP client in RAG callers) | Medium (start service manually) | Medium |
 | Fix mcp import speed    | Low (profile + lazy-load) | Transparent         | Low |
 | Fix ACP handshake       | Low-Medium (timeout tuning, retry logic) | Transparent         | Low |
 | Fix torch hang          | Low (subprocess guard, CUDA init wrapper) | Transparent         | Low |
@@ -251,7 +251,7 @@ The correct intervention is a two-pronged targeted fix:
    simpler dispatch patterns).
 
 3. **Document the `[rag]` boundary**: Make explicit that `pip install vaultspec`
-   (no RAG) is the standard install. RAG features (`docs.py index/search`) are
+   (no RAG) is the standard install. RAG features (`vault.py index/search`) are
    opt-in and have their own CUDA environment requirements.
 
 4. **Investigate torch hang on CUDA 13.0**: This is an environment-specific bug

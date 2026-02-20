@@ -62,7 +62,7 @@ three independently configurable path roots via environment variables.
   and validation
 - `_paths.py` provides `ROOT_DIR` and `LIB_SRC_DIR` as module-level globals
 - `cli.py` `init_paths(root)` sets all global path variables from one root
-- All three CLIs (cli.py, subagent.py, docs.py) accept `--root` with
+- All three CLIs (cli.py, subagent.py, vault.py) accept `--root` with
   `ROOT_DIR` fallback
 - `atomic_write()` already uses write-to-temp-then-rename
 
@@ -408,7 +408,7 @@ certain output files that are shared).
 | 2 | `core/config.py` — Add `content_dir` field + VAULTSPEC_CONTENT_DIR registry entry | Small edit |
 | 3 | `_paths.py` — Delegate to resolve_workspace(), structural fallback inside resolver | Small edit |
 | 4 | `cli.py` — init_paths() takes WorkspaceLayout; add --content-dir flag | Medium edit |
-| 5 | `subagent.py`, `docs.py` — Add --content-dir flag, use resolve_workspace() | Small edits |
+| 5 | `subagent.py`, `vault.py` — Add --content-dir flag, use resolve_workspace() | Small edits |
 | 6 | `core/tests/test_workspace.py` — Unit tests for all layout modes | New file (~200 lines) |
 | 7 | `requirements.txt` — Fix stale dependency list (ADR-006 item 4) | Small edit |
 | 8 | `extension.toml` — New file for companion project discovery (ADR-006 item 5) | New file (~20 lines) |

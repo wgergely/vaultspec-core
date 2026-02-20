@@ -233,8 +233,8 @@ Three issues would completely stop a new user:
 |---------|----------------------|----------------------|
 | 5-phase workflow | `.vaultspec/README.md` (buried) | Low |
 | CLI commands | `cli.py --help` (works) | Medium |
-| Docs audit | `docs.py --help` (works) | Medium |
-| RAG search | `docs.py search --help` (works, but GPU req undocumented) | Low |
+| Docs audit | `vault.py --help` (works) | Medium |
+| RAG search | `vault.py search --help` (works, but GPU req undocumented) | Low |
 | Agent definitions | `cli.py agents list` (excellent output) | High |
 | Skills | `cli.py skills list` (excellent output) | High |
 | Templates | Must browse `.vaultspec/templates/` manually | Low |
@@ -248,7 +248,7 @@ A well-designed system allows users to discover features while using it. vaultsp
 
 **Good**: `cli.py agents list` produces a clean table showing all agents with their tiers and model mappings. This naturally leads to curiosity about what agents can do. (Cross-ref: 01-ux-simulation.md, Section 3.1 -- "Output is clean, aligned, and informative")
 
-**Good**: `docs.py audit --summary` provides an immediate overview of vault health, naturally leading to `--verify` and `--graph` for deeper analysis. (Cross-ref: 01-ux-simulation.md, Section 3.2 -- "The crown jewel of the CLI")
+**Good**: `vault.py audit --summary` provides an immediate overview of vault health, naturally leading to `--verify` and `--graph` for deeper analysis. (Cross-ref: 01-ux-simulation.md, Section 3.2 -- "The crown jewel of the CLI")
 
 **Bad**: There is no `--version` flag on any CLI tool, no `cli.py status` command showing current configuration state, and no `cli.py doctor` command that checks prerequisites.
 
@@ -268,15 +268,15 @@ Using 02-tech-audit.md's feature matrix as the ground truth:
 |---------|-------------|-------------------------|-----|
 | Core Configuration (30+ vars) | Yes | No | Environment variables not listed |
 | YAML Frontmatter Parsing | Yes | Yes (templates/readme.md) | Adequate |
-| Vault Document Scanning | Yes | Implicit (via `docs.py audit`) | Implicit only |
+| Vault Document Scanning | Yes | Implicit (via `vault.py audit`) | Implicit only |
 | Wiki-link Extraction | Yes | Yes (templates/readme.md) | Adequate |
 | Template Hydration | Yes | No | Users don't know about auto-hydration |
 | GPU Embeddings | Yes | No | GPU/CUDA requirement undocumented |
-| Full/Incremental Indexing | Yes | No | `docs.py index --help` only |
+| Full/Incremental Indexing | Yes | No | `vault.py index --help` only |
 | Hybrid Search + Reranking | Yes | No | Search algorithm undocumented |
 | Query Filter Syntax | Yes | No | `type:`, `feature:`, `date:`, `tag:` filters undocumented |
 | LanceDB Vector Store | Yes | No | Implementation detail, acceptable |
-| Document Graph | Yes | Implicit (`docs.py audit --graph`) | Implicit only |
+| Document Graph | Yes | Implicit (`vault.py audit --graph`) | Implicit only |
 | ACP Client/Bridge | Yes | No | Protocol integration undocumented |
 | A2A Server | Yes | No | Protocol integration undocumented |
 | MCP Server (5 tools) | Yes | Partial (`vaultspec-subagent` skill) | Tool surface undocumented |
@@ -397,7 +397,7 @@ Tailwind's documentation site is the industry benchmark: search, sidebar navigat
 
 1. **Rewrite `README.md`** to include: one-paragraph value proposition, prerequisites, installation steps (with `pip install` variants), a 60-second quickstart showing the first CLI command, and prominent links to the full user manual.
 
-2. **Create a "Getting Started" guide** covering: environment setup, first `cli.py agents list`, first `docs.py create`, first full Research-to-Verify cycle with a worked example.
+2. **Create a "Getting Started" guide** covering: environment setup, first `cli.py agents list`, first `vault.py create`, first full Research-to-Verify cycle with a worked example.
 
 3. **Add a "Concepts" document** explaining: what SDD is and why it matters, the 5-phase workflow with plain-language descriptions, what `.vault/` is and why it exists, how agents/skills/rules relate to each other.
 
@@ -405,7 +405,7 @@ Tailwind's documentation site is the industry benchmark: search, sidebar navigat
 
 ### Tier 2: High Priority (Needed for Developer Adoption)
 
-5. **Create a CLI reference document** consolidating all three CLIs (cli.py, docs.py, subagent.py) with examples and expected output.
+5. **Create a CLI reference document** consolidating all three CLIs (cli.py, vault.py, subagent.py) with examples and expected output.
 
 6. **Document the 30+ configuration variables** with a reference page listing each `VAULTSPEC_*` env var, its default, and what it controls.
 

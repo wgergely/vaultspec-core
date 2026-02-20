@@ -496,17 +496,17 @@ Creates:
 
 ---
 
-## docs.py -- Vault Manager
+## vault.py -- Vault Manager
 
 Manages the `.vault/` documentation vault: creation,
 auditing, indexing, and semantic search.
 
 ```text
-python .vaultspec/lib/scripts/docs.py \
+python .vaultspec/lib/scripts/vault.py \
   [global-flags] <command> [options]
 ```
 
-### Global Flags (docs.py)
+### Global Flags (vault.py)
 
 | Flag | Type | Default | Desc |
 | ---- | ---- | ------- | ---- |
@@ -522,7 +522,7 @@ Audit the vault for document counts, feature coverage,
 verification errors, and graph hotspots.
 
 ```bash
-python .vaultspec/lib/scripts/docs.py \
+python .vaultspec/lib/scripts/vault.py \
   audit --summary --features --verify
 ```
 
@@ -539,7 +539,7 @@ python .vaultspec/lib/scripts/docs.py \
 | --json | flag | off | Output as JSON |
 
 ```bash
-python .vaultspec/lib/scripts/docs.py \
+python .vaultspec/lib/scripts/vault.py \
   audit --summary --json
 ```
 
@@ -551,7 +551,7 @@ Create a new document from a template with pre-filled
 frontmatter.
 
 ```bash
-python .vaultspec/lib/scripts/docs.py create \
+python .vaultspec/lib/scripts/vault.py create \
   --type research --feature my-feature
 ```
 
@@ -579,10 +579,10 @@ documents.
 
 ```bash
 # Incremental index (default — new/changed files)
-python .vaultspec/lib/scripts/docs.py index
+python .vaultspec/lib/scripts/vault.py index
 
 # Full re-index
-python .vaultspec/lib/scripts/docs.py index --full
+python .vaultspec/lib/scripts/vault.py index --full
 ```
 
 | Flag | Type | Default | Desc |
@@ -614,7 +614,7 @@ BM25 + ANN retrieval.
 **Requires NVIDIA GPU with CUDA.**
 
 ```bash
-python .vaultspec/lib/scripts/docs.py \
+python .vaultspec/lib/scripts/vault.py \
   search "protocol integration patterns"
 ```
 
@@ -629,11 +629,11 @@ Filter tokens can be embedded in the query:
 
 ```bash
 # Only ADRs about search
-python .vaultspec/lib/scripts/docs.py \
+python .vaultspec/lib/scripts/vault.py \
   search "type:adr search implementation"
 
 # Only RAG-related research
-python .vaultspec/lib/scripts/docs.py \
+python .vaultspec/lib/scripts/vault.py \
   search "type:research feature:rag embeddings"
 ```
 

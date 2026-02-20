@@ -90,10 +90,10 @@ vaultspec is a governed development framework for AI agents, built around a "doc
 | **CLI: System** | `cli.py` | Complete | show, sync (system prompt assembly from parts) |
 | **CLI: sync-all** | `cli.py` | Complete | Syncs rules, agents, skills, system, config in one command |
 | **CLI: Test** | `cli.py` | Complete | Pytest runner with category/module filtering |
-| **Docs CLI: Audit** | `docs.py` | Complete | Summary, features, verify, graph (with JSON output) |
-| **Docs CLI: Create** | `docs.py` | Complete | Template-based document creation |
-| **Docs CLI: Index** | `docs.py` | Complete | Full/incremental RAG indexing |
-| **Docs CLI: Search** | `docs.py` | Complete | Semantic search with JSON output |
+| **Docs CLI: Audit** | `vault.py` | Complete | Summary, features, verify, graph (with JSON output) |
+| **Docs CLI: Create** | `vault.py` | Complete | Template-based document creation |
+| **Docs CLI: Index** | `vault.py` | Complete | Full/incremental RAG indexing |
+| **Docs CLI: Search** | `vault.py` | Complete | Semantic search with JSON output |
 | **Subagent CLI: Run** | `subagent.py` | Complete | Agent execution with goal/context/plan, model/provider override |
 | **Subagent CLI: Serve** | `subagent.py` | Complete | MCP server startup |
 | **Subagent CLI: A2A-Serve** | `subagent.py` | Complete | A2A HTTP server with executor selection |
@@ -133,10 +133,10 @@ python .vaultspec/lib/scripts/cli.py [--root PATH] [--verbose|-v] [--debug] <res
 
 **Tool destinations**: Claude (`.claude/`), Gemini (`.gemini/`), Antigravity (`.agent/`), Agents (`AGENTS.md`)
 
-### 3.2 docs.py — Vault Manager
+### 3.2 vault.py — Vault Manager
 
 ```
-python .vaultspec/lib/scripts/docs.py [--verbose|-v] [--debug] <command>
+python .vaultspec/lib/scripts/vault.py [--verbose|-v] [--debug] <command>
 ```
 
 | Command | Description | Key Flags |

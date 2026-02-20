@@ -151,9 +151,9 @@ def list_documents(
     feature: str | None = None,
 ) -> list[dict]:
     """List vault documents with optional filtering by type or feature."""
-    from vault.models import DocType
-    from vault.parser import parse_vault_metadata
-    from vault.scanner import get_doc_type, scan_vault
+    from vaultcore.models import DocType
+    from vaultcore.parser import parse_vault_metadata
+    from vaultcore.scanner import get_doc_type, scan_vault
 
     docs: list[dict] = []
     for path in scan_vault(root_dir):
@@ -217,9 +217,9 @@ def get_document(root_dir: pathlib.Path, doc_id: str) -> dict | None:
         logger.warning("Vector store lookup failed: %s", e)
 
     # Fallback: scan the vault filesystem
-    from vault.models import DocType
-    from vault.parser import parse_vault_metadata
-    from vault.scanner import get_doc_type, scan_vault
+    from vaultcore.models import DocType
+    from vaultcore.parser import parse_vault_metadata
+    from vaultcore.scanner import get_doc_type, scan_vault
 
     for path in scan_vault(root_dir):
         if path.stem == doc_id:

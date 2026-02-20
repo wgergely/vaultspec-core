@@ -69,17 +69,17 @@ fresh.
 
 The framework is organized under `.vaultspec/`:
 
-| Folder     | Role                                                     |
-|------------|----------------------------------------------------------|
-| rules/     | Persistent behavioral rules, always loaded into sessions |
-| skills/    | Activatable workflow recipes, invoked by name            |
-| agents/    | Sub-agent persona definitions, dispatched by skills      |
-| templates/ | Structural schemas for .vault/ artifacts                 |
-| system/    | Composable system prompt fragments                       |
+| Folder           | Role                                                     |
+|------------------|----------------------------------------------------------|
+| rules/           | Persistent behavioral rules, always loaded into sessions |
+| rules/skills/    | Activatable workflow recipes, invoked by name            |
+| rules/agents/    | Sub-agent persona definitions, dispatched by skills      |
+| rules/templates/ | Structural schemas for .vault/ artifacts                 |
+| rules/system/    | Composable system prompt fragments                       |
 
 Artifacts are persisted in `.vault/` (adr/, audit/, exec/, plan/, reference/,
-research/). Each artifact follows a template from `.vaultspec/templates/` with
-YAML frontmatter, wiki-links, and a two-tag taxonomy.
+research/). Each artifact follows a template from `.vaultspec/rules/templates/`
+with YAML frontmatter, wiki-links, and a two-tag taxonomy.
 
 The user must approve plans before execution proceeds. Code review via
 vaultspec-review is mandatory after execution.

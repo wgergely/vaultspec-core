@@ -48,7 +48,7 @@ Instruct it to:
 ## Persistence
 
 - **Template:** You MUST read and use the template at
-  `.vaultspec/templates/code-review.md`.
+  `.vaultspec/rules/templates/code-review.md`.
 - **Location:**
   `.vault/exec/yyyy-mm-dd-{feature}/yyyy-mm-dd-{feature}-review.md`.
 - **Tags:** Ensure it uses the `#exec` and `#{feature}` tags.

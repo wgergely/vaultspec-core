@@ -4,10 +4,10 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from vault.links import extract_related_links, extract_wiki_links
-from vault.models import DocType
-from vault.parser import parse_vault_metadata
-from vault.scanner import get_doc_type, scan_vault
+from vaultcore.links import extract_related_links, extract_wiki_links
+from vaultcore.models import DocType
+from vaultcore.parser import parse_vault_metadata
+from vaultcore.scanner import get_doc_type, scan_vault
 
 if TYPE_CHECKING:
     import pathlib

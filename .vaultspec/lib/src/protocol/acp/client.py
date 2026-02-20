@@ -301,6 +301,14 @@ class SubagentClient(Client):
                 "does not permit shell access. "
                 "Use read_text_file for file access instead."
             )
+        if sys.platform == "win32":
+            loop = asyncio.get_running_loop()
+            if not isinstance(loop, asyncio.ProactorEventLoop):
+                raise RuntimeError(
+                    "SubagentClient requires ProactorEventLoop on Windows for"
+                    " subprocess support. Set asyncio.WindowsProactorEventLoopPolicy()"
+                    " before starting the event loop."
+                )
         _ = session_id
         _ = kwargs
         terminal_id = str(uuid.uuid4())

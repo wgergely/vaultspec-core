@@ -1,6 +1,6 @@
 import pytest
 from metrics.api import VaultSummary, get_vault_metrics
-from vault.models import DocType
+from vaultcore.models import DocType
 
 pytestmark = [pytest.mark.unit]
 

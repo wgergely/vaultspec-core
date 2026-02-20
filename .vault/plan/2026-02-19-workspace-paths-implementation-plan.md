@@ -39,7 +39,7 @@ matrix and bootstrap ordering constraints.
     1. **Update `_paths.py`** — Rewrite `.vaultspec/lib/scripts/_paths.py`. Preserve the two-step bootstrap: Step 1 computes `_SCRIPTS_DIR`, `_LIB_DIR`, `_FRAMEWORK_ROOT`, `LIB_SRC_DIR` structurally and adds to `sys.path`. Step 2 imports `resolve_workspace` and calls it with env var overrides and `framework_root=_FRAMEWORK_ROOT`. Export `ROOT_DIR = _layout.output_root` and `LIB_SRC_DIR` as before. Add `_env_path()` helper.
     2. **Update `cli.py` `init_paths()`** — Change signature from `init_paths(root: Path)` to `init_paths(layout: WorkspaceLayout)`. Source dirs (`RULES_SRC_DIR`, `AGENTS_SRC_DIR`, `SKILLS_SRC_DIR`, `SYSTEM_SRC_DIR`, `FRAMEWORK_CONFIG_SRC`, `PROJECT_CONFIG_SRC`, `CONSTITUTION_SRC`, `HOOKS_DIR`) derived from `layout.content_root`. Output dirs in `TOOL_CONFIGS` derived from `layout.output_root`. Update the default initialization call at module level. Update `main()` to build a `WorkspaceLayout` via `resolve_workspace()` when `--root` or `--content-dir` is provided. Add `--content-dir` argument to the top-level parser.
     3. **Update `subagent.py`** — Add `--content-dir` argument. In the `main()` function, use `resolve_workspace()` with `root_override=args.root` and `content_override=args.content_dir` where root is currently passed directly.
-    4. **Update `docs.py`** — Add `--content-dir` argument to all subcommand parsers that accept `--root`. Pass through to `resolve_workspace()` at each command entry point where `root_dir` is resolved.
+    4. **Update `vault.py`** — Add `--content-dir` argument to all subcommand parsers that accept `--root`. Pass through to `resolve_workspace()` at each command entry point where `root_dir` is resolved.
 
 - `Phase 3: Packaging + Extension Manifest` — Non-code deliverables
     1. **Fix `requirements.txt`** — Update to match `pyproject.toml` runtime deps. Change `mcp>=0.1.0` to `mcp>=1.20.0`. Add missing: `claude-agent-sdk>=0.1.30`, `sse-starlette>=1.0.0`. Remove dev-only deps from the main list (they belong in `pyproject.toml [project.optional-dependencies]` only).
@@ -48,7 +48,7 @@ matrix and bootstrap ordering constraints.
 ## Parallelization
 
 - **Phase 1 steps can run in parallel.** Step 1 (workspace.py), step 2 (config.py edit), and step 3 (tests) are independent. The tests import workspace.py but writing both simultaneously is fine — tests validate post-write.
-- **Phase 2 steps are sequential.** `_paths.py` must be updated first (step 1) since all CLIs import from it. Then cli.py (step 2), then subagent.py + docs.py (steps 3-4) which follow the same pattern.
+- **Phase 2 steps are sequential.** `_paths.py` must be updated first (step 1) since all CLIs import from it. Then cli.py (step 2), then subagent.py + vault.py (steps 3-4) which follow the same pattern.
 - **Phase 3 steps are independent** of each other and of Phase 2. Can run in parallel with Phase 2 if desired.
 
 **Recommended team allocation:**

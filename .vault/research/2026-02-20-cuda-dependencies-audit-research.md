@@ -53,9 +53,9 @@ All documentation references **CUDA 13.0+** and the `cu130` index URL. CUDA 13.0
 | `api.py:107-132` | `get_engine()` | Calls `_require_cuda()`, catches exceptions, good |
 | `api.py:206-208` | `get_document()` | Catches `ImportError` with debug log, good |
 | `api.py:326-329` | `get_status()` | Catches `ImportError` and `FileNotFoundError`, good |
-| `docs.py:119,145` | CLI epilog | "Requires NVIDIA GPU with CUDA" — adequate |
-| `docs.py:374-376` | `handle_index` ImportError | "RAG dependencies not installed" — adequate |
-| `docs.py:425-427` | `handle_search` ImportError | Same — adequate |
+| `vault.py:119,145` | CLI epilog | "Requires NVIDIA GPU with CUDA" — adequate |
+| `vault.py:374-376` | `handle_index` ImportError | "RAG dependencies not installed" — adequate |
+| `vault.py:425-427` | `handle_search` ImportError | Same — adequate |
 
 #### Issues found
 
@@ -107,7 +107,7 @@ The Python 3.13 mandate is self-consistent **once the torch floor is raised to >
 - `get_document()` falls back to filesystem scan when vector store lookup fails.
 - `get_status()` returns `index.exists=False` and `index.device=None` when RAG is unavailable.
 - Tests use `pytest.mark.skipif(not HAS_RAG, ...)` to skip RAG tests cleanly.
-- CLI commands (`docs.py index`, `docs.py search`) catch `ImportError` and print actionable install instructions.
+- CLI commands (`vault.py index`, `vault.py search`) catch `ImportError` and print actionable install instructions.
 
 #### What should be improved
 

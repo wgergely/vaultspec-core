@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from vault.models import DocType
+from vaultcore.models import DocType
 
 logger = logging.getLogger(__name__)
 

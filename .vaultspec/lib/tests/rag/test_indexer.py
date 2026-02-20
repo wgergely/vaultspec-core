@@ -71,7 +71,7 @@ class TestDocumentPreparation:
         from rag.indexer import prepare_document
 
         # Find a real document in the test-project
-        from vault.scanner import scan_vault
+        from vaultcore.scanner import scan_vault
 
         docs = list(scan_vault(TEST_PROJECT))
         assert len(docs) > 0, "test-project should have documents"
@@ -87,7 +87,7 @@ class TestDocumentPreparation:
     @pytest.mark.timeout(300)
     def test_prepare_all_documents(self):
         from rag.indexer import prepare_document
-        from vault.scanner import scan_vault
+        from vaultcore.scanner import scan_vault
 
         prepared = 0
         skipped = 0
@@ -144,8 +144,8 @@ class TestIndexEdgeCases:
         These should all be in unsupported directories (stories) or have
         no YAML block at all (some research docs).
         """
-        from vault.parser import parse_vault_metadata
-        from vault.scanner import scan_vault
+        from vaultcore.parser import parse_vault_metadata
+        from vaultcore.scanner import scan_vault
 
         no_frontmatter = []
         for path in scan_vault(TEST_PROJECT):

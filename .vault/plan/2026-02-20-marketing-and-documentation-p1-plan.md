@@ -47,7 +47,7 @@ Per [[2026-02-20-marketing-and-documentation-research]] and the interactive docu
        **Agent**: `vaultspec-standard-executor`
 
     2. Create `cli-reference.md`. Structure: existing CLI reference + configuration appendix.
-       - Part 1: All content from `docs/cli-reference.md` verbatim (cli.py, docs.py, subagent.py).
+       - Part 1: All content from `docs/cli-reference.md` verbatim (cli.py, vault.py, subagent.py).
        - Part 2: Append all content from `docs/configuration.md` as a new `## Configuration
          Reference` appendix section at the end of the file.
        - Destination: `.vaultspec/docs/cli-reference.md`
@@ -109,7 +109,7 @@ Steps 2.1, 2.2, and 2.3 within Phase 2 are independent and can run in parallel.
 - `cli-reference.md` contains the configuration table (search for "VAULTSPEC_ROOT_DIR")
 - `search-guide.md` does NOT contain the configuration table (search for "VAULTSPEC_EMBEDDING_MODEL" — should not appear)
 
-**Link audit**: Run `docs.py audit --verify` after completion to confirm no broken wiki-links
+**Link audit**: Run `vault.py audit --verify` after completion to confirm no broken wiki-links
 were introduced. The vault's internal `.vault/` links are unaffected by this change (they do
 not reference `docs/` files).
 

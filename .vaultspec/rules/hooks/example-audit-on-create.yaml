@@ -1,15 +1,15 @@
 # Example hook: auto-verify vault after document creation.
 #
-# This hook runs `docs.py audit --verify` whenever a new document
-# is created via `docs.py create`. Remove the `.example` suffix
+# This hook runs `vault.py audit --verify` whenever a new document
+# is created via `vault.py create`. Remove the `.example` suffix
 # (or copy this file) to activate it.
 #
 # Available events:
-#   vault.document.created   — after docs.py create
+#   vault.document.created   — after vault.py create
 #   vault.document.modified  — after vault doc edits
-#   vault.index.updated      — after docs.py index
+#   vault.index.updated      — after vault.py index
 #   config.synced            — after cli.py sync-all
-#   audit.completed          — after docs.py audit
+#   audit.completed          — after vault.py audit
 #
 # Available action types:
 #   shell  — run a shell command
@@ -24,4 +24,4 @@ event: vault.document.created
 enabled: false  # set to true to activate
 actions:
   - type: shell
-    command: "python .vaultspec/lib/scripts/docs.py audit --verify"
+    command: "python .vaultspec/lib/scripts/vault.py audit --verify"

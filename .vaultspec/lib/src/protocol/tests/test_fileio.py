@@ -88,7 +88,7 @@ class TestReadOnlyModeEnforcement:
         self, readonly_client, test_root_dir
     ):
         """Read-only mode rejects writes to .vaultspec/ (not .vault/)."""
-        target = test_root_dir / ".vaultspec" / "agents" / "rogue.md"
+        target = test_root_dir / ".vaultspec" / "rules" / "agents" / "rogue.md"
         with pytest.raises(ValueError, match="read-only mode"):
             await readonly_client.write_text_file(
                 content="# Rogue agent",

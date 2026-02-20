@@ -107,7 +107,7 @@ The CLI provides `list` and `add` for rules, agents, and skills, but no `remove`
 **Severity**: Medium
 **Sources**: 01-ux-simulation.md (S3.2, S7 Pain Point #5)
 
-Running `docs.py audit --verify` against the framework's own `.vault/` directory produces 93 errors (naming violations, missing tags, broken links, orphaned documents). This is a credibility issue -- the tool that enforces documentation standards doesn't meet its own standards.
+Running `vault.py audit --verify` against the framework's own `.vault/` directory produces 93 errors (naming violations, missing tags, broken links, orphaned documents). This is a credibility issue -- the tool that enforces documentation standards doesn't meet its own standards.
 
 ### Finding 10: MCP Security Not Addressed
 
@@ -132,7 +132,7 @@ Every major feature is implemented, not stubbed. The three-protocol stack is arc
 Session-scoped fixtures, centralized path constants, autouse isolation, separate lance directories for test isolation, and strong edge case coverage (unicode, SQL injection, embedded YAML separators). The ~99.5% pass rate on ~960 tests demonstrates real reliability.
 (03-test-verification.md, Test Infrastructure Assessment)
 
-### 3. `docs.py audit` Is Exceptional
+### 3. `vault.py audit` Is Exceptional
 
 The vault auditor with `--verify`, `--graph`, `--summary`, and `--features` flags is the standout CLI feature. Graph hotspot analysis, orphan detection, and invalid link reporting provide genuine value. This should be prominently featured in marketing.
 (01-ux-simulation.md, S3.2 -- "The crown jewel of the CLI")

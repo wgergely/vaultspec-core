@@ -44,7 +44,7 @@ Instruct it to "Execute the plan at `[[...-plan.md]]`. Start with Phase `{X}`."
   `.vault/exec/yyyy-mm-dd-{feature}/yyyy-mm-dd-{feature}-{phase}-{step}.md`
   for every completed phase.
 - **Template**: You MUST read and use the template at
-  `.vaultspec/templates/exec-step.md`.
+  `.vaultspec/rules/templates/exec-step.md`.
 
 ### Frontmatter & Tagging Mandate (Artifacts)
 
@@ -76,7 +76,7 @@ following schema:
   passes), write the consolidated Phase Summary at
   `.vault/exec/yyyy-mm-dd-{feature}/yyyy-mm-dd-{feature}-{phase}-summary.md`.
 - **Template**: You MUST read and use the template at
-  `.vaultspec/templates/exec-summary.md`.
+  `.vaultspec/rules/templates/exec-summary.md`.
 - Present the final findings, including modified files and safety status, to
   the user.
 

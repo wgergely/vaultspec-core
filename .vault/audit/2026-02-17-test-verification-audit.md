@@ -182,7 +182,7 @@ But the actual test directory is `.vaultspec/lib/tests/`. This means `cli.py tes
 
 1. **CLI test runner path bug** -- functional test path is `.vaultspec/tests` (wrong), should be `.vaultspec/lib/tests`
 2. **`subagent.py` self-bootstrap** -- script cannot find `logging_config` when run directly
-3. **No test isolation for `docs.py`** -- the docs CLI has no dedicated tests
+3. **No test isolation for `vault.py`** -- the docs CLI has no dedicated tests
 
 5. **Benchmark runner (`bench_rag.py`)** -- exists but not included in any test marker category
 
@@ -237,7 +237,7 @@ But the actual test directory is `.vaultspec/lib/tests/`. This means `cli.py tes
 | File I/O sandbox | 6+10+12 sandbox tests | COVERED |
 | Task engine | 15 task engine tests | COVERED |
 | Interactive mode | 2 tests (skipped) | MINIMAL |
-| `docs.py` CLI | 0 tests | NOT COVERED |
+| `vault.py` CLI | 0 tests | NOT COVERED |
 | `subagent.py` standalone | 2 tests (broken) | BROKEN |
 
 ---
@@ -248,5 +248,5 @@ But the actual test directory is `.vaultspec/lib/tests/`. This means `cli.py tes
 2. **Fix `subagent.py` import**: Add `_paths.py` bootstrap or make `logging_config` importable via proper package installation.
 3. **Add skip markers to A2A e2e tests**: Use `@pytest.mark.claude` / `@pytest.mark.gemini` with `skipIf` to avoid false failures.
 4. **Increase RAG test timeouts**: Set `test_index_incremental` to 300s or mark as `@pytest.mark.quality`.
-5. **Add `docs.py` tests**: The docs CLI has no test coverage.
+5. **Add `vault.py` tests**: The docs CLI has no test coverage.
 6. **Add CI pipeline**: No automated test runs found. GitHub Actions would catch regressions.

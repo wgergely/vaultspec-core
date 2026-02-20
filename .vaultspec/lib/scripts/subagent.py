@@ -114,30 +114,32 @@ def command_run(args):
 
         task_goal = READONLY_PERMISSION_PROMPT + task_goal
 
-    warnings.simplefilter("ignore", ResourceWarning)
-
     project_root = args.root
 
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
     try:
-        result = loop.run_until_complete(
-            run_subagent(
-                agent_name=args.agent,
-                initial_task=task_goal,
-                context_files=context_files,
-                plan_file=plan_file,
-                root_dir=project_root,
-                model_override=args.model,
-                provider_override=args.provider,
-                interactive=args.interactive,
-                debug=args.debug,
-                mode=args.mode,
-                quiet=False,  # CLI should be noisy
-                client_class=SubagentClient,
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", ResourceWarning)
+            result = loop.run_until_complete(
+                run_subagent(
+                    agent_name=args.agent,
+                    initial_task=task_goal,
+                    context_files=context_files,
+                    plan_file=plan_file,
+                    root_dir=project_root,
+                    model_override=args.model,
+                    provider_override=args.provider,
+                    interactive=args.interactive,
+                    debug=args.debug,
+                    mode=args.mode,
+                    quiet=False,  # CLI should be noisy
+                    client_class=SubagentClient,
+                )
             )
-        )
         if result.response_text:
             print("\n--- Response ---\n")
             print(result.response_text)

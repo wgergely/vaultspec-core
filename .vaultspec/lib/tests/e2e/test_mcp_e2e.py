@@ -45,7 +45,7 @@ def _cleanup_test_project(root: Path) -> None:
 def test_project_root() -> Iterator[Path]:
     """Set up test-project as workspace for MCP e2e tests."""
     root = TEST_PROJECT
-    (root / ".vaultspec" / "agents").mkdir(parents=True, exist_ok=True)
+    (root / ".vaultspec" / "rules" / "agents").mkdir(parents=True, exist_ok=True)
     (root / ".claude" / "rules").mkdir(parents=True, exist_ok=True)
     (root / ".gemini" / "rules").mkdir(parents=True, exist_ok=True)
     (root / ".gemini" / "settings.json").write_text("{}", encoding="utf-8")
@@ -55,7 +55,7 @@ def test_project_root() -> Iterator[Path]:
 
 def _write_jean_claude_agent(root: Path) -> None:
     """Write the Jean-Claude test agent to the workspace."""
-    (root / ".vaultspec" / "agents" / "tester.md").write_text(
+    (root / ".vaultspec" / "rules" / "agents" / "tester.md").write_text(
         "---\ntier: LOW\n---\n\n# Persona\n"
         "You are Jean-Claude, a helpful French Baker.\n"
         "Your name is Jean-Claude. Always introduce yourself by name.\n"
@@ -91,7 +91,7 @@ async def _mcp_dispatch_and_wait(
 
     # Build agent cache from disk
     agent_cache: dict = {}
-    agents_dir = root / ".vaultspec" / "agents"
+    agents_dir = root / ".vaultspec" / "rules" / "agents"
     if agents_dir.is_dir():
         for md_file in agents_dir.glob("*.md"):
             agent_cache[md_file.stem] = {
@@ -120,8 +120,8 @@ async def _mcp_dispatch_and_wait(
     task_id = dispatch_data["taskId"]
 
     # Poll until completed/failed or timeout
-    deadline = asyncio.get_event_loop().time() + timeout
-    while asyncio.get_event_loop().time() < deadline:
+    deadline = asyncio.get_running_loop().time() + timeout
+    while asyncio.get_running_loop().time() < deadline:
         await asyncio.sleep(1.0)
         _, status_result = await mcp.call_tool("get_task_status", {"task_id": task_id})
         status_data = json.loads(status_result["result"])  # type: ignore[index]

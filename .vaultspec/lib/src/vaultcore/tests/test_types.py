@@ -1,6 +1,6 @@
 import pytest
-from vault.models import DocType, DocumentMetadata, VaultConstants
-from vault.parser import parse_vault_metadata
+from vaultcore.models import DocType, DocumentMetadata, VaultConstants
+from vaultcore.parser import parse_vault_metadata
 
 pytestmark = [pytest.mark.unit]
 

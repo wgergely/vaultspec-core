@@ -131,6 +131,29 @@ def resolve_includes(
     return "\n".join(resolved_lines)
 
 
+def resolve_executable(name: str, which_fn=None) -> tuple[str, list[str]]:
+    """Resolve an executable name, handling Windows .cmd/.bat wrappers.
+
+    On Windows, tools installed via npm/pip often appear as .cmd batch
+    scripts that cannot be directly launched by subprocess or
+    asyncio.create_subprocess_exec. This function wraps them with
+    ``cmd.exe /c`` so they execute correctly.
+
+    Returns:
+        (executable, prefix_args) — prepend prefix_args to the command's
+        argument list when constructing the subprocess call.
+    """
+    import shutil
+    import sys
+
+    _which = which_fn or shutil.which
+    path = _which(name) or name
+
+    if sys.platform == "win32" and path.lower().endswith((".cmd", ".bat")):
+        return "cmd.exe", ["/c", path]
+    return path, []
+
+
 class AgentProvider(abc.ABC):
     """Abstract base class for agent providers."""
 

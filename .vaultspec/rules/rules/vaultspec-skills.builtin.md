@@ -33,5 +33,5 @@ Where appropriate, load and use the following skills:
 - `vaultspec-execute`
 
 Make sure to utilize the sub-agents defined in
-`.vaultspec/agents`. Dispatch them using the
+`.vaultspec/rules/agents`. Dispatch them using the
 `vaultspec-subagent` skill.

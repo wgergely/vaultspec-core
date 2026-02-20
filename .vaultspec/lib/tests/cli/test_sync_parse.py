@@ -119,16 +119,16 @@ class TestInitPaths:
     def test_sets_globals(self):
         cli.init_paths(TEST_PROJECT)
         assert TEST_PROJECT == cli.ROOT_DIR
-        assert TEST_PROJECT / ".vaultspec" / "rules" == cli.RULES_SRC_DIR
-        assert TEST_PROJECT / ".vaultspec" / "agents" == cli.AGENTS_SRC_DIR
-        assert TEST_PROJECT / ".vaultspec" / "skills" == cli.SKILLS_SRC_DIR
-        assert TEST_PROJECT / ".vaultspec" / "system" == cli.SYSTEM_SRC_DIR
+        assert TEST_PROJECT / ".vaultspec" / "rules" / "rules" == cli.RULES_SRC_DIR
+        assert TEST_PROJECT / ".vaultspec" / "rules" / "agents" == cli.AGENTS_SRC_DIR
+        assert TEST_PROJECT / ".vaultspec" / "rules" / "skills" == cli.SKILLS_SRC_DIR
+        assert TEST_PROJECT / ".vaultspec" / "rules" / "system" == cli.SYSTEM_SRC_DIR
         assert (
-            TEST_PROJECT / ".vaultspec" / "system" / "framework.md"
+            TEST_PROJECT / ".vaultspec" / "rules" / "system" / "framework.md"
             == cli.FRAMEWORK_CONFIG_SRC
         )
         assert (
-            TEST_PROJECT / ".vaultspec" / "system" / "project.md"
+            TEST_PROJECT / ".vaultspec" / "rules" / "system" / "project.md"
             == cli.PROJECT_CONFIG_SRC
         )
 

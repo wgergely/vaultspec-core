@@ -23,7 +23,7 @@ The feature adds exactly four new files and modifies two existing files, per the
 New files:
 - `.vaultspec/lib/src/orchestration/team.py` — `TeamCoordinator`, `TeamSession`, `TeamMember`, `TeamStatus`, `MemberStatus`
 - `.vaultspec/lib/src/orchestration/tests/test_team.py` — unit tests for the orchestration layer
-- `.vaultspec/lib/scripts/team.py` — standalone CLI entry point following `subagent.py`/`docs.py` conventions exactly
+- `.vaultspec/lib/scripts/team.py` — standalone CLI entry point following `subagent.py`/`vault.py` conventions exactly
 - `.vaultspec/lib/tests/cli/test_team_cli.py` — functional CLI tests
 
 Modified files:

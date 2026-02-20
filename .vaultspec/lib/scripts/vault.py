@@ -22,8 +22,8 @@ def _get_version() -> str:
 from graph.api import VaultGraph  # noqa: E402
 from logging_config import configure_logging  # noqa: E402
 from metrics.api import get_vault_metrics  # noqa: E402
-from vault.hydration import get_template_path, hydrate_template  # noqa: E402
-from vault.models import DocType  # noqa: E402
+from vaultcore.hydration import get_template_path, hydrate_template  # noqa: E402
+from vaultcore.models import DocType  # noqa: E402
 from verification.api import (  # noqa: E402
     fix_violations,
     get_malformed,
@@ -33,7 +33,7 @@ from verification.api import (  # noqa: E402
 
 
 def _make_parser() -> argparse.ArgumentParser:
-    """Build the docs.py argument parser."""
+    """Build the vault.py argument parser."""
     parser = argparse.ArgumentParser(description="Audit and manage the .vault vault.")
     parser.add_argument(
         "--verbose",
@@ -195,7 +195,7 @@ def _resolve_root(args) -> "pathlib.Path":
     """Resolve output root from args, using workspace resolution if needed.
 
     When only ``--root`` is provided, it is used directly (backwards
-    compat — docs.py treats ``--root`` as the project root for vault
+    compat — vault.py treats ``--root`` as the project root for vault
     operations, NOT as a full workspace override).  ``resolve_workspace``
     is only invoked when ``--content-dir`` is explicitly set.
     """

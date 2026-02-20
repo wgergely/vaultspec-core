@@ -76,7 +76,7 @@ def project_root(tmp_path):
             )
 
     # Create agent definition
-    agents_dir = tmp_path / ".vaultspec" / "agents"
+    agents_dir = tmp_path / ".vaultspec" / "rules" / "agents"
     agents_dir.mkdir(parents=True)
     (agents_dir / "jean-claude.md").write_text(JEAN_CLAUDE_PERSONA, encoding="utf-8")
 
@@ -197,10 +197,10 @@ async def _collect_until_response(
     Returns (response, notifications).
     """
     notifications = []
-    deadline = asyncio.get_event_loop().time() + timeout
+    deadline = asyncio.get_running_loop().time() + timeout
 
-    while asyncio.get_event_loop().time() < deadline:
-        remaining = deadline - asyncio.get_event_loop().time()
+    while asyncio.get_running_loop().time() < deadline:
+        remaining = deadline - asyncio.get_running_loop().time()
         msg = await _read_jsonrpc(reader, timeout=remaining)
         if msg is None:
             break
@@ -320,14 +320,18 @@ class TestJeanClaudePersona:
 
     def test_persona_file_created(self, project_root):
         """The jean-claude agent definition exists in the test project."""
-        persona_path = project_root / ".vaultspec" / "agents" / "jean-claude.md"
+        persona_path = (
+            project_root / ".vaultspec" / "rules" / "agents" / "jean-claude.md"
+        )
         assert persona_path.exists()
 
     def test_persona_has_frontmatter(self, project_root):
         """The persona file has valid frontmatter with tier and mode."""
-        from vault.parser import parse_frontmatter
+        from vaultcore.parser import parse_frontmatter
 
-        persona_path = project_root / ".vaultspec" / "agents" / "jean-claude.md"
+        persona_path = (
+            project_root / ".vaultspec" / "rules" / "agents" / "jean-claude.md"
+        )
         meta, body = parse_frontmatter(persona_path.read_text(encoding="utf-8"))
 
         assert meta.get("tier") == "MEDIUM"
@@ -336,9 +340,11 @@ class TestJeanClaudePersona:
 
     def test_persona_uses_read_only_mode(self, project_root):
         """The persona enforces read-only mode for sandbox safety."""
-        from vault.parser import parse_frontmatter
+        from vaultcore.parser import parse_frontmatter
 
-        persona_path = project_root / ".vaultspec" / "agents" / "jean-claude.md"
+        persona_path = (
+            project_root / ".vaultspec" / "rules" / "agents" / "jean-claude.md"
+        )
         meta, _ = parse_frontmatter(persona_path.read_text(encoding="utf-8"))
         assert meta["mode"] == "read-only"
 

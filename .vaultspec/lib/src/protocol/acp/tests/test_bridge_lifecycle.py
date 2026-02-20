@@ -449,7 +449,7 @@ class TestBridgeLifecycleUnit:
         from protocol.providers.claude import ClaudeProvider
 
         # Create minimal agent file
-        agents_dir = tmp_path / ".vaultspec" / "agents"
+        agents_dir = tmp_path / ".vaultspec" / "rules" / "agents"
         agents_dir.mkdir(parents=True)
         (agents_dir / "test-agent.md").write_text(
             "---\ntier: MEDIUM\nmode: read-write\n---\nYou are a test agent.",

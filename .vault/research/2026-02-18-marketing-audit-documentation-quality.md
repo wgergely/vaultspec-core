@@ -169,7 +169,7 @@ The search guide is technically excellent. The three-stage hybrid retrieval pipe
 
 This is the only place in any doc where the consequence of not having a GPU is spelled out. But there is no:
 
-- Alternative for non-GPU users ("use `docs.py audit` for metadata-only search")
+- Alternative for non-GPU users ("use `vault.py audit` for metadata-only search")
 - Roadmap mention ("CPU support is planned for v0.2")
 - Workaround ("run on a cloud GPU instance with...")
 
@@ -255,7 +255,7 @@ The Mermaid diagrams in `.vaultspec/README.md` and `docs/concepts.md` are effect
 
 - The `.vaultspec/README.md` does not link to `docs/` files — it exists in isolation.
 - `docs/concepts.md` references the agent dispatch flow but does not link to the CLI reference section on `subagent.py run`.
-- The CLI reference does not link to the search guide for `docs.py search` commands.
+- The CLI reference does not link to the search guide for `vault.py search` commands.
 - There is no navigation index or table of contents for the `docs/` directory as a whole.
 - The skills and agents in `.vaultspec/` are mentioned in documentation but there are no links from the docs into those files (understandable for skills, but agent definitions serve as documentation).
 

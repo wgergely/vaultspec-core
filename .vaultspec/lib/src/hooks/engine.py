@@ -11,11 +11,11 @@ Hooks are YAML files in ``.vaultspec/hooks/`` with the structure::
         task: "Review new document at {path}"
 
 Supported events:
-    vault.document.created   — after docs.py create
+    vault.document.created   — after vault.py create
     vault.document.modified  — after vault doc edits
-    vault.index.updated      — after docs.py index
+    vault.index.updated      — after vault.py index
     config.synced            — after cli.py sync-all
-    audit.completed          — after docs.py audit
+    audit.completed          — after vault.py audit
 """
 
 from __future__ import annotations

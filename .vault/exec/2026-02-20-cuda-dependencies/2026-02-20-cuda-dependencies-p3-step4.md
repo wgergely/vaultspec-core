@@ -37,7 +37,7 @@ Expanded the `> **Note:**` block to serve as the authoritative first-contact exp
 > **Note:** The `[rag]` optional dependency group powers the semantic search index
 > (torch >= 2.9.0, CUDA 13.0+, compute capability >= 7.5). Core governance features
 > (Research → Specify → Plan → Execute → Verify) work without a GPU — omit `[rag]`
-> and skip the `docs.py index` step. Always use `--extra-index-url` (not `--index-url`)
+> and skip the `vault.py index` step. Always use `--extra-index-url` (not `--index-url`)
 > when installing `[rag]` dependencies: without it, pip installs CPU-only PyTorch from
 > PyPI, which fails at runtime with `GPUNotAvailableError`.
 ```

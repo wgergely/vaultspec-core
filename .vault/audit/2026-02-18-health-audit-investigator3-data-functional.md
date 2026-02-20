@@ -136,7 +136,7 @@ Multi-pass lifecycle test across 5 sync passes with mutations (agent tier change
 
 Three concerns:
 
-**1. Lone `unittest.mock` usage**: `TestLoggingDispatch` uses `from unittest.mock import patch` to patch `docs.py` internals. This is the only occurrence of `unittest.mock` in the entire functional test scope. Not a defect, but inconsistent with the rest of the test suite which relies on `monkeypatch`.
+**1. Lone `unittest.mock` usage**: `TestLoggingDispatch` uses `from unittest.mock import patch` to patch `vault.py` internals. This is the only occurrence of `unittest.mock` in the entire functional test scope. Not a defect, but inconsistent with the rest of the test suite which relies on `monkeypatch`.
 
 **2. Fragile argument parser reconstruction**: `TestArgumentParsing` rebuilds the argument parser in-test by importing the parser-creation function and constructing it independently, rather than invoking the CLI. Changes to the production parser will not automatically break these tests if the test's manual construction diverges from the real code path.
 
@@ -294,7 +294,7 @@ All follow the same pattern: `_reset_cfg` autouse fixture + `vault_root` returni
 - Deduplicate `_fast_index` / `_build_rag_components`: define once in `tests/conftest.py` and import in `rag/tests/conftest.py`.
 - Reclassify `graph/tests/test_graph.py` tests as `pytest.mark.api` (or `integration`).
 
-- Replace `test_create_generates_correct_filename` with a real subprocess invocation of `docs.py create`.
+- Replace `test_create_generates_correct_filename` with a real subprocess invocation of `vault.py create`.
 - Fix `TestArgumentParsing` to invoke the real CLI rather than rebuilding the parser.
 
 **Cleanup (Low severity):**

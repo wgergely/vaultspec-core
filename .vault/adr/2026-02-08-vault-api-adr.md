@@ -40,7 +40,7 @@ The system is implemented as a modular suite under `.vaultspec/lib/src/`:
 - **`verification/`**: Rule enforcement logic (`get_malformed`, `verify_file`).
 - **`graph/`**: Static connectivity analysis using a directed graph model.
 - **`metrics/`**: Summary statistics.
-- **`docs.py`**: A unified CLI entry point supporting `audit` and `create` subcommands.
+- **`vault.py`**: A unified CLI entry point supporting `audit` and `create` subcommands.
 
 ## Rationale
 

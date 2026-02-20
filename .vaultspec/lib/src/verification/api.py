@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from vault.models import DocType, DocumentMetadata, VaultConstants
-from vault.parser import parse_vault_metadata
-from vault.scanner import get_doc_type, scan_vault
+from vaultcore.models import DocType, DocumentMetadata, VaultConstants
+from vaultcore.parser import parse_vault_metadata
+from vaultcore.scanner import get_doc_type, scan_vault
 
 if TYPE_CHECKING:
     import pathlib

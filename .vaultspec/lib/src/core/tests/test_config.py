@@ -391,7 +391,7 @@ class TestRegistry:
     """CONFIG_REGISTRY integrity checks."""
 
     def test_registry_count(self):
-        assert len(CONFIG_REGISTRY) == 34
+        assert len(CONFIG_REGISTRY) == 38
 
     def test_all_attr_names_unique(self):
         names = [v.attr_name for v in CONFIG_REGISTRY]

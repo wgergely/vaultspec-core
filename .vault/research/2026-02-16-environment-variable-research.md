@@ -60,7 +60,7 @@ LIB_SRC_DIR: Path = ROOT_DIR / ".vaultspec" / "lib" / "src"
 
 ```
 
-All 3 CLI entry points (cli.py, subagent.py, docs.py) accept `--root` parameter with `ROOT_DIR` fallback from `_paths.py`.
+All 3 CLI entry points (cli.py, subagent.py, vault.py) accept `--root` parameter with `ROOT_DIR` fallback from `_paths.py`.
 
 #### Pattern C: No Centralized Configuration Objects
 

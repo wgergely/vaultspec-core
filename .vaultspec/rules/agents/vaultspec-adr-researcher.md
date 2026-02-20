@@ -74,7 +74,7 @@ these key areas:
 
 ## Research Report Format
 
-- You MUST read and use the template at `.vaultspec/templates/research.md`.
+- You MUST read and use the template at `.vaultspec/rules/templates/research.md`.
 
 ### Frontmatter & Tagging Mandate
 

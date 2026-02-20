@@ -36,7 +36,7 @@ Utilize:
   Record>`
   (`.vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-<step>.md`).
   - **Template**: You MUST read and use the template at
-    `.vaultspec/templates/exec-step.md`.
+    `.vaultspec/rules/templates/exec-step.md`.
   - **Linking**: Use `[[wiki-links]]`.
   - Modified files listed.
   - Concise summary of key changes.

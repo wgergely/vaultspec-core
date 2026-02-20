@@ -42,7 +42,7 @@ Phase 3 documentation changes committed in `58e0f1a`. Files reviewed:
 
 ### 4. `--extra-index-url` footgun warning in getting-started.md
 
-- `docs/getting-started.md` line 35: PASS — "**Important:** Always use `--extra-index-url` (not `--index-url`) when installing the `[rag]` extras. Without this flag, pip resolves PyTorch from the default PyPI index and installs the CPU-only build. A CPU-only PyTorch installation will appear to succeed but fail at runtime with `GPUNotAvailableError` when you run `docs.py index` or `docs.py search`."
+- `docs/getting-started.md` line 35: PASS — "**Important:** Always use `--extra-index-url` (not `--index-url`) when installing the `[rag]` extras. Without this flag, pip resolves PyTorch from the default PyPI index and installs the CPU-only build. A CPU-only PyTorch installation will appear to succeed but fail at runtime with `GPUNotAvailableError` when you run `vault.py index` or `vault.py search`."
 
 ### 5. README couples CUDA/GPU to `[rag]` group
 

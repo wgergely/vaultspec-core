@@ -25,7 +25,7 @@ from tests.constants import (
 def _fast_index(indexer, model, store, root, stems):
     """Index only the given subset of document stems."""
     from rag.indexer import IndexResult, prepare_document
-    from vault.scanner import scan_vault
+    from vaultcore.scanner import scan_vault
 
     start = time.time()
 

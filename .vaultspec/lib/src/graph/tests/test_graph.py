@@ -1,6 +1,6 @@
 import pytest
 from graph.api import DocNode, VaultGraph
-from vault.models import DocType
+from vaultcore.models import DocType
 
 pytestmark = [pytest.mark.api]
 

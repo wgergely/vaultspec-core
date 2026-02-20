@@ -22,7 +22,7 @@ Audited all four target files for bare `--index-url` (without the `extra-` prefi
 
 Added a prominent warning callout in `docs/getting-started.md` (line 35) immediately after the install command block:
 
-> **Important:** Always use `--extra-index-url` (not `--index-url`) when installing the `[rag]` extras. Without this flag, pip resolves PyTorch from the default PyPI index and installs the CPU-only build. A CPU-only PyTorch installation will appear to succeed but fail at runtime with `GPUNotAvailableError` when you run `docs.py index` or `docs.py search`.
+> **Important:** Always use `--extra-index-url` (not `--index-url`) when installing the `[rag]` extras. Without this flag, pip resolves PyTorch from the default PyPI index and installs the CPU-only build. A CPU-only PyTorch installation will appear to succeed but fail at runtime with `GPUNotAvailableError` when you run `vault.py index` or `vault.py search`.
 
 The rationale: using `--index-url` (without `extra-`) for torch 2.10+ fails because `cuda-bindings==13.0.3` is not mirrored to the PyTorch cu130 index (see pytorch/pytorch#172926). `--extra-index-url` preserves the PyPI index fallback for all other packages while directing torch resolution to the CUDA wheel index.
 
