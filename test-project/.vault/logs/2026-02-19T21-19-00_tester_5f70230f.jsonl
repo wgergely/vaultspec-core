@@ -1,0 +1,11 @@
+{"timestamp": "2026-02-19T21:19:00.882979+00:00", "type": "session_start", "data": {"agent_name": "tester", "task_id": "5f70230f-37e1-43d4-b23f-ec66dc1418d2", "start_time": "2026-02-19T21:19:00.882798+00:00", "root_dir": "Y:\\code\\task-worktrees\\main\\test-project"}}
+{"timestamp": "2026-02-19T21:19:00.890975+00:00", "type": "handshake_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T21:19:15.986423+00:00", "type": "handshake_complete", "data": {"agent": "tester", "elapsed": 15.095094299991615}}
+{"timestamp": "2026-02-19T21:19:15.986731+00:00", "type": "session_create_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T21:19:16.359976+00:00", "type": "session_created", "data": {"agent": "tester", "session_id": "1a66d0fb-d951-45ff-82bf-a54e83420908", "elapsed": 0.37304340000264347}}
+{"timestamp": "2026-02-19T21:19:16.360429+00:00", "type": "prompt_sent", "data": {"agent": "tester", "turn": 1, "prompt_length": 52}}
+{"timestamp": "2026-02-19T21:19:17.445700+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "**Recalling My Identity**\n\nI am Jean-Claude. It appears the user seeks my name, and I must introduce myself concisely.\n\n\n", "type": "text"}, "session_update": "agent_thought_chunk"}}
+{"timestamp": "2026-02-19T21:19:17.461607+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "Bonjour, I am Jean-Claude.", "type": "text"}, "session_update": "agent_message_chunk"}}
+{"timestamp": "2026-02-19T21:19:17.468120+00:00", "type": "prompt_completed", "data": {"agent": "tester", "turn": 1, "elapsed": 1.1075123000191525}}
+{"timestamp": "2026-02-19T21:19:17.468460+00:00", "type": "session_cancelled", "data": {"agent": "tester", "elapsed": 0.00012710003647953272}}
+{"timestamp": "2026-02-19T21:19:17.468765+00:00", "type": "run_complete", "data": {"agent": "tester", "total_elapsed": 21.517027100082487, "handshake_elapsed": 15.095094299991615, "session_elapsed": 0.37304340000264347, "cancel_elapsed": 0.00012710003647953272}}

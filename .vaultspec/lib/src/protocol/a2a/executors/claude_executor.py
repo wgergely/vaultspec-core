@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import shutil
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -24,6 +25,7 @@ from claude_agent_sdk import (
     ResultMessage,
     TextBlock,
 )
+from claude_agent_sdk._errors import MessageParseError
 
 from protocol.a2a.executors.base import _make_sandbox_callback
 
@@ -86,6 +88,7 @@ class ClaudeA2AExecutor(AgentExecutor):
         self._options_factory = options_factory or _default_options_factory
         self._active_clients: dict[str, Any] = {}
         self._clients_lock = asyncio.Lock()
+        self._cli_path: str | None = shutil.which("claude")
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         task_id = context.task_id or ""
@@ -96,14 +99,17 @@ class ClaudeA2AExecutor(AgentExecutor):
         await updater.start_work()
 
         sandbox_cb = _make_sandbox_callback(self._mode, self._root_dir)
-        options = self._options_factory(
-            model=self._model,
-            cwd=self._root_dir,
-            mcp_servers=self._mcp_servers,
-            can_use_tool=sandbox_cb,
-            permission_mode="bypassPermissions",
-            system_prompt=self._system_prompt,
-        )
+        kwargs: dict[str, Any] = {
+            "model": self._model,
+            "cwd": self._root_dir,
+            "mcp_servers": self._mcp_servers,
+            "can_use_tool": sandbox_cb,
+            "permission_mode": "bypassPermissions",
+            "system_prompt": self._system_prompt,
+        }
+        if self._cli_path:
+            kwargs["cli_path"] = self._cli_path
+        options = self._options_factory(**kwargs)
         sdk_client = self._client_factory(options)
         async with self._clients_lock:
             self._active_clients[task_id] = sdk_client
@@ -116,7 +122,22 @@ class ClaudeA2AExecutor(AgentExecutor):
             await sdk_client.query(prompt)
             collected: list[str] = []
 
-            async for msg in sdk_client.receive_messages():
+            _stream = sdk_client.receive_messages().__aiter__()
+            _finalised = False
+            while True:
+                try:
+                    msg = await _stream.__anext__()
+                except StopAsyncIteration:
+                    break
+                except MessageParseError as exc:
+                    exc_str = str(exc)
+                    if "rate_limit_event" in exc_str:
+                        raise RuntimeError(
+                            "Claude CLI rate limited — retry after the rate-limit "
+                            "window expires."
+                        ) from exc
+                    logger.debug("Skipping unparseable SDK message: %s", exc)
+                    continue
                 if isinstance(msg, AssistantMessage):
                     for block in msg.content:
                         if isinstance(block, TextBlock):
@@ -140,7 +161,22 @@ class ClaudeA2AExecutor(AgentExecutor):
                                 parts=[Part(root=TextPart(text=text))]
                             )
                         )
+                    _finalised = True
                     break
+            if not _finalised:
+                # Stream ended without a ResultMessage (unexpected EOF).
+                text = "".join(collected)
+                await updater.failed(
+                    message=updater.new_agent_message(
+                        parts=[
+                            Part(
+                                root=TextPart(
+                                    text=text or "Stream ended without result"
+                                )
+                            )
+                        ]
+                    )
+                )
         except Exception as e:
             logger.exception("ClaudeA2AExecutor error for task %s", task_id)
             await updater.failed(

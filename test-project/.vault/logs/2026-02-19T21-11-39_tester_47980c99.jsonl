@@ -1,0 +1,12 @@
+{"timestamp": "2026-02-19T21:11:39.824795+00:00", "type": "session_start", "data": {"agent_name": "tester", "task_id": "47980c99-ae5e-4c2b-a818-30caf2075a79", "start_time": "2026-02-19T21:11:39.824633+00:00", "root_dir": "Y:\\code\\task-worktrees\\main\\test-project"}}
+{"timestamp": "2026-02-19T21:11:39.828777+00:00", "type": "handshake_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T21:11:55.911439+00:00", "type": "handshake_complete", "data": {"agent": "tester", "elapsed": 16.082288799923845}}
+{"timestamp": "2026-02-19T21:11:55.911849+00:00", "type": "session_create_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T21:11:56.337935+00:00", "type": "session_created", "data": {"agent": "tester", "session_id": "abdc4b9b-9e6d-47b0-922d-62e1f7b6a665", "elapsed": 0.42586479999590665}}
+{"timestamp": "2026-02-19T21:11:56.338514+00:00", "type": "prompt_sent", "data": {"agent": "tester", "turn": 1, "prompt_length": 52}}
+{"timestamp": "2026-02-19T21:11:57.711946+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "**Defining My Identity**\n\nI've clarified the core request \u2013 the user wants my name. I've focused on the parameters: delivering only my name and adhering to my persona. My next step is a simple response: Jean-Claude.\n\n\n", "type": "text"}, "session_update": "agent_thought_chunk"}}
+{"timestamp": "2026-02-19T21:11:57.731968+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "Bonjour", "type": "text"}, "session_update": "agent_message_chunk"}}
+{"timestamp": "2026-02-19T21:11:57.754799+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": ", I am Jean-Claude.", "type": "text"}, "session_update": "agent_message_chunk"}}
+{"timestamp": "2026-02-19T21:11:57.766252+00:00", "type": "prompt_completed", "data": {"agent": "tester", "turn": 1, "elapsed": 1.427480399957858}}
+{"timestamp": "2026-02-19T21:11:57.766813+00:00", "type": "session_cancelled", "data": {"agent": "tester", "elapsed": 0.0002106999745592475}}
+{"timestamp": "2026-02-19T21:11:57.767251+00:00", "type": "run_complete", "data": {"agent": "tester", "total_elapsed": 23.484914999920875, "handshake_elapsed": 16.082288799923845, "session_elapsed": 0.42586479999590665, "cancel_elapsed": 0.0002106999745592475}}

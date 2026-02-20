@@ -34,26 +34,6 @@ TEST_PROJECT: pathlib.Path = PROJECT_ROOT / "test-project"
 TEST_VAULT: pathlib.Path = TEST_PROJECT / ".vault"
 
 # ---------------------------------------------------------------------------
-# GPU / RAG detection
-# ---------------------------------------------------------------------------
-
-try:
-    import torch
-
-    HAS_CUDA: bool = torch.cuda.is_available()
-except ImportError:
-    HAS_CUDA = False
-
-try:
-    import lancedb as _lancedb  # noqa: F401
-    import sentence_transformers as _st  # noqa: F401
-    import torch as _torch  # noqa: F401
-
-    HAS_RAG: bool = True
-except ImportError:
-    HAS_RAG = False
-
-# ---------------------------------------------------------------------------
 # GPU fast corpus (13 representative docs covering all 5 doc_types)
 # ---------------------------------------------------------------------------
 

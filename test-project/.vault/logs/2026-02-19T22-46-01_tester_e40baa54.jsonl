@@ -1,0 +1,11 @@
+{"timestamp": "2026-02-19T22:46:01.657339+00:00", "type": "session_start", "data": {"agent_name": "tester", "task_id": "e40baa54-e458-4128-a878-ceead904e332", "start_time": "2026-02-19T22:46:01.657173+00:00", "root_dir": "Y:\\code\\task-worktrees\\main\\test-project"}}
+{"timestamp": "2026-02-19T22:46:01.661887+00:00", "type": "handshake_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T22:46:18.055103+00:00", "type": "handshake_complete", "data": {"agent": "tester", "elapsed": 16.392763399984688}}
+{"timestamp": "2026-02-19T22:46:18.055392+00:00", "type": "session_create_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T22:46:18.429999+00:00", "type": "session_created", "data": {"agent": "tester", "session_id": "e4060c94-3b29-47ce-9096-855f045a5890", "elapsed": 0.37432790000457317}}
+{"timestamp": "2026-02-19T22:46:18.430447+00:00", "type": "prompt_sent", "data": {"agent": "tester", "turn": 1, "prompt_length": 52}}
+{"timestamp": "2026-02-19T22:46:19.454896+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "**Stating the Name**\n\nI'm focusing now on answering the user's question about my name. I've processed the prompt and confirmed the need to state it. Next, I'll identify and formulate the appropriate response.\n\n\n", "type": "text"}, "session_update": "agent_thought_chunk"}}
+{"timestamp": "2026-02-19T22:46:19.464417+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "Jean-Claude", "type": "text"}, "session_update": "agent_message_chunk"}}
+{"timestamp": "2026-02-19T22:46:19.473726+00:00", "type": "prompt_completed", "data": {"agent": "tester", "turn": 1, "elapsed": 1.0430920000653714}}
+{"timestamp": "2026-02-19T22:46:19.474199+00:00", "type": "session_cancelled", "data": {"agent": "tester", "elapsed": 0.00015330000314861536}}
+{"timestamp": "2026-02-19T22:46:19.474537+00:00", "type": "run_complete", "data": {"agent": "tester", "total_elapsed": 23.00190479995217, "handshake_elapsed": 16.392763399984688, "session_elapsed": 0.37432790000457317, "cancel_elapsed": 0.00015330000314861536}}

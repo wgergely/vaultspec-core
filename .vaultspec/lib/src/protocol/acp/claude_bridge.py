@@ -21,6 +21,7 @@ import asyncio
 import dataclasses
 import datetime
 import logging
+import shutil
 import uuid
 from typing import TYPE_CHECKING, Any
 
@@ -247,6 +248,9 @@ class ClaudeACPBridge:
             include_dirs if include_dirs is not None else cfg.include_dirs
         )
 
+        # Path to the authenticated Claude CLI — overrides the SDK's bundled v2.1.42
+        self._cli_path: str | None = shutil.which("claude")
+
         # All sessions tracked by this bridge instance
         self._sessions: dict[str, _SessionState] = {}
 
@@ -347,6 +351,8 @@ class ClaudeACPBridge:
             kwargs["fallback_model"] = self._fallback_model
         if self._include_dirs:
             kwargs["add_dirs"] = self._include_dirs
+        if self._cli_path:
+            kwargs["cli_path"] = self._cli_path
 
         return self._options_factory(**kwargs)
 

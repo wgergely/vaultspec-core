@@ -1,0 +1,11 @@
+{"timestamp": "2026-02-19T21:03:52.317443+00:00", "type": "session_start", "data": {"agent_name": "tester", "task_id": "688a7d0a-fa11-48ef-b5b1-231929973b77", "start_time": "2026-02-19T21:03:52.317257+00:00", "root_dir": "Y:\\code\\task-worktrees\\main\\test-project"}}
+{"timestamp": "2026-02-19T21:03:52.320894+00:00", "type": "handshake_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T21:04:07.431473+00:00", "type": "handshake_complete", "data": {"agent": "tester", "elapsed": 15.110074099968188}}
+{"timestamp": "2026-02-19T21:04:07.431826+00:00", "type": "session_create_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T21:04:07.784233+00:00", "type": "session_created", "data": {"agent": "tester", "session_id": "b84daf4e-e4f5-4d64-8425-cf239e49b8ce", "elapsed": 0.3522063000127673}}
+{"timestamp": "2026-02-19T21:04:07.839995+00:00", "type": "prompt_sent", "data": {"agent": "tester", "turn": 1, "prompt_length": 52}}
+{"timestamp": "2026-02-19T21:04:09.091767+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "**Defining My Identity**\n\nI've got it. The user wants my name, and my programming tells me it's Jean-Claude. Simple enough \u2013 a direct response, no complexities. Ready to deliver the answer now.\n\n\n", "type": "text"}, "session_update": "agent_thought_chunk"}}
+{"timestamp": "2026-02-19T21:04:09.105940+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "Jean-Claude", "type": "text"}, "session_update": "agent_message_chunk"}}
+{"timestamp": "2026-02-19T21:04:09.117523+00:00", "type": "prompt_completed", "data": {"agent": "tester", "turn": 1, "elapsed": 1.2773465000791475}}
+{"timestamp": "2026-02-19T21:04:09.117914+00:00", "type": "session_cancelled", "data": {"agent": "tester", "elapsed": 0.0001382000045850873}}
+{"timestamp": "2026-02-19T21:04:09.118233+00:00", "type": "run_complete", "data": {"agent": "tester", "total_elapsed": 21.614299300010316, "handshake_elapsed": 15.110074099968188, "session_elapsed": 0.3522063000127673, "cancel_elapsed": 0.0001382000045850873}}

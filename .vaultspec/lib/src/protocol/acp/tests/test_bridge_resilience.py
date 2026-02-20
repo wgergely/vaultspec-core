@@ -221,7 +221,7 @@ class TestGranularErrorHandling:
     async def test_untracked_tool_id_logs_warning(
         self,
         connected_bridge,
-        test_conn,  # noqa: ARG002
+        test_conn,
         caplog,
     ):
         """UserMessage with tool_use_id not in _pending_tools triggers warning."""
@@ -255,7 +255,7 @@ class TestGranularErrorHandling:
     async def test_tracked_tool_id_no_warning(
         self,
         connected_bridge,
-        test_conn,  # noqa: ARG002
+        test_conn,
         caplog,
     ):
         """UserMessage with a tracked tool_use_id does NOT trigger warning."""
@@ -274,7 +274,7 @@ class TestGranularErrorHandling:
     async def test_unknown_block_type_logs_warning(
         self,
         connected_bridge,
-        test_conn,  # noqa: ARG002
+        test_conn,
         caplog,
     ):
         """Unsupported content block type in AssistantMessage triggers warning."""
@@ -334,7 +334,7 @@ class TestGranularErrorHandling:
     async def test_unknown_block_type_no_debug_no_detail(
         self,
         connected_bridge,
-        test_conn,  # noqa: ARG002
+        test_conn,
         caplog,
     ):
         """In non-debug mode, unknown block type logs warning but not debug detail."""
@@ -358,7 +358,7 @@ class TestGranularErrorHandling:
     async def test_warning_includes_block_type_name(
         self,
         connected_bridge,
-        test_conn,  # noqa: ARG002
+        test_conn,
         caplog,
     ):
         """Warning log for unsupported block includes the block's class name."""

@@ -291,7 +291,7 @@ class TestEmitAssistant:
     async def test_tool_use_block_caches_pending_tool(
         self,
         connected_bridge,
-        test_conn,  # noqa: ARG002
+        test_conn,
     ):
         """A ToolUseBlock caches tool_call_id -> tool_name in _pending_tools."""
         tool_block = ToolUseBlock(id="toolu_cache_test", name="Write", input={})
@@ -874,7 +874,7 @@ class TestContentBlockStartTracking:
     async def test_multiple_tool_blocks_tracked(
         self,
         connected_bridge,
-        test_conn,  # noqa: ARG002
+        test_conn,
     ):
         """Multiple tool_use content blocks track their respective indices."""
         from claude_agent_sdk.types import StreamEvent
@@ -902,7 +902,7 @@ class TestContentBlockStartTracking:
     async def test_missing_index_not_tracked(
         self,
         connected_bridge,
-        test_conn,  # noqa: ARG002
+        test_conn,
     ):
         """content_block_start without index does not track."""
         from claude_agent_sdk.types import StreamEvent
@@ -927,7 +927,7 @@ class TestContentBlockStartTracking:
     async def test_missing_tool_id_not_tracked(
         self,
         connected_bridge,
-        test_conn,  # noqa: ARG002
+        test_conn,
     ):
         """content_block_start with tool_use but empty id does not track."""
         from claude_agent_sdk.types import StreamEvent

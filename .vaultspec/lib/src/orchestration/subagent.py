@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import gc
 import logging
+import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -32,6 +33,28 @@ logger = logging.getLogger(__name__)
 
 _CLAUDE_PATTERNS = ("claude-",)
 _GEMINI_PATTERNS = ("gemini-",)
+
+
+def _kill_process_tree(pid: int) -> None:
+    """Kill a process and all its descendants.
+
+    On Windows, asyncio's proc.terminate() kills only the bridge process;
+    node.exe children spawned by claude-agent-sdk become orphaned and
+    persist indefinitely.  taskkill /F /T kills the entire tree recursively.
+
+    On Unix, orphaned children are reparented to PID 1 and eventually reaped
+    by init/systemd, so no intervention is needed.
+    """
+    if sys.platform != "win32":
+        return
+    import subprocess
+
+    with contextlib.suppress(Exception):
+        subprocess.run(
+            ["taskkill", "/F", "/T", "/PID", str(pid)],
+            capture_output=True,
+            timeout=5,
+        )
 
 
 class AgentNotFoundError(Exception):
@@ -332,6 +355,10 @@ async def run_subagent(
 
                 # Shutdown
                 await conn.cancel(session_id=session.session_id)
+
+                # Windows: kill the entire bridge process tree so node.exe
+                # children (spawned by claude-agent-sdk) don't become orphans.
+                _kill_process_tree(_proc.pid)
 
                 t.cancel()
                 with contextlib.suppress(asyncio.CancelledError):

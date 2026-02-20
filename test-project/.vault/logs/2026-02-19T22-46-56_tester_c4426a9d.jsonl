@@ -1,0 +1,11 @@
+{"timestamp": "2026-02-19T22:46:56.017294+00:00", "type": "session_start", "data": {"agent_name": "tester", "task_id": "c4426a9d-49f0-4f68-8515-5168d2901f64", "start_time": "2026-02-19T22:46:56.017123+00:00", "root_dir": "Y:\\code\\task-worktrees\\main\\test-project"}}
+{"timestamp": "2026-02-19T22:46:56.021779+00:00", "type": "handshake_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T22:47:12.144124+00:00", "type": "handshake_complete", "data": {"agent": "tester", "elapsed": 16.12196859996766}}
+{"timestamp": "2026-02-19T22:47:12.144440+00:00", "type": "session_create_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T22:47:12.524191+00:00", "type": "session_created", "data": {"agent": "tester", "session_id": "f9f3aca6-d30f-4666-8f09-0217e7aba272", "elapsed": 0.37956609996035695}}
+{"timestamp": "2026-02-19T22:47:12.524683+00:00", "type": "prompt_sent", "data": {"agent": "tester", "turn": 1, "prompt_length": 52}}
+{"timestamp": "2026-02-19T22:47:13.715869+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "**Responding to the Inquiry**\n\nI have received the user's request. My name is Jean-Claude. I'm satisfied with the simple, direct response. I believe it fulfills all the criteria.\n\n\n", "type": "text"}, "session_update": "agent_thought_chunk"}}
+{"timestamp": "2026-02-19T22:47:13.736953+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "Bonjour, I am Jean-Claude.", "type": "text"}, "session_update": "agent_message_chunk"}}
+{"timestamp": "2026-02-19T22:47:13.744786+00:00", "type": "prompt_completed", "data": {"agent": "tester", "turn": 1, "elapsed": 1.2199173000408337}}
+{"timestamp": "2026-02-19T22:47:13.745208+00:00", "type": "session_cancelled", "data": {"agent": "tester", "elapsed": 0.00014370004646480083}}
+{"timestamp": "2026-02-19T22:47:13.745563+00:00", "type": "run_complete", "data": {"agent": "tester", "total_elapsed": 22.85118980007246, "handshake_elapsed": 16.12196859996766, "session_elapsed": 0.37956609996035695, "cancel_elapsed": 0.00014370004646480083}}

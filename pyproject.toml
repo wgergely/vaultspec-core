@@ -81,6 +81,7 @@ markers = [
     "a2a: A2A protocol interoperability tests",
     "e2e: end-to-end tests requiring real LLM API keys",
     "benchmark: performance and throughput benchmarks (GPU required)",
+    "team: multi-agent team coordination tests (TeamCoordinator)",
 ]
 
 [tool.ruff]
@@ -103,6 +104,10 @@ select = [
     "N",    # pep8-naming
 ]
 unfixable = ["B"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**/*.py" = ["ARG"]
+"**/test_*.py" = ["ARG"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["orchestration", "protocol"]

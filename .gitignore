@@ -32,6 +32,9 @@ MANIFEST
 .vaultspec/lib/**/__pycache__/
 .vaultspec/lib/**/*.pyc
 
+# Auto-generated temp files
+.vaultspec/.tmp/
+
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.

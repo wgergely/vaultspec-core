@@ -1,0 +1,11 @@
+{"timestamp": "2026-02-19T22:32:22.653611+00:00", "type": "session_start", "data": {"agent_name": "vaultspec-researcher", "task_id": "7c040d53-306e-4575-8289-d194288aba72", "start_time": "2026-02-19T22:32:22.653449+00:00", "root_dir": "Y:\\code\\task-worktrees\\main"}}
+{"timestamp": "2026-02-19T22:32:22.658238+00:00", "type": "handshake_start", "data": {"agent": "vaultspec-researcher"}}
+{"timestamp": "2026-02-19T22:32:40.433798+00:00", "type": "handshake_complete", "data": {"agent": "vaultspec-researcher", "elapsed": 17.77510860003531}}
+{"timestamp": "2026-02-19T22:32:40.434144+00:00", "type": "session_create_start", "data": {"agent": "vaultspec-researcher"}}
+{"timestamp": "2026-02-19T22:32:40.991336+00:00", "type": "session_created", "data": {"agent": "vaultspec-researcher", "session_id": "649ca489-2756-415a-89c2-1563da4fc278", "elapsed": 0.5570012999232858}}
+{"timestamp": "2026-02-19T22:32:40.991642+00:00", "type": "prompt_sent", "data": {"agent": "vaultspec-researcher", "turn": 1, "prompt_length": 112}}
+{"timestamp": "2026-02-19T22:32:42.713064+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "**Processing the Input Request**\n\nI've successfully identified the exact string `CLAUDE_CONFIR MED` and understand I'm required to output a specific response. The output I'm generating will be `GEMINI_RECEIVED_CLAUDE`.\n\n\n", "type": "text"}, "session_update": "agent_thought_chunk"}}
+{"timestamp": "2026-02-19T22:32:42.738255+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "GEMINI_RECEIVED_CLAUDE", "type": "text"}, "session_update": "agent_message_chunk"}}
+{"timestamp": "2026-02-19T22:32:42.749493+00:00", "type": "prompt_completed", "data": {"agent": "vaultspec-researcher", "turn": 1, "elapsed": 1.7576462000142783}}
+{"timestamp": "2026-02-19T22:32:42.749935+00:00", "type": "session_cancelled", "data": {"agent": "vaultspec-researcher", "elapsed": 0.00015169999096542597}}
+{"timestamp": "2026-02-19T22:32:42.750267+00:00", "type": "run_complete", "data": {"agent": "vaultspec-researcher", "total_elapsed": 25.432739999960177, "handshake_elapsed": 17.77510860003531, "session_elapsed": 0.5570012999232858, "cancel_elapsed": 0.00015169999096542597}}

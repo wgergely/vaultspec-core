@@ -1,0 +1,11 @@
+{"timestamp": "2026-02-19T22:38:13.203526+00:00", "type": "session_start", "data": {"agent_name": "tester", "task_id": "5392a021-1def-4b2d-a704-88b22379a41e", "start_time": "2026-02-19T22:38:13.203333+00:00", "root_dir": "Y:\\code\\task-worktrees\\main\\test-project"}}
+{"timestamp": "2026-02-19T22:38:13.208477+00:00", "type": "handshake_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T22:38:29.197598+00:00", "type": "handshake_complete", "data": {"agent": "tester", "elapsed": 15.988730799988844}}
+{"timestamp": "2026-02-19T22:38:29.197951+00:00", "type": "session_create_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T22:38:29.605916+00:00", "type": "session_created", "data": {"agent": "tester", "session_id": "91d5ae2c-1d5c-41a2-965e-67110ab398ab", "elapsed": 0.4076122000114992}}
+{"timestamp": "2026-02-19T22:38:29.606379+00:00", "type": "prompt_sent", "data": {"agent": "tester", "turn": 1, "prompt_length": 52}}
+{"timestamp": "2026-02-19T22:38:31.142143+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "**Formulating the Response**\n\nI've got the user's request, and I'm crafting the reply. My name, Jean-Claude, must be relayed in a single, concise sentence, which is the current objective.\n\n\n", "type": "text"}, "session_update": "agent_thought_chunk"}}
+{"timestamp": "2026-02-19T22:38:31.150235+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "Bonjour! My name is Jean-Claude.", "type": "text"}, "session_update": "agent_message_chunk"}}
+{"timestamp": "2026-02-19T22:38:31.162519+00:00", "type": "prompt_completed", "data": {"agent": "tester", "turn": 1, "elapsed": 1.5559297000290826}}
+{"timestamp": "2026-02-19T22:38:31.162971+00:00", "type": "session_cancelled", "data": {"agent": "tester", "elapsed": 0.00016010005492717028}}
+{"timestamp": "2026-02-19T22:38:31.163317+00:00", "type": "run_complete", "data": {"agent": "tester", "total_elapsed": 23.02600449998863, "handshake_elapsed": 15.988730799988844, "session_elapsed": 0.4076122000114992, "cancel_elapsed": 0.00016010005492717028}}

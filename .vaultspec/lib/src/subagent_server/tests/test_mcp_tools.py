@@ -190,19 +190,25 @@ class TestDispatchAgent:
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_successful_dispatch(self, baker_cache, fresh_task_engine):
-        """Successful dispatch returns taskId and 'working' status."""
+        """Successful dispatch returns taskId 'working', then completes with result."""
 
-        async def _noop(**_kw):
-            from protocol.acp.types import SubagentResult
+        from protocol.acp.types import SubagentResult
 
-            return SubagentResult(response_text="ok", written_files=[], session_id=None)
+        recorded_calls: list[dict] = []
+
+        async def _recording_subagent(**kw):
+            recorded_calls.append(kw)
+            return SubagentResult(
+                response_text="Baguette baked successfully",
+                written_files=[],
+                session_id="sess-001",
+            )
 
         srv._agent_cache = baker_cache
-
         srv.task_engine = fresh_task_engine
         srv._background_tasks = {}
         srv._active_clients = {}
-        srv._run_subagent_fn = _noop
+        srv._run_subagent_fn = _recording_subagent
         result = await dispatch_agent(
             agent="vaultspec-simple-executor",
             task="Bake a baguette",
@@ -212,6 +218,23 @@ class TestDispatchAgent:
         assert data["agent"] == "vaultspec-simple-executor"
         assert "taskId" in data
         assert data["mode"] == "read-write"
+
+        # Await the background task to verify full lifecycle
+        bg_task = srv._background_tasks.get(data["taskId"])
+        assert bg_task is not None
+        await bg_task
+
+        # Verify task completed in the engine with real result
+        task_status_json = await get_task_status(task_id=data["taskId"])
+        task_data = json.loads(task_status_json)
+        assert task_data["status"] == "completed"
+        assert task_data["result"]["summary"] == "Baguette baked successfully"
+        assert task_data["result"]["agent"] == "vaultspec-simple-executor"
+
+        # Verify the recording subagent received correct parameters
+        assert len(recorded_calls) == 1
+        assert recorded_calls[0]["agent_name"] == "vaultspec-simple-executor"
+        assert "Bake a baguette" in recorded_calls[0]["initial_task"]
 
     @pytest.mark.asyncio
     async def test_unknown_agent_raises_tool_error(self, baker_cache):
@@ -240,19 +263,24 @@ class TestDispatchAgent:
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_model_override_passthrough(self, baker_cache, fresh_task_engine):
-        """Model override is included in the dispatch response."""
+        """Model override is forwarded to the subagent and included in response."""
+        from protocol.acp.types import SubagentResult
 
-        async def _noop(**_kw):
-            from protocol.acp.types import SubagentResult
+        recorded_calls: list[dict] = []
 
-            return SubagentResult(response_text="ok", written_files=[], session_id=None)
+        async def _recording_subagent(**kw):
+            recorded_calls.append(kw)
+            return SubagentResult(
+                response_text="sourdough ready",
+                written_files=[],
+                session_id=None,
+            )
 
         srv._agent_cache = baker_cache
-
         srv.task_engine = fresh_task_engine
         srv._background_tasks = {}
         srv._active_clients = {}
-        srv._run_subagent_fn = _noop
+        srv._run_subagent_fn = _recording_subagent
         result = await dispatch_agent(
             agent="vaultspec-simple-executor",
             task="Bake sourdough",
@@ -261,22 +289,36 @@ class TestDispatchAgent:
         data = json.loads(result)
         assert data["model"] == ClaudeModels.HIGH
 
+        # Await the background task and verify model was forwarded
+        bg_task = srv._background_tasks.get(data["taskId"])
+        assert bg_task is not None
+        await bg_task
+
+        assert len(recorded_calls) == 1
+        assert recorded_calls[0]["model_override"] == ClaudeModels.HIGH
+
+        # Verify task reached completed state
+        task_data = json.loads(await get_task_status(task_id=data["taskId"]))
+        assert task_data["status"] == "completed"
+
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_task_engine_creates_task(self, baker_cache, fresh_task_engine):
-        """dispatch_agent creates a task in the engine."""
+        """dispatch_agent creates a task, transitions through working to completed."""
+        from protocol.acp.types import SubagentResult
 
-        async def _noop(**_kw):
-            from protocol.acp.types import SubagentResult
-
-            return SubagentResult(response_text="ok", written_files=[], session_id=None)
+        async def _recording_subagent(**_kw):
+            return SubagentResult(
+                response_text="Dough proofed",
+                written_files=[".vault/exec/proof.md"],
+                session_id="sess-proof",
+            )
 
         srv._agent_cache = baker_cache
-
         srv.task_engine = fresh_task_engine
         srv._background_tasks = {}
         srv._active_clients = {}
-        srv._run_subagent_fn = _noop
+        srv._run_subagent_fn = _recording_subagent
         result = await dispatch_agent(
             agent="vaultspec-simple-executor",
             task="Proof the dough",
@@ -288,28 +330,57 @@ class TestDispatchAgent:
         assert task_obj.agent == "vaultspec-simple-executor"
         assert task_obj.status == TaskStatus.WORKING
 
+        # Await the background task to verify full lifecycle
+        bg_task = srv._background_tasks.get(task_id)
+        assert bg_task is not None
+        await bg_task
+
+        # Verify task transitioned to completed with artifacts
+        task_obj = fresh_task_engine.get_task(task_id)
+        assert task_obj.status == TaskStatus.COMPLETED
+        assert task_obj.result is not None
+        assert ".vault/exec/proof.md" in task_obj.result["artifacts"]
+        assert task_obj.result["summary"] == "Dough proofed"
+
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_default_mode_from_agent_cache(self, baker_cache, fresh_task_engine):
-        """When no mode is passed, uses agent's default_mode from cache."""
+        """No mode passed: uses agent's default_mode from cache, forwarded."""
+        from protocol.acp.types import SubagentResult
 
-        async def _noop(**_kw):
-            from protocol.acp.types import SubagentResult
+        recorded_calls: list[dict] = []
 
-            return SubagentResult(response_text="ok", written_files=[], session_id=None)
+        async def _recording_subagent(**kw):
+            recorded_calls.append(kw)
+            return SubagentResult(
+                response_text="Supply chain analyzed",
+                written_files=[],
+                session_id=None,
+            )
 
         srv._agent_cache = baker_cache
-
         srv.task_engine = fresh_task_engine
         srv._background_tasks = {}
         srv._active_clients = {}
-        srv._run_subagent_fn = _noop
+        srv._run_subagent_fn = _recording_subagent
         result = await dispatch_agent(
             agent="research-analyst",
             task="Analyze the flour supply chain",
         )
         data = json.loads(result)
         assert data["mode"] == "read-only"
+
+        # Await the background task and verify mode was forwarded
+        bg_task = srv._background_tasks.get(data["taskId"])
+        assert bg_task is not None
+        await bg_task
+
+        assert len(recorded_calls) == 1
+        assert recorded_calls[0]["mode"] == "read-only"
+        # Verify task completed via the engine
+        task_data = json.loads(await get_task_status(task_id=data["taskId"]))
+        assert task_data["status"] == "completed"
+        assert task_data["result"]["summary"] == "Supply chain analyzed"
 
 
 class TestGetTaskStatus:
@@ -418,21 +489,49 @@ class TestCancelTask:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_cancel_invokes_graceful_cancel(self):
-        """Cancellation sends ACP graceful_cancel when client is active.
+    async def test_cancel_stops_running_background_task(
+        self, baker_cache, fresh_task_engine
+    ):
+        """Cancellation stops the background asyncio.Task from a running dispatch."""
+        import asyncio
 
-        Integration: requires real ACP client with graceful_cancel method.
-        """
-        pytest.skip("requires real ACP client connection")
+        from protocol.acp.types import SubagentResult
 
-    @pytest.mark.asyncio
-    @pytest.mark.integration
-    async def test_cancel_stops_background_task(self):
-        """Cancellation calls .cancel() on the background asyncio.Task.
+        # Slow subagent that blocks long enough for cancellation to hit
+        async def _slow_subagent(**_kw):
+            await asyncio.sleep(60)
+            return SubagentResult(
+                response_text="done", written_files=[], session_id=None
+            )
 
-        Integration: requires real asyncio.Task from a running dispatch.
-        """
-        pytest.skip("requires real background asyncio.Task from dispatch")
+        srv._agent_cache = baker_cache
+        srv.task_engine = fresh_task_engine
+        srv._background_tasks = {}
+        srv._active_clients = {}
+        srv._run_subagent_fn = _slow_subagent
+
+        result = await dispatch_agent(
+            agent="vaultspec-simple-executor",
+            task="Long task",
+        )
+        data = json.loads(result)
+        task_id = data["taskId"]
+
+        # Give background task a moment to start
+        await asyncio.sleep(0.05)
+
+        bg_task = srv._background_tasks.get(task_id)
+        assert bg_task is not None
+        assert not bg_task.done()
+
+        # Cancel via the MCP tool
+        cancel_result = await cancel_task(task_id=task_id)
+        cancel_data = json.loads(cancel_result)
+        assert cancel_data["status"] == "cancelled"
+
+        # Background task should be cancelled
+        await asyncio.sleep(0.05)
+        assert bg_task.done()
 
 
 class TestGetLocks:

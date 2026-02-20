@@ -213,7 +213,13 @@
       "Bash(npx markdownlint-cli2:*)",
       "Bash(ren:*)",
       "Bash(node_modules/.bin/markdownlint:*)",
-      "Bash(.venvScriptspython.exe .vaultspeclibscriptscli.py config sync --dry-run)"
+      "Bash(.venvScriptspython.exe .vaultspeclibscriptscli.py config sync --dry-run)",
+      "Bash(git checkout:*)",
+      "Bash(.venv/Scripts/pre-commit run:*)",
+      "Bash(.venv/Scripts/pre-commit.exe run:*)",
+      "Bash(pre-commit:*)",
+      "Bash(~/.cache/pre-commit/repof4ubhhe2/node_env-default/Scripts/markdownlint.cmd:*)",
+      "Bash(.venv/Scripts/ty.exe check:*)"
     ]
   }
 }

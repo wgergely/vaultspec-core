@@ -1,0 +1,11 @@
+{"timestamp": "2026-02-19T21:25:57.290911+00:00", "type": "session_start", "data": {"agent_name": "tester", "task_id": "73af86a8-f219-4dbd-8675-2cd8399e623c", "start_time": "2026-02-19T21:25:57.290727+00:00", "root_dir": "Y:\\code\\task-worktrees\\main\\test-project"}}
+{"timestamp": "2026-02-19T21:25:57.294904+00:00", "type": "handshake_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T21:26:12.742979+00:00", "type": "handshake_complete", "data": {"agent": "tester", "elapsed": 15.44754369999282}}
+{"timestamp": "2026-02-19T21:26:12.743341+00:00", "type": "session_create_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T21:26:13.231327+00:00", "type": "session_created", "data": {"agent": "tester", "session_id": "e4b1691a-b68f-4ae5-a5a8-ccc9b86c45bd", "elapsed": 0.48778810002841055}}
+{"timestamp": "2026-02-19T21:26:13.231783+00:00", "type": "prompt_sent", "data": {"agent": "tester", "turn": 1, "prompt_length": 52}}
+{"timestamp": "2026-02-19T21:26:14.626285+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "**Defining the Identity**\n\nI've homed in on the core requirement: delivering my name. It's a simple directive, but precision is key. Maintaining the persona is the primary focus, so it needs to be concise and accurate. The response must be a single name, so I will prepare that.\n\n\n", "type": "text"}, "session_update": "agent_thought_chunk"}}
+{"timestamp": "2026-02-19T21:26:14.656217+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "Jean-Claude", "type": "text"}, "session_update": "agent_message_chunk"}}
+{"timestamp": "2026-02-19T21:26:14.666810+00:00", "type": "prompt_completed", "data": {"agent": "tester", "turn": 1, "elapsed": 1.4348211999749765}}
+{"timestamp": "2026-02-19T21:26:14.667210+00:00", "type": "session_cancelled", "data": {"agent": "tester", "elapsed": 0.00013699999544769526}}
+{"timestamp": "2026-02-19T21:26:14.667522+00:00", "type": "run_complete", "data": {"agent": "tester", "total_elapsed": 22.431771300034598, "handshake_elapsed": 15.44754369999282, "session_elapsed": 0.48778810002841055, "cancel_elapsed": 0.00013699999544769526}}

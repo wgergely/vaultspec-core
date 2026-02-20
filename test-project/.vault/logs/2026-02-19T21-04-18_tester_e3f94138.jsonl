@@ -1,0 +1,11 @@
+{"timestamp": "2026-02-19T21:04:18.163254+00:00", "type": "session_start", "data": {"agent_name": "tester", "task_id": "e3f94138-0b93-42f3-8722-a25eeb8753b0", "start_time": "2026-02-19T21:04:18.163096+00:00", "root_dir": "Y:\\code\\task-worktrees\\main\\test-project"}}
+{"timestamp": "2026-02-19T21:04:18.167147+00:00", "type": "handshake_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T21:04:33.616935+00:00", "type": "handshake_complete", "data": {"agent": "tester", "elapsed": 15.4494137999136}}
+{"timestamp": "2026-02-19T21:04:33.617272+00:00", "type": "session_create_start", "data": {"agent": "tester"}}
+{"timestamp": "2026-02-19T21:04:34.016887+00:00", "type": "session_created", "data": {"agent": "tester", "session_id": "86df1b42-e31d-4245-902f-170d5faeaaed", "elapsed": 0.399423599941656}}
+{"timestamp": "2026-02-19T21:04:34.017350+00:00", "type": "prompt_sent", "data": {"agent": "tester", "turn": 1, "prompt_length": 52}}
+{"timestamp": "2026-02-19T21:04:35.490807+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "**Defining the Response**\n\nI'm focusing on the user's request, which is straightforward. My primary task is clear: to respond with only my name, Jean-Claude. I've re-affirmed this in my mind and will execute the output precisely as instructed.\n\n\n", "type": "text"}, "session_update": "agent_thought_chunk"}}
+{"timestamp": "2026-02-19T21:04:35.523288+00:00", "type": "session_update", "data": {"field_meta": null, "content": {"field_meta": null, "annotations": null, "text": "Bonjour, I am Jean-Claude.", "type": "text"}, "session_update": "agent_message_chunk"}}
+{"timestamp": "2026-02-19T21:04:35.532791+00:00", "type": "prompt_completed", "data": {"agent": "tester", "turn": 1, "elapsed": 1.5152615999104455}}
+{"timestamp": "2026-02-19T21:04:35.533138+00:00", "type": "session_cancelled", "data": {"agent": "tester", "elapsed": 0.00013149995356798172}}
+{"timestamp": "2026-02-19T21:04:35.533481+00:00", "type": "run_complete", "data": {"agent": "tester", "total_elapsed": 22.328046699985862, "handshake_elapsed": 15.4494137999136, "session_elapsed": 0.399423599941656, "cancel_elapsed": 0.00013149995356798172}}
