@@ -6,8 +6,9 @@ commands, and completing a full workflow cycle.
 ## Prerequisites
 
 - **Python 3.13+** -- verify with `python --version`
-- **NVIDIA GPU with CUDA 13.0+** -- required for RAG/search features only.
-  Verify with `nvidia-smi`
+- **NVIDIA GPU with CUDA 13.0+ and compute capability >= 7.5** (Turing+: RTX 2000+, T4+, A-series, H-series) -- required for the RAG index backend (`[rag]` extras) only. Verify with `nvidia-smi`
+
+  > **Note:** `nvidia-smi` shows the driver's maximum CUDA compatibility version, not the installed toolkit version. Run `nvcc --version` to confirm the actual CUDA toolkit version installed on your system.
 - **pip** -- Python package manager
 
 > **No GPU?** Search and indexing require an NVIDIA GPU with CUDA 13.0+.
@@ -30,6 +31,8 @@ source .venv/bin/activate    # Linux/macOS
 # Install with RAG and development dependencies
 pip install -e ".[rag,dev]" --extra-index-url https://download.pytorch.org/whl/cu130
 ```
+
+> **Important:** Always use `--extra-index-url` (not `--index-url`) when installing the `[rag]` extras. Without this flag, pip resolves PyTorch from the default PyPI index and installs the CPU-only build. A CPU-only PyTorch installation will appear to succeed but fail at runtime with `GPUNotAvailableError` when you run `docs.py index` or `docs.py search`.
 
 The `rag` extra installs PyTorch (CUDA), sentence-transformers, and LanceDB.
 The `dev` extra installs testing tools (pytest, ruff, etc.).
