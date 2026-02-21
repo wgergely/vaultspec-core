@@ -8,7 +8,7 @@ version = ">=3.13"
 
 [runtime]
 type = "python"
-install = "uv sync --extra dev --extra rag"
+install = "uv sync --extra rag"
 
 [entry_points]
 cli = ".vaultspec/lib/scripts/cli.py"
