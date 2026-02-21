@@ -41,7 +41,7 @@ python .vaultspec/lib/scripts/subagent.py run \
 ## MCP Server (preferred)
 
 The subagent system is also available as an MCP server
-(`vs-subagent-mcp`) configured in `.mcp.json`. When
+(`vaultspec-mcp`) configured in `.mcp.json`. When
 available, prefer MCP tool calls over CLI invocation:
 
 - **`list_agents`**: Discover available agents and their

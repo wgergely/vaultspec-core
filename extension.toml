@@ -12,10 +12,10 @@ install = "uv sync --extra rag"
 
 [entry_points]
 cli = ".vaultspec/lib/scripts/cli.py"
-mcp = ".vaultspec/lib/scripts/subagent.py serve"
+mcp = "vaultspec.server:main"
 
 [provides]
-mcp = ["vs-subagent-mcp"]
+mcp = ["vaultspec-mcp"]
 content_types = ["rules", "agents", "skills", "system", "templates"]
 
 [outputs]

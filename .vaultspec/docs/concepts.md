@@ -396,7 +396,7 @@ graph TB
     A2A --- |"horizontal: peer communication"| A2A
 ```
 
-- **MCP**: agent → tools (stdio transport). The `vs-subagent-mcp` server
+- **MCP**: agent → tools (stdio transport). The `vaultspec-mcp` server
   exposes `list_agents`, `dispatch_agent`, `get_task_status`, `cancel_task`,
   `get_locks`.
 - **ACP**: orchestrator → agent (stdio). Handles session lifecycle for

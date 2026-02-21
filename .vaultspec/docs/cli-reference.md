@@ -711,7 +711,7 @@ python .vaultspec/lib/scripts/subagent.py run \
 
 ### serve
 
-Start the subagent MCP server (`vs-subagent-mcp`).
+Start the subagent MCP server (`vaultspec-mcp`).
 Exposes 5 tools: `list_agents`, `dispatch_agent`,
 `get_task_status`, `cancel_task`, `get_locks`.
 

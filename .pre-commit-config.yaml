@@ -3,28 +3,28 @@ repos:
     hooks:
       - id: ruff-check
         name: ruff check fix
-        entry: .venv/Scripts/ruff.exe check --fix
+        entry: ruff check --fix
         language: system
         types: [python]
         pass_filenames: true
 
       - id: ruff-format
         name: ruff format
-        entry: .venv/Scripts/ruff.exe format
+        entry: ruff format
         language: system
         types: [python]
         pass_filenames: true
 
       - id: ty
         name: ty
-        entry: .venv/Scripts/python.exe -m ty check .vaultspec/lib/src .vaultspec/lib/scripts
+        entry: python -m ty check src/vaultspec --exclude src/vaultspec/rag
         language: system
         types: [python]
         pass_filenames: false
 
       - id: check-naming
         name: check docs naming
-        entry: .venv/Scripts/python.exe .vaultspec/lib/scripts/vault.py audit --verify
+        entry: python -m vaultspec.vault_cli audit --verify
         language: system
         types: [markdown]
         pass_filenames: false
@@ -35,11 +35,10 @@ repos:
       - id: markdownlint
         name: markdownlint
         args: ["--config", ".markdownlint.yaml", "--fix", ".vaultspec/", ".vault/", "README.md"]
-        # Now checking .vaultspec, .vault and README.md
 
   - repo: https://github.com/lycheeverse/lychee.git
     rev: v0.15.1
     hooks:
       - id: lychee
         name: lychee link check
-        args: ["--no-progress", "--exclude-path", "README.md"] # Example args
+        args: ["--no-progress", "--exclude-path", "README.md"]

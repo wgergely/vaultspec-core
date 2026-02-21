@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "vaultspec"
@@ -42,6 +42,29 @@ Repository = "https://github.com/wgergely/vaultspec"
 Documentation = "https://github.com/wgergely/vaultspec/tree/main/docs"
 "Bug Tracker" = "https://github.com/wgergely/vaultspec/issues"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/vaultspec"]
+
+[project.scripts]
+vaultspec = "vaultspec.cli:main"
+vaultspec-mcp = "vaultspec.server:main"
+vaultspec-vault = "vaultspec.vault_cli:main"
+vaultspec-team = "vaultspec.team_cli:main"
+vaultspec-subagent = "vaultspec.subagent_cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-timeout>=2.3.0",
+    "ruff>=0.1.0",
+    "ty>=0.0.15",
+    "prek>=0.3.2",
+    "lychee>=0.0.1",
+    "identify>=2.0.0",
+    "nodeenv>=1.0.0",
+]
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
@@ -65,8 +88,7 @@ dev-rag = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = [".vaultspec/lib/tests", ".vaultspec/lib/src"]
-pythonpath = [".vaultspec/lib/src", ".vaultspec/lib/scripts", ".vaultspec/lib"]
+testpaths = ["tests", "src"]
 asyncio_mode = "auto"
 markers = [
     "unit: fast tests with no external dependencies",
@@ -110,12 +132,8 @@ unfixable = ["B"]
 "**/test_*.py" = ["ARG"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["orchestration", "protocol"]
-known-third-party = ["acp"]
-
-[tool.setuptools.packages.find]
-where = [".vaultspec/lib/src"]
+known-first-party = ["vaultspec"]
 
 [tool.ty.environment]
 python-version = "3.13"
-root = [".", ".vaultspec/lib/src", ".vaultspec/lib/scripts", ".vaultspec/lib"]
+root = [".", "src"]
