@@ -2,12 +2,10 @@
 
 import pytest
 
+from vaultspec.core import reset_config
+from vaultspec.protocol.a2a import agent_card_from_definition
+
 pytestmark = [pytest.mark.unit]
-
-a2a = pytest.importorskip("a2a")
-
-from vaultspec.core import reset_config  # noqa: E402
-from vaultspec.protocol.a2a import agent_card_from_definition  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import pathlib
 import sys
 import tempfile
@@ -113,37 +114,36 @@ class TestSessionUpdate:
         return SubagentClient(root_dir=TEST_PROJECT, debug=False)
 
     @pytest.mark.asyncio
-    async def test_agent_message_chunk(self, client, capsys):
+    async def test_agent_message_chunk(self, client, caplog):
         update = AgentMessageChunk(
             session_update="agent_message_chunk",
             content=TextContentBlock(type="text", text="Hello from agent"),
         )
-        await client.session_update("s1", update)
-        captured = capsys.readouterr()
-        assert "Hello from agent" in captured.out
+        with caplog.at_level(logging.INFO, logger="vaultspec.protocol.acp.client"):
+            await client.session_update("s1", update)
+        assert "Hello from agent" in caplog.text
         assert client.response_text == "Hello from agent"
 
     @pytest.mark.asyncio
-    async def test_agent_thought_chunk(self, client, capsys):
+    async def test_agent_thought_chunk(self, client, caplog):
         update = AgentThoughtChunk(
             session_update="agent_thought_chunk",
             content=TextContentBlock(type="text", text="Thinking..."),
         )
-        await client.session_update("s1", update)
-        captured = capsys.readouterr()
-        assert "Thinking..." in captured.err
+        with caplog.at_level(logging.DEBUG, logger="vaultspec.protocol.acp.client"):
+            await client.session_update("s1", update)
+        assert "Thinking..." in caplog.text
 
     @pytest.mark.asyncio
-    async def test_tool_call_start(self, client, capsys):
+    async def test_tool_call_start(self, client, caplog):
         update = ToolCallStart(
             session_update="tool_call",
             tool_call_id="tc-1",
             title="read_file",
         )
-        await client.session_update("s1", update)
-        captured = capsys.readouterr()
-        # SubagentClient prints [Tool] to stderr
-        assert "read_file" in captured.err
+        with caplog.at_level(logging.INFO, logger="vaultspec.protocol.acp.client"):
+            await client.session_update("s1", update)
+        assert "read_file" in caplog.text
 
     @pytest.mark.asyncio
     async def test_tool_call_progress_no_crash(self, client, capsys):

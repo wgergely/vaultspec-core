@@ -2,15 +2,13 @@
 
 import pytest
 
-pytestmark = [pytest.mark.unit]
-
-claude_sdk = pytest.importorskip("claude_agent_sdk")
-
-from tests.constants import TEST_PROJECT  # noqa: E402
-from vaultspec.protocol.sandbox import (  # noqa: E402
+from tests.constants import TEST_PROJECT
+from vaultspec.protocol.sandbox import (
     _is_vault_path,
     _make_sandbox_callback,
 )
+
+pytestmark = [pytest.mark.unit]
 
 TEST_PROJECT_STR = str(TEST_PROJECT)
 

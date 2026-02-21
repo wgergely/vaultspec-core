@@ -21,15 +21,15 @@ pytestmark = [pytest.mark.unit]
 def _reset_logging():
     """Reset logging state before and after each test.
 
-    Clears the module-level _logging_configured flag and removes
-    any handlers added to the root logger during the test.
+    Uses the public reset_logging() API to clear module state and
+    restores the root logger to its original handler state.
     """
-    logging_config._logging_configured = False
+    logging_config.reset_logging()
     root = logging.getLogger()
     original_handlers = root.handlers[:]
     original_level = root.level
     yield
-    logging_config._logging_configured = False
+    logging_config.reset_logging()
     # Restore original handler state
     root.handlers = original_handlers
     root.setLevel(original_level)
@@ -141,8 +141,8 @@ class TestIdempotency:
         assert after_second == after_first, "Second call added duplicate handler"
 
     def test_configured_flag_prevents_reconfiguration(self):
-        """Setting _logging_configured=True manually should prevent configuration."""
-        logging_config._logging_configured = True  # type: ignore[assignment]
+        """Once configured, a second call with different args must not add a handler."""
+        logging_config.configure_logging()
         root = logging.getLogger()
         before = len(root.handlers)
         logging_config.configure_logging(level="DEBUG")

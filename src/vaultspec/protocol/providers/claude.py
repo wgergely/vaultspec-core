@@ -275,7 +275,7 @@ class ClaudeProvider(AgentProvider):
             executable=sys.executable,
             args=[
                 "-m",
-                "protocol.acp.claude_bridge",
+                "vaultspec.protocol.acp.claude_bridge",
                 "--model",
                 model,
             ],

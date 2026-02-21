@@ -15,6 +15,7 @@ Markers:
 
 from __future__ import annotations
 
+import logging
 import shutil
 import time
 import uuid
@@ -31,6 +32,8 @@ from vaultspec.protocol.a2a.tests.conftest import (
     _make_card,
 )
 from vaultspec.protocol.providers import ClaudeModels, GeminiModels
+
+logger = logging.getLogger(__name__)
 
 requires_anthropic = pytest.mark.skipif(
     not shutil.which("claude"),
@@ -292,6 +295,7 @@ class TestClaudeE2E:
 
         async with client:
             payload = _send_message_payload("Reply with exactly: HELLO_A2A_CLAUDE")
+            logger.info("Sending request to Claude E2E (%s)...", ClaudeModels.MEDIUM)
             start = time.monotonic()
             resp = await client.post("/", json=payload)
             elapsed = time.monotonic() - start
@@ -300,7 +304,8 @@ class TestClaudeE2E:
             body = resp.json()
             result = body.get("result")
             assert result is not None, f"No result in response: {body}"
-            assert result["status"]["state"] == "completed"
+            state = result["status"]["state"]
+            assert state == "completed"
 
             # Verify the response contains expected text
             message = result["status"].get("message", {})
@@ -309,7 +314,12 @@ class TestClaudeE2E:
             response_text = parts[0].get("text", "")
             assert "HELLO_A2A_CLAUDE" in response_text
 
-            print(f"Claude A2A round-trip: {elapsed:.2f}s")
+            logger.info(
+                "Response from Claude E2E: state=%s, %.2fs, model=%s",
+                state,
+                elapsed,
+                ClaudeModels.MEDIUM,
+            )
 
 
 @pytest.mark.integration
@@ -331,6 +341,7 @@ class TestGeminiE2E:
 
         async with client:
             payload = _send_message_payload("Reply with exactly: HELLO_A2A_GEMINI")
+            logger.info("Sending request to Gemini E2E (%s)...", GeminiModels.LOW)
             start = time.monotonic()
             resp = await client.post("/", json=payload)
             elapsed = time.monotonic() - start
@@ -354,7 +365,12 @@ class TestGeminiE2E:
             response_text = parts[0].get("text", "")
             assert "HELLO_A2A_GEMINI" in response_text
 
-            print(f"Gemini A2A round-trip: {elapsed:.2f}s")
+            logger.info(
+                "Response from Gemini E2E: state=%s, %.2fs, model=%s",
+                state,
+                elapsed,
+                GeminiModels.LOW,
+            )
 
 
 @pytest.mark.integration
@@ -427,6 +443,7 @@ class TestGoldStandardBidirectional:
 
         async with gemini_client, claude_client:
             # Step 1: Send task to Gemini
+            logger.info("Sending request to Gemini (%s)...", GeminiModels.LOW)
             start = time.monotonic()
             gemini_resp = await gemini_client.post(
                 "/",
@@ -436,15 +453,20 @@ class TestGoldStandardBidirectional:
             )
             gemini_elapsed = time.monotonic() - start
             gemini_body = gemini_resp.json()
-            assert gemini_body["result"]["status"]["state"] == "completed"
+            gemini_state = gemini_body["result"]["status"]["state"]
+            assert gemini_state == "completed"
             gemini_text = (
                 gemini_body["result"]["status"]
                 .get("message", {})
                 .get("parts", [{}])[0]
                 .get("text", "")
             )
+            logger.info(
+                "Response from Gemini: state=%s, %.2fs", gemini_state, gemini_elapsed
+            )
 
             # Step 2: Send Gemini's output to Claude for processing
+            logger.info("Sending request to Claude (%s)...", ClaudeModels.MEDIUM)
             start2 = time.monotonic()
             claude_resp = await claude_client.post(
                 "/",
@@ -455,12 +477,16 @@ class TestGoldStandardBidirectional:
             )
             claude_elapsed = time.monotonic() - start2
             claude_body = claude_resp.json()
-            assert claude_body["result"]["status"]["state"] == "completed"
+            claude_state = claude_body["result"]["status"]["state"]
+            assert claude_state == "completed"
             claude_text = (
                 claude_body["result"]["status"]
                 .get("message", {})
                 .get("parts", [{}])[0]
                 .get("text", "")
+            )
+            logger.info(
+                "Response from Claude: state=%s, %.2fs", claude_state, claude_elapsed
             )
 
             total_elapsed = gemini_elapsed + claude_elapsed
@@ -468,11 +494,11 @@ class TestGoldStandardBidirectional:
             assert "GEMINI_CONFIRMED" in gemini_text
             assert "CLAUDE_RECEIVED_GEMINI" in claude_text
 
-            print(
-                f"Claude-asks-Gemini round-trip: "
-                f"Gemini={gemini_elapsed:.2f}s, "
-                f"Claude={claude_elapsed:.2f}s, "
-                f"Total={total_elapsed:.2f}s"
+            logger.info(
+                "Claude-asks-Gemini total: %.2fs (gemini=%.2fs, claude=%.2fs)",
+                total_elapsed,
+                gemini_elapsed,
+                claude_elapsed,
             )
 
     @pytest.mark.asyncio
@@ -523,6 +549,7 @@ class TestGoldStandardBidirectional:
 
         async with claude_client, gemini_client:
             # Step 1: Send task to Claude
+            logger.info("Sending request to Claude (%s)...", ClaudeModels.MEDIUM)
             start = time.monotonic()
             claude_resp = await claude_client.post(
                 "/",
@@ -532,15 +559,20 @@ class TestGoldStandardBidirectional:
             )
             claude_elapsed = time.monotonic() - start
             claude_body = claude_resp.json()
-            assert claude_body["result"]["status"]["state"] == "completed"
+            claude_state = claude_body["result"]["status"]["state"]
+            assert claude_state == "completed"
             claude_text = (
                 claude_body["result"]["status"]
                 .get("message", {})
                 .get("parts", [{}])[0]
                 .get("text", "")
             )
+            logger.info(
+                "Response from Claude: state=%s, %.2fs", claude_state, claude_elapsed
+            )
 
             # Step 2: Send Claude's output to Gemini for processing
+            logger.info("Sending request to Gemini (%s)...", GeminiModels.LOW)
             start2 = time.monotonic()
             gemini_resp = await gemini_client.post(
                 "/",
@@ -551,12 +583,16 @@ class TestGoldStandardBidirectional:
             )
             gemini_elapsed = time.monotonic() - start2
             gemini_body = gemini_resp.json()
-            assert gemini_body["result"]["status"]["state"] == "completed"
+            gemini_state = gemini_body["result"]["status"]["state"]
+            assert gemini_state == "completed"
             gemini_text = (
                 gemini_body["result"]["status"]
                 .get("message", {})
                 .get("parts", [{}])[0]
                 .get("text", "")
+            )
+            logger.info(
+                "Response from Gemini: state=%s, %.2fs", gemini_state, gemini_elapsed
             )
 
             total_elapsed = claude_elapsed + gemini_elapsed
@@ -564,9 +600,9 @@ class TestGoldStandardBidirectional:
             assert "CLAUDE_CONFIRMED" in claude_text
             assert "GEMINI_RECEIVED_CLAUDE" in gemini_text
 
-            print(
-                f"Gemini-asks-Claude round-trip: "
-                f"Claude={claude_elapsed:.2f}s, "
-                f"Gemini={gemini_elapsed:.2f}s, "
-                f"Total={total_elapsed:.2f}s"
+            logger.info(
+                "Gemini-asks-Claude total: %.2fs (claude=%.2fs, gemini=%.2fs)",
+                total_elapsed,
+                claude_elapsed,
+                gemini_elapsed,
             )

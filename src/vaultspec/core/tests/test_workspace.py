@@ -405,5 +405,6 @@ class TestResolveWorkspace:
             cwd=tmp_path,
         )
 
+        attr = "output_root"
         with pytest.raises(AttributeError):
-            layout.output_root = tmp_path / "changed"  # type: ignore[misc]
+            setattr(layout, attr, tmp_path / "changed")

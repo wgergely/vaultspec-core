@@ -12,9 +12,12 @@ import http.server
 import json
 import logging
 import os
-import pathlib  # noqa: TC003
 import threading
 import time
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pathlib
 
 import pytest
 

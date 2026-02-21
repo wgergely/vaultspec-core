@@ -135,7 +135,13 @@ async def _spawn_bridge(
     The bridge speaks ACP over stdio using AgentSideConnection.
     We write to proc.stdin (the bridge's stdin) and read from proc.stdout.
     """
-    args = [sys.executable, "-m", "protocol.acp.claude_bridge", "--model", model]
+    args = [
+        sys.executable,
+        "-m",
+        "vaultspec.protocol.acp.claude_bridge",
+        "--model",
+        model,
+    ]
     if debug:
         args.append("--debug")
 
@@ -233,6 +239,7 @@ class TestBridgeSpawn:
         finally:
             if proc.returncode is None:
                 proc.kill()
+            await proc.wait()
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(15)
@@ -269,8 +276,105 @@ class TestBridgeSpawn:
             assert "result" in response
         finally:
             writer.close()
+            await writer.wait_closed()
             if proc.returncode is None:
                 proc.kill()
+            await proc.wait()
+
+
+class TestMultiTurnContext:
+    """Verify that the bridge retains conversation history across turns."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(60)
+    async def test_session_retains_context(self, bridge_env):
+        """Two sequential prompts on one session verify context retention.
+
+        Verifies that the secret word (BANANA) is recalled.
+        """
+        proc, reader, writer = await _spawn_bridge(env=bridge_env)
+
+        try:
+            # 1. Initialize
+            await _send_jsonrpc(
+                writer,
+                "initialize",
+                {
+                    "protocolVersion": 1,
+                    "clientInfo": {"name": "test-harness", "version": "0.1.0"},
+                },
+                msg_id=1,
+            )
+            await _collect_until_response(reader, expected_id=1)
+
+            # 2. Create Session
+            await _send_jsonrpc(
+                writer,
+                "session/new",
+                {"cwd": str(_TEST_PROJECT), "mcpServers": []},
+                msg_id=2,
+            )
+            resp, _ = await _collect_until_response(reader, expected_id=2)
+            if resp is None or "result" not in resp:
+                pytest.fail(f"session/new failed: {resp}")
+            session_id = resp["result"]["sessionId"]
+
+            # 3. Turn 1: Establish Secret
+            await _send_jsonrpc(
+                writer,
+                "session/prompt",
+                {
+                    "sessionId": session_id,
+                    "prompt": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "My secret word is BANANA. Remember it. Reply with OK."
+                            ),
+                        }
+                    ],
+                },
+                msg_id=3,
+            )
+            await _collect_until_response(reader, expected_id=3)
+
+            # 4. Turn 2: Test Recall
+            await _send_jsonrpc(
+                writer,
+                "session/prompt",
+                {
+                    "sessionId": session_id,
+                    "prompt": [
+                        {
+                            "type": "text",
+                            "text": "What is my secret word? Reply with only the word.",
+                        }
+                    ],
+                },
+                msg_id=4,
+            )
+            # We need to collect notifications to see the response text
+            resp, notifications = await _collect_until_response(reader, expected_id=4)
+
+            # Concatenate all text chunks from notifications
+            full_response = ""
+            for n in notifications:
+                if n.get("method") == "session/update":
+                    update = n.get("params", {}).get("update", {})
+                    if update.get("sessionUpdate") == "agent_message_chunk":
+                        full_response += update.get("content", {}).get("text", "")
+
+            assert "BANANA" in full_response.upper()
+            if resp is None or "result" not in resp:
+                pytest.fail(f"session/prompt failed: {resp}")
+            assert resp["result"]["stopReason"] == "end_turn"
+
+        finally:
+            writer.close()
+            await writer.wait_closed()
+            if proc.returncode is None:
+                proc.kill()
+            await proc.wait()
 
 
 class TestSandboxEnforcement:

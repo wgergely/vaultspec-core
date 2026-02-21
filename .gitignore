@@ -60,6 +60,7 @@ coverage.xml
 .pytest_cache/
 .ruff_cache/
 cover/
+test-events.jsonl
 
 # Translations
 *.mo
@@ -160,6 +161,9 @@ cython_debug/
 
 # VS Code
 .vscode/
+
+# Claude Code
+.claude/
 
 # Gemini CLI
 .gemini/

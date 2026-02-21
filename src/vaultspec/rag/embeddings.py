@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import functools
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import numpy as np
@@ -36,8 +36,11 @@ class GPUNotAvailableError(RuntimeError):
 def _check_rag_deps() -> None:
     """Verify RAG dependencies are installed."""
     try:
-        import sentence_transformers  # noqa: F401
-        import torch  # noqa: F401
+        import sentence_transformers
+        import torch
+
+        _ = sentence_transformers
+        _ = torch
     except ImportError:
         raise ImportError(
             "RAG dependencies not installed. Run: pip install -e '.[rag]'"
@@ -91,6 +94,19 @@ def get_device_info() -> dict:
         "gpu_name": gpu_name,
         "vram_mb": vram_mb,
     }
+
+
+@functools.lru_cache(maxsize=128)
+def _encode_query_cached(
+    model: Any, query_prefix: str, query: str
+) -> tuple[float, ...]:
+    """Encode and cache a query embedding as a tuple (hashable for LRU cache).
+
+    Module-level function so lru_cache does not capture ``self``.
+    """
+    prefixed = f"{query_prefix}{query}"
+    result = model.encode(prefixed, show_progress_bar=False, normalize_embeddings=True)
+    return tuple(float(x) for x in result)
 
 
 class EmbeddingModel:
@@ -208,14 +224,5 @@ class EmbeddingModel:
         """
         import numpy as np
 
-        cached_tuple = self._encode_query_cached(query)
+        cached_tuple = _encode_query_cached(self.model, self.QUERY_PREFIX, query)
         return np.asarray(cached_tuple, dtype=np.float32)
-
-    @functools.lru_cache(maxsize=128)  # noqa: B019
-    def _encode_query_cached(self, query: str) -> tuple[float, ...]:
-        """Encode and cache query as a tuple (hashable for LRU cache)."""
-        prefixed = f"{self.QUERY_PREFIX}{query}"
-        result = self.model.encode(
-            prefixed, show_progress_bar=False, normalize_embeddings=True
-        )
-        return tuple(float(x) for x in result)

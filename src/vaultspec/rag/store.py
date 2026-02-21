@@ -25,7 +25,9 @@ EMBEDDING_DIM = 768  # nomic-embed-text-v1.5 default
 
 def _check_rag_deps() -> None:
     try:
-        import lancedb  # noqa: F401
+        import lancedb
+
+        _ = lancedb
     except ImportError:
         raise ImportError(
             "RAG dependencies not installed. Run: pip install -e '.[rag]'"

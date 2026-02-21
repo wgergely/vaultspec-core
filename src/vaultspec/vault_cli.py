@@ -5,6 +5,20 @@ import sys
 from datetime import datetime
 
 from vaultspec.core import WorkspaceLayout, resolve_workspace
+from vaultspec.graph import VaultGraph
+from vaultspec.logging_config import configure_logging
+from vaultspec.metrics import get_vault_metrics
+from vaultspec.vaultcore import (
+    DocType,
+    get_template_path,
+    hydrate_template,
+)
+from vaultspec.verification import (
+    fix_violations,
+    get_malformed,
+    list_features,
+    verify_vertical_integrity,
+)
 
 # Resolve workspace layout at import time (replaces _paths.py bootstrap)
 _default_layout: WorkspaceLayout = resolve_workspace(framework_dir_name=".vaultspec")
@@ -20,22 +34,6 @@ def _get_version(root_dir: pathlib.Path | None = None) -> str:
             if line.strip().startswith("version"):
                 return line.split("=", 1)[1].strip().strip('"').strip("'")
     return "unknown"
-
-
-from vaultspec.graph import VaultGraph  # noqa: E402
-from vaultspec.logging_config import configure_logging  # noqa: E402
-from vaultspec.metrics import get_vault_metrics  # noqa: E402
-from vaultspec.vaultcore import (  # noqa: E402
-    DocType,
-    get_template_path,
-    hydrate_template,
-)
-from vaultspec.verification import (  # noqa: E402
-    fix_violations,
-    get_malformed,
-    list_features,
-    verify_vertical_integrity,
-)
 
 
 def _make_parser() -> argparse.ArgumentParser:
@@ -374,7 +372,8 @@ def handle_audit(args):
 
 def handle_index(args):
     try:
-        from vaultspec.rag import get_device_info, index
+        from vaultspec.rag.api import index
+        from vaultspec.rag.embeddings import get_device_info
     except ImportError:
         print("Error: RAG dependencies not installed.")
         print("Run: pip install -e '.[rag]'")
@@ -383,7 +382,7 @@ def handle_index(args):
     root_dir = _resolve_root(args)
 
     # Report device info
-    device_info = get_device_info()  # ty: ignore[call-non-callable]
+    device_info = get_device_info()
     if not args.json:
         device = device_info["device"]
         gpu = device_info.get("gpu_name")
@@ -397,7 +396,7 @@ def handle_index(args):
     if not args.json:
         print("Running full index..." if args.full else "Running incremental index...")
 
-    result = index(root_dir, full=args.full)  # ty: ignore[call-non-callable]
+    result = index(root_dir, full=args.full)
 
     if args.json:
         print(
@@ -425,14 +424,14 @@ def handle_index(args):
 
 def handle_search(args):
     try:
-        from vaultspec.rag import search
+        from vaultspec.rag.api import search
     except ImportError:
         print("Error: RAG dependencies not installed.")
         print("Run: pip install -e '.[rag]'")
         sys.exit(1)
 
     root_dir = _resolve_root(args)
-    results = search(root_dir, args.query, limit=args.limit)  # ty: ignore[call-non-callable]
+    results = search(root_dir, args.query, limit=args.limit)
 
     if args.json:
         print(

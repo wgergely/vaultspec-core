@@ -8,7 +8,7 @@ stdin/stdout.  Internally it drives Claude via ``claude-agent-sdk``'s
 
 Usage::
 
-    python -m protocol.acp.claude_bridge --model ClaudeModels.MEDIUM
+    python -m vaultspec.protocol.acp.claude_bridge --model ClaudeModels.MEDIUM
 
 The bridge reads ``VAULTSPEC_AGENT_MODE`` from the environment to decide
 sandboxing policy and ``VAULTSPEC_ROOT_DIR`` for the workspace root.
@@ -18,30 +18,39 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import dataclasses
 import datetime
 import logging
 import shutil
+import sys
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from vaultspec.logging_config import configure_logging
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-from acp import PROTOCOL_VERSION, run_agent
+from acp import PROTOCOL_VERSION, Agent, run_agent
 from acp.schema import (
     AgentCapabilities,
     AgentMessageChunk,
+    AgentPlanUpdate,
     AgentThoughtChunk,
     AuthenticateResponse,
+    ContentToolCallContent,
+    FileEditToolCallContent,
     ForkSessionResponse,
     Implementation,
     InitializeResponse,
     ListSessionsResponse,
     LoadSessionResponse,
     NewSessionResponse,
+    PlanEntry,
+    PlanEntryPriority,
+    PlanEntryStatus,
+    PromptCapabilities,
     PromptResponse,
     ResumeSessionResponse,
     SessionCapabilities,
@@ -50,9 +59,11 @@ from acp.schema import (
     SessionInfoUpdate,
     SessionListCapabilities,
     SessionResumeCapabilities,
+    TerminalToolCallContent,
     TextContentBlock,
     ToolCallProgress,
     ToolCallStart,
+    ToolKind,
 )
 from claude_agent_sdk import (
     AssistantMessage,
@@ -66,6 +77,7 @@ from claude_agent_sdk import (
     ToolUseBlock,
     UserMessage,
 )
+from claude_agent_sdk._errors import MessageParseError
 from claude_agent_sdk.types import (
     McpStdioServerConfig,
     StreamEvent,
@@ -125,7 +137,7 @@ def _convert_mcp_servers(
     return result
 
 
-def _extract_prompt_text(
+def _build_sdk_message_payload(
     prompt: list[
         TextContentBlock
         | ImageContentBlock
@@ -133,15 +145,123 @@ def _extract_prompt_text(
         | ResourceContentBlock
         | EmbeddedResourceContentBlock
     ],
-) -> str:
-    """Extract plain text from ACP prompt content blocks."""
-    parts = []
+) -> dict[str, Any]:
+    """Convert ACP prompt blocks into a Claude SDK message dict."""
+    content: list[dict[str, Any]] = []
+    text_parts: list[str] = []
+
     for block in prompt:
         if isinstance(block, TextContentBlock):
-            parts.append(block.text)
-        elif hasattr(block, "text"):
-            parts.append(str(block.text))
-    return "\n".join(parts)
+            text_parts.append(block.text)
+        elif hasattr(block, "text") and block.text:  # Fallback for text-like
+            text_parts.append(str(block.text))
+        elif hasattr(block, "uri") and block.uri:  # Resource/Link
+            # Map file:// URI to @path for Claude CLI
+            uri = str(block.uri)
+            if uri.startswith("file://"):
+                path = uri[7:]  # Strip file://
+                text_parts.append(f"@{path}")
+            else:
+                text_parts.append(uri)
+        elif hasattr(block, "data") and block.data:  # Image
+            mime_type = getattr(block, "mime_type", "image/jpeg")
+            content.append(
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": mime_type,
+                        "data": block.data,
+                    },
+                }
+            )
+
+    # Append accumulated text as a single text block if present
+    if text_parts:
+        content.append({"type": "text", "text": "\n".join(text_parts)})
+
+    return {
+        "type": "user",
+        "message": {
+            "role": "user",
+            "content": content,
+        },
+    }
+
+
+async def _to_async_iter(item: Any) -> Any:
+    """Wrap an item in an async iterable."""
+    yield item
+
+
+def _map_tool_kind(tool_name: str) -> str:
+    """Map a Claude tool name to an ACP tool kind via substring matching.
+
+    Follows the reference pattern from acp-claude-code ``mapToolKind()``.
+    """
+    name = tool_name.lower()
+    for keyword, kind in (
+        ("read", "read"),
+        ("view", "read"),
+        ("get", "read"),
+        ("write", "edit"),
+        ("create", "edit"),
+        ("update", "edit"),
+        ("edit", "edit"),
+        ("delete", "delete"),
+        ("remove", "delete"),
+        ("move", "move"),
+        ("rename", "move"),
+        ("search", "search"),
+        ("find", "search"),
+        ("grep", "search"),
+        ("run", "execute"),
+        ("execute", "execute"),
+        ("bash", "execute"),
+        ("think", "think"),
+        ("plan", "think"),
+        ("fetch", "fetch"),
+        ("download", "fetch"),
+    ):
+        if keyword in name:
+            return kind
+    return "other"
+
+
+def _get_tool_call_content(
+    tool_name: str, tool_input: dict[str, Any] | None
+) -> list[ContentToolCallContent | FileEditToolCallContent | TerminalToolCallContent]:
+    """Produce initial ACP content blocks for a tool call.
+
+    For ``Edit``/``MultiEdit`` tools, generates structured diff blocks.
+    For all others, returns an empty list.
+    """
+    if tool_input is None:
+        return []
+    if tool_name == "Edit":
+        path = tool_input.get("file_path", "")
+        old = tool_input.get("old_string", "")
+        new = tool_input.get("new_string", "")
+        if path:
+            return [
+                FileEditToolCallContent(
+                    type="diff", path=path, old_text=old, new_text=new
+                )
+            ]
+    elif tool_name == "MultiEdit":
+        path = tool_input.get("file_path", "")
+        edits = tool_input.get("edits", [])
+        if path and edits:
+            return [
+                FileEditToolCallContent(
+                    type="diff",
+                    path=path,
+                    old_text=e.get("old_string", ""),
+                    new_text=e.get("new_string", ""),
+                )
+                for e in edits
+            ]
+    return []
 
 
 @dataclasses.dataclass
@@ -156,9 +276,24 @@ class _SessionState:
     created_at: str
     sdk_client: ClaudeSDKClient | None = None
     connected: bool = True
+    # Claude's native session ID — extracted from SDK messages for multi-turn resume
+    claude_session_id: str | None = None
+    # Per-session cancel event — replaces bridge-level _cancelled boolean
+    cancel_event: asyncio.Event = dataclasses.field(default_factory=asyncio.Event)
+    # Tool call content accumulation: tool_call_id → list of content models
+    tool_call_contents: dict[
+        str,
+        list[
+            ContentToolCallContent | FileEditToolCallContent | TerminalToolCallContent
+        ],
+    ] = dataclasses.field(default_factory=dict)
+    # IDs of TodoWrite tool calls — suppressed from tool call events
+    todo_write_tool_call_ids: set[str] = dataclasses.field(default_factory=set)
+    # Permission mode for this session
+    permission_mode: str = "bypassPermissions"
 
 
-class ClaudeACPBridge:
+class ClaudeACPBridge(Agent):
     """ACP ``Agent`` implementation that wraps ``claude-agent-sdk``.
 
     This class implements the ``acp.interfaces.Agent`` protocol.  When used
@@ -268,6 +403,10 @@ class ClaudeACPBridge:
         # Cancel tracking — set by cancel(), checked in prompt()
         self._cancelled: bool = False
 
+        # NOTE: No persistent stream — each prompt() call uses
+        # receive_response() which creates a fresh generator per turn,
+        # avoiding the generator-death bug from upstream MessageParseError.
+
     def on_connect(self, conn: Any) -> None:
         """Called by ``AgentSideConnection`` with the client-facing connection.
 
@@ -301,6 +440,10 @@ class ClaudeACPBridge:
                     list=SessionListCapabilities(),
                     resume=SessionResumeCapabilities(),
                 ),
+                prompt_capabilities=PromptCapabilities(
+                    image=True,
+                    embedded_context=True,
+                ),
             ),
         )
 
@@ -309,6 +452,7 @@ class ClaudeACPBridge:
         cwd: str,
         sdk_mcp: dict[str, Any],
         sandbox_cb: Any,
+        permission_mode: str = "bypassPermissions",
     ) -> ClaudeAgentOptions:
         """Build ``ClaudeAgentOptions`` with all configured features.
 
@@ -321,7 +465,7 @@ class ClaudeACPBridge:
             "cwd": cwd,
             "mcp_servers": sdk_mcp,
             "can_use_tool": sandbox_cb,
-            "permission_mode": "bypassPermissions",
+            "permission_mode": permission_mode,
             "system_prompt": (
                 {
                     "type": "preset",
@@ -376,7 +520,9 @@ class ClaudeACPBridge:
         sandbox_cb = _make_sandbox_callback(self._mode, self._root_dir)
 
         # Create SDK client
-        options = self._build_options(cwd, sdk_mcp, sandbox_cb)
+        options = self._build_options(
+            cwd, sdk_mcp, sandbox_cb, permission_mode="bypassPermissions"
+        )
         sdk_client = self._client_factory(options)
 
         # Open the SDK connection without a prompt (streaming mode).
@@ -385,7 +531,7 @@ class ClaudeACPBridge:
         await sdk_client.connect()
         self._sdk_client = sdk_client
 
-        # Track session state
+        # Track session state — store SDK client per-session
         self._sessions[session_id] = _SessionState(
             session_id=session_id,
             cwd=cwd,
@@ -393,6 +539,7 @@ class ClaudeACPBridge:
             mode=self._mode,
             mcp_servers=mcp_servers or [],
             created_at=datetime.datetime.now(datetime.UTC).isoformat(),
+            sdk_client=sdk_client,
         )
 
         if self._debug:
@@ -419,56 +566,199 @@ class ClaudeACPBridge:
         **kwargs: Any,
     ) -> PromptResponse:
         _ = kwargs
-        if self._sdk_client is None:
+        # Resolve per-session SDK client (fall back to bridge-level for compat)
+        state = self._sessions.get(session_id)
+        sdk_client = (state.sdk_client if state else None) or self._sdk_client
+        if sdk_client is None:
             raise RuntimeError("No active session — call new_session first")
 
-        # Reset cancel flag at start of new prompt
-        self._cancelled = False
+        # Reset per-session cancel event
+        if state:
+            state.cancel_event.clear()
 
-        prompt_text = _extract_prompt_text(prompt)
+        # Clear stale tool correlation dicts from previous turns
+        self._pending_tools.clear()
+        self._block_index_to_tool.clear()
+
+        # Build structured message payload (text + images + resources)
+        message_payload = _build_sdk_message_payload(prompt)
+
+        # Handle dynamic permission mode switching via magic strings
+        full_text = ""
+        # The message payload is nested: {"type": "user", "message": {"content": [...]}}
+        msg_content = message_payload.get("message", {}).get("content", [])
+        if isinstance(msg_content, list):
+            for block in msg_content:
+                if block.get("type") == "text":
+                    full_text += block.get("text", "")
+
+        new_mode = None
+        if "[ACP:PERMISSION:ACCEPT_EDITS]" in full_text:
+            new_mode = "acceptEdits"
+        elif "[ACP:PERMISSION:BYPASS]" in full_text:
+            new_mode = "bypassPermissions"
+        elif "[ACP:PERMISSION:DEFAULT]" in full_text:
+            new_mode = "default"
+
+        if new_mode and state and new_mode != state.permission_mode:
+            if self._debug:
+                logger.debug(
+                    "Switching permission mode: %s -> %s",
+                    state.permission_mode,
+                    new_mode,
+                )
+            state.permission_mode = new_mode
+
+            # Recreate SDK client with new permission mode
+            if state.sdk_client:
+                try:
+                    state.sdk_client.disconnect()
+                except Exception:
+                    logger.exception(
+                        "Error disconnecting SDK client during mode switch"
+                    )
+
+            effective_mcp = state.mcp_servers
+            sdk_mcp = _convert_mcp_servers(effective_mcp)
+            sandbox_cb = _make_sandbox_callback(state.mode, self._root_dir)
+
+            options = self._build_options(
+                self._root_dir,
+                sdk_mcp,
+                sandbox_cb,
+                permission_mode=state.permission_mode,
+            )
+            # Preserve resume context if available
+            if state.claude_session_id:
+                options.resume = state.claude_session_id
+
+            sdk_client = self._client_factory(options)
+            await sdk_client.connect()
+            state.sdk_client = sdk_client
+            # Note: self._sdk_client also updated in case of fallback usage
+            self._sdk_client = sdk_client
 
         if self._debug:
-            logger.debug("Prompting (session=%s): %.200s...", session_id, prompt_text)
+            logger.debug("Prompting (session=%s): %r", session_id, message_payload)
 
-        # Send prompt via query() — connection was opened in new_session()
-        await self._sdk_client.query(prompt_text)
+        # Send prompt via query() as an async stream of messages
+        await sdk_client.query(_to_async_iter(message_payload))
 
-        # Stream SDK events → ACP session/update notifications
+        # Stream SDK events → ACP session/update notifications.
+        # Uses receive_response() which creates a fresh generator per turn
+        # and stops cleanly at ResultMessage.  This avoids the generator-death
+        # bug: if the upstream SDK emits an unparseable event (e.g.
+        # rate_limit_event) AFTER ResultMessage, it would raise
+        # MessageParseError inside the generator, finalising it.  A
+        # persistent iterator across turns would then be dead on turn 2.
         stop_reason: str = "end_turn"
-        try:
-            async for message in self._sdk_client.receive_messages():
-                if self._cancelled:
-                    stop_reason = "cancelled"
-                    break
+        msg_count = 0
+        result_seen = False
 
-                await self._emit_updates(message, session_id)
+        while not result_seen:
+            try:
+                async for message in sdk_client.receive_response():
+                    msg_count += 1
+                    if self._debug:
+                        logger.debug(
+                            "Bridge msg #%d: %s",
+                            msg_count,
+                            type(message).__name__,
+                        )
 
-                if isinstance(message, ResultMessage) and getattr(
-                    message, "is_error", False
-                ):
-                    stop_reason = "refusal"
-        except Exception:
-            logger.exception("Error streaming SDK messages")
-            stop_reason = "refusal"  # closest valid ACP stop_reason for errors
+                    # Extract Claude's native session_id for multi-turn resume
+                    msg_session_id = getattr(message, "session_id", None)
+                    if (
+                        state
+                        and msg_session_id
+                        and msg_session_id != state.claude_session_id
+                    ):
+                        state.claude_session_id = msg_session_id
+                        if self._debug:
+                            logger.debug(
+                                "Captured Claude session_id: %s", msg_session_id
+                            )
+
+                    # Check per-session cancel (fall back to bridge-level for compat)
+                    cancelled = (
+                        state.cancel_event.is_set() if state else self._cancelled
+                    )
+                    if cancelled:
+                        stop_reason = "cancelled"
+                        break
+
+                    await self._emit_updates(message, session_id)
+
+                    if isinstance(message, ResultMessage):
+                        result_seen = True
+                        if getattr(message, "is_error", False):
+                            error_text = (
+                                getattr(message, "result", "") or "Unknown error"
+                            )
+                            if self._conn is not None:
+                                await self._conn.session_update(
+                                    session_id=session_id,
+                                    update=AgentMessageChunk(
+                                        session_update="agent_message_chunk",
+                                        content=TextContentBlock(
+                                            type="text", text=error_text
+                                        ),
+                                    ),
+                                )
+                            # Clear stale session ID so next attempt starts fresh
+                            if state and state.claude_session_id:
+                                logger.debug(
+                                    "Clearing stale claude_session_id after error"
+                                )
+                                state.claude_session_id = None
+                            stop_reason = "end_turn"
+            except MessageParseError as exc:
+                logger.debug("Skipping unparseable SDK message: %s", exc)
+                continue
+            except Exception:
+                logger.exception(
+                    "Error streaming SDK messages after %d msgs", msg_count
+                )
+                try:
+                    if self._conn is not None:
+                        error_text = str(sys.exc_info()[1]) or "Unknown error"
+                        await self._conn.session_update(
+                            session_id=session_id,
+                            update=AgentMessageChunk(
+                                session_update="agent_message_chunk",
+                                content=TextContentBlock(type="text", text=error_text),
+                            ),
+                        )
+                except Exception:
+                    logger.debug("Failed to emit error as AgentMessageChunk")
+                stop_reason = "end_turn"
+                break
+
+            if stop_reason == "cancelled":
+                break
+
+            if not result_seen:
+                if self._debug:
+                    logger.debug("Stream ended without ResultMessage")
+                break
 
         return PromptResponse(stop_reason=stop_reason)
 
     async def cancel(self, session_id: str, **kwargs: Any) -> None:
         _ = kwargs
+        # Set per-session cancel event (also set bridge-level for compat)
         self._cancelled = True
-        if self._sdk_client is not None:
+        state = self._sessions.get(session_id)
+        if state:
+            state.cancel_event.set()
+
+        # Interrupt (not disconnect!) — session stays alive for future prompts
+        sdk_client = (state.sdk_client if state else None) or self._sdk_client
+        if sdk_client is not None:
             try:
-                self._sdk_client.interrupt()
+                await sdk_client.interrupt()
             except Exception:
                 logger.exception("Error interrupting SDK client")
-            try:
-                self._sdk_client.disconnect()
-            except Exception:
-                logger.exception("Error disconnecting SDK client")
-
-        # Mark session as disconnected
-        if session_id in self._sessions:
-            self._sessions[session_id].connected = False
 
     async def authenticate(
         self,
@@ -502,6 +792,9 @@ class ClaudeACPBridge:
         the current SDK client (if any) and creates a new one with the
         stored session configuration.
 
+        If the session ID is not found (e.g. after bridge restart), a new
+        session is created with default configuration to allow recovery.
+
         .. note::
 
            The Claude SDK does not persist conversation history across
@@ -510,10 +803,23 @@ class ClaudeACPBridge:
         """
         _ = kwargs
         state = self._sessions.get(session_id)
+
+        # Session recovery: if not found, create a new session state
         if state is None:
             if self._debug:
-                logger.debug("load_session(%s) — not found", session_id)
-            return None
+                logger.debug(
+                    "load_session(%s) — not found, creating recovery session",
+                    session_id,
+                )
+            state = _SessionState(
+                session_id=session_id,
+                cwd=cwd,
+                model=self._model,
+                mode=self._mode,
+                mcp_servers=mcp_servers or [],
+                created_at=datetime.datetime.now(datetime.UTC).isoformat(),
+            )
+            self._sessions[session_id] = state
 
         # Disconnect current session if active
         if self._sdk_client is not None:
@@ -529,9 +835,16 @@ class ClaudeACPBridge:
 
         self._model = state.model
         self._mode = state.mode
-        options = self._build_options(cwd, sdk_mcp, sandbox_cb)
-        self._sdk_client = self._client_factory(options)
-        await self._sdk_client.connect()
+        options = self._build_options(
+            cwd, sdk_mcp, sandbox_cb, permission_mode=state.permission_mode
+        )
+        # Pass stored Claude session_id for conversation resume
+        if state.claude_session_id:
+            options.resume = state.claude_session_id
+        sdk_client = self._client_factory(options)
+        await sdk_client.connect()
+        self._sdk_client = sdk_client
+        state.sdk_client = sdk_client
 
         self._session_id = session_id
         self._root_dir = cwd
@@ -539,7 +852,10 @@ class ClaudeACPBridge:
 
         if self._debug:
             logger.debug(
-                "load_session(%s) — restored (model=%s)", session_id, state.model
+                "load_session(%s) — restored (model=%s, resume=%s)",
+                session_id,
+                state.model,
+                state.claude_session_id,
             )
 
         return LoadSessionResponse()
@@ -548,9 +864,9 @@ class ClaudeACPBridge:
         self,
         cwd: str,
         session_id: str,
-        mcp_servers: list[Any] | None = None,
+        mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None,
         **kwargs: Any,
-    ) -> ResumeSessionResponse | None:
+    ) -> ResumeSessionResponse:
         """Resume a previously created session.
 
         Functionally equivalent to ``load_session`` — reconnects the SDK
@@ -567,7 +883,7 @@ class ClaudeACPBridge:
         if state is None:
             if self._debug:
                 logger.debug("resume_session(%s) — not found", session_id)
-            return None
+            return ResumeSessionResponse()
 
         # Disconnect current session if active
         if self._sdk_client is not None:
@@ -584,15 +900,24 @@ class ClaudeACPBridge:
         self._model = state.model
         self._mode = state.mode
         options = self._build_options(cwd, sdk_mcp, sandbox_cb)
-        self._sdk_client = self._client_factory(options)
-        await self._sdk_client.connect()
+        # Pass stored Claude session_id for conversation resume
+        if state.claude_session_id:
+            options.resume = state.claude_session_id
+        sdk_client = self._client_factory(options)
+        await sdk_client.connect()
+        self._sdk_client = sdk_client
+        state.sdk_client = sdk_client
 
         self._session_id = session_id
         self._root_dir = cwd
         state.connected = True
 
         if self._debug:
-            logger.debug("resume_session(%s) — reconnected", session_id)
+            logger.debug(
+                "resume_session(%s) — reconnected (resume=%s)",
+                session_id,
+                state.claude_session_id,
+            )
 
         return ResumeSessionResponse()
 
@@ -632,8 +957,9 @@ class ClaudeACPBridge:
         self._model = source.model
         self._mode = source.mode
         options = self._build_options(cwd, sdk_mcp, sandbox_cb)
-        self._sdk_client = self._client_factory(options)
-        await self._sdk_client.connect()
+        sdk_client = self._client_factory(options)
+        await sdk_client.connect()
+        self._sdk_client = sdk_client
 
         self._session_id = new_id
         self._root_dir = cwd
@@ -645,6 +971,7 @@ class ClaudeACPBridge:
             mode=source.mode,
             mcp_servers=list(effective_mcp),
             created_at=datetime.datetime.now(datetime.UTC).isoformat(),
+            sdk_client=sdk_client,
         )
 
         if self._debug:
@@ -738,6 +1065,14 @@ class ClaudeACPBridge:
             logger.debug("set_config_option(%s=%s) -- no-op", config_id, value)
         return None
 
+    async def close(self) -> None:
+        """Close all active sessions and disconnect SDK clients."""
+        for state in list(self._sessions.values()):
+            if state.sdk_client:
+                with contextlib.suppress(Exception):
+                    await state.sdk_client.disconnect()
+        self._sessions.clear()
+
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         _ = params
         if self._debug:
@@ -794,6 +1129,34 @@ class ClaudeACPBridge:
                 if index is not None and tool_id:
                     self._block_index_to_tool[index] = tool_id
 
+                if content_block.get("name") == "TodoWrite":
+                    todos = content_block.get("input", {}).get("todos", [])
+                    if todos:
+                        state = self._sessions.get(session_id)
+                        if state:
+                            state.todo_write_tool_call_ids.add(tool_id)
+
+                        await self._conn.session_update(
+                            session_id=session_id,
+                            update=AgentPlanUpdate(
+                                session_update="plan",
+                                entries=[
+                                    PlanEntry(
+                                        content=t.get("content", ""),
+                                        status=cast(
+                                            "PlanEntryStatus",
+                                            t.get("status", "pending"),
+                                        ),
+                                        priority=cast(
+                                            "PlanEntryPriority",
+                                            t.get("priority", "low"),
+                                        ),
+                                    )
+                                    for t in todos
+                                ],
+                            ),
+                        )
+
         elif event_type == "content_block_delta":
             delta = event.get("delta", {})
             delta_type = delta.get("type", "")
@@ -837,38 +1200,100 @@ class ClaudeACPBridge:
             elif self._debug:
                 logger.debug("Unhandled delta type: %s", delta_type)
 
+        elif event_type == "tool_use_error":
+            # Explicit tool error event (e.g. from Claude CLI)
+            error_message = event.get("error", "Unknown tool error")
+            tool_use_id = event.get("tool_use_id", "")
+
+            # If no ID in event, we can't route it. But usually it should have one.
+            # If not, we might try to infer from index if provided?
+            # The reference implementation uses ID.
+
+            if tool_use_id:
+                # Retrieve cached title
+                title = self._pending_tools.get(tool_use_id)
+                await self._conn.session_update(
+                    session_id=session_id,
+                    update=ToolCallProgress(
+                        session_update="tool_call_update",
+                        tool_call_id=tool_use_id,
+                        title=title,
+                        status="failed",
+                        raw_output={"error": error_message},
+                        content=[
+                            ContentToolCallContent(
+                                type="content",
+                                content=TextContentBlock(
+                                    type="text", text=f"Error: {error_message}"
+                                ),
+                            )
+                        ],
+                    ),
+                )
+
         elif self._debug:
             logger.debug("Unhandled stream event type: %s", event_type)
 
     async def _emit_assistant(self, msg: AssistantMessage, session_id: str) -> None:
-        """Emit ACP updates for each content block in an AssistantMessage."""
+        """Emit ACP updates for each content block in an AssistantMessage.
+
+        TextBlock and ThinkingBlock are skipped here because they were
+        already streamed incrementally via ``_emit_stream_event``
+        (``include_partial_messages=True`` is always on).  Only ToolUseBlock
+        needs emission — streaming only tracks the block index mapping, not
+        the full tool call notification.
+        """
+        state = self._sessions.get(session_id)
         for block in msg.content:
-            if isinstance(block, TextBlock):
-                await self._conn.session_update(
-                    session_id=session_id,
-                    update=AgentMessageChunk(
-                        session_update="agent_message_chunk",
-                        content=TextContentBlock(type="text", text=block.text),
-                    ),
-                )
-            elif isinstance(block, ThinkingBlock):
-                await self._conn.session_update(
-                    session_id=session_id,
-                    update=AgentThoughtChunk(
-                        session_update="agent_thought_chunk",
-                        content=TextContentBlock(type="text", text=block.thinking),
-                    ),
-                )
+            if isinstance(block, (TextBlock, ThinkingBlock)):
+                continue
             elif isinstance(block, ToolUseBlock):
+                if block.name == "TodoWrite":
+                    todos = (block.input or {}).get("todos", [])
+                    if todos:
+                        if state:
+                            state.todo_write_tool_call_ids.add(block.id)
+
+                        await self._conn.session_update(
+                            session_id=session_id,
+                            update=AgentPlanUpdate(
+                                session_update="plan",
+                                entries=[
+                                    PlanEntry(
+                                        content=t.get("content", ""),
+                                        status=cast(
+                                            "PlanEntryStatus",
+                                            t.get("status", "pending"),
+                                        ),
+                                        priority=cast(
+                                            "PlanEntryPriority",
+                                            t.get("priority", "low"),
+                                        ),
+                                    )
+                                    for t in todos
+                                ],
+                            ),
+                        )
+                        continue
+
                 # Cache the tool use so we can correlate with the tool_result
                 self._pending_tools[block.id] = block.name
+
+                # Generate initial content (e.g. diffs for Edit tools)
+                content = _get_tool_call_content(block.name, block.input)
+                if state:
+                    state.tool_call_contents[block.id] = content
+
                 await self._conn.session_update(
                     session_id=session_id,
                     update=ToolCallStart(
                         session_update="tool_call",
                         tool_call_id=block.id,
                         title=block.name,
+                        kind=cast("ToolKind", _map_tool_kind(block.name)),
                         status="pending",
+                        content=content,
+                        raw_input=block.input,
                     ),
                 )
             else:
@@ -892,6 +1317,10 @@ class ClaudeACPBridge:
         if not tool_use_id:
             return
 
+        state = self._sessions.get(session_id)
+        if state and tool_use_id in state.todo_write_tool_call_ids:
+            return
+
         # Determine status from tool result content
         status = "completed"
         content = getattr(msg, "content", None)
@@ -912,15 +1341,47 @@ class ClaudeACPBridge:
                 tool_use_id,
             )
 
-        await self._conn.session_update(
-            session_id=session_id,
-            update=ToolCallProgress(
-                session_update="tool_call_update",
-                tool_call_id=tool_use_id,
-                title=title,
-                status=status,
-            ),
-        )
+        # Accumulate tool result text into content
+        state = self._sessions.get(session_id)
+        content_updates: list[
+            ContentToolCallContent | FileEditToolCallContent | TerminalToolCallContent
+        ] = []
+        full_text = ""
+
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, ToolResultBlock):
+                    block_text = block.content or ""
+                    full_text += block_text
+                    if block_text:
+                        content_updates.append(
+                            ContentToolCallContent(
+                                type="content",
+                                content=TextContentBlock(type="text", text=block_text),
+                            )
+                        )
+
+        # Add to state and get accumulated content
+        current_content: list[
+            ContentToolCallContent | FileEditToolCallContent | TerminalToolCallContent
+        ] = []
+        if state:
+            current_content = state.tool_call_contents.get(tool_use_id, [])
+            current_content.extend(content_updates)
+            state.tool_call_contents[tool_use_id] = current_content
+
+        if self._conn is not None:
+            await self._conn.session_update(
+                session_id=session_id,
+                update=ToolCallProgress(
+                    session_update="tool_call_update",
+                    tool_call_id=tool_use_id,
+                    title=title,
+                    status=status,
+                    content=current_content,
+                    raw_output={"output": full_text} if full_text else None,
+                ),
+            )
 
     async def _emit_system_message(self, msg: SystemMessage, session_id: str) -> None:
         """Emit a SessionInfoUpdate for system messages."""
@@ -967,7 +1428,10 @@ async def main() -> None:
     configure_logging(debug=args.debug)
 
     bridge = ClaudeACPBridge(model=args.model, debug=args.debug)
-    await run_agent(bridge)  # type: ignore[arg-type]  # structural Agent protocol
+    try:
+        await run_agent(bridge)
+    finally:
+        await bridge.close()
 
 
 if __name__ == "__main__":

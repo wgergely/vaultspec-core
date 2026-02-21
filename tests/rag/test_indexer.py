@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
+import importlib.util
+
 import pytest
 
 from tests.constants import TEST_PROJECT
 
-# Check if RAG deps are available
-try:
-    import lancedb  # noqa: F401
-    import sentence_transformers  # noqa: F401
-    import torch  # noqa: F401
-
-    HAS_RAG = True
-except ImportError:
-    HAS_RAG = False
+HAS_RAG = all(
+    importlib.util.find_spec(pkg) is not None
+    for pkg in ("lancedb", "sentence_transformers", "torch")
+)
 
 pytestmark = [
     pytest.mark.index,

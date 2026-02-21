@@ -228,7 +228,7 @@ class TestClaudeProvider:
         )
         assert isinstance(spec, ProcessSpec)
         assert "-m" in spec.args
-        assert "protocol.acp.claude_bridge" in spec.args
+        assert "vaultspec.protocol.acp.claude_bridge" in spec.args
 
 
 class TestGetProviderForModel:

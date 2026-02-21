@@ -6,9 +6,13 @@ _emit_system_message, _emit_result, _emit_stream_event.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, cast
+
 import pytest
+from acp.schema import ContentToolCallContent, TextContentBlock
 from claude_agent_sdk import (
     AssistantMessage,
+    ContentBlock,
     ResultMessage,
     SystemMessage,
     TextBlock,
@@ -20,6 +24,10 @@ from claude_agent_sdk import (
 
 from tests.constants import TEST_PROJECT
 from vaultspec.protocol.acp import ClaudeACPBridge
+from vaultspec.protocol.acp.claude_bridge import _map_tool_kind
+
+if TYPE_CHECKING:
+    from acp.schema import FileEditToolCallContent
 
 from .conftest import (
     SDKClientRecorder,
@@ -31,13 +39,16 @@ from .conftest import (
 pytestmark = [pytest.mark.unit]
 
 
+class _UnknownBlock:
+    """Sentinel for testing unsupported content block types."""
+
+
 class TestPrompt:
     """Test the prompt method."""
 
     @pytest.mark.asyncio
     async def test_raises_without_session(self):
         """prompt() raises RuntimeError if no session exists."""
-        from acp.schema import TextContentBlock
 
         bridge, _holder, _captured = make_di_bridge()
 
@@ -48,7 +59,7 @@ class TestPrompt:
     @pytest.mark.asyncio
     async def test_returns_prompt_response(self):
         """prompt() returns PromptResponse with stop_reason."""
-        from acp.schema import PromptResponse, TextContentBlock
+        from acp.schema import PromptResponse
 
         bridge, _holder, _captured = make_di_bridge()
         bridge.on_connect(make_test_conn())
@@ -61,9 +72,8 @@ class TestPrompt:
         assert result.stop_reason == "end_turn"
 
     @pytest.mark.asyncio
-    async def test_calls_query_with_prompt_text(self):
-        """prompt() calls sdk_client.query() with extracted prompt text."""
-        from acp.schema import TextContentBlock
+    async def test_calls_query_with_prompt_payload(self):
+        """prompt() calls sdk_client.query() with a structured message payload."""
 
         test_client = make_test_client()
         bridge, _holder, _captured = make_di_bridge(client=test_client)
@@ -74,7 +84,17 @@ class TestPrompt:
         prompt_blocks = [TextContentBlock(type="text", text="Write a story")]
         await bridge.prompt(prompt=prompt_blocks, session_id="s1")
 
-        assert test_client.query_calls == ["Write a story"]
+        assert len(test_client.query_calls) == 1
+        # query() receives an async generator; recorder consumes it into a list
+        payload = test_client.query_calls[0]
+        assert len(payload) == 1
+        msg = payload[0]
+        assert msg["type"] == "user"
+        assert msg["message"]["role"] == "user"
+        text_parts = [
+            c["text"] for c in msg["message"]["content"] if c["type"] == "text"
+        ]
+        assert text_parts == ["Write a story"]
 
     @pytest.mark.asyncio
     async def test_connects_in_new_session(self):
@@ -88,9 +108,8 @@ class TestPrompt:
         assert len(test_client.connect_calls) == 1
 
     @pytest.mark.asyncio
-    async def test_error_result_sets_refusal(self):
-        """If ResultMessage.is_error is True, stop_reason is 'refusal'."""
-        from acp.schema import TextContentBlock
+    async def test_error_result_sets_end_turn(self):
+        """If ResultMessage.is_error is True, stop_reason is 'end_turn'."""
 
         error_msg = ResultMessage(
             subtype="result",
@@ -111,12 +130,11 @@ class TestPrompt:
 
         prompt_blocks = [TextContentBlock(type="text", text="test")]
         result = await bridge.prompt(prompt=prompt_blocks, session_id="s1")
-        assert result.stop_reason == "refusal"
+        assert result.stop_reason == "end_turn"
 
     @pytest.mark.asyncio
-    async def test_exception_sets_refusal(self):
-        """If streaming raises an exception, stop_reason is 'refusal'."""
-        from acp.schema import TextContentBlock
+    async def test_exception_sets_end_turn(self):
+        """If streaming raises an exception, stop_reason is 'end_turn'."""
 
         test_client = SDKClientRecorder(stream_error=RuntimeError("stream failed"))
         bridge, _holder, _captured = make_di_bridge(client=test_client)
@@ -126,7 +144,7 @@ class TestPrompt:
 
         prompt_blocks = [TextContentBlock(type="text", text="test")]
         result = await bridge.prompt(prompt=prompt_blocks, session_id="s1")
-        assert result.stop_reason == "refusal"
+        assert result.stop_reason == "end_turn"
 
 
 class TestEmitUpdates:
@@ -146,7 +164,8 @@ class TestEmitUpdates:
         msg = AssistantMessage(content=[text_block], model="test-model")
 
         await connected_bridge._emit_updates(msg, "s1")
-        assert len(test_conn.session_update_calls) == 1
+        # TextBlock is skipped in _emit_assistant, so no update emitted
+        assert len(test_conn.session_update_calls) == 0
 
     @pytest.mark.asyncio
     async def test_routes_user_message(self, connected_bridge, test_conn):
@@ -235,37 +254,28 @@ class TestEmitAssistant:
     """Test _emit_assistant maps content blocks to session_update calls."""
 
     @pytest.mark.asyncio
-    async def test_text_block_emits_agent_message_chunk(
+    async def test_text_block_skipped_in_assistant_message(
         self, connected_bridge, test_conn
     ):
-        """A TextBlock triggers session_update with AgentMessageChunk."""
-        from acp.schema import AgentMessageChunk
-
+        """A TextBlock in AssistantMessage is skipped (streamed earlier)."""
         text_block = TextBlock(text="Hello from Claude")
         msg = AssistantMessage(content=[text_block], model="test-model")
 
         await connected_bridge._emit_assistant(msg, "s1")
 
-        assert len(test_conn.session_update_calls) == 1
-        call_kwargs = test_conn.session_update_calls[-1]
-        assert call_kwargs["session_id"] == "s1"
-        assert isinstance(call_kwargs["update"], AgentMessageChunk)
+        assert len(test_conn.session_update_calls) == 0
 
     @pytest.mark.asyncio
-    async def test_thinking_block_emits_agent_thought_chunk(
+    async def test_thinking_block_skipped_in_assistant_message(
         self, connected_bridge, test_conn
     ):
-        """A ThinkingBlock triggers session_update with AgentThoughtChunk."""
-        from acp.schema import AgentThoughtChunk
-
+        """A ThinkingBlock in AssistantMessage is skipped (streamed earlier)."""
         thinking_block = ThinkingBlock(thinking="Let me analyze...", signature="")
         msg = AssistantMessage(content=[thinking_block], model="test-model")
 
         await connected_bridge._emit_assistant(msg, "s1")
 
-        assert len(test_conn.session_update_calls) == 1
-        call_kwargs = test_conn.session_update_calls[-1]
-        assert isinstance(call_kwargs["update"], AgentThoughtChunk)
+        assert len(test_conn.session_update_calls) == 0
 
     @pytest.mark.asyncio
     async def test_tool_use_block_emits_tool_call_start(
@@ -302,24 +312,24 @@ class TestEmitAssistant:
         assert connected_bridge._pending_tools["toolu_cache_test"] == "Write"
 
     @pytest.mark.asyncio
-    async def test_multiple_blocks_emit_multiple_updates(
+    async def test_multiple_blocks_skip_text_emit_tool(
         self, connected_bridge, test_conn
     ):
-        """Multiple content blocks produce multiple session_update calls."""
+        """Multiple content blocks: TextBlock skipped, ToolUseBlock emitted."""
         text_block = TextBlock(text="Reading file...")
         tool_block = ToolUseBlock(id="toolu_456", name="Bash", input={})
         msg = AssistantMessage(content=[text_block, tool_block], model="test-model")
 
         await connected_bridge._emit_assistant(msg, "s1")
 
-        assert len(test_conn.session_update_calls) == 2
+        assert len(test_conn.session_update_calls) == 1
 
     @pytest.mark.asyncio
     async def test_unknown_block_type_skipped(self, connected_bridge, test_conn):
         """Unknown block types are skipped (not emitted via session_update)."""
-        unknown_block = object()
+        unknown_block = _UnknownBlock()
         msg = AssistantMessage(
-            content=[unknown_block],  # type: ignore[arg-type]
+            content=cast("list[ContentBlock]", [unknown_block]),
             model="test-model",
         )
 
@@ -1110,3 +1120,307 @@ class TestInputJsonDelta:
         assert update.title == "Bash"
         assert update.status == "in_progress"
         assert update.raw_input == '{"command":"ls"}'
+
+
+class TestTodoWritePlan:
+    """Test TodoWrite-to-Plan conversion."""
+
+    @pytest.mark.asyncio
+    async def test_emit_assistant_intercepts_todo_write(
+        self, connected_bridge, test_conn
+    ):
+        """AssistantMessage with TodoWrite tool use emits AgentPlanUpdate."""
+        from acp.schema import AgentPlanUpdate, ToolCallStart
+
+        from vaultspec.protocol.acp.claude_bridge import _SessionState
+
+        # Setup session state
+        connected_bridge._sessions["s1"] = _SessionState(
+            session_id="s1",
+            cwd="/tmp",
+            model="test",
+            mode="read-write",
+            mcp_servers=[],
+            created_at="now",
+        )
+
+        todos = [{"content": "Fix bug", "status": "pending", "priority": "high"}]
+        tool_block = ToolUseBlock(
+            id="toolu_plan",
+            name="TodoWrite",
+            input={"todos": todos},
+        )
+        msg = AssistantMessage(content=[tool_block], model="test-model")
+
+        await connected_bridge._emit_assistant(msg, "s1")
+
+        # Verify plan update emitted
+        assert len(test_conn.session_update_calls) == 1
+        update = test_conn.session_update_calls[0]["update"]
+        assert isinstance(update, AgentPlanUpdate)
+        assert len(update.entries) == 1
+        assert update.entries[0].content == "Fix bug"
+        assert update.entries[0].status == "pending"
+
+        # Verify tool call ID tracked
+        session_state = connected_bridge._sessions.get("s1")
+        assert "toolu_plan" in session_state.todo_write_tool_call_ids
+
+        # Verify no ToolCallStart emitted
+        assert not any(
+            isinstance(call["update"], ToolCallStart)
+            for call in test_conn.session_update_calls
+        )
+
+    @pytest.mark.asyncio
+    async def test_emit_stream_event_intercepts_todo_write(
+        self, connected_bridge, test_conn
+    ):
+        """StreamEvent with TodoWrite content_block_start emits AgentPlanUpdate."""
+        from acp.schema import AgentPlanUpdate
+        from claude_agent_sdk.types import StreamEvent
+
+        from vaultspec.protocol.acp.claude_bridge import _SessionState
+
+        # Setup session state
+        connected_bridge._sessions["s1"] = _SessionState(
+            session_id="s1",
+            cwd="/tmp",
+            model="test",
+            mode="read-write",
+            mcp_servers=[],
+            created_at="now",
+        )
+
+        todos = [{"content": "Refactor", "status": "completed"}]
+        msg = StreamEvent(
+            uuid="evt-plan",
+            session_id="s1",
+            event={
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": {
+                    "type": "tool_use",
+                    "id": "toolu_stream_plan",
+                    "name": "TodoWrite",
+                    "input": {"todos": todos},
+                },
+            },
+        )
+
+        await connected_bridge._emit_stream_event(msg, "s1")
+
+        assert len(test_conn.session_update_calls) == 1
+        update = test_conn.session_update_calls[0]["update"]
+        assert isinstance(update, AgentPlanUpdate)
+        assert update.entries[0].content == "Refactor"
+
+        session_state = connected_bridge._sessions.get("s1")
+        assert "toolu_stream_plan" in session_state.todo_write_tool_call_ids
+
+    @pytest.mark.asyncio
+    async def test_emit_user_message_suppresses_todo_write(
+        self, connected_bridge, test_conn
+    ):
+        """UserMessage for TodoWrite does not emit ToolCallProgress."""
+        from vaultspec.protocol.acp.claude_bridge import _SessionState
+
+        # Setup session state with tracked ID
+        session_state = _SessionState(
+            session_id="s1",
+            cwd="/tmp",
+            model="test",
+            mode="read-write",
+            mcp_servers=[],
+            created_at="now",
+        )
+        session_state.todo_write_tool_call_ids.add("toolu_suppress")
+        connected_bridge._sessions["s1"] = session_state
+
+        msg = UserMessage(parent_tool_use_id="toolu_suppress", content=[])
+
+        await connected_bridge._emit_user_message(msg, "s1")
+
+        assert len(test_conn.session_update_calls) == 0
+
+
+class TestContentAccumulation:
+    """Test tool content accumulation and kind mapping."""
+
+    @pytest.mark.asyncio
+    async def test_emit_assistant_accumulates_content(
+        self, connected_bridge, test_conn
+    ):
+        """AssistantMessage initializes content in state."""
+        from acp.schema import ToolCallStart
+
+        from vaultspec.protocol.acp.claude_bridge import _SessionState
+
+        # Setup session state
+        connected_bridge._sessions["s1"] = _SessionState(
+            session_id="s1",
+            cwd="/tmp",
+            model="test",
+            mode="read-write",
+            mcp_servers=[],
+            created_at="now",
+        )
+
+        # Edit tool should produce diff content
+        input_data = {
+            "file_path": "test.txt",
+            "old_string": "foo",
+            "new_string": "bar",
+        }
+        tool_block = ToolUseBlock(id="toolu_edit", name="Edit", input=input_data)
+        msg = AssistantMessage(content=[tool_block], model="test-model")
+
+        await connected_bridge._emit_assistant(msg, "s1")
+
+        # Check state
+        session_state = connected_bridge._sessions.get("s1")
+        assert "toolu_edit" in session_state.tool_call_contents
+        content = session_state.tool_call_contents["toolu_edit"]
+        assert len(content) == 1
+        assert cast("FileEditToolCallContent", content[0]).type == "diff"
+
+        # Check update
+        update = test_conn.session_update_calls[0]["update"]
+        assert isinstance(update, ToolCallStart)
+        assert update.kind == "edit"  # mapped from "Edit"
+        # Convert Pydantic models to dicts for comparison
+        update_content = [
+            c.model_dump(by_alias=True, exclude_none=True) for c in update.content
+        ]
+        stored_content = [
+            c.model_dump(by_alias=True, exclude_none=True) for c in content
+        ]
+        assert update_content == stored_content
+        assert update.raw_input == input_data
+
+    @pytest.mark.asyncio
+    async def test_emit_user_message_accumulates_result(
+        self, connected_bridge, test_conn
+    ):
+        """UserMessage appends result text to content."""
+        from acp.schema import ToolCallProgress
+
+        from vaultspec.protocol.acp.claude_bridge import _SessionState
+
+        # Setup session state
+        session_state = _SessionState(
+            session_id="s1",
+            cwd="/tmp",
+            model="test",
+            mode="read-write",
+            mcp_servers=[],
+            created_at="now",
+        )
+        # Pre-populate state as if ToolCallStart happened
+        from acp.schema import ContentToolCallContent
+
+        session_state.tool_call_contents["toolu_res"] = [
+            ContentToolCallContent(
+                type="content",
+                content=TextContentBlock(type="text", text="initial"),
+            )
+        ]
+        connected_bridge._sessions["s1"] = session_state
+        connected_bridge._pending_tools["toolu_res"] = "Bash"
+
+        result_block = ToolResultBlock(
+            tool_use_id="toolu_res", content="output", is_error=False
+        )
+        msg = UserMessage(parent_tool_use_id="toolu_res", content=[result_block])
+
+        await connected_bridge._emit_user_message(msg, "s1")
+
+        # Check state accumulation
+        content = session_state.tool_call_contents["toolu_res"]
+        assert len(content) == 2
+        # Cast to check attributes on union type
+        assert cast("ContentToolCallContent", content[1]).content.text == "output"
+
+        # Check update
+        update = test_conn.session_update_calls[0]["update"]
+        assert isinstance(update, ToolCallProgress)
+        # Convert Pydantic models to dicts for comparison
+        update_content = []
+        if update.content:
+            for c in update.content:
+                d = c.model_dump(by_alias=True, exclude_none=True)
+                # Normalize nested TextContentBlock if needed
+                if "content" in d and isinstance(d["content"], dict):
+                    pass
+                update_content.append(d)
+
+        # Simplified check for content structure match
+        assert len(update_content) == 2
+        assert update_content[0]["type"] == "content"
+        assert update_content[0]["content"]["text"] == "initial"
+        assert update_content[1]["type"] == "content"
+        assert update_content[1]["content"]["text"] == "output"
+        assert update_content[0]["content"]["text"] == "initial"
+        assert update_content[1]["type"] == "content"
+        assert update_content[1]["content"]["text"] == "output"
+
+        assert update.raw_output == {"output": "output"}
+
+
+class TestToolKindMapping:
+    """Test _map_tool_kind() maps tool names to ACP kinds via substring matching."""
+
+    @pytest.mark.parametrize(
+        ("tool_name", "expected_kind"),
+        [
+            # read
+            ("Read", "read"),
+            ("ReadFile", "read"),
+            ("View", "read"),
+            ("GetConfig", "read"),
+            # edit
+            ("Write", "edit"),
+            ("CreateFile", "edit"),
+            ("Update", "edit"),
+            ("Edit", "edit"),
+            ("MultiEdit", "edit"),
+            # delete
+            ("Delete", "delete"),
+            ("Remove", "delete"),
+            # move
+            ("Move", "move"),
+            ("Rename", "move"),
+            # search
+            ("Search", "search"),
+            ("Find", "search"),
+            ("Grep", "search"),
+            # execute
+            ("Run", "execute"),
+            ("Execute", "execute"),
+            ("Bash", "execute"),
+            # think
+            ("Think", "think"),
+            ("Plan", "think"),
+            # fetch
+            ("Fetch", "fetch"),
+            ("Download", "fetch"),
+            ("WebFetch", "fetch"),
+            # other
+            ("UnknownTool", "other"),
+            ("CustomAction", "other"),
+        ],
+    )
+    def test_maps_tool_to_kind(self, tool_name, expected_kind):
+        """_map_tool_kind maps tool names to expected ACP kinds."""
+        assert _map_tool_kind(tool_name) == expected_kind
+
+    def test_case_insensitive(self):
+        """_map_tool_kind is case-insensitive."""
+        assert _map_tool_kind("READ") == "read"
+        assert _map_tool_kind("bash") == "execute"
+        assert _map_tool_kind("WebFETCH") == "fetch"
+
+    def test_first_match_wins(self):
+        """When multiple keywords match, the first in priority order wins."""
+        # "ReadWrite" contains both "read" and "write" — "read" comes first
+        assert _map_tool_kind("ReadWrite") == "read"

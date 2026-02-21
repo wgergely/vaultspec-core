@@ -1,7 +1,7 @@
 """Lifecycle tests for ClaudeACPBridge.
 
 Covers: constructor, on_connect, initialize, new_session, ext_method,
-ext_notification, _extract_prompt_text, _convert_mcp_servers,
+ext_notification, _build_sdk_message_payload, _convert_mcp_servers,
 and full lifecycle unit tests (injected SDK via constructor DI).
 """
 
@@ -10,18 +10,29 @@ from __future__ import annotations
 import logging
 import sys
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 
 import pytest
+
+if TYPE_CHECKING:
+    from acp.schema import TextContentBlock
+
+from claude_agent_sdk import ResultMessage
 
 from tests.constants import TEST_PROJECT
 from vaultspec.protocol.acp import ClaudeACPBridge
 from vaultspec.protocol.acp.claude_bridge import (
+    _build_sdk_message_payload,
     _convert_mcp_servers,
-    _extract_prompt_text,
 )
 from vaultspec.protocol.providers import ClaudeModels
 
-from .conftest import make_di_bridge, make_test_client, make_test_conn
+from .conftest import (
+    SDKClientRecorder,
+    make_di_bridge,
+    make_test_client,
+    make_test_conn,
+)
 
 pytestmark = [pytest.mark.unit]
 
@@ -281,36 +292,49 @@ class TestExtNotification:
         assert result is None
 
 
-class TestExtractPromptText:
-    """Test the _extract_prompt_text module-level function."""
+class TestBuildSdkMessagePayload:
+    """Test the _build_sdk_message_payload module-level function."""
 
     def test_text_content_blocks(self):
-        """TextContentBlock instances have their text extracted."""
+        """TextContentBlock instances are joined into a single text block."""
         from acp.schema import TextContentBlock
 
         blocks = [
             TextContentBlock(type="text", text="First line"),
             TextContentBlock(type="text", text="Second line"),
         ]
-        result = _extract_prompt_text(blocks)
-        assert result == "First line\nSecond line"
+        result = _build_sdk_message_payload(blocks)
+        assert result["type"] == "user"
+        assert result["message"]["role"] == "user"
+        assert result["message"]["content"][0]["text"] == "First line\nSecond line"
 
     def test_single_block(self):
-        """Single block returns its text directly."""
+        """Single block produces a user message with one text content."""
         from acp.schema import TextContentBlock
 
         blocks = [TextContentBlock(type="text", text="Hello")]
-        assert _extract_prompt_text(blocks) == "Hello"
+        result = _build_sdk_message_payload(blocks)
+        assert result["message"]["content"][-1]["text"] == "Hello"
 
     def test_empty_list(self):
-        """Empty list returns empty string."""
-        assert _extract_prompt_text([]) == ""
+        """Empty list returns a user message with no content."""
+        result = _build_sdk_message_payload([])
+        assert result["type"] == "user"
+        assert result["message"]["role"] == "user"
+        assert result["message"]["content"] == []
 
     def test_non_text_block_with_text_attr(self):
         """Non-TextContentBlock with .text attribute is handled."""
-        block = SimpleNamespace(text="fallback text")
-        result = _extract_prompt_text([block])  # type: ignore[list-item]
-        assert "fallback text" in result
+
+        class _TextAttrBlock:
+            text = "fallback text"
+
+        block = cast("TextContentBlock", _TextAttrBlock())
+        result = _build_sdk_message_payload([block])
+        text_parts = [
+            c["text"] for c in result["message"]["content"] if c["type"] == "text"
+        ]
+        assert text_parts == ["fallback text"]
 
 
 class TestMCPServerConfigConversion:
@@ -438,7 +462,7 @@ class TestBridgeLifecycleUnit:
 
         assert spec.executable == sys.executable
         assert "-m" in spec.args
-        assert "protocol.acp.claude_bridge" in spec.args
+        assert "vaultspec.protocol.acp.claude_bridge" in spec.args
         assert "--model" in spec.args
         assert spec.env.get("VAULTSPEC_ROOT_DIR") == str(TEST_PROJECT)
         assert "CLAUDECODE" not in spec.env
@@ -767,12 +791,17 @@ class TestLoadSession:
     """Test load_session reconnects SDK from stored state."""
 
     @pytest.mark.asyncio
-    async def test_returns_none_for_unknown_session(self, bridge):
-        """load_session returns None for a session_id not in _sessions."""
+    async def test_recovers_unknown_session(self):
+        """load_session creates a recovery session for a session_id not in _sessions."""
+        from acp.schema import LoadSessionResponse
+
+        bridge, _holder, _captured = make_di_bridge()
         result = await bridge.load_session(
-            cwd=str(TEST_PROJECT), session_id="nonexistent"
+            cwd=str(TEST_PROJECT), session_id="recovered-id"
         )
-        assert result is None
+        assert result is not None
+        assert isinstance(result, LoadSessionResponse)
+        assert "recovered-id" in bridge._sessions
 
     @pytest.mark.asyncio
     async def test_loads_existing_session(self):
@@ -848,12 +877,14 @@ class TestResumeSession:
     """Test resume_session reconnects SDK from stored state."""
 
     @pytest.mark.asyncio
-    async def test_returns_none_for_unknown_session(self, bridge):
-        """resume_session returns None for a session_id not in _sessions."""
+    async def test_returns_empty_response_for_unknown_session(self, bridge):
+        """Unknown session_id yields an empty ResumeSessionResponse."""
+        from acp.schema import ResumeSessionResponse
+
         result = await bridge.resume_session(
             cwd=str(TEST_PROJECT), session_id="unknown"
         )
-        assert result is None
+        assert isinstance(result, ResumeSessionResponse)
 
     @pytest.mark.asyncio
     async def test_resumes_existing_session(self):
@@ -1045,15 +1076,17 @@ class TestSessionTracking:
         assert state.created_at is not None
 
     @pytest.mark.asyncio
-    async def test_cancel_marks_session_disconnected(self):
-        """cancel sets the session's connected flag to False."""
+    async def test_cancel_sets_cancel_event_keeps_connected(self):
+        """cancel sets cancel_event but keeps session connected (non-destructive)."""
         bridge, _holder, _captured = make_di_bridge()
         await bridge.new_session(cwd=str(TEST_PROJECT))
         session_id = bridge._session_id
 
         assert bridge._sessions[session_id].connected is True
+        assert bridge._sessions[session_id].cancel_event.is_set() is False
         await bridge.cancel(session_id=session_id)
-        assert bridge._sessions[session_id].connected is False
+        assert bridge._sessions[session_id].cancel_event.is_set() is True
+        assert bridge._sessions[session_id].connected is True
 
     @pytest.mark.asyncio
     async def test_multiple_sessions_tracked_independently(self):
@@ -1207,3 +1240,241 @@ class TestBridgeFeatureConfig:
         assert sp["type"] == "preset"
         assert sp["preset"] == "claude_code"
         assert "append" not in sp
+
+
+class TestSessionResume:
+    """Test multi-turn session resume via claude_session_id."""
+
+    @pytest.mark.asyncio
+    async def test_prompt_extracts_session_id_from_result(self):
+        """prompt() captures Claude's native session_id from ResultMessage."""
+        result_msg = ResultMessage(
+            subtype="result",
+            duration_ms=0,
+            duration_api_ms=0,
+            is_error=False,
+            num_turns=1,
+            session_id="claude-native-abc123",
+            result="Done",
+        )
+
+        bridge, _holder, _captured = make_di_bridge(
+            client=make_test_client(messages=[result_msg])
+        )
+        bridge.on_connect(make_test_conn())
+        await bridge.new_session(cwd=str(TEST_PROJECT))
+        session_id = bridge._session_id
+
+        from acp.schema import TextContentBlock
+
+        prompt_blocks = [TextContentBlock(type="text", text="hello")]
+        await bridge.prompt(prompt=prompt_blocks, session_id=session_id)
+
+        state = bridge._sessions[session_id]
+        assert state.claude_session_id == "claude-native-abc123"
+
+    @pytest.mark.asyncio
+    async def test_load_session_passes_resume(self):
+        """load_session() passes resume=claude_session_id to SDK options."""
+        captured_opts: list[SimpleNamespace] = []
+
+        def _client_factory(opts):
+            captured_opts.append(opts)
+            return SDKClientRecorder()
+
+        bridge = ClaudeACPBridge(
+            client_factory=_client_factory,
+            options_factory=lambda **kw: SimpleNamespace(**kw),
+            model=ClaudeModels.MEDIUM,
+            debug=False,
+        )
+
+        await bridge.new_session(cwd=str(TEST_PROJECT))
+        session_id = bridge._session_id
+        assert session_id is not None
+
+        # Simulate that a previous prompt extracted a Claude session_id
+        bridge._sessions[session_id].claude_session_id = "claude-resume-xyz"
+
+        await bridge.load_session(cwd=str(TEST_PROJECT), session_id=session_id)
+
+        # The last options object should have resume set after _build_options
+        assert captured_opts[-1].resume == "claude-resume-xyz"
+
+    @pytest.mark.asyncio
+    async def test_resume_session_passes_resume(self):
+        """resume_session() passes resume=claude_session_id to SDK options."""
+        captured_opts: list[SimpleNamespace] = []
+
+        def _client_factory(opts):
+            captured_opts.append(opts)
+            return SDKClientRecorder()
+
+        bridge = ClaudeACPBridge(
+            client_factory=_client_factory,
+            options_factory=lambda **kw: SimpleNamespace(**kw),
+            model=ClaudeModels.MEDIUM,
+            debug=False,
+        )
+
+        await bridge.new_session(cwd=str(TEST_PROJECT))
+        session_id = bridge._session_id
+        assert session_id is not None
+
+        bridge._sessions[session_id].claude_session_id = "claude-resume-abc"
+
+        await bridge.resume_session(cwd=str(TEST_PROJECT), session_id=session_id)
+
+        assert captured_opts[-1].resume == "claude-resume-abc"
+
+    @pytest.mark.asyncio
+    async def test_error_result_clears_session_id(self):
+        """ResultMessage with is_error=True clears stale claude_session_id."""
+        error_msg = ResultMessage(
+            subtype="result",
+            duration_ms=0,
+            duration_api_ms=0,
+            is_error=True,
+            num_turns=0,
+            session_id="claude-stale-id",
+            result="Error occurred",
+        )
+
+        bridge, _holder, _captured = make_di_bridge(
+            client=make_test_client(messages=[error_msg])
+        )
+        bridge.on_connect(make_test_conn())
+        await bridge.new_session(cwd=str(TEST_PROJECT))
+        session_id = bridge._session_id
+
+        # Pre-set a session ID as if from a previous turn
+        bridge._sessions[session_id].claude_session_id = "claude-stale-id"
+
+        from acp.schema import TextContentBlock
+
+        prompt_blocks = [TextContentBlock(type="text", text="test")]
+        await bridge.prompt(prompt=prompt_blocks, session_id=session_id)
+
+        # Session ID should be cleared after error
+        assert bridge._sessions[session_id].claude_session_id is None
+
+
+class TestSessionIsolation:
+    """Test per-session state isolation."""
+
+    @pytest.mark.asyncio
+    async def test_independent_cancel_events(self):
+        """Each session has its own cancel_event.
+
+        Cancelling one leaves others intact.
+        """
+        bridge, _holder, _captured = make_di_bridge()
+
+        await bridge.new_session(cwd=str(TEST_PROJECT / "ws1"))
+        id1 = bridge._session_id
+        await bridge.new_session(cwd=str(TEST_PROJECT / "ws2"))
+        id2 = bridge._session_id
+
+        # Cancel session 1 only
+        await bridge.cancel(session_id=id1)
+
+        assert bridge._sessions[id1].cancel_event.is_set() is True
+        assert bridge._sessions[id2].cancel_event.is_set() is False
+
+    @pytest.mark.asyncio
+    async def test_sessions_have_independent_state_dicts(self):
+        """Each session has its own tool_call_contents and todo_write_tool_call_ids."""
+        bridge, _holder, _captured = make_di_bridge()
+
+        await bridge.new_session(cwd=str(TEST_PROJECT / "ws1"))
+        id1 = bridge._session_id
+        await bridge.new_session(cwd=str(TEST_PROJECT / "ws2"))
+        id2 = bridge._session_id
+
+        # Modify session 1's state
+        bridge._sessions[id1].tool_call_contents["tool1"] = [{"type": "test"}]
+        bridge._sessions[id1].todo_write_tool_call_ids.add("todo1")
+
+        # Session 2's state should be unaffected
+        assert "tool1" not in bridge._sessions[id2].tool_call_contents
+        assert "todo1" not in bridge._sessions[id2].todo_write_tool_call_ids
+
+    @pytest.mark.asyncio
+    async def test_prompt_clears_tool_dicts_between_turns(self):
+        """prompt() clears _pending_tools and _block_index_to_tool at start."""
+        from acp.schema import TextContentBlock
+
+        bridge, _holder, _captured = make_di_bridge()
+        bridge.on_connect(make_test_conn())
+        await bridge.new_session(cwd=str(TEST_PROJECT))
+        session_id = bridge._session_id
+
+        # Pollute dicts as if from a previous turn
+        bridge._pending_tools["stale_tool"] = "Read"
+        bridge._block_index_to_tool[0] = "stale_block"
+
+        prompt_blocks = [TextContentBlock(type="text", text="next turn")]
+        await bridge.prompt(prompt=prompt_blocks, session_id=session_id)
+
+        assert "stale_tool" not in bridge._pending_tools
+        assert 0 not in bridge._block_index_to_tool
+
+
+class TestMultiTurnFlow:
+    """Test complete multi-turn prompt flow with session resume."""
+
+    @pytest.mark.asyncio
+    async def test_two_turn_session_id_preserved(self):
+        """Two consecutive prompts: session_id extracted on turn 1, preserved.
+
+        Verifies extraction on turn 1 and reuse on turn 2.
+        """
+        from acp.schema import TextContentBlock
+
+        # Turn 1: ResultMessage with session_id
+        result1 = ResultMessage(
+            subtype="result",
+            duration_ms=100,
+            duration_api_ms=80,
+            is_error=False,
+            num_turns=1,
+            session_id="claude-multi-turn-id",
+            result="Turn 1 done",
+        )
+
+        test_client = make_test_client(messages=[result1])
+        bridge, holder, _captured = make_di_bridge(client=test_client)
+        bridge.on_connect(make_test_conn())
+        await bridge.new_session(cwd=str(TEST_PROJECT))
+        session_id = bridge._session_id
+
+        # Turn 1
+        blocks1 = [TextContentBlock(type="text", text="First prompt")]
+        result = await bridge.prompt(prompt=blocks1, session_id=session_id)
+        assert result.stop_reason == "end_turn"
+        assert bridge._sessions[session_id].claude_session_id == "claude-multi-turn-id"
+
+        # Turn 2: swap to a fresh client with new messages
+        result2 = ResultMessage(
+            subtype="result",
+            duration_ms=50,
+            duration_api_ms=40,
+            is_error=False,
+            num_turns=2,
+            session_id="claude-multi-turn-id",
+            result="Turn 2 done",
+        )
+        new_client = make_test_client(messages=[result2])
+        holder.client = new_client
+        bridge._sdk_client = new_client
+        bridge._sessions[session_id].sdk_client = new_client
+
+        blocks2 = [TextContentBlock(type="text", text="Follow-up")]
+        result = await bridge.prompt(prompt=blocks2, session_id=session_id)
+        assert result.stop_reason == "end_turn"
+        # Session ID preserved across turns
+        assert bridge._sessions[session_id].claude_session_id == "claude-multi-turn-id"
+
+        # Both turns called query
+        assert len(test_client.query_calls) == 1
+        assert len(new_client.query_calls) == 1

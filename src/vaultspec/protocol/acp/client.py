@@ -186,9 +186,7 @@ class SubagentClient(Client):
             if self.on_tool_update:
                 self.on_tool_update(update)
             elif not self.quiet:
-                sys.stderr.write(
-                    f"\033[94m[Tool] {update.title} ({update.tool_call_id})\033[0m\n"
-                )
+                logger.info("[tool] %s (%s)", update.title, update.tool_call_id)
 
     def _handle_content_chunk(
         self, update: AgentMessageChunk | AgentThoughtChunk
@@ -202,18 +200,14 @@ class SubagentClient(Client):
             if self.on_message_chunk:
                 self.on_message_chunk(text)
             elif not self.quiet:
-                # Default CLI behavior if no callback
-                sys.stdout.write(text)
-                sys.stdout.flush()
+                logger.info("[agent] %s", text)
 
             self.response_text += text
         else:
             if self.on_thought_chunk:
                 self.on_thought_chunk(text)
             elif not self.quiet:
-                # Default CLI behavior
-                sys.stderr.write(f"\033[90m{text}\033[0m")
-                sys.stderr.flush()
+                logger.debug("[thought] %s", text)
 
     # -- File I/O (required by ACP Client protocol) --
 
@@ -451,7 +445,7 @@ class SubagentClient(Client):
             logger.debug("Extension notification: %s", method)
 
     def on_connect(self, conn: Any) -> None:
-        pass
+        self._conn = conn
 
     async def close(self) -> None:
         """Release all tracked terminals to prevent zombie processes."""

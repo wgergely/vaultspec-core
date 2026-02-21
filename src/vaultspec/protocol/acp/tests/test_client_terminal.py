@@ -37,18 +37,13 @@ class TestCreateTerminalReadOnly:
     async def test_create_terminal_allowed_readwrite(self):
         """Terminal creation succeeds in read-write mode (requires bash on PATH)."""
         client = SubagentClient(root_dir=TEST_PROJECT, mode="read-write")
-        # create_terminal should not raise in read-write mode
-        # The actual subprocess may fail for other reasons, but the
-        # read-write permission check must pass
         try:
             await client.create_terminal(
                 command="bash",
                 session_id="test-session",
             )
-        except ValueError:
-            pytest.fail(
-                "create_terminal should not raise ValueError in read-write mode"
-            )
+        finally:
+            await client.close()
 
     @pytest.mark.asyncio
     async def test_create_terminal_denied_message_mentions_readonly(self):

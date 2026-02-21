@@ -147,7 +147,7 @@ class TestProtocolCallTool:
         srv._agent_cache = baker_cache
 
         _, result = await mcp.call_tool("list_agents", {})
-        data = json.loads(result["result"])  # type: ignore[index]
+        data = json.loads(result["result"])
         assert len(data["agents"]) == 1
         assert data["agents"][0]["name"] == "vaultspec-simple-executor"
 
@@ -164,7 +164,7 @@ class TestProtocolCallTool:
             "dispatch_agent",
             {"agent": "vaultspec-simple-executor", "task": "Bake baguettes"},
         )
-        data = json.loads(result["result"])  # type: ignore[index]
+        data = json.loads(result["result"])
         assert data["status"] == "working"
         assert data["agent"] == "vaultspec-simple-executor"
         assert "taskId" in data
@@ -187,7 +187,7 @@ class TestProtocolCallTool:
         srv.task_engine = fresh_engine
         srv.lock_manager = fresh_engine._lock_manager
         _, result = await mcp.call_tool("get_task_status", {"task_id": "proto-001"})
-        data = json.loads(result["result"])  # type: ignore[index]
+        data = json.loads(result["result"])
         assert data["status"] == "working"
         assert data["taskId"] == "proto-001"
 
@@ -206,7 +206,7 @@ class TestProtocolCallTool:
         srv._active_clients = {}
         srv._background_tasks = {}
         _, result = await mcp.call_tool("cancel_task", {"task_id": "proto-002"})
-        data = json.loads(result["result"])  # type: ignore[index]
+        data = json.loads(result["result"])
         assert data["status"] == "cancelled"
 
     @pytest.mark.asyncio
@@ -215,7 +215,7 @@ class TestProtocolCallTool:
         srv.lock_manager = fresh_engine._lock_manager
         srv.task_engine = fresh_engine
         _, result = await mcp.call_tool("get_locks", {})
-        data = json.loads(result["result"])  # type: ignore[index]
+        data = json.loads(result["result"])
         assert data["locks"] == []
         assert data["count"] == 0
 
@@ -229,7 +229,7 @@ class TestProtocolCallTool:
         srv.lock_manager = fresh_engine._lock_manager
         srv.task_engine = fresh_engine
         _, result = await mcp.call_tool("get_locks", {})
-        data = json.loads(result["result"])  # type: ignore[index]
+        data = json.loads(result["result"])
         assert data["count"] == 1
         assert data["locks"][0]["agent"] == "vaultspec-simple-executor"
 
@@ -264,7 +264,7 @@ class TestProtocolRoundTrip:
             "dispatch_agent",
             {"agent": "vaultspec-simple-executor", "task": "Introduce yourself"},
         )
-        dispatch_data = json.loads(dispatch_result["result"])  # type: ignore[index]
+        dispatch_data = json.loads(dispatch_result["result"])
         task_id = dispatch_data["taskId"]
         assert dispatch_data["status"] == "working"
 
@@ -276,6 +276,6 @@ class TestProtocolRoundTrip:
 
         # Step 3: Poll status
         _, status_result = await mcp.call_tool("get_task_status", {"task_id": task_id})
-        status_data = json.loads(status_result["result"])  # type: ignore[index]
+        status_data = json.loads(status_result["result"])
         assert status_data["status"] == "completed"
         assert "Jean-Claude" in status_data["result"]["summary"]

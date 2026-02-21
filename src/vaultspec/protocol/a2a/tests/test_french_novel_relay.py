@@ -12,6 +12,7 @@ Markers:
 
 from __future__ import annotations
 
+import logging
 import re
 import shutil
 import time
@@ -25,6 +26,8 @@ from vaultspec.orchestration.team import TeamCoordinator, extract_artifact_text
 from vaultspec.protocol.a2a import create_app
 from vaultspec.protocol.a2a.tests.conftest import _make_card
 from vaultspec.protocol.providers import ClaudeModels, GeminiModels
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from a2a.server.agent_execution import AgentExecutor
@@ -226,18 +229,24 @@ class TestFrenchNovelRelayLive:
             gemini_name = agent_names[1]
 
             # Turn 1: Claude begins the story
+            logger.info(
+                "Sending request to %s (%s)...", claude_name, ClaudeModels.MEDIUM
+            )
             t1_start = time.monotonic()
             tasks_1 = await coordinator.dispatch_parallel({claude_name: PROMPT_BEGIN})
             t1_elapsed = time.monotonic() - t1_start
             task_1 = tasks_1[claude_name]
-            assert task_1.status.state.value == "completed", (
-                f"Turn 1 state: {task_1.status.state.value}"
-            )
+            t1_state = task_1.status.state.value
+            assert t1_state == "completed", f"Turn 1 state: {t1_state}"
             chapter_1 = extract_artifact_text(task_1)
             _assert_french_prose(chapter_1)
+            logger.info(
+                "Response from %s: state=%s, %.2fs", claude_name, t1_state, t1_elapsed
+            )
             print(f"Turn 1 (Claude begins): {t1_elapsed:.2f}s | {len(chapter_1)} chars")
 
             # Turn 2: relay chapter_1 to Gemini to continue
+            logger.info("Sending request to %s (%s)...", gemini_name, GeminiModels.LOW)
             t2_start = time.monotonic()
             task_2 = await coordinator.relay_output(
                 task_1,
@@ -245,17 +254,22 @@ class TestFrenchNovelRelayLive:
                 PROMPT_CONTINUE.format(chapter_1=chapter_1),
             )
             t2_elapsed = time.monotonic() - t2_start
-            assert task_2.status.state.value == "completed", (
-                f"Turn 2 state: {task_2.status.state.value}"
-            )
+            t2_state = task_2.status.state.value
+            assert t2_state == "completed", f"Turn 2 state: {t2_state}"
             chapter_2 = extract_artifact_text(task_2)
             _assert_french_prose(chapter_2, check_character=False)
             assert chapter_2 != chapter_1, "Turn 2 echoed Turn 1 verbatim (no progress)"
+            logger.info(
+                "Response from %s: state=%s, %.2fs", gemini_name, t2_state, t2_elapsed
+            )
             print(
                 f"Turn 2 (Gemini continues): {t2_elapsed:.2f}s | {len(chapter_2)} chars"
             )
 
             # Turn 3: relay chapter_2 back to Claude for the epilogue
+            logger.info(
+                "Sending request to %s (%s)...", claude_name, ClaudeModels.MEDIUM
+            )
             t3_start = time.monotonic()
             task_3 = await coordinator.relay_output(
                 task_2,
@@ -263,13 +277,15 @@ class TestFrenchNovelRelayLive:
                 PROMPT_FINISH.format(chapter_1=chapter_1, chapter_2=chapter_2),
             )
             t3_elapsed = time.monotonic() - t3_start
-            assert task_3.status.state.value == "completed", (
-                f"Turn 3 state: {task_3.status.state.value}"
-            )
+            t3_state = task_3.status.state.value
+            assert t3_state == "completed", f"Turn 3 state: {t3_state}"
             epilogue = extract_artifact_text(task_3)
             _assert_french_prose(epilogue)
             assert epilogue != chapter_1, "Epilogue echoed chapter 1 verbatim"
             assert epilogue != chapter_2, "Epilogue echoed chapter 2 verbatim"
+            logger.info(
+                "Response from %s: state=%s, %.2fs", claude_name, t3_state, t3_elapsed
+            )
 
             total_elapsed = time.monotonic() - relay_start
             print(
@@ -279,6 +295,14 @@ class TestFrenchNovelRelayLive:
                 f"French novel relay total: "
                 f"T1={t1_elapsed:.2f}s, T2={t2_elapsed:.2f}s, "
                 f"T3={t3_elapsed:.2f}s, Total={total_elapsed:.2f}s"
+            )
+
+            logger.info(
+                "French novel relay total: %.2fs (t1=%.2fs, t2=%.2fs, t3=%.2fs)",
+                total_elapsed,
+                t1_elapsed,
+                t2_elapsed,
+                t3_elapsed,
             )
 
             # Task IDs must be distinct

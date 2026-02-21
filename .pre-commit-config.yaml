@@ -17,7 +17,7 @@ repos:
 
       - id: ty
         name: ty
-        entry: python -m ty check src/vaultspec --exclude src/vaultspec/rag
+        entry: python -m ty check src/vaultspec
         language: system
         types: [python]
         pass_filenames: false

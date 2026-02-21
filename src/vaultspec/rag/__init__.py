@@ -5,6 +5,39 @@ dependencies (torch, sentence-transformers, lancedb) at package
 import time.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .api import (
+        VaultRAG,
+        get_document,
+        get_engine,
+        get_related,
+        get_status,
+        index,
+        list_documents,
+        reset_engine,
+        search,
+    )
+    from .embeddings import (
+        CUDA_INDEX_TAG,
+        CUDA_INDEX_URL,
+        EmbeddingModel,
+        GPUNotAvailableError,
+        get_device_info,
+    )
+    from .indexer import IndexResult, VaultIndexer, prepare_document
+    from .search import (
+        ParsedQuery,
+        SearchResult,
+        VaultSearcher,
+        parse_query,
+        rerank_with_graph,
+    )
+    from .store import EMBEDDING_DIM, VaultDocument, VaultStore
+
 __all__ = [
     # embeddings
     "CUDA_INDEX_TAG",

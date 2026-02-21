@@ -105,6 +105,7 @@ except ImportError:
 
 from vaultspec.core import WorkspaceLayout, resolve_workspace
 from vaultspec.logging_config import configure_logging
+from vaultspec.vaultcore import parse_frontmatter
 
 # Resolve workspace layout at import time (replaces _paths.py bootstrap)
 _default_layout: WorkspaceLayout = resolve_workspace(framework_dir_name=".vaultspec")
@@ -273,9 +274,6 @@ class SyncResult:
     skipped: int = 0
     pruned: int = 0
     errors: list[str] = field(default_factory=list)
-
-
-from vaultspec.vaultcore import parse_frontmatter  # noqa: E402
 
 
 def build_file(frontmatter: dict[str, Any], body: str) -> str:
@@ -1498,7 +1496,7 @@ def doctor_run(_args: argparse.Namespace) -> None:
 
     # CUDA/GPU
     try:
-        import torch  # ty: ignore[unresolved-import]
+        torch = importlib.import_module("torch")
 
         if torch.cuda.is_available():
             props = torch.cuda.get_device_properties(0)
@@ -1836,7 +1834,9 @@ def readiness_run(args: argparse.Namespace) -> None:
 
         # Check GPU
         try:
-            import torch  # ty: ignore[unresolved-import]
+            import importlib as _rl
+
+            torch = _rl.import_module("torch")
 
             if torch.cuda.is_available():
                 env_score = 3
@@ -1846,8 +1846,8 @@ def readiness_run(args: argparse.Namespace) -> None:
 
                 # Check for optional deps
                 try:
-                    import lancedb  # noqa: F401  # ty: ignore[unresolved-import]
-                    import sentence_transformers  # noqa: F401  # ty: ignore[unresolved-import]
+                    _rl.import_module("lancedb")
+                    _rl.import_module("sentence_transformers")
 
                     env_score = 4
                     env_detail = f"GPU + all deps, {gpu_name}"

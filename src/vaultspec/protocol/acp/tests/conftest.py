@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -56,23 +57,34 @@ class SDKClientRecorder:
         self.connect_error = connect_error
         self.stream_error = stream_error
         self.connect_calls: list[tuple[tuple, dict]] = []
-        self.query_calls: list[str] = []
+        self.query_calls: list[Any] = []
         self.disconnect_count: int = 0
         self.interrupt_count: int = 0
         self._interrupt_hook: Exception | Callable[..., None] | None = None
-        self._query_hook: Callable[..., None] | None = None
+        self._query_hook: Callable[..., Any] | None = None
 
     async def connect(self, *args, **kwargs):
         self.connect_calls.append((args, kwargs))
         if self.connect_error:
             raise self.connect_error
 
-    async def query(self, prompt: str):
-        self.query_calls.append(prompt)
+    async def query(self, prompt):
+        # prompt may be a plain string or an async generator of message dicts
         if self._query_hook:
-            self._query_hook(prompt)
+            # If hook returns True, skip default recording
+            if asyncio.iscoroutinefunction(self._query_hook):
+                if await self._query_hook(prompt):
+                    return
+            elif self._query_hook(prompt):
+                return
 
-    def interrupt(self):
+        if hasattr(prompt, "__aiter__"):
+            items = [item async for item in prompt]
+            self.query_calls.append(items)
+        else:
+            self.query_calls.append(prompt)
+
+    async def interrupt(self):
         self.interrupt_count += 1
         if self._interrupt_hook is not None:
             if isinstance(self._interrupt_hook, BaseException):
@@ -83,6 +95,10 @@ class SDKClientRecorder:
         self.disconnect_count += 1
 
     def receive_messages(self):
+        return AsyncItemIterator(self.messages, raise_exc=self.stream_error)
+
+    def receive_response(self):
+        """Simulate receive_response generator used by the bridge."""
         return AsyncItemIterator(self.messages, raise_exc=self.stream_error)
 
 
@@ -141,15 +157,19 @@ def make_di_bridge(*, client=None, **bridge_kwargs):
 
 
 @pytest.fixture
-def bridge():
+async def bridge():
     """Create a ClaudeACPBridge instance with default settings."""
-    return ClaudeACPBridge(model=ClaudeModels.MEDIUM, debug=False)
+    b = ClaudeACPBridge(model=ClaudeModels.MEDIUM, debug=False)
+    yield b
+    await b.close()
 
 
 @pytest.fixture
-def bridge_debug():
+async def bridge_debug():
     """Create a ClaudeACPBridge instance with debug enabled."""
-    return ClaudeACPBridge(model=ClaudeModels.MEDIUM, debug=True)
+    b = ClaudeACPBridge(model=ClaudeModels.MEDIUM, debug=True)
+    yield b
+    await b.close()
 
 
 @pytest.fixture

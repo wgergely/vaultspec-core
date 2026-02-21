@@ -119,7 +119,7 @@ async def _mcp_dispatch_and_wait(
         "dispatch_agent",
         {"agent": agent, "task": task},
     )
-    dispatch_data = json.loads(dispatch_result["result"])  # type: ignore[index]
+    dispatch_data = json.loads(dispatch_result["result"])
     task_id = dispatch_data["taskId"]
 
     # Poll until completed/failed or timeout
@@ -127,7 +127,7 @@ async def _mcp_dispatch_and_wait(
     while asyncio.get_running_loop().time() < deadline:
         await asyncio.sleep(1.0)
         _, status_result = await mcp.call_tool("get_task_status", {"task_id": task_id})
-        status_data = json.loads(status_result["result"])  # type: ignore[index]
+        status_data = json.loads(status_result["result"])
         if status_data["status"] in ("completed", "failed"):
             return status_data
 

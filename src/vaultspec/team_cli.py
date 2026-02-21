@@ -20,6 +20,7 @@ import warnings
 from pathlib import Path
 
 from vaultspec.core import WorkspaceLayout, resolve_workspace
+from vaultspec.logging_config import configure_logging
 
 # Resolve workspace layout at import time (replaces _paths.py bootstrap)
 _default_layout: WorkspaceLayout = resolve_workspace(framework_dir_name=".vaultspec")
@@ -35,8 +36,6 @@ def _get_version() -> str:
                 return line.split("=", 1)[1].strip().strip('"').strip("'")
     return "unknown"
 
-
-from vaultspec.logging_config import configure_logging  # noqa: E402
 
 try:
     from vaultspec.orchestration.team import (
@@ -297,7 +296,12 @@ def command_message(args) -> None:
                     sys.exit(1)
                 import uuid as _uuid
 
-                from a2a.types import GetTaskRequest, TaskQueryParams
+                from a2a.types import (
+                    GetTaskRequest,
+                    GetTaskSuccessResponse,
+                    JSONRPCErrorResponse,
+                    TaskQueryParams,
+                )
 
                 src_client = coordinator._get_client(args.from_agent)
                 resp = await src_client.get_task(
@@ -307,12 +311,13 @@ def command_message(args) -> None:
                     )
                 )
                 result = resp.root
-                if getattr(result, "error", None) is not None:
+                if isinstance(result, JSONRPCErrorResponse):
                     raise RuntimeError(
                         f"A2A error fetching task from "
-                        f"{args.from_agent!r}: {result.error}"  # type: ignore[union-attr]
+                        f"{args.from_agent!r}: {result.error}"
                     )
-                src_task = result.result  # type: ignore[union-attr]
+                assert isinstance(result, GetTaskSuccessResponse)
+                src_task = result.result
                 task = await coordinator.relay_output(src_task, args.to, args.content)
             else:
                 # Direct dispatch

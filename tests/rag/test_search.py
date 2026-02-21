@@ -6,17 +6,14 @@ src/vaultspec/rag/tests/test_query.py
 
 from __future__ import annotations
 
+import importlib.util
+
 import pytest
 
-# Check if RAG deps are available
-try:
-    import lancedb  # noqa: F401
-    import sentence_transformers  # noqa: F401
-    import torch  # noqa: F401
-
-    HAS_RAG = True
-except ImportError:
-    HAS_RAG = False
+HAS_RAG = all(
+    importlib.util.find_spec(pkg) is not None
+    for pkg in ("lancedb", "sentence_transformers", "torch")
+)
 
 pytestmark = [
     pytest.mark.search,

@@ -14,6 +14,7 @@ import warnings
 from pathlib import Path
 
 from vaultspec.core import WorkspaceLayout, resolve_workspace
+from vaultspec.logging_config import configure_logging
 
 # Resolve workspace layout at import time (replaces _paths.py bootstrap)
 _default_layout: WorkspaceLayout = resolve_workspace(framework_dir_name=".vaultspec")
@@ -29,8 +30,6 @@ def _get_version() -> str:
                 return line.split("=", 1)[1].strip().strip('"').strip("'")
     return "unknown"
 
-
-from vaultspec.logging_config import configure_logging  # noqa: E402
 
 try:
     from vaultspec.orchestration.subagent import run_subagent

@@ -116,9 +116,12 @@ class ClaudeA2AExecutor(AgentExecutor):
         async with self._clients_lock:
             self._active_clients[task_id] = sdk_client
 
-        # Strip CLAUDECODE env var so the child claude process doesn't
-        # refuse to start inside an existing Claude Code session.
-        _saved_claudecode = os.environ.pop("CLAUDECODE", None)
+        # Build a clean env for the SDK subprocess — strip CLAUDECODE so the
+        # child claude process doesn't refuse to start inside an existing
+        # Claude Code session.  We use a copy to avoid thread-unsafe mutation
+        # of os.environ when multiple executors run concurrently.
+        sdk_env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+        options.env = sdk_env
         try:
             await sdk_client.connect()
             await sdk_client.query(prompt)
@@ -132,12 +135,6 @@ class ClaudeA2AExecutor(AgentExecutor):
                 except StopAsyncIteration:
                     break
                 except MessageParseError as exc:
-                    exc_str = str(exc)
-                    if "rate_limit_event" in exc_str:
-                        raise RuntimeError(
-                            "Claude CLI rate limited — retry after the rate-limit "
-                            "window expires."
-                        ) from exc
                     logger.debug("Skipping unparseable SDK message: %s", exc)
                     continue
                 if isinstance(msg, AssistantMessage):
@@ -166,19 +163,29 @@ class ClaudeA2AExecutor(AgentExecutor):
                     _finalised = True
                     break
             if not _finalised:
-                # Stream ended without a ResultMessage (unexpected EOF).
+                # Stream ended without a ResultMessage. This is expected
+                # when the CLI emits events the SDK can't parse (e.g.
+                # rate_limit_event) — the stream dies but the response
+                # text was already collected.
                 text = "".join(collected)
-                await updater.failed(
-                    message=updater.new_agent_message(
-                        parts=[
-                            Part(
-                                root=TextPart(
-                                    text=text or "Stream ended without result"
-                                )
-                            )
-                        ]
+                if text:
+                    await updater.add_artifact(
+                        parts=[Part(root=TextPart(text=text))],
+                        name="response",
                     )
-                )
+                    await updater.complete(
+                        message=updater.new_agent_message(
+                            parts=[Part(root=TextPart(text=text))]
+                        )
+                    )
+                else:
+                    await updater.failed(
+                        message=updater.new_agent_message(
+                            parts=[
+                                Part(root=TextPart(text="Stream ended without result"))
+                            ]
+                        )
+                    )
         except Exception as e:
             logger.exception("ClaudeA2AExecutor error for task %s", task_id)
             await updater.failed(
@@ -190,8 +197,6 @@ class ClaudeA2AExecutor(AgentExecutor):
             await sdk_client.disconnect()
             async with self._clients_lock:
                 self._active_clients.pop(task_id, None)
-            if _saved_claudecode is not None:
-                os.environ["CLAUDECODE"] = _saved_claudecode
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         task_id = context.task_id or ""
