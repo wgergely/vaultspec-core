@@ -14,7 +14,9 @@ __all__ = ["configure_logging", "reset_logging"]
 _logging_configured = False
 
 
-def configure_logging(level: str | None = None, debug: bool = False) -> None:
+def configure_logging(
+    level: str | None = None, debug: bool = False, log_format: str | None = None
+) -> None:
     """Configure logging for vaultspec.
 
     This function is idempotent and safe to call multiple times.
@@ -23,6 +25,8 @@ def configure_logging(level: str | None = None, debug: bool = False) -> None:
         level: Optional log level override (DEBUG, INFO, WARNING, ERROR, CRITICAL).
                If None, reads from VAULTSPEC_LOG_LEVEL env var, defaults to INFO.
         debug: If True, forces log level to DEBUG. Overrides level param.
+        log_format: Optional format string for the log handler.
+                    Defaults to "%(asctime)s [%(name)s] %(levelname)s: %(message)s".
     """
     global _logging_configured
 
@@ -48,7 +52,8 @@ def configure_logging(level: str | None = None, debug: bool = False) -> None:
     handler.setLevel(log_level)
 
     # Set format
-    formatter = logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s")
+    fmt_string = log_format or "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
+    formatter = logging.Formatter(fmt_string)
     handler.setFormatter(formatter)
 
     # Add handler to root logger

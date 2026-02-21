@@ -249,3 +249,27 @@ class TestInvalidLevel:
         logging_config.configure_logging()
         root = logging.getLogger()
         assert root.level == logging.INFO
+
+
+# ===================================================================
+# Log format parameter
+# ===================================================================
+
+
+class TestLogFormat:
+    """Test configure_logging(log_format=...) parameter."""
+
+    def test_custom_format(self):
+        """Custom format string should be applied."""
+        custom_fmt = "%(message)s"
+        logging_config.configure_logging(log_format=custom_fmt)
+        root = logging.getLogger()
+        handler = root.handlers[-1]
+        assert handler.formatter._fmt == custom_fmt
+
+    def test_default_format(self):
+        """Default format should be used if not provided."""
+        logging_config.configure_logging()
+        root = logging.getLogger()
+        handler = root.handlers[-1]
+        assert "%(asctime)s" in handler.formatter._fmt

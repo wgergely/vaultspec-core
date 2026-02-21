@@ -8,6 +8,7 @@ The authoritative entry point for all sub-agent operations:
 
 import argparse
 import asyncio
+import contextlib
 import pathlib
 import sys
 import warnings
@@ -153,6 +154,11 @@ def command_run(args):
 
             traceback.print_exc()
     finally:
+        # Workaround for Windows ProactorEventLoop "I/O operation on closed pipe" error
+        # Allow pending callbacks to settle before closing the loop
+        if sys.platform == "win32":
+            with contextlib.suppress(Exception):
+                loop.run_until_complete(asyncio.sleep(0.250))
         loop.close()
 
 
@@ -352,9 +358,16 @@ def main() -> None:
     elif getattr(args, "verbose", False):
         configure_logging(level="INFO")
     else:
-        configure_logging()
+        # Default CLI format: clean message only
+        configure_logging(log_format="%(message)s")
 
     if hasattr(args, "func"):
+        # Suppress ProactorEventLoop pipe warnings on Windows
+        if sys.platform == "win32":
+            warnings.filterwarnings(
+                "ignore", category=ResourceWarning, message="unclosed transport"
+            )
+
         args.func(args)
     else:
         parser.print_help()

@@ -48,7 +48,7 @@ __all__ = [
 ]
 
 # Configure logging
-configure_logging()
+# configure_logging() - Removed to avoid side effects on import
 logger = logging.getLogger(__name__)
 
 
@@ -728,6 +728,7 @@ def main(
     """
     from vaultspec.core import get_config
 
+    configure_logging()
     cfg = get_config()
 
     if root_dir is None:
