@@ -2,202 +2,267 @@
 tags:
   - "#adr"
   - "#claude-a2a-overhaul"
-date: "2026-02-21"
+date: "2026-02-22"
 related:
   - "[[2026-02-21-claude-a2a-overhaul-research]]"
   - "[[2026-02-21-protocol-gap-analysis-research]]"
-  - "[[2026-02-21-a2a-ref-impl-research]]"
   - "[[2026-02-21-a2a-layer-audit-research]]"
   - "[[2026-02-21-claude-sdk-rate-limit-research]]"
-  - "[[2026-02-21-claude-acp-bidirectional-adr]]"
+  - "[[2026-02-22-claude-team-management-reference]]"
+  - "[[2026-02-22-claude-team-management-adr]]"
+  - "[[2026-02-22-claude-team-management-plan]]"
   - "[[2026-02-20-a2a-team-adr]]"
 ---
 
-# `claude-a2a-overhaul` adr: `Claude A2A Executor & Team Coordination Overhaul` | (**status:** `accepted`)
+# `claude-a2a-overhaul` adr: `Claude A2A Executor, Team Tools, and Process Lifecycle` | (**status:** `proposed`)
 
 ## Problem Statement
 
-The `ClaudeA2AExecutor` (`src/vaultspec/protocol/a2a/executors/claude_executor.py`) is a single-shot, fire-and-forget executor with no retry logic, no session resume, destructive cancel, and no intermediate streaming events. The E2E test `test_claude_a2a_responds` fails because `claude-agent-sdk` throws `MessageParseError` on `rate_limit_event` messages, and the executor has no recovery strategy.
+Claude cannot operate as a viable team member in A2A. Three gaps prevent this:
 
-The `TeamCoordinator` (`src/vaultspec/orchestration/team.py`) dispatches tasks correctly but cannot stream progress from long-running tasks, has no session-level continuity across dispatch rounds, and has a cancel propagation gap during team dissolution.
+**Gap 1 — Executor reliability.** The `ClaudeA2AExecutor` crashes on every session
+because `claude-agent-sdk` 0.1.39 throws `MessageParseError` on `rate_limit_event`
+messages emitted by the Claude CLI on 100% of sessions. The executor has no retry,
+no session resume, destructive cancel, and no streaming progress events.
 
-The [[2026-02-21-claude-a2a-overhaul-research]] synthesized findings from the protocol gap analysis, A2A layer audit, and reference implementations (`a2a-python-sdk`, `acp-claude-code`, `a2a-educational`). This ADR addresses the 7 executor-level and 3 coordinator-level findings.
+**Gap 2 — No team tools.** `src/vaultspec/mcp_tools/team_tools.py` is an empty stub.
+Claude agents running inside `ClaudeA2AExecutor` have no MCP tools to create teams,
+dispatch tasks, broadcast messages, spawn agents, or manage team lifecycle. Without
+these tools, Claude cannot act as a team leader or coordinator.
+
+**Gap 3 — No process lifecycle.** `TeamCoordinator` can only connect to pre-existing
+agent URLs. It cannot spawn local agent processes. The reference `AgentManager`
+(`tmp-ref/python-a2a`) uses `subprocess` to start agents from templates, monitor
+health, and clean shutdown. Without spawning, teams must be manually started.
+
+These three gaps compound: even if the executor works, Claude has no tools to manage
+teams; even if tools exist, there's no way to spawn the agents they'd manage.
 
 ## Considerations
 
-### Tech Stack Divergence
+### SDK Fix Status
 
-The reference implementations do NOT use the same tech stack as our executor:
+The `rate_limit_event` crash is an upstream bug in `claude-agent-sdk`. PR #598
+(merged Feb 20, 2026) fixes it by returning `None` for unknown message types
+instead of raising `MessageParseError`. The fix is NOT in the released version
+(0.1.39, released Feb 19). Options:
 
-- **python-a2a** (980 stars): Uses `anthropic.Anthropic` directly — raw REST calls via `client.messages.create()`. Rate limits handled at the HTTP level (429 status). No subprocess. No parse errors. Session history maintained via in-memory `_conversation_histories` dict per `conversation_id`.
+- Install from git main: `claude-agent-sdk @ git+https://...@main`
+- Keep current workaround (catch `MessageParseError` in executor loop)
+- Wait for 0.1.40 release
 
-- **acp-claude-code** (235 stars): TypeScript SDK (`@anthropic-ai/claude-code`). Stateless `query()` function. Session resume via `resume` parameter. `AbortController` for cancel. Patterns adapted (not ported) for our Python ACP bridge in Phase 1 ([[2026-02-21-claude-acp-bidirectional-adr]]).
+### Why Stay on claude-agent-sdk
 
-- **a2a-python-sdk** (official): The A2A protocol SDK. We already use this (`A2AClient`, `DefaultRequestHandler`, `InMemoryTaskStore`, `TaskUpdater`). No changes needed to our usage of this SDK.
+The executor needs `mcp_servers` to receive team tools injection. The `claude-agent-sdk`
+passes `mcp_servers` to `ClaudeAgentOptions`, which configures which MCP servers the
+Claude subprocess can connect to. This is how Claude gets access to team management
+capabilities. The raw `anthropic` SDK has no equivalent — it's a stateless API client
+with no MCP support.
 
-Our executor uses **`claude-agent-sdk`** — a Python wrapper around the Claude CLI subprocess (`ClaudeSDKClient` with `connect()`, `query()`, `receive_messages()`). This introduces:
-- `rate_limit_event` parse bug (upstream `MessageParseError`)
-- Subprocess lifecycle management (`connect`/`disconnect`)
-- `CLAUDECODE` env var stripping for nested invocations
-- No native session resume (must extract `session_id` from stream)
+Additionally, `claude-agent-sdk` provides:
+- Full Claude Code tool suite (Bash, Read, Write, Edit, Glob, Grep, etc.)
+- `can_use_tool` sandbox callbacks (read-only / read-write mode)
+- `permission_mode` for auto-approval
+- System prompt injection
+- Context compaction for long conversations
 
-**Conclusion:** We cannot port reference code directly. We adapt patterns to work within `claude-agent-sdk` constraints, just as Phase 1 did for the ACP bridge. The executor architecture remains subprocess-based.
+All of these are required for Claude to do actual work as a team member.
 
-### Phase 1 Precedent
+### Reference Architecture
 
-The Phase 1 ACP bridge overhaul ([[2026-02-21-claude-acp-bidirectional-adr]]) established patterns that directly apply here:
+Per [[2026-02-22-claude-team-management-reference]], the reference implementation
+(`python-a2a`) has three components we lack:
 
-- **Session ID extraction from SDK messages**: `ResultMessage` and `StreamEvent` carry `session_id`. The ACP bridge now extracts and stores it in per-session state. The A2A executor should do the same.
-- **Non-destructive cancel**: The ACP bridge uses `asyncio.Event` per session, calls `interrupt()` without `disconnect()`. The same pattern applies.
-- **Per-session state**: The ACP bridge moved from bridge-level singletons to `_SessionState` per session. The A2A executor needs per-context state for multi-turn.
-- **`receive_response()` over `receive_messages()`**: The ACP bridge switched from raw `receive_messages()` to filtered `receive_response()` for robustness. The A2A executor should do the same.
+- **`AgentManager`**: Spawns agent processes via `subprocess`, tracks PIDs, monitors
+  health, auto-discovers ports. Maps to our `TeamCoordinator` + new spawn capability.
+- **`AgentNetwork`**: High-level agent grouping with `network.add(name, url)` and
+  `network.get_agent(name).ask(query)`. Maps to our `TeamCoordinator.dispatch_parallel()`.
+- **MCP tools**: The reference exposes agent management as callable tools. Maps to
+  our empty `team_tools.py` stub.
 
-### DI and Testing Constraints
+### Existing Patterns
 
-The executor uses constructor DI (`client_factory`, `options_factory`) for test injection. Tests in `test_claude_executor.py` use `_InProcessSDKClient` (a real type implementing the SDK client interface) and `_OptionsRecorder`. No mocking is allowed. All new features must be testable through this DI mechanism.
+The `subagent_server/server.py` establishes the MCP tool registration pattern:
+imperative `mcp.tool(title=..., annotations=ToolAnnotations(...))(function_ref)`.
+The `team_cli.py` (506 lines) already implements all 7 team subcommands with session
+persistence via JSON in `.vault/logs/teams/`. The team tools should wrap the same
+`TeamCoordinator` methods that the CLI uses.
 
 ## Constraints
 
-- **Upstream SDK immutability**: Cannot modify `claude-agent-sdk`. The `rate_limit_event` parse bug remains. Must catch `MessageParseError` and implement retry.
-
-- **No mocks in tests**: DI-injected recorders only. Existing `_InProcessSDKClient` and `_OptionsRecorder` patterns must be extended, not replaced.
-
-- **Backward compatibility**: `TeamCoordinator` callers depend on `dispatch_parallel()`, `collect_results()`, and `dissolve_team()` signatures. Changes must be additive.
-
-- **`claude-agent-sdk` architecture**: Persistent subprocess via `ClaudeSDKClient`. Cannot adopt stateless "fresh query per turn" pattern. Must work within `connect() → query() → receive_*() → disconnect()` lifecycle.
-
-- **Second of six protocol cases**: Decisions here must be consistent with Phase 1 (ACP bridge) and generalizable to the remaining four cases (Claude A2A team, Gemini A2A subagent, Gemini A2A team).
-
-- **Test baseline**: 69/69 non-E2E tests pass. 1 E2E failure (`test_claude_a2a_responds`). No regressions allowed in the 69 passing tests.
+- **No mocks in tests.** DI-injected test doubles only. Extend existing patterns.
+- **claude-agent-sdk stays.** Required for MCP injection, tool use, and sandboxing.
+- **Backward compatibility.** `TeamCoordinator` public API (`form_team`,
+  `dispatch_parallel`, `collect_results`, `dissolve_team`) must not break.
+- **Test baseline.** 69/69 non-E2E tests pass. No regressions.
+- **MCP pattern consistency.** Follow `subagent_server/server.py` registration pattern.
 
 ## Implementation
 
-Five decisions, ordered by priority. References specific findings from [[2026-02-21-claude-a2a-overhaul-research]] and [[2026-02-21-protocol-gap-analysis-research]].
+Six decisions addressing all three gaps.
 
-### Decision 1: Rate Limit Handling with Bounded Retry
+### Decision 1: Install claude-agent-sdk from Git Main
 
-**Research finding**: P0 — rate_limit_event crash. `MessageParseError` from `rate_limit_event` kills the stream. The `_finalised` fallback is unreliable.
+Pin `claude-agent-sdk` to git main in `pyproject.toml` to get the `rate_limit_event`
+fix immediately. When 0.1.40 releases, switch back to a version pin.
 
-**Gap analysis finding**: P0 #6 — "A2A Executor Uses `receive_messages()` Instead of `receive_response()`"
+```
+claude-agent-sdk @ git+https://github.com/anthropics/claude-agent-sdk-python.git@main
+```
 
-Switch from `receive_messages()` to `receive_response()` for consistency with the ACP bridge (Phase 1). Wrap the streaming loop in a bounded retry (3 attempts, exponential backoff: 1s, 2s, 4s). On `MessageParseError`, check `exc.data` for `rate_limit_event` — if detected, wait and retry the entire `query() → stream` cycle. On non-rate-limit parse errors, log and continue the stream.
+Keep the existing `MessageParseError` catch in the executor loop as a safety net —
+belt and suspenders. The catch becomes a no-op once the SDK fix is active (the SDK
+filters unknowns before they reach the executor), but it protects against future
+unknown message types.
 
-**What changes in `execute()`**:
+### Decision 2: Harden ClaudeA2AExecutor
 
-- Replace `receive_messages().__aiter__().__anext__()` pattern with `async for msg in sdk_client.receive_response()`.
-- Wrap the query+stream cycle in a retry loop with configurable `max_retries` (default 3) and `base_delay` (default 1.0s).
-- On `MessageParseError`: inspect `exc.data` for `"rate_limit"` substring. If rate limit, increment retry counter, await exponential backoff, reconnect if needed, and re-query. If not rate limit, log at warning and continue stream.
-- After max retries exhausted, fail the task with a descriptive error via `updater.failed()`.
+Five changes to the executor, building on the existing architecture:
 
-**What changes in `__init__()`**:
+**2a. Switch to `receive_response()`**: Replace `receive_messages().__aiter__().__anext__()`
+with `async for msg in sdk_client.receive_response()`. Consistent with the ACP bridge
+(Phase 1). `receive_response()` yields messages until `ResultMessage`, then stops —
+cleaner than manual `_finalised` tracking.
 
-- Add `max_retries: int = 3` and `retry_base_delay: float = 1.0` parameters.
+**2b. Session resume via `context_id`**: Add `_session_ids: dict[str, str]` mapping
+`context_id` to Claude `session_id`. Extract `session_id` from `ResultMessage` in the
+streaming loop. On subsequent `execute()` calls with the same `context_id`, pass
+`resume=session_id` in `ClaudeAgentOptions`. Enables multi-turn A2A conversations.
 
-### Decision 2: Session Resume for Multi-Turn A2A
+**2c. Non-destructive cancel**: In `cancel()`, call `interrupt()` only — do not call
+`disconnect()` or pop from `_active_clients`. Add `_cancel_events: dict[str, asyncio.Event]`
+for per-task cancel signaling. Check in the streaming loop, break if set. The subprocess
+and session survive cancellation.
 
-**Research finding**: P1 — No session resume. Each `execute()` creates a fresh `ClaudeSDKClient`. Multi-turn conversations within the same `context_id` are impossible.
+**2d. Streaming progress events**: Emit `updater.update_status()` with accumulated text
+during streaming (throttled). Emit status on retry and cancel. A2A clients see
+incremental progress instead of a silent wait followed by a single result.
 
-Store `session_id` from `ResultMessage` per `context_id`. On subsequent `execute()` calls with the same `context_id`, pass the stored `session_id` as the `resume` parameter to `ClaudeAgentOptions`.
+**2e. Bounded retry on transient errors**: Wrap the `query() → stream` cycle in a retry
+loop (3 attempts, exponential backoff). Trigger on `MessageParseError` with rate limit
+data or `AssistantMessage.error == "rate_limit"`. After retries exhausted, fail the task.
 
-**What changes**:
+### Decision 3: Implement team_tools.py MCP Module
 
-- Add `_session_ids: dict[str, str]` to `__init__()` — maps `context_id` to Claude `session_id`.
-- Add `_session_ids_lock: asyncio.Lock` for thread-safe access.
-- In the streaming loop: when `ResultMessage` is received, extract `msg.session_id` (if present) and store in `_session_ids[context_id]`.
-- In `execute()`: before building options, check `_session_ids.get(context_id)`. If present, set `resume=session_id` in the options kwargs.
+Implement `src/vaultspec/mcp_tools/team_tools.py` following the `subagent_server/server.py`
+registration pattern. Seven tools wrapping `TeamCoordinator` + new spawn capability:
 
-**Reference pattern**: `python-a2a` maintains `_conversation_histories` per `conversation_id`. Our equivalent is Claude's server-side session identified by `session_id`. We store the ID, Claude stores the history.
+| Tool | TeamCoordinator Method | Description |
+|------|----------------------|-------------|
+| `create_team` | `form_team()` | Form a team from agent URLs |
+| `team_status` | session inspection | Get status of a running team |
+| `list_teams` | session file listing | List active teams |
+| `dispatch_task` | `dispatch_parallel()` | Assign a task to a team member |
+| `broadcast_message` | `dispatch_parallel()` (all) | Send message to all members |
+| `send_message` | `_dispatch_one()` / `relay_output()` | Message a specific member |
+| `dissolve_team` | `dissolve_team()` | Dissolve a running team |
 
-### Decision 3: Non-Destructive Cancel
+Each tool follows the imperative registration pattern:
+```python
+mcp.tool(
+    title="Create Team",
+    annotations=ToolAnnotations(readOnlyHint=False, ...),
+)(create_team)
+```
 
-**Research finding**: P1 — Cancel is destructive. `cancel()` calls `interrupt()` + `disconnect()`. The SDK client is destroyed. Cannot resume after cancel.
+Session persistence reuses the `team_cli.py` helpers (`_save_session`, `_load_session`,
+`_restore_coordinator`) — the tools and CLI share the same `.vault/logs/teams/` storage.
 
-**Gap analysis finding**: P0 #2 — analogous to ACP bridge cancel bug.
+### Decision 4: Add Process Spawning to TeamCoordinator
 
-Replace destructive cancel with `interrupt()` only. The SDK client stays connected. The session's `session_id` is preserved for future `execute()` calls.
+Add `spawn_agent(script_path, port, name)` method to `TeamCoordinator`. Uses
+`asyncio.create_subprocess_exec` to start a local A2A server process. Tracks spawned
+processes in `self._spawned: dict[str, asyncio.subprocess.Process]`. Clean shutdown
+in `dissolve_team()` terminates all spawned processes.
 
-**What changes in `cancel()`**:
+This mirrors the reference `AgentManager.start_agent_server` pattern but uses
+`asyncio.subprocess` instead of `subprocess.Popen` for consistency with our async
+architecture.
 
-- Remove `await client.disconnect()` from cancel flow.
-- Keep `client.interrupt()` to stop the current stream.
-- Do NOT pop the client from `_active_clients` — it remains for potential re-use.
-- Add a per-task cancel tracking: `_cancelled_tasks: set[str]` to track which tasks were cancelled.
-- In `execute()`: check `_cancelled_tasks` at stream start and after each message. Clear the task from the set at the start of a new `execute()` for the same `task_id`.
+The spawned agent's URL is `http://localhost:{port}/`. After spawning, the coordinator
+waits for the agent card endpoint to become reachable (polling with timeout), then
+adds the agent to the team session via the existing `form_team` flow.
 
-**What changes in `execute()` finally block**:
+### Decision 5: Inject Team Tools into ClaudeA2AExecutor
 
-- Only `disconnect()` if the task completed or failed (not if cancelled).
-- Pop from `_active_clients` only on completion, failure, or explicit cleanup.
+The executor already accepts `mcp_servers: dict[str, Any]` and passes it to
+`ClaudeAgentOptions`. To give Claude access to team tools:
 
-### Decision 4: AssistantMessage.error Checking
+- Start a local `team_tools` MCP server (stdio or SSE transport)
+- Pass its configuration in the `mcp_servers` dict when constructing the executor
+- The Claude subprocess connects to it and can call `create_team`, `dispatch_task`, etc.
 
-**Research finding**: P1 — No `AssistantMessage.error` checking. The `.error` field (which can be `"rate_limit"`, `"authentication_failed"`, etc.) is ignored.
+This is done at the server/app initialization level (`server.py` or wherever the
+executor is constructed), not inside the executor itself. The executor is transport-agnostic
+— it just passes `mcp_servers` through.
 
-Check `AssistantMessage.error` in the streaming loop. If set, treat as a retriable error (for `"rate_limit"`) or terminal error (for others).
+### Decision 6: Register Team Tools in Unified MCP Server
 
-**What changes in the streaming loop**:
-
-- After receiving an `AssistantMessage`, check `msg.error`.
-- If `msg.error == "rate_limit"`: trigger the retry logic from Decision 1.
-- If `msg.error` is any other non-None value: emit `updater.failed()` with the error message and break the loop.
-- If `msg.error is None`: process content blocks as normal.
-
-### Decision 5: Streaming Progress Events
-
-**Research finding**: P2 — No intermediate streaming events. Only `working` → `completed/failed`. Rich A2A clients see no progress.
-
-Emit `TaskArtifactUpdateEvent` during streaming to provide progress visibility. Emit status updates on retry and cancel.
-
-**What changes in the streaming loop**:
-
-- On each `AssistantMessage` with text content: emit an intermediate artifact update via `updater.update_status()` with a message containing the latest text chunk.
-- On rate limit retry: emit status update noting "Rate limited, retrying (attempt N/M)".
-- On cancel detection: emit status update noting "Task cancelled" before cleanup.
-
-**What this enables**: A2A clients polling via `tasks/get` or streaming via SSE see incremental progress instead of a single final result.
+Add `register_team_tools(mcp)` call to `server.py`'s `create_server()` function,
+alongside the existing `register_subagent_tools(mcp)`. This makes team tools available
+to any MCP client connecting to the unified `vaultspec-mcp` server — not just Claude
+agents running inside the A2A executor.
 
 ## Rationale
 
-### Why Retry at Executor Level (not SDK Level)
+### Why Three Gaps Must Be Addressed Together
 
-The `rate_limit_event` is a `claude-agent-sdk` upstream bug — the SDK doesn't recognize this message type. We cannot fix the SDK. Retry at the executor level is the only option. Bounded retry (3 attempts, exponential backoff) prevents infinite loops while giving transient rate limits time to clear. This matches standard HTTP client retry patterns and is consistent with how `python-a2a` handles 429 responses.
+Fixing the executor alone (Gap 1) gives Claude reliable A2A communication but no team
+management. Implementing team tools alone (Gap 2) gives tools with no reliable executor
+to run them in. Adding process spawning alone (Gap 3) gives lifecycle management with
+no tools to invoke it. The three capabilities are interdependent — Claude as a viable
+team member requires all three.
 
-### Why `receive_response()` Over `receive_messages()`
+### Why MCP Tools (not Direct Python API)
 
-The ACP bridge (Phase 1) switched to `receive_response()` which provides filtered, higher-level messages. The A2A executor still uses raw `receive_messages()` which exposes parse errors for unknown message types. Consistency across protocol layers reduces maintenance burden and makes the code more robust. Both layers now use the same streaming API.
+Claude agents interact with capabilities via tools. MCP is the standard tool protocol.
+The `claude-agent-sdk` natively supports `mcp_servers` in its options. Exposing team
+management as MCP tools means any Claude agent (A2A, ACP, or standalone) can manage
+teams — not just our executor code.
 
-### Why Per-Context Session IDs (not Per-Task)
+### Why Wrap TeamCoordinator (not Rewrite)
 
-A2A `context_id` groups related tasks into a session. Multiple tasks in the same context should share conversation history. Storing `session_id` per `context_id` (not per `task_id`) means follow-up tasks in the same team session resume the conversation naturally. This aligns with the `TeamCoordinator`'s use of `context_id = team_id` ([[2026-02-20-a2a-team-adr]], Decision 2).
+`TeamCoordinator` already works correctly for its current scope (form, dispatch,
+collect, relay, dissolve). The CLI (`team_cli.py`) validates these methods across all
+7 subcommands. The tools add spawning capability and MCP exposure — they don't replace
+the coordinator.
 
-### Why Non-Destructive Cancel (Consistent with Phase 1)
+### Why asyncio.subprocess (not subprocess.Popen)
 
-Phase 1 established the pattern: `interrupt()` without `disconnect()`. The A2A executor should follow the same pattern for consistency. Destructive cancel forces a full reconnect (subprocess spawn, ~200-500ms on Windows) for the next task. Non-destructive cancel preserves the subprocess and session state. The saved `session_id` enables resume even if the client is eventually recreated.
-
-### Why Streaming Progress (not Just Final Result)
-
-The A2A spec supports `TaskStatusUpdateEvent` and `TaskArtifactUpdateEvent` for exactly this purpose. Our `TeamCoordinator` already calls `A2AClient.send_message()` which could be upgraded to `send_message_streaming()` in a future phase. Emitting intermediate events from the executor is a prerequisite for streaming dispatch at the coordinator level.
+Our entire stack is async. `asyncio.create_subprocess_exec` integrates naturally with
+the event loop, supports non-blocking I/O, and allows `await process.wait()` for clean
+shutdown. `subprocess.Popen` would require threading or polling for process management.
 
 ## Consequences
 
 ### Positive
 
-- E2E test `test_claude_a2a_responds` should pass after retry logic handles `rate_limit_event`.
-- Multi-turn A2A conversations via `context_id` grouping will preserve history.
-- Cancel preserves session state — cancelled tasks can be retried or followed up.
-- Streaming progress enables richer A2A client experiences.
-- Consistent patterns with Phase 1 ACP bridge reduce cognitive load and maintenance.
+- Claude can create teams, spawn agents, dispatch tasks, and dissolve teams — all via
+  natural language through MCP tools.
+- E2E `test_claude_a2a_responds` should pass with the SDK fix.
+- Multi-turn A2A conversations via session resume.
+- Non-destructive cancel preserves sessions.
+- Streaming progress gives observability into long-running tasks.
+- Team tools available to all MCP clients, not just A2A executor.
 
 ### Negative
 
-- Retry logic adds complexity to `execute()`. The method grows from ~90 lines to ~120 lines. Consider extracting the retry loop into a helper.
-- Per-context `_session_ids` dict grows unbounded over the executor's lifetime. Consider an LRU eviction strategy if the executor is long-lived.
-- Non-destructive cancel means the subprocess persists after cancellation. If many tasks are cancelled, subprocesses accumulate until `disconnect()` is explicitly called.
-- Streaming progress increases the number of events emitted per task. For tasks with many `AssistantMessage` chunks, this could be verbose.
+- `claude-agent-sdk` pinned to git main is less stable than a release version. Must
+  monitor for 0.1.40 release and switch back.
+- Process spawning adds complexity to `TeamCoordinator`. Must handle process crashes,
+  orphaned processes, port conflicts.
+- Team tools share session storage with `team_cli.py`. Concurrent access (CLI + MCP)
+  could cause conflicts. Consider file locking in a future phase.
+- In-memory `_session_ids` and `_conversations` grow unbounded. Consider eviction
+  for long-lived executors.
 
 ### Migration
 
-- Existing unit tests (`test_claude_executor.py`) must be extended to cover retry, session resume, and non-destructive cancel. The DI pattern (`_InProcessSDKClient`) supports this without mocking.
-- `TeamCoordinator` callers are unaffected — the coordinator dispatches via `A2AClient`, not directly to the executor.
-- The `_InProcessSDKClient` test double needs methods to simulate `MessageParseError` for retry testing and `session_id` on `ResultMessage` for resume testing.
-- This is the second of six protocol cases. The retry and session resume patterns will be applied to the Gemini A2A executor in a future phase.
+- `pyproject.toml`: Pin `claude-agent-sdk` to git main.
+- `claude_executor.py`: Extend (not rewrite). Add retry, session resume, cancel, streaming.
+- `team_tools.py`: Implement from stub. Follow `subagent_server/server.py` pattern.
+- `team.py`: Add `spawn_agent()` method. Extend `dissolve_team()` for process cleanup.
+- `server.py`: Add `register_team_tools(mcp)` call.
+- `test_claude_executor.py`: Extend with new test cases for retry, resume, cancel.
+- New test file for team tools.
+- No changes to ACP bridge, TeamCoordinator public API, or existing test fixtures.

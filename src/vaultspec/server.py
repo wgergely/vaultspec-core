@@ -4,12 +4,12 @@ Creates a single :class:`FastMCP` instance and registers tool modules.
 Each tool module exposes a ``register_tools(mcp)`` function that adds its
 ``@mcp.tool()`` and ``@mcp.resource()`` endpoints.
 
-Currently registered modules:
+Registered modules:
 - :mod:`vaultspec.subagent_server.server` -- 5 subagent dispatch tools
+- :mod:`vaultspec.mcp_tools.team_tools` -- 8 team coordination tools
 
 Future phases will add:
 - :mod:`vaultspec.mcp_tools.vault_tools` -- vault audit/management tools
-- :mod:`vaultspec.mcp_tools.team_tools` -- multi-agent team tools
 - :mod:`vaultspec.mcp_tools.framework_tools` -- framework CLI tools
 """
 
@@ -25,6 +25,8 @@ if TYPE_CHECKING:
 
 from mcp.server.fastmcp import FastMCP
 
+from vaultspec.mcp_tools.team_tools import register_tools as register_team_tools
+from vaultspec.mcp_tools.team_tools import set_root_dir as set_team_root_dir
 from vaultspec.subagent_server import (
     initialize_server,
     subagent_lifespan,
@@ -59,13 +61,17 @@ def create_server() -> FastMCP:
             "`dispatch_agent` to run a sub-agent with a task, "
             "`get_task_status` to check on a running task, "
             "`cancel_task` to cancel a running task, "
-            "and `get_locks` to view active advisory file locks."
+            "`get_locks` to view active advisory file locks, "
+            "and team tools (`create_team`, `team_status`, `list_teams`, "
+            "`dispatch_task`, `broadcast_message`, `send_message`, "
+            "`spawn_agent`, `dissolve_team`) for multi-agent coordination."
         ),
         lifespan=_lifespan,
     )
 
     # Register tool modules
     register_subagent_tools(mcp)
+    register_team_tools(mcp)
 
     return mcp
 
@@ -91,6 +97,7 @@ def main() -> None:
         root_dir=root_dir,
         ttl_seconds=cfg.mcp_ttl_seconds,
     )
+    set_team_root_dir(root_dir)
 
     mcp = create_server()
 

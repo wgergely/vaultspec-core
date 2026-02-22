@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -154,6 +155,8 @@ class TeamCoordinator:
         self._clients: dict[str, A2AClient] = {}
         # Single underlying httpx.AsyncClient shared across all A2A connections
         self._http_client: httpx.AsyncClient | None = None
+        # Map agent-name -> spawned subprocess (managed by spawn_agent / dissolve_team)
+        self._spawned: dict[str, asyncio.subprocess.Process] = {}
 
     # ------------------------------------------------------------------
     # Context manager support
@@ -398,6 +401,22 @@ class TeamCoordinator:
         self._in_flight.clear()
         self._clients.clear()
 
+        # Terminate all spawned subprocesses.
+        for agent_name, proc in list(self._spawned.items()):
+            try:
+                proc.terminate()
+                await asyncio.wait_for(proc.wait(), timeout=5.0)
+                logger.debug("Spawned process for %s terminated cleanly", agent_name)
+            except TimeoutError:
+                proc.kill()
+                logger.warning(
+                    "Spawned process for %s did not terminate in time; killed",
+                    agent_name,
+                )
+            except ProcessLookupError:
+                logger.debug("Spawned process for %s already exited", agent_name)
+        self._spawned.clear()
+
         # Mark all members terminated
         for member in self._session.members.values():
             member.status = MemberStatus.TERMINATED
@@ -532,6 +551,89 @@ class TeamCoordinator:
         task = await self._dispatch_one(dst_agent, request)
         self._in_flight[dst_agent] = task.id
         return task
+
+    async def spawn_agent(
+        self,
+        script_path: str,
+        port: int,
+        name: str,
+    ) -> TeamMember:
+        """Spawn a subprocess running an A2A agent server and add it to the team.
+
+        Uses ``sys.executable`` to ensure the subprocess shares the active
+        Python environment (virtualenv). After launching, polls the agent's
+        well-known endpoint until it becomes reachable, then discovers its
+        ``AgentCard`` and adds it as a new ``TeamMember``.
+
+        Args:
+            script_path: Path to a Python script that starts an A2A server
+                on the given port.
+            port: TCP port the agent will listen on.
+            name: Logical name for the new team member.
+
+        Returns:
+            The newly created ``TeamMember``.
+
+        Raises:
+            RuntimeError: If no active team session exists, if the agent
+                does not become reachable within the timeout, or if the
+                subprocess exits prematurely.
+        """
+        if self._session is None:
+            raise RuntimeError("No active team session. Call form_team() first.")
+
+        process = await asyncio.create_subprocess_exec(
+            sys.executable,
+            script_path,
+            "--port",
+            str(port),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        self._spawned[name] = process
+        logger.info("Spawned agent %r (pid=%s) on port %d", name, process.pid, port)
+
+        # Poll until the agent's well-known endpoint is reachable.
+        base_url = f"http://localhost:{port}"
+        card_url = f"{base_url}/.well-known/agent-card.json"
+        http = self._ensure_http_client()
+
+        deadline = asyncio.get_event_loop().time() + 10.0
+        while True:
+            # Check that the subprocess has not exited prematurely.
+            if process.returncode is not None:
+                stderr_bytes = await process.stderr.read() if process.stderr else b""
+                raise RuntimeError(
+                    f"Spawned process for {name!r} exited with code "
+                    f"{process.returncode}: {stderr_bytes.decode(errors='replace')}"
+                )
+            try:
+                resp = await http.get(card_url, timeout=2.0)
+                if resp.status_code == 200:
+                    break
+            except (httpx.ConnectError, httpx.ReadError, httpx.TimeoutException):
+                pass
+
+            if asyncio.get_event_loop().time() >= deadline:
+                process.terminate()
+                raise RuntimeError(
+                    f"Agent {name!r} on port {port} did not become reachable "
+                    "within 10 seconds"
+                )
+            await asyncio.sleep(0.5)
+
+        # Discover the agent card and register the member.
+        resolver = A2ACardResolver(httpx_client=http, base_url=f"{base_url}/")
+        card = await resolver.get_agent_card()
+        member = TeamMember(
+            name=name,
+            url=f"{base_url}/",
+            card=card,
+            status=MemberStatus.IDLE,
+        )
+        self._session.members[name] = member
+        logger.info("Agent %r joined team %r", name, self._session.name)
+        return member
 
     async def ping_agents(self) -> dict[str, bool]:
         """Check reachability of all team members.

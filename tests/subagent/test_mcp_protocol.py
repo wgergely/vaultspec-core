@@ -71,17 +71,28 @@ class TestToolRegistration:
     """Verify all tools are registered with correct schemas."""
 
     @pytest.mark.asyncio
-    async def test_all_five_tools_registered(self):
-        """Server exposes exactly 5 tools."""
+    async def test_all_tools_registered(self):
+        """Server exposes subagent + team tools."""
         tools = await mcp.list_tools()
         names = {t.name for t in tools}
-        assert names == {
+        expected_subagent = {
             "list_agents",
             "dispatch_agent",
             "get_task_status",
             "cancel_task",
             "get_locks",
         }
+        expected_team = {
+            "create_team",
+            "team_status",
+            "list_teams",
+            "dispatch_task",
+            "broadcast_message",
+            "send_message",
+            "spawn_agent",
+            "dissolve_team",
+        }
+        assert names == expected_subagent | expected_team
 
     @pytest.mark.asyncio
     async def test_tool_titles_set(self):

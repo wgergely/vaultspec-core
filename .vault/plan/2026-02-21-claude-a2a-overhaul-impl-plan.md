@@ -2,112 +2,192 @@
 tags:
   - "#plan"
   - "#claude-a2a-overhaul"
-date: "2026-02-21"
+date: "2026-02-22"
 related:
   - "[[2026-02-21-claude-a2a-overhaul-adr]]"
   - "[[2026-02-21-claude-a2a-overhaul-research]]"
-  - "[[2026-02-21-protocol-gap-analysis-research]]"
-  - "[[2026-02-21-claude-acp-bidirectional-adr]]"
+  - "[[2026-02-22-claude-team-management-reference]]"
+  - "[[2026-02-22-claude-team-management-adr]]"
+  - "[[2026-02-22-claude-team-management-plan]]"
+  - "[[2026-02-20-a2a-team-adr]]"
 ---
 
 # `claude-a2a-overhaul` implementation plan
 
-Overhaul `ClaudeA2AExecutor` per [[2026-02-21-claude-a2a-overhaul-adr]]: add bounded retry
-on rate limit, session resume via `context_id`, non-destructive cancel, `AssistantMessage.error`
-checking, and streaming progress events. Extend test infrastructure to cover all new behaviors
-without mocking.
+> **Parallel plan**: [[2026-02-22-claude-team-management-plan]] covers the same
+> team tools, process spawning, and executor injection work from a different angle.
+> That plan focuses on team lifecycle management; this plan adds executor reliability
+> (Phase 1) and unified server registration (Phase 4). The two plans share modified
+> files (`team.py`, `team_tools.py`, `claude_executor.py`) and must be coordinated
+> — do not execute both independently. Phase 1 of this plan (executor hardening) is
+> unique and has no overlap. Phases 2-5 here subsume the `claude-team-management`
+> plan's Phases 1-3.
+
+Make Claude a viable A2A team member. Three gaps closed across five phases:
+executor reliability (SDK fix + hardening), team tools (MCP implementation),
+process lifecycle (agent spawning), tool injection, and integration testing.
 
 ## Proposed Changes
 
-Five ADR decisions implemented across three phases. The executor at
-`src/vaultspec/protocol/a2a/executors/claude_executor.py` is the primary target.
-Test infrastructure at `src/vaultspec/protocol/a2a/tests/test_claude_executor.py`
-and `conftest.py` is extended in parallel.
+Per [[2026-02-21-claude-a2a-overhaul-adr]], six decisions implemented across five
+phases. Primary targets:
 
-The `TeamCoordinator` (`src/vaultspec/orchestration/team.py`) is NOT modified in this
-plan. Streaming dispatch and coordinator-level enhancements are deferred to a future
-phase per [[2026-02-21-claude-a2a-overhaul-research]] Finding 6.
+- `src/vaultspec/protocol/a2a/executors/claude_executor.py` — executor hardening
+- `src/vaultspec/mcp_tools/team_tools.py` — implement from stub
+- `src/vaultspec/orchestration/team.py` — add process spawning
+- `src/vaultspec/server.py` — register team tools
+- `pyproject.toml` — SDK pin to git main
+
+The `TeamCoordinator` public API is not changed. The ACP bridge is not touched.
 
 ## Tasks
 
-- `Phase 1: Core Reliability (ADR Decisions 1 + 4)`
-    1. **Switch streaming API**: Replace `receive_messages().__aiter__().__anext__()`
-       pattern with `async for msg in sdk_client.receive_response()` in `execute()`.
-       This aligns with the ACP bridge (Phase 1) and filters out raw parse errors.
-    2. **Add retry parameters**: Add `max_retries: int = 3` and
-       `retry_base_delay: float = 1.0` to `__init__()`.
-    3. **Implement bounded retry loop**: Wrap the `query() → stream` cycle in a retry
-       loop. On `MessageParseError`, inspect `exc.data` for `"rate_limit"`. If rate
-       limit detected, await `base_delay * 2^attempt` seconds then retry. After
-       `max_retries` exhausted, fail the task.
-    4. **Add `AssistantMessage.error` checking**: After receiving an `AssistantMessage`,
-       check `msg.error`. If `"rate_limit"`, trigger retry. If other non-None error,
-       fail the task immediately.
-    5. **Update `_InProcessSDKClient`**: Add `receive_response()` method that yields
-       the same messages as `receive_messages()`. Add ability to inject
-       `MessageParseError` into the stream for retry testing.
-    6. **Write tests**: Test successful retry after rate limit. Test failure after max
-       retries exhausted. Test `AssistantMessage.error` handling (rate_limit triggers
-       retry, other errors fail). Test non-rate-limit `MessageParseError` is logged
-       and skipped.
-    - **Files modified**: `claude_executor.py`, `test_claude_executor.py`
+- `Phase 1: SDK Fix + Executor Hardening (ADR Decisions 1 + 2)`
+    1. **Pin claude-agent-sdk to git main** in `pyproject.toml`:
+       `claude-agent-sdk @ git+https://github.com/anthropics/claude-agent-sdk-python.git@main`.
+       Run `uv sync`. Verify the `rate_limit_event` fix is present by inspecting
+       installed `message_parser.py`.
+    2. **Switch to `receive_response()`**: Replace the manual
+       `receive_messages().__aiter__().__anext__()` pattern (lines 130-164) with
+       `async for msg in sdk_client.receive_response()`. Remove the `_finalised`
+       flag — `receive_response()` stops at `ResultMessage` automatically.
+    3. **Add bounded retry**: Add `max_retries: int = 3` and
+       `retry_base_delay: float = 1.0` to `__init__()`. Wrap the `query() → stream`
+       cycle in a retry loop. On `MessageParseError` with rate limit data or
+       `AssistantMessage.error == "rate_limit"`, wait `base_delay * 2^attempt` then
+       retry. Keep the `MessageParseError` catch as belt-and-suspenders even with the
+       SDK fix.
+    4. **Add session resume**: Add `_session_ids: dict[str, str]` to `__init__()`.
+       In the streaming loop, extract `msg.session_id` from `ResultMessage`. On
+       subsequent `execute()` with same `context_id`, pass `resume=session_id` in
+       options kwargs.
+    5. **Make cancel non-destructive**: Remove `disconnect()` from `cancel()`. Keep
+       `interrupt()`. Add `_cancel_events: dict[str, asyncio.Event]` for per-task
+       cancel. Check in streaming loop, break if set. Only `disconnect()` on
+       completion/failure in the `finally` block.
+    6. **Add streaming progress**: Emit `updater.update_status()` with accumulated
+       text during streaming (throttle: every 500ms or 100 chars). Emit status on
+       retry ("Rate limited, retrying N/M") and cancel ("Task cancelled").
+    7. **Extend `_InProcessSDKClient`**: Add `receive_response()` method. Add ability
+       to inject errors (for retry testing) and `session_id` on `ResultMessage`
+       (for resume testing).
+    8. **Write tests**: Retry after rate limit. Failure after max retries. Session
+       resume across two executions with same context_id. Non-destructive cancel
+       (no disconnect, session preserved). Streaming progress events in output.
+       `AssistantMessage.error` handling.
+    - **Files modified**: `pyproject.toml`, `claude_executor.py`,
+      `test_claude_executor.py`
+    - **Verify**: `uv sync` succeeds. All existing 69 non-E2E tests pass. New tests
+      pass.
 
-- `Phase 2: Session Resume + Non-Destructive Cancel (ADR Decisions 2 + 3)`
-    1. **Add per-context session tracking**: Add `_session_ids: dict[str, str]` and
-       `_session_ids_lock: asyncio.Lock` to `__init__()`.
-    2. **Extract session ID from `ResultMessage`**: In the streaming loop, when
-       `ResultMessage` is received, extract `msg.session_id` (if present) and store
-       in `_session_ids[context_id]`.
-    3. **Pass `resume` on subsequent executions**: In `execute()`, before building
-       options, check `_session_ids.get(context_id)`. If present, include
-       `resume=session_id` in the options kwargs dict.
-    4. **Make cancel non-destructive**: In `cancel()`, remove
-       `await client.disconnect()`. Keep `client.interrupt()`. Do NOT pop client from
-       `_active_clients`. Add `_cancelled_tasks: set[str]` tracking.
-    5. **Adjust execute() finally block**: Only call `disconnect()` on completion or
-       failure, not after cancellation. Check `_cancelled_tasks` in the streaming loop
-       to break early.
-    6. **Update `_OptionsRecorder`**: Verify that `resume` parameter is captured when
-       present.
-    7. **Write tests**: Test session ID extraction from `ResultMessage`. Test `resume`
-       is passed on second `execute()` with same `context_id`. Test cancel does not
-       disconnect. Test cancelled task can be followed up with new execute.
-    - **Files modified**: `claude_executor.py`, `test_claude_executor.py`
+- `Phase 2: Implement team_tools.py (ADR Decision 3)`
+    1. **Implement `register_tools()`**: Follow `subagent_server/server.py` pattern.
+       Register 7 tools via imperative `mcp.tool(title=..., annotations=...)(fn)`.
+    2. **Implement `create_team()`**: Accept `name: str` and `agent_urls: list[str]`.
+       Instantiate `TeamCoordinator`, call `form_team()`. Persist session via
+       `team_cli._save_session()` helpers (reuse, don't duplicate). Return team_id
+       and member list as JSON.
+    3. **Implement `team_status()`**: Accept `name: str`. Load session from
+       `.vault/logs/teams/{name}.json`. Return status, members, and their states.
+    4. **Implement `list_teams()`**: List `.json` files in `.vault/logs/teams/`.
+       Return list of team names and statuses.
+    5. **Implement `dispatch_task()`**: Accept `team_name: str`, `agent_name: str`,
+       `task: str`. Restore coordinator from session. Call
+       `dispatch_parallel({agent_name: task})`. Return task ID and status.
+    6. **Implement `broadcast_message()`**: Accept `team_name: str`, `message: str`.
+       Dispatch same message to all members. Return results.
+    7. **Implement `send_message()`**: Accept `team_name: str`, `to: str`,
+       `message: str`. Dispatch to specific agent. Return result.
+    8. **Implement `dissolve_team()`**: Accept `team_name: str`. Restore coordinator.
+       Call `dissolve_team()`. Delete session file. Return confirmation.
+    9. **Write tests**: Test each tool function with DI'd coordinator. Test session
+       persistence round-trip. Test error cases (unknown team, unknown agent).
+    - **Files modified**: `team_tools.py`
+    - **New test file**: `src/vaultspec/mcp_tools/tests/test_team_tools.py`
+    - **Verify**: All tools callable. Session persistence works. No regressions.
 
-- `Phase 3: Streaming Progress Events (ADR Decision 5)`
-    1. **Emit intermediate status updates**: On each `AssistantMessage` with text
-       content, call `updater.update_status()` with the latest text chunk.
-    2. **Emit retry status**: On rate limit retry, emit status update with
-       "Rate limited, retrying (attempt N/M)" message.
-    3. **Emit cancel status**: On cancel detection in streaming loop, emit status
-       update before breaking.
-    4. **Write tests**: Test intermediate status events are emitted during streaming.
-       Test retry status events. Verify event ordering: working → intermediate →
-       completed/failed.
-    - **Files modified**: `claude_executor.py`, `test_claude_executor.py`
+- `Phase 3: Process Spawning (ADR Decision 4)`
+    1. **Add `spawn_agent()` to `TeamCoordinator`**: Accept `script_path: str`,
+       `port: int`, `name: str`. Use `asyncio.create_subprocess_exec` to start the
+       process. Use `sys.executable` as the command (e.g., `[sys.executable, script_path, ...]`)
+       to ensure the subprocess runs in the same Python environment (virtualenv) as the host.
+       Track in `self._spawned: dict[str, asyncio.subprocess.Process]`.
+    2. **Add health check polling**: After spawning, poll
+       `http://localhost:{port}/.well-known/agent.json` with timeout (10s, 500ms
+       interval). Raise if agent doesn't become reachable.
+    3. **Extend `dissolve_team()`**: Terminate all spawned processes. Call
+       `process.terminate()`, then `process.wait()` with timeout. If still alive,
+       `process.kill()`.
+    4. **Add `spawn_agent` tool to team_tools.py**: Accept `script_path: str`,
+       `port: int`, `name: str`, `team_name: str`. Call coordinator's `spawn_agent()`.
+       Add spawned agent to team session.
+    5. **Write tests**: Test spawn + health check with a simple echo server script.
+       Test dissolve terminates spawned processes. Test spawn failure (invalid script).
+    - **Files modified**: `team.py`, `team_tools.py`
+    - **Verify**: Process spawns, becomes reachable, gets added to team. Clean
+      shutdown on dissolve.
+
+- `Phase 4: Wiring (ADR Decisions 5 + 6)`
+    1. **Register team tools in unified server**: Add
+       `from vaultspec.mcp_tools.team_tools import register_tools as register_team_tools`
+       and `register_team_tools(mcp)` to `server.py`'s `create_server()`.
+    2. **Document MCP injection pattern**: Add a helper or documentation showing how
+       to construct `mcp_servers` config for injecting `team_tools` into
+       `ClaudeA2AExecutor`. The executor already passes `mcp_servers` through to
+       `ClaudeAgentOptions` — the wiring is at the call site, not inside the executor.
+    3. **Verify MCP tool discovery**: Start the unified server, connect a client,
+       verify team tools appear alongside subagent tools.
+    - **Files modified**: `server.py`
+    - **Verify**: `vaultspec-mcp` exposes team tools. `list_tools` returns all
+      subagent + team tools.
+
+- `Phase 5: Integration Testing`
+    1. **Team lifecycle integration test**: Create team with in-process echo agents
+       (using existing `EchoExecutor` from conftest). Dispatch task. Collect result.
+       Dissolve team. Verify full lifecycle.
+    2. **Team tools integration test**: Verify `create_team` → `dispatch_task` →
+       `team_status` → `dissolve_team` flow through MCP tools.
+    3. **Executor + team tools test**: Construct executor with `mcp_servers` including
+       team tools. Verify the executor can be configured to access team capabilities.
+    4. **Run full test suite**: All non-E2E tests pass. No regressions.
+    - **New test file**: `tests/integration/test_team_lifecycle.py` or extend
+      existing `test_team.py`
+    - **Verify**: Full lifecycle works end-to-end through tools.
 
 ## Parallelization
 
-Phases 1 and 2 share the `execute()` method and must be sequential — Phase 1
-restructures the streaming loop (retry wrapper), Phase 2 adds session tracking and
-cancel changes to the same loop. Phase 3 (streaming events) adds to the loop
-established by Phases 1-2 and should follow them.
+- **Phase 1** (executor) and **Phase 2** (team tools) are independent and can run
+  in parallel. Phase 1 modifies executor code; Phase 2 implements MCP tools. No
+  shared files.
+- **Phase 3** (spawning) depends on Phase 2 (adds a tool to team_tools.py) and
+  modifies `team.py`.
+- **Phase 4** (wiring) depends on Phase 2 (tools must exist to register).
+- **Phase 5** (integration) depends on all prior phases.
 
-**Recommended**: Sequential execution. Phase 1 → Phase 2 → Phase 3. Each phase has
-its own step record.
+**Recommended**: Run Phase 1 and Phase 2 in parallel. Then Phase 3. Then Phase 4.
+Then Phase 5.
+
+```
+Phase 1 (executor) ──┐
+                      ├── Phase 3 (spawning) ── Phase 4 (wiring) ── Phase 5 (integration)
+Phase 2 (tools)  ────┘
+```
 
 ## Verification
 
-- **Baseline preservation**: All 69 non-E2E tests must continue to pass after each phase.
-- **New test coverage**: Each phase adds tests for its specific behaviors. Target: at
-  least 6 new test cases (Phase 1: 4, Phase 2: 4, Phase 3: 3).
-- **E2E validation**: After Phase 1, the `test_claude_a2a_responds` E2E test should
-  have improved resilience to `rate_limit_event`. However, E2E tests depend on external
-  services and may still be flaky. The retry logic is verified via DI-based tests.
-- **Backward compatibility**: `TeamCoordinator` and CLI callers are not modified and
-  should work unchanged. Verify by running `test_team.py` and `test_integration_a2a.py`
-  after all phases.
-- **Pattern consistency**: Compare the final `claude_executor.py` streaming loop
-  structure with the ACP bridge's `prompt()` loop in `claude_bridge.py`. Both should
-  follow the same patterns: `receive_response()`, session ID extraction, non-destructive
-  cancel, `asyncio.Event`-based or set-based cancel tracking.
+- **Baseline preservation**: All 69 non-E2E tests pass after each phase.
+- **New test coverage**: Target 20+ new test cases across all phases.
+  - Phase 1: ~8 (retry, resume, cancel, streaming, error handling)
+  - Phase 2: ~8 (one per tool + error cases)
+  - Phase 3: ~3 (spawn, health check, dissolve cleanup)
+  - Phase 5: ~3 (lifecycle, tools flow, executor config)
+- **E2E validation**: `test_claude_a2a_responds` should pass with the SDK fix if
+  `ANTHROPIC_API_KEY` is available. The `rate_limit_event` crash is fixed upstream.
+- **Import hygiene**: No new imports of `anthropic` in the executor. `claude-agent-sdk`
+  remains the sole SDK. `anthropic` is NOT added as a direct dependency.
+- **MCP consistency**: Team tools follow the same `register_tools(mcp)` pattern as
+  `subagent_server/server.py`. Same `ToolAnnotations`, same error reporting via
+  `ToolError`.
+- **Backward compatibility**: `TeamCoordinator.form_team()`,
+  `dispatch_parallel()`, `collect_results()`, `dissolve_team()` signatures unchanged.
+  CLI (`team_cli.py`) works unchanged.
