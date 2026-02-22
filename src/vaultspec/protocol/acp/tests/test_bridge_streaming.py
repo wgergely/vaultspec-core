@@ -23,8 +23,9 @@ from claude_agent_sdk import (
 )
 
 from tests.constants import TEST_PROJECT
-from vaultspec.protocol.acp import ClaudeACPBridge
-from vaultspec.protocol.acp.claude_bridge import _map_tool_kind
+
+from .. import ClaudeACPBridge
+from ..claude_bridge import _map_tool_kind
 
 if TYPE_CHECKING:
     from acp.schema import FileEditToolCallContent
@@ -1132,7 +1133,7 @@ class TestTodoWritePlan:
         """AssistantMessage with TodoWrite tool use emits AgentPlanUpdate."""
         from acp.schema import AgentPlanUpdate, ToolCallStart
 
-        from vaultspec.protocol.acp.claude_bridge import _SessionState
+        from ..claude_bridge import _SessionState
 
         # Setup session state
         connected_bridge._sessions["s1"] = _SessionState(
@@ -1180,7 +1181,7 @@ class TestTodoWritePlan:
         from acp.schema import AgentPlanUpdate
         from claude_agent_sdk.types import StreamEvent
 
-        from vaultspec.protocol.acp.claude_bridge import _SessionState
+        from ..claude_bridge import _SessionState
 
         # Setup session state
         connected_bridge._sessions["s1"] = _SessionState(
@@ -1223,7 +1224,7 @@ class TestTodoWritePlan:
         self, connected_bridge, test_conn
     ):
         """UserMessage for TodoWrite does not emit ToolCallProgress."""
-        from vaultspec.protocol.acp.claude_bridge import _SessionState
+        from ..claude_bridge import _SessionState
 
         # Setup session state with tracked ID
         session_state = _SessionState(
@@ -1254,7 +1255,7 @@ class TestContentAccumulation:
         """AssistantMessage initializes content in state."""
         from acp.schema import ToolCallStart
 
-        from vaultspec.protocol.acp.claude_bridge import _SessionState
+        from ..claude_bridge import _SessionState
 
         # Setup session state
         connected_bridge._sessions["s1"] = _SessionState(
@@ -1305,7 +1306,7 @@ class TestContentAccumulation:
         """UserMessage appends result text to content."""
         from acp.schema import ToolCallProgress
 
-        from vaultspec.protocol.acp.claude_bridge import _SessionState
+        from ..claude_bridge import _SessionState
 
         # Setup session state
         session_state = _SessionState(

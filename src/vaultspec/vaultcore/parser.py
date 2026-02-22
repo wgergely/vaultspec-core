@@ -1,3 +1,5 @@
+"""YAML frontmatter parsers for vault markdown documents."""
+
 from __future__ import annotations
 
 import logging
@@ -19,6 +21,12 @@ def _simple_yaml_load(text: str) -> dict[str, Any]:
 
     Handles ``key: value`` pairs, preserving colons in values.
     Does NOT handle nested structures, multi-line values, or lists.
+
+    Args:
+        text: Raw YAML text (without ``---`` delimiters).
+
+    Returns:
+        Dictionary of parsed key-value pairs.
     """
     data: dict[str, Any] = {}
     for line in text.split("\n"):
@@ -34,6 +42,14 @@ try:
     import yaml
 
     def _yaml_load_impl(text: str) -> dict[str, Any]:
+        """Load YAML text via PyYAML, falling back to the simple parser on error.
+
+        Args:
+            text: Raw YAML text (without ``---`` delimiters).
+
+        Returns:
+            Dictionary of parsed key-value pairs.
+        """
         try:
             return yaml.safe_load(text) or {}
         except yaml.YAMLError:
@@ -53,6 +69,15 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
 
     Uses PyYAML when available, falling back to a simple key-value
     splitter otherwise.
+
+    Args:
+        content: Raw markdown text, optionally beginning with ``---`` fenced
+            YAML frontmatter.
+
+    Returns:
+        A two-tuple of ``(frontmatter_dict, body)`` where ``body`` is the
+        markdown content after the closing ``---`` fence, or the full content
+        if no frontmatter is present.
     """
     content = content.lstrip()
     frontmatter: dict[str, Any] = {}
@@ -73,7 +98,21 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
 
 
 def parse_vault_metadata(content: str) -> tuple[DocumentMetadata, str]:
-    """Parses rigid vault metadata from markdown content."""
+    """Parse rigid vault metadata from the YAML frontmatter of a markdown document.
+
+    Uses a hand-written line scanner that tolerates the YAML list syntax
+    used by the vault schema (``- "value"`` items under ``tags:`` /
+    ``related:``).
+
+    Args:
+        content: Raw markdown text, optionally beginning with ``---`` fenced
+            YAML frontmatter.
+
+    Returns:
+        A two-tuple of ``(DocumentMetadata, body)`` where ``body`` is the
+        markdown content that follows the closing ``---`` fence, or the full
+        content if no frontmatter is present.
+    """
     content = content.lstrip()
     metadata = DocumentMetadata()
     body = content

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from vaultspec.core.config import (
+from vaultspec.config.config import (
     CONFIG_REGISTRY,
     VaultSpecConfig,
     _OptionalFloat,

@@ -1,56 +1,36 @@
+"""Vault CLI — audit, create, index, and search .vault/ documents."""
+
 import argparse
 import json
-import pathlib
+import logging
 import sys
 from datetime import datetime
 
-from vaultspec.core import WorkspaceLayout, resolve_workspace
-from vaultspec.graph import VaultGraph
-from vaultspec.logging_config import configure_logging
-from vaultspec.metrics import get_vault_metrics
-from vaultspec.vaultcore import (
-    DocType,
-    get_template_path,
-    hydrate_template,
+from .cli_common import (
+    add_common_args,
+    get_default_layout,
+    resolve_args_workspace,
+    setup_logging,
 )
-from vaultspec.verification import (
+from .graph import VaultGraph
+from .metrics import get_vault_metrics
+from .vaultcore import (
+    DocType,
+    create_vault_doc,
+)
+from .verification import (
     fix_violations,
     get_malformed,
     list_features,
     verify_vertical_integrity,
 )
 
-# Resolve workspace layout at import time (replaces _paths.py bootstrap)
-_default_layout: WorkspaceLayout = resolve_workspace(framework_dir_name=".vaultspec")
-ROOT_DIR = _default_layout.output_root
-
-
-def _get_version(root_dir: pathlib.Path | None = None) -> str:
-    """Read version from pyproject.toml."""
-    root = root_dir if root_dir is not None else ROOT_DIR
-    toml_path = root / "pyproject.toml"
-    if toml_path.exists():
-        for line in toml_path.read_text(encoding="utf-8").splitlines():
-            if line.strip().startswith("version"):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return "unknown"
+logger = logging.getLogger(__name__)
 
 
 def _make_parser() -> argparse.ArgumentParser:
-    """Build the vault.py argument parser."""
     parser = argparse.ArgumentParser(description="Audit and manage the .vault vault.")
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Enable verbose output (INFO level)",
-    )
-    parser.add_argument(
-        "--debug", action="store_true", help="Enable debug logging (DEBUG level)"
-    )
-    parser.add_argument(
-        "--version", "-V", action="version", version=f"%(prog)s {_get_version()}"
-    )
+    add_common_args(parser)
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
     # Audit command
@@ -66,15 +46,6 @@ def _make_parser() -> argparse.ArgumentParser:
     )
     audit_parser.add_argument(
         "--graph", action="store_true", help="Show graph hotspots."
-    )
-    audit_parser.add_argument(
-        "--root", type=pathlib.Path, default=None, help="Vault root directory."
-    )
-    audit_parser.add_argument(
-        "--content-dir",
-        type=pathlib.Path,
-        default=None,
-        help="Content source directory (rules, agents, skills).",
     )
     audit_parser.add_argument(
         "--limit", type=int, default=10, help="Limit number of items in reports."
@@ -105,15 +76,6 @@ def _make_parser() -> argparse.ArgumentParser:
         "--feature", type=str, required=True, help="Feature name (kebab-case)."
     )
     create_parser.add_argument("--title", type=str, help="Title of the document.")
-    create_parser.add_argument(
-        "--root", type=pathlib.Path, default=None, help="Vault root directory."
-    )
-    create_parser.add_argument(
-        "--content-dir",
-        type=pathlib.Path,
-        default=None,
-        help="Content source directory (rules, agents, skills).",
-    )
 
     # Index command (RAG)
     index_parser = subparsers.add_parser(
@@ -122,15 +84,6 @@ def _make_parser() -> argparse.ArgumentParser:
         epilog=(
             "NOTE: Requires NVIDIA GPU with CUDA. CPU-only systems are not supported."
         ),
-    )
-    index_parser.add_argument(
-        "--root", type=pathlib.Path, default=None, help="Vault root directory."
-    )
-    index_parser.add_argument(
-        "--content-dir",
-        type=pathlib.Path,
-        default=None,
-        help="Content source directory (rules, agents, skills).",
     )
     index_parser.add_argument(
         "--full",
@@ -151,15 +104,6 @@ def _make_parser() -> argparse.ArgumentParser:
     )
     search_parser.add_argument("query", type=str, help="Search query.")
     search_parser.add_argument(
-        "--root", type=pathlib.Path, default=None, help="Vault root directory."
-    )
-    search_parser.add_argument(
-        "--content-dir",
-        type=pathlib.Path,
-        default=None,
-        help="Content source directory (rules, agents, skills).",
-    )
-    search_parser.add_argument(
         "--limit", type=int, default=5, help="Number of results."
     )
     search_parser.add_argument(
@@ -170,20 +114,16 @@ def _make_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
-
     parser = _make_parser()
     args = parser.parse_args(argv)
 
-    if args.debug:
-        configure_logging(level="DEBUG")
-    elif args.verbose:
-        configure_logging(level="INFO")
-    else:
-        configure_logging()
+    setup_logging(args)
 
     if not args.command:
         parser.print_help()
         return
+
+    resolve_args_workspace(args, get_default_layout())
 
     if args.command == "create":
         handle_create(args)
@@ -195,60 +135,22 @@ def main(argv: list[str] | None = None) -> None:
         handle_search(args)
 
 
-def _resolve_root(args) -> "pathlib.Path":
-    """Resolve output root from args, using workspace resolution if needed.
-
-    When only ``--root`` is provided, it is used directly (backwards
-    compat — vault.py treats ``--root`` as the project root for vault
-    operations, NOT as a full workspace override).  ``resolve_workspace``
-    is only invoked when ``--content-dir`` is explicitly set.
-    """
-    content_dir = getattr(args, "content_dir", None)
-    if content_dir is not None:
-        layout = resolve_workspace(
-            root_override=args.root,
-            content_override=content_dir,
-            framework_dir_name=".vaultspec",
-        )
-        return layout.output_root
-    if args.root is not None:
-        return args.root
-    return ROOT_DIR
-
-
 def handle_create(args):
-    root_dir = _resolve_root(args)
     doc_type = DocType(args.type)
     feature = args.feature.strip("#")
     date_str = datetime.now().strftime("%Y-%m-%d")
-
-    template_path = get_template_path(root_dir, doc_type)
-    if template_path is None:
-        print(f"Error: No template found for type '{doc_type.value}'")
+    try:
+        create_vault_doc(args.root, doc_type, feature, date_str, args.title)
+    except FileNotFoundError as exc:
+        logger.error("Error: %s", exc)
         sys.exit(1)
-
-    assert template_path is not None  # narrowing for type checker
-    content = template_path.read_text(encoding="utf-8")
-    hydrated = hydrate_template(content, feature, date_str, args.title)
-
-    # Generate filename: yyyy-mm-dd-<feature>-<type>.md
-    filename = f"{date_str}-{feature}-{doc_type.value}.md"
-    from vaultspec.core import get_config
-
-    target_dir = root_dir / get_config().docs_dir / doc_type.value
-    target_path = target_dir / filename
-
-    if target_path.exists():
-        print(f"Error: File already exists at {target_path}")
+    except FileExistsError as exc:
+        logger.error("Error: %s", exc)
         sys.exit(1)
-
-    target_dir.mkdir(parents=True, exist_ok=True)
-    target_path.write_text(hydrated, encoding="utf-8")
-    print(f"Created {target_path}")
 
 
 def handle_audit(args):
-    root_dir = _resolve_root(args)
+    root_dir = args.root
     results = {}
 
     if args.summary:
@@ -295,7 +197,6 @@ def handle_audit(args):
                 print("Verification Passed.")
             print()
 
-        # Auto-fix violations if requested
         if args.fix and errors:
             if not args.json:
                 print("Running auto-repair...")
@@ -372,29 +273,27 @@ def handle_audit(args):
 
 def handle_index(args):
     try:
-        from vaultspec.rag.api import index
-        from vaultspec.rag.embeddings import get_device_info
+        from .rag import get_device_info, index
     except ImportError:
-        print("Error: RAG dependencies not installed.")
-        print("Run: pip install -e '.[rag]'")
+        logger.error("Error: RAG dependencies not installed.")
+        logger.error("Run: pip install -e '.[rag]'")
         sys.exit(1)
 
-    root_dir = _resolve_root(args)
+    root_dir = args.root
 
-    # Report device info
     device_info = get_device_info()
     if not args.json:
         device = device_info["device"]
         gpu = device_info.get("gpu_name")
         if gpu:
             vram = device_info.get("vram_mb", 0)
-            print(f"Device: {device} ({gpu}, {vram}MB VRAM)")
+            logger.info("Device: %s (%s, %dMB VRAM)", device, gpu, vram)
         else:
-            print(f"Device: {device}")
-        print()
+            logger.info("Device: %s", device)
 
     if not args.json:
-        print("Running full index..." if args.full else "Running incremental index...")
+        msg = "Running full index..." if args.full else "Running incremental index..."
+        logger.info(msg)
 
     result = index(root_dir, full=args.full)
 
@@ -413,24 +312,24 @@ def handle_index(args):
             )
         )
     else:
-        print("Index complete:")
-        print(f"  Total documents: {result.total}")
-        print(f"  Added:           {result.added}")
-        print(f"  Updated:         {result.updated}")
-        print(f"  Removed:         {result.removed}")
-        print(f"  Duration:        {result.duration_ms}ms")
-        print(f"  Device:          {result.device}")
+        logger.info("Index complete:")
+        logger.info("  Total documents: %d", result.total)
+        logger.info("  Added:           %d", result.added)
+        logger.info("  Updated:         %d", result.updated)
+        logger.info("  Removed:         %d", result.removed)
+        logger.info("  Duration:        %dms", result.duration_ms)
+        logger.info("  Device:          %s", result.device)
 
 
 def handle_search(args):
     try:
-        from vaultspec.rag.api import search
+        from .rag import search
     except ImportError:
-        print("Error: RAG dependencies not installed.")
-        print("Run: pip install -e '.[rag]'")
+        logger.error("Error: RAG dependencies not installed.")
+        logger.error("Run: pip install -e '.[rag]'")
         sys.exit(1)
 
-    root_dir = _resolve_root(args)
+    root_dir = args.root
     results = search(root_dir, args.query, limit=args.limit)
 
     if args.json:
@@ -454,8 +353,8 @@ def handle_search(args):
         )
     else:
         if not results:
-            print(f"No results found for '{args.query}'.")
-            print("Try broadening your query or removing filters.")
+            logger.info("No results found for '%s'.", args.query)
+            logger.info("Try broadening your query or removing filters.")
             return
         print(f"Search results for '{args.query}':")
         for r in results:

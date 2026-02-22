@@ -3,7 +3,8 @@
 import pytest
 
 from tests.constants import TEST_PROJECT
-from vaultspec.protocol.sandbox import (
+
+from ..sandbox import (
     _is_vault_path,
     _make_sandbox_callback,
 )

@@ -24,10 +24,6 @@ with the macroscopic awareness of an architect.
   needed, but typically you perform the review yourself using analysis tools.
 - Use `rg`, `sg`, and `fd` to explore the codebase.
 
----
-<!-- Human-readable documentation above | Agent instructions below -->
----
-
 ## Safety Domain (Strict)
 
 *Inherited from the legacy Safety Auditor. These rules are non-negotiable.*

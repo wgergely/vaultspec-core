@@ -1,6 +1,6 @@
 import pytest
 
-from vaultspec.vaultcore import (
+from .. import (
     DocType,
     DocumentMetadata,
     VaultConstants,

@@ -17,8 +17,8 @@ from claude_agent_sdk import (
 )
 
 from tests.constants import TEST_PROJECT
-from vaultspec.protocol.acp import ClaudeACPBridge
 
+from .. import ClaudeACPBridge
 from .conftest import (
     make_di_bridge,
     make_test_client,

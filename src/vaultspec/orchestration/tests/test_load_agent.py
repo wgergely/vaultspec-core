@@ -5,15 +5,15 @@ import tempfile
 
 import pytest
 
-from vaultspec.orchestration import (
+from ...protocol.providers import ClaudeModels, GeminiModels
+from .. import (
     SecurityError,
     safe_read_text,
 )
-from vaultspec.orchestration.subagent import (
+from ..subagent import (
     AgentNotFoundError,
     load_agent,
 )
-from vaultspec.protocol.providers import ClaudeModels, GeminiModels
 
 pytestmark = [pytest.mark.unit]
 

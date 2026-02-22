@@ -1,3 +1,5 @@
+"""Filesystem scanner for discovering and classifying vault documents."""
+
 from __future__ import annotations
 
 import logging
@@ -15,8 +17,17 @@ if TYPE_CHECKING:
 
 
 def scan_vault(root_dir: pathlib.Path) -> Iterator[pathlib.Path]:
-    """Yields all markdown files in the .vault/ directory."""
-    from vaultspec.core import get_config
+    """Yield all markdown files under the configured docs directory.
+
+    Skips hidden ``.obsidian`` subtrees.
+
+    Args:
+        root_dir: Project root that contains the docs directory.
+
+    Yields:
+        Absolute paths to each ``.md`` file found.
+    """
+    from ..config import get_config
 
     docs_dir = root_dir / get_config().docs_dir
     if not docs_dir.exists():
@@ -35,8 +46,17 @@ def scan_vault(root_dir: pathlib.Path) -> Iterator[pathlib.Path]:
 
 
 def get_doc_type(path: pathlib.Path, root_dir: pathlib.Path) -> DocType | None:
-    """Determines the DocType based on the file's parent directory."""
-    from vaultspec.core import get_config
+    """Determine the DocType of a vault file based on its parent directory.
+
+    Args:
+        path: Absolute path to the vault document.
+        root_dir: Project root used to resolve the docs directory prefix.
+
+    Returns:
+        The ``DocType`` inferred from the first path component relative to the
+        docs directory, or ``None`` if the path does not match any known type.
+    """
+    from ..config import get_config
 
     docs_dir = root_dir / get_config().docs_dir
     try:

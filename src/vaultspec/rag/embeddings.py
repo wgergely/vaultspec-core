@@ -103,6 +103,15 @@ def _encode_query_cached(
     """Encode and cache a query embedding as a tuple (hashable for LRU cache).
 
     Module-level function so lru_cache does not capture ``self``.
+
+    Args:
+        model: A ``SentenceTransformer`` instance used for encoding.
+        query_prefix: Prefix string to prepend before the query text
+            (e.g. ``"search_query: "``).
+        query: The raw query string to encode.
+
+    Returns:
+        Normalized embedding as a tuple of floats (hashable for LRU cache).
     """
     prefixed = f"{query_prefix}{query}"
     result = model.encode(prefixed, show_progress_bar=False, normalize_embeddings=True)
@@ -114,6 +123,17 @@ class EmbeddingModel:
 
     Requires a CUDA-enabled GPU. Will fail fast on initialization if
     no GPU is available.
+
+    Attributes:
+        MODEL_NAME: HuggingFace model ID used for embeddings.
+        DEFAULT_DIMENSION: Fallback embedding dimension before the model loads.
+        DOCUMENT_PREFIX: Prefix prepended to document text before encoding.
+        QUERY_PREFIX: Prefix prepended to query text before encoding.
+        DEFAULT_BATCH_SIZE: Fallback batch size for encoding (class-level
+            constant kept for backwards compatibility).
+        MAX_EMBED_CHARS: Fallback max characters per document for truncation
+            (class-level constant kept for backwards compatibility).
+        dimension: Actual embedding dimension queried from the loaded model.
     """
 
     MODEL_NAME = "nomic-ai/nomic-embed-text-v1.5"
@@ -123,13 +143,24 @@ class EmbeddingModel:
 
     @staticmethod
     def _default_batch_size() -> int:
-        from vaultspec.core import get_config
+        """Return the configured embedding batch size.
+
+        Returns:
+            Batch size integer from :attr:`~..config.VaultConfig.embedding_batch_size`.
+        """
+        from ..config import get_config
 
         return get_config().embedding_batch_size
 
     @staticmethod
     def _default_max_embed_chars() -> int:
-        from vaultspec.core import get_config
+        """Return the configured maximum characters per document to embed.
+
+        Returns:
+            Max character count integer from
+            :attr:`~..config.VaultConfig.max_embed_chars`.
+        """
+        from ..config import get_config
 
         return get_config().max_embed_chars
 
@@ -138,11 +169,18 @@ class EmbeddingModel:
     MAX_EMBED_CHARS = 8000
 
     def __init__(self) -> None:
+        """Load the embedding model onto the CUDA device.
+
+        Raises:
+            ImportError: If ``sentence-transformers`` or ``torch`` are not
+                installed (hint: ``pip install -e '.[rag]'``).
+            GPUNotAvailableError: If no CUDA device is detected.
+        """
         _check_rag_deps()
         _require_cuda()
         from sentence_transformers import SentenceTransformer
 
-        from vaultspec.core import get_config
+        from ..config import get_config
 
         model_name = get_config().embedding_model
         self._device = "cuda"
@@ -155,7 +193,11 @@ class EmbeddingModel:
 
     @property
     def device(self) -> str:
-        """Return the current device string (always 'cuda')."""
+        """Return the current device string (always 'cuda').
+
+        Returns:
+            The string ``"cuda"``.
+        """
         return self._device
 
     def encode_documents(

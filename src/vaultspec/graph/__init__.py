@@ -1,5 +1,4 @@
 """Vault document graph analysis."""
 
-from .api import DocNode, VaultGraph
-
-__all__ = ["DocNode", "VaultGraph"]
+from .api import DocNode as DocNode
+from .api import VaultGraph as VaultGraph

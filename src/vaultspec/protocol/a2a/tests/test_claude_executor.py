@@ -18,9 +18,10 @@ from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock
 from claude_agent_sdk._errors import MessageParseError
 
 from tests.constants import TEST_PROJECT
-from vaultspec.protocol.a2a.executors import ClaudeA2AExecutor
-from vaultspec.protocol.a2a.tests.conftest import make_request_context
-from vaultspec.protocol.providers import ClaudeModels
+
+from ...providers import ClaudeModels
+from ..executors import ClaudeA2AExecutor
+from .conftest import make_request_context
 
 
 def _make_result(

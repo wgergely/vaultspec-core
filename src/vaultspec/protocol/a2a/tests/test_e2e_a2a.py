@@ -25,13 +25,14 @@ import pytest
 from a2a.types import AgentCard
 
 from tests.constants import PROJECT_ROOT as _TEST_ROOT
-from vaultspec.protocol.a2a import agent_card_from_definition, create_app
-from vaultspec.protocol.a2a.tests.conftest import (
+
+from ...providers import ClaudeModels, GeminiModels
+from .. import agent_card_from_definition, create_app
+from .conftest import (
     EchoExecutor,
     PrefixExecutor,
     _make_card,
 )
-from vaultspec.protocol.providers import ClaudeModels, GeminiModels
 
 logger = logging.getLogger(__name__)
 
@@ -284,7 +285,7 @@ class TestClaudeE2E:
     @pytest.mark.asyncio
     async def test_claude_a2a_responds(self):
         """Real Claude processes an A2A message and returns a completed task."""
-        from vaultspec.protocol.a2a.executors import ClaudeA2AExecutor
+        from ..executors import ClaudeA2AExecutor
 
         executor = ClaudeA2AExecutor(
             model=ClaudeModels.MEDIUM,
@@ -330,7 +331,7 @@ class TestGeminiE2E:
     @pytest.mark.asyncio
     async def test_gemini_a2a_responds(self):
         """Real Gemini processes an A2A message and returns a completed task."""
-        from vaultspec.protocol.a2a.executors import GeminiA2AExecutor
+        from ..executors import GeminiA2AExecutor
 
         executor = GeminiA2AExecutor(
             root_dir=_TEST_ROOT,
@@ -402,7 +403,7 @@ class TestGoldStandardBidirectional:
         Phase 6 scope. Here we validate both agents can independently
         complete A2A tasks and that results can be chained.
         """
-        from vaultspec.protocol.a2a.executors import (
+        from ..executors import (
             ClaudeA2AExecutor,
             GeminiA2AExecutor,
         )
@@ -508,7 +509,7 @@ class TestGoldStandardBidirectional:
         Mirror of test_claude_asks_gemini with reversed flow:
         1. Claude processes first, Gemini processes Claude's output.
         """
-        from vaultspec.protocol.a2a.executors import (
+        from ..executors import (
             ClaudeA2AExecutor,
             GeminiA2AExecutor,
         )

@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import httpx
 import pytest
-from a2a.server.agent_execution import AgentExecutor, RequestContext
+from a2a.server.agent_execution import RequestContext
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
-from a2a.server.tasks import InMemoryTaskStore, TaskUpdater
+from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import (
     AgentCapabilities,
     AgentCard,
@@ -21,55 +19,7 @@ from a2a.types import (
     TextPart,
 )
 
-if TYPE_CHECKING:
-    from a2a.server.events import EventQueue
-
-
-class EchoExecutor(AgentExecutor):
-    """Echoes input back as completed task."""
-
-    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        assert context.task_id is not None
-        assert context.context_id is not None
-        updater = TaskUpdater(event_queue, context.task_id, context.context_id)
-        text = context.get_user_input()
-        await updater.start_work()
-        await updater.complete(
-            message=updater.new_agent_message(
-                parts=[Part(root=TextPart(text=f"Echo: {text}"))]
-            )
-        )
-
-    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        assert context.task_id is not None
-        assert context.context_id is not None
-        updater = TaskUpdater(event_queue, context.task_id, context.context_id)
-        await updater.cancel()
-
-
-class PrefixExecutor(AgentExecutor):
-    """Prepends a prefix to input text."""
-
-    def __init__(self, prefix: str) -> None:
-        self._prefix = prefix
-
-    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        assert context.task_id is not None
-        assert context.context_id is not None
-        updater = TaskUpdater(event_queue, context.task_id, context.context_id)
-        text = context.get_user_input()
-        await updater.start_work()
-        await updater.complete(
-            message=updater.new_agent_message(
-                parts=[Part(root=TextPart(text=f"{self._prefix}{text}"))]
-            )
-        )
-
-    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        assert context.task_id is not None
-        assert context.context_id is not None
-        updater = TaskUpdater(event_queue, context.task_id, context.context_id)
-        await updater.cancel()
+from .helpers import EchoExecutor, PrefixExecutor
 
 
 @pytest.fixture

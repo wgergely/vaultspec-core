@@ -20,10 +20,6 @@ Utilize:
 - If you have to compact your context, ensure any original document paths are
   preserved.
 
----
-<!-- Human-readable documentation above | Agent instructions below -->
----
-
 ## Core Implementation Mandate
 
 - **Technical Excellence**: Deliver idiomatic, high-performance, and safe code.

@@ -18,10 +18,6 @@ Utilize:
 - Code and web discovery capabilities.
 - Relevant tools (domain knowledge tools, language tools, search tools, etc.).
 
----
-<!-- Human-readable documentation above | Agent instructions below -->
----
-
 ## Research Domains
 
 Conduct broad and deep research to help make informed technical decisions in

@@ -1,3 +1,5 @@
+"""ACP client implementation and session event logger for subagent communication."""
+
 from __future__ import annotations
 
 import asyncio
@@ -42,15 +44,27 @@ if TYPE_CHECKING:
 
     from acp.schema import ConfigOptionUpdate, UsageUpdate
 
+from rich.console import Console
+
 logger = logging.getLogger(__name__)
 
 __all__ = ["SessionLogger", "SubagentClient"]
+
+# Shared console for styled agent feed output (stderr, no syntax highlighting)
+_console = Console(stderr=True, highlight=False)
 
 
 class SessionLogger:
     """Handles persistent logging of agent session events to disk."""
 
     def __init__(self, session_id: str, root_dir: pathlib.Path):
+        """Initialise the logger and create the log directory.
+
+        Args:
+            session_id: Unique identifier for the session being logged.
+            root_dir: Workspace root; logs are written under
+                ``{root_dir}/.vaultspec/logs/``.
+        """
         self.session_id = session_id
         self.log_dir = root_dir / ".vaultspec" / "logs"
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -58,6 +72,12 @@ class SessionLogger:
         self.start_time = datetime.datetime.now()
 
     def log(self, event_type: str, data: Any) -> None:
+        """Append a timestamped JSON event record to the session log file.
+
+        Args:
+            event_type: Short label for the event (e.g. ``"session_update"``).
+            data: Arbitrary serialisable data to include in the log entry.
+        """
         timestamp = datetime.datetime.now().isoformat()
         log_entry = {"timestamp": timestamp, "type": event_type, "data": data}
         with self.log_file.open("a", encoding="utf-8") as f:
@@ -68,6 +88,12 @@ class _Terminal:
     """Tracks a subprocess spawned via the ACP terminal API."""
 
     def __init__(self, proc: asyncio.subprocess.Process, byte_limit: int):
+        """Initialise terminal tracking for a subprocess.
+
+        Args:
+            proc: The running subprocess.
+            byte_limit: Maximum bytes of output to retain before truncating.
+        """
         self.proc = proc
         self.output_chunks: list[bytes] = []
         self.total_bytes = 0
@@ -76,7 +102,7 @@ class _Terminal:
 
 
 class SubagentClient(Client):
-    """ACP Client implementation that handles protocol messages."""
+    """ACP Client implementation that handles protocol messages from an agent bridge."""
 
     def __init__(
         self,
@@ -86,6 +112,15 @@ class SubagentClient(Client):
         mode: str = "read-write",
         logger_instance: SessionLogger | None = None,
     ):
+        """Initialise the client with workspace settings and optional callbacks.
+
+        Args:
+            root_dir: Workspace root directory — all file I/O is scoped here.
+            debug: If True, emit verbose debug log messages.
+            quiet: If True, suppress informational tool-call log lines.
+            mode: Access mode — ``"read-only"`` restricts writes to ``.vault/``.
+            logger_instance: Optional pre-configured ``SessionLogger``.
+        """
         self.root_dir = root_dir
         self.debug = debug
         self.quiet = quiet
@@ -104,9 +139,20 @@ class SubagentClient(Client):
         self.on_tool_update: Callable[[ToolCallStart], None] | None = None
 
     def set_logger(self, logger_instance: SessionLogger) -> None:
+        """Attach a session logger after construction.
+
+        Args:
+            logger_instance: The ``SessionLogger`` to use for event logging.
+        """
         self.session_logger = logger_instance
 
     def _log(self, event_type: str, data: Any) -> None:
+        """Forward an event to the session logger if one is configured.
+
+        Args:
+            event_type: Short label for the event.
+            data: Arbitrary data to include in the log entry.
+        """
         if self.session_logger:
             self.session_logger.log(event_type, data)
 
@@ -120,6 +166,16 @@ class SubagentClient(Client):
         """Auto-approves tool call permissions (Emulates YOLO mode).
 
         Selects the first 'allow' option per ACP AllowedOutcome schema.
+
+        Args:
+            options: List of permission options offered by the agent.
+            session_id: The current session identifier (unused).
+            tool_call: The tool call requiring permission.
+            **kwargs: Additional fields forwarded by the ACP library.
+
+        Returns:
+            A ``RequestPermissionResponse`` selecting the first allow option,
+            or ``"allow"`` if no explicit allow option is found.
         """
         _ = session_id
         _ = kwargs
@@ -168,7 +224,13 @@ class SubagentClient(Client):
         | UsageUpdate,
         **kwargs: Any,
     ) -> None:
-        """Handles and displays protocol updates from the agent."""
+        """Handles and displays protocol updates from the agent.
+
+        Args:
+            session_id: The session identifier the update belongs to (unused).
+            update: The ACP update object received from the agent.
+            **kwargs: Additional fields forwarded by the ACP library.
+        """
         _ = session_id
         _ = kwargs
         data = update.model_dump() if hasattr(update, "model_dump") else str(update)
@@ -181,16 +243,25 @@ class SubagentClient(Client):
             self._handle_content_chunk(update)
             return
 
-        # Delegate UI rendering to callbacks or default to logging
+        # Delegate UI rendering to callbacks or default to styled console
         if isinstance(update, ToolCallStart):
             if self.on_tool_update:
                 self.on_tool_update(update)
             elif not self.quiet:
-                logger.info("[tool] %s (%s)", update.title, update.tool_call_id)
+                _console.print(f"({update.title})", style="dim")
 
     def _handle_content_chunk(
         self, update: AgentMessageChunk | AgentThoughtChunk
     ) -> None:
+        """Dispatch a text content chunk to the appropriate callback or logger.
+
+        For ``AgentMessageChunk``, also accumulates text in
+        ``self.response_text`` so callers can retrieve the full response.
+
+        Args:
+            update: The chunk update from the agent, either a message chunk
+                or a thought chunk.
+        """
         content = update.content
         if not isinstance(content, TextContentBlock):
             return
@@ -200,14 +271,14 @@ class SubagentClient(Client):
             if self.on_message_chunk:
                 self.on_message_chunk(text)
             elif not self.quiet:
-                logger.info("[agent] %s", text)
+                _console.print(text, end="")
 
             self.response_text += text
         else:
             if self.on_thought_chunk:
                 self.on_thought_chunk(text)
             elif not self.quiet:
-                logger.debug("[thought] %s", text)
+                _console.print(text, style="italic", end="")
 
     # -- File I/O (required by ACP Client protocol) --
 
@@ -219,7 +290,22 @@ class SubagentClient(Client):
         line: int | None = None,
         **kwargs: Any,
     ) -> ReadTextFileResponse:
-        """Read a text file from the workspace."""
+        """Read a text file from the workspace.
+
+        Args:
+            path: Absolute or workspace-relative path to the file.
+            session_id: The current session identifier (unused).
+            limit: Maximum number of lines to return.
+            line: 1-based line number to start reading from.
+            **kwargs: Additional fields forwarded by the ACP library.
+
+        Returns:
+            A ``ReadTextFileResponse`` containing the file content.
+
+        Raises:
+            ValueError: If ``path`` resolves outside the workspace root.
+            FileNotFoundError: If the file does not exist.
+        """
         _ = session_id
         _ = kwargs
         file_path = pathlib.Path(path).resolve()
@@ -247,6 +333,20 @@ class SubagentClient(Client):
 
         In read-only mode, only writes to `.vault/` are permitted.
         All other writes are rejected with a ValueError.
+
+        Args:
+            content: Text content to write to the file.
+            path: Workspace-relative or absolute destination path.
+            session_id: The current session identifier (unused).
+            **kwargs: Additional fields forwarded by the ACP library.
+
+        Returns:
+            A ``WriteTextFileResponse`` on success, or ``None`` if the write
+            was silently skipped.
+
+        Raises:
+            ValueError: If ``path`` resolves outside the workspace root, or if
+                read-only mode blocks the write target.
         """
         _ = session_id
         _ = kwargs
@@ -257,7 +357,7 @@ class SubagentClient(Client):
         # Enforce read-only mode: only .vault/ writes allowed.
         if self.mode == "read-only":
             rel_path = file_path.relative_to(self.root_dir).as_posix()
-            from vaultspec.core import get_config
+            from ...config import get_config
 
             _docs_dir = get_config().docs_dir
             docs_prefix = f"{_docs_dir}/"
@@ -290,7 +390,28 @@ class SubagentClient(Client):
         output_byte_limit: int | None = None,
         **kwargs: Any,
     ) -> CreateTerminalResponse:
-        """Spawn a subprocess and track it as an ACP terminal."""
+        """Spawn a subprocess and track it as an ACP terminal.
+
+        Args:
+            command: Executable to run.
+            session_id: The current session identifier (unused).
+            args: Additional command-line arguments passed to ``command``.
+            cwd: Working directory for the subprocess; defaults to the
+                workspace root.
+            env: Extra environment variables merged with the current process
+                environment.
+            output_byte_limit: Maximum bytes of stdout/stderr to retain;
+                defaults to the configured ``terminal_output_limit``.
+            **kwargs: Additional fields forwarded by the ACP library.
+
+        Returns:
+            A ``CreateTerminalResponse`` containing the new terminal ID.
+
+        Raises:
+            ValueError: If the client is in read-only mode.
+            RuntimeError: On Windows when the event loop is not a
+                ``ProactorEventLoop``.
+        """
         if self.mode == "read-only":
             raise ValueError(
                 "Terminal creation denied: read-only mode "
@@ -323,12 +444,13 @@ class SubagentClient(Client):
             env=env_dict,
         )
 
-        from vaultspec.core import get_config
+        from ...config import get_config
 
         cfg = get_config()
         terminal = _Terminal(proc, output_byte_limit or cfg.terminal_output_limit)
 
         async def _reader() -> None:
+            """Continuously read stdout chunks into the terminal buffer."""
             assert proc.stdout is not None
             try:
                 while True:
@@ -351,7 +473,18 @@ class SubagentClient(Client):
     async def terminal_output(
         self, session_id: str, terminal_id: str, **kwargs: Any
     ) -> TerminalOutputResponse:
-        """Return current output from a tracked terminal."""
+        """Return current output from a tracked terminal.
+
+        Args:
+            session_id: The current session identifier (unused).
+            terminal_id: The terminal ID returned by ``create_terminal``.
+            **kwargs: Additional fields forwarded by the ACP library.
+
+        Returns:
+            A ``TerminalOutputResponse`` with accumulated stdout/stderr text,
+            a ``truncated`` flag if output exceeded the byte limit, and the
+            ``exit_status`` if the process has already finished.
+        """
         _ = session_id
         _ = kwargs
         terminal = self._terminals.get(terminal_id)
@@ -383,7 +516,17 @@ class SubagentClient(Client):
     async def wait_for_terminal_exit(
         self, session_id: str, terminal_id: str, **kwargs: Any
     ) -> WaitForTerminalExitResponse:
-        """Wait for a terminal process to finish."""
+        """Wait for a terminal process to finish.
+
+        Args:
+            session_id: The current session identifier (unused).
+            terminal_id: The terminal ID returned by ``create_terminal``.
+            **kwargs: Additional fields forwarded by the ACP library.
+
+        Returns:
+            A ``WaitForTerminalExitResponse`` containing the process exit code,
+            or ``None`` if the terminal ID is unknown.
+        """
         _ = session_id
         _ = kwargs
         terminal = self._terminals.get(terminal_id)
@@ -402,7 +545,16 @@ class SubagentClient(Client):
     async def kill_terminal(
         self, session_id: str, terminal_id: str, **kwargs: Any
     ) -> KillTerminalCommandResponse:
-        """Kill a tracked terminal process."""
+        """Kill a tracked terminal process.
+
+        Args:
+            session_id: The current session identifier (unused).
+            terminal_id: The terminal ID returned by ``create_terminal``.
+            **kwargs: Additional fields forwarded by the ACP library.
+
+        Returns:
+            A ``KillTerminalCommandResponse`` (empty acknowledgement).
+        """
         _ = session_id
         _ = kwargs
         terminal = self._terminals.get(terminal_id)
@@ -414,7 +566,19 @@ class SubagentClient(Client):
     async def release_terminal(
         self, session_id: str, terminal_id: str, **kwargs: Any
     ) -> ReleaseTerminalResponse:
-        """Release and clean up a tracked terminal."""
+        """Release and clean up a tracked terminal.
+
+        Cancels the background reader task and kills the process if it is
+        still running.
+
+        Args:
+            session_id: The current session identifier (unused).
+            terminal_id: The terminal ID returned by ``create_terminal``.
+            **kwargs: Additional fields forwarded by the ACP library.
+
+        Returns:
+            A ``ReleaseTerminalResponse`` (empty acknowledgement).
+        """
         _ = session_id
         _ = kwargs
         terminal = self._terminals.pop(terminal_id, None)
@@ -434,17 +598,37 @@ class SubagentClient(Client):
     # -- Extension methods --
 
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+        """Handle an ACP extension method call.  Returns an empty dict.
+
+        Args:
+            method: The extension method name.
+            params: Arbitrary parameters sent by the caller.
+
+        Returns:
+            An empty dict — no extension methods are implemented.
+        """
         _ = params
         if self.debug:
             logger.debug("Extension method: %s", method)
         return {}
 
     async def ext_notification(self, method: str, params: dict[str, Any]) -> None:
+        """Handle an ACP extension notification.  No-op.
+
+        Args:
+            method: The extension notification name.
+            params: Arbitrary parameters sent by the caller.
+        """
         _ = params
         if self.debug:
             logger.debug("Extension notification: %s", method)
 
     def on_connect(self, conn: Any) -> None:
+        """Store the agent-side connection for later use.
+
+        Args:
+            conn: The connection object provided by the ACP library.
+        """
         self._conn = conn
 
     async def close(self) -> None:

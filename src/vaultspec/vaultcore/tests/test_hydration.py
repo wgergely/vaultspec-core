@@ -1,7 +1,8 @@
 import pytest
 
 from tests.constants import PROJECT_ROOT
-from vaultspec.vaultcore import DocType, get_template_path, hydrate_template
+
+from .. import DocType, get_template_path, hydrate_template
 
 pytestmark = [pytest.mark.unit]
 

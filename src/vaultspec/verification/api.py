@@ -1,3 +1,5 @@
+"""Vault document verification, integrity checking, and auto-repair."""
+
 from __future__ import annotations
 
 import logging
@@ -6,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from vaultspec.vaultcore import (
+from ..vaultcore import (
     DocType,
     DocumentMetadata,
     VaultConstants,
@@ -33,19 +35,38 @@ __all__ = [
 
 
 class VerificationError:
-    """A single vault verification failure tied to a file path."""
+    """A single vault verification failure tied to a file path.
+
+    Attributes:
+        path: The file (or directory) where the violation was detected.
+        message: Human-readable description of the violation.
+    """
 
     def __init__(self, path: pathlib.Path, message: str) -> None:
+        """Initialise a VerificationError.
+
+        Args:
+            path: Path associated with the violation.
+            message: Description of what went wrong.
+        """
         self.path = path
         self.message = message
 
     def __str__(self) -> str:
+        """Return a concise string representation for display."""
         return f"{self.path}: {self.message}"
 
 
 def verify_vault_structure(root_dir: pathlib.Path) -> list[VerificationError]:
-    """Checks for unsupported directories and files in .vault/ root."""
-    from vaultspec.core import get_config
+    """Check for unsupported directories and stray files in the docs root.
+
+    Args:
+        root_dir: Project root containing the docs directory.
+
+    Returns:
+        List of ``VerificationError`` objects for each structural violation.
+    """
+    from ..config import get_config
 
     logger.info("Verifying vault structure at %s", root_dir)
     errors = VaultConstants.validate_vault_structure(root_dir)
@@ -57,7 +78,18 @@ def verify_vault_structure(root_dir: pathlib.Path) -> list[VerificationError]:
 
 
 def verify_file(path: pathlib.Path, root_dir: pathlib.Path) -> list[VerificationError]:
-    """Performs all checks on a single file."""
+    """Run all verification checks against a single vault document.
+
+    Validates the filename pattern, YAML frontmatter schema, and that the
+    mandatory directory tag is present.
+
+    Args:
+        path: Absolute path to the vault document.
+        root_dir: Project root used to infer the document's ``DocType``.
+
+    Returns:
+        List of ``VerificationError`` objects; empty when the file is valid.
+    """
     errors = []
     doc_type = get_doc_type(path, root_dir)
 
@@ -91,7 +123,17 @@ def verify_file(path: pathlib.Path, root_dir: pathlib.Path) -> list[Verification
 
 
 def get_malformed(root_dir: pathlib.Path) -> list[VerificationError]:
-    """Returns all documents that fail verification."""
+    """Return all vault documents and structural issues that fail verification.
+
+    Combines structural checks with per-file verification across the entire
+    vault.
+
+    Args:
+        root_dir: Project root containing the docs directory.
+
+    Returns:
+        Aggregated list of ``VerificationError`` objects.
+    """
     logger.info("Starting comprehensive vault verification")
     all_errors = verify_vault_structure(root_dir)
     file_count = 0
@@ -107,7 +149,14 @@ def get_malformed(root_dir: pathlib.Path) -> list[VerificationError]:
 
 
 def list_features(root_dir: pathlib.Path) -> set[str]:
-    """Infers features from tags across all documents."""
+    """Infer the set of feature names from tags across all vault documents.
+
+    Args:
+        root_dir: Project root containing the docs directory.
+
+    Returns:
+        Set of feature name strings (without the leading ``#``).
+    """
     logger.debug("Extracting features from vault")
     features = set()
     skip_count = 0
@@ -132,7 +181,15 @@ def list_features(root_dir: pathlib.Path) -> set[str]:
 
 
 def verify_vertical_integrity(root_dir: pathlib.Path) -> list[VerificationError]:
-    """Ensures every feature used has a corresponding plan doc."""
+    """Ensure every feature tag used in the vault has a corresponding plan document.
+
+    Args:
+        root_dir: Project root containing the docs directory.
+
+    Returns:
+        List of ``VerificationError`` objects for features missing a plan; empty
+        when all features are accounted for.
+    """
     logger.info("Verifying vertical integrity: feature -> plan mapping")
     features_found = set()
     planned_features = set()
@@ -155,7 +212,7 @@ def verify_vertical_integrity(root_dir: pathlib.Path) -> list[VerificationError]
             logger.debug("Failed to parse vertical integrity from %s", path.name)
             continue
 
-    from vaultspec.core import get_config
+    from ..config import get_config
 
     missing_plans = features_found - planned_features
     for feature in sorted(missing_plans):
@@ -180,13 +237,21 @@ def verify_vertical_integrity(root_dir: pathlib.Path) -> list[VerificationError]
 
 @dataclass
 class FixResult:
-    """Result of a single auto-repair operation."""
+    """Result of a single auto-repair operation applied to a vault document.
+
+    Attributes:
+        path: Path of the file that was modified or renamed.
+        action: Short identifier for the fix type (e.g. ``add_date``,
+            ``rename_suffix``).
+        detail: Human-readable description of what was changed.
+    """
 
     path: pathlib.Path
     action: str
     detail: str
 
     def __str__(self) -> str:
+        """Return a concise string representation for display."""
         return f"{self.path}: {self.action} - {self.detail}"
 
 
@@ -198,6 +263,9 @@ def fix_violations(root_dir: pathlib.Path) -> list[FixResult]:
     - Missing tags in frontmatter (add empty list)
     - Wrong filename suffix (rename to match doc_type)
     - Missing date prefix (prepend today's date)
+
+    Args:
+        root_dir: Project root directory containing the ``.vault/`` subtree.
 
     Returns:
         List of FixResult objects describing what was repaired.
@@ -343,7 +411,18 @@ def fix_violations(root_dir: pathlib.Path) -> list[FixResult]:
 
 
 def _rebuild_frontmatter(metadata: DocumentMetadata, body: str) -> str:
-    """Rebuild markdown content with updated frontmatter."""
+    """Rebuild markdown content from updated metadata and original body.
+
+    Serialises ``metadata`` back to a YAML ``---`` fence and prepends it
+    to ``body``.
+
+    Args:
+        metadata: Updated ``DocumentMetadata`` to serialise.
+        body: Markdown body text (everything after the original closing ``---``).
+
+    Returns:
+        Full markdown string with refreshed frontmatter.
+    """
     lines = ["---"]
 
     # Tags

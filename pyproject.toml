@@ -23,6 +23,7 @@ dependencies = [
     "sse-starlette>=1.0.0",
     "mcp>=1.20.0",
     "PyYAML>=6.0",
+    "rich>=13.0.0",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -49,8 +50,8 @@ allow-direct-references = true
 packages = ["src/vaultspec"]
 
 [project.scripts]
-vaultspec = "vaultspec.cli:main"
-vaultspec-mcp = "vaultspec.server:main"
+vaultspec = "vaultspec.__main__:main"
+vaultspec-mcp = "vaultspec.mcp_server.app:main"
 vaultspec-vault = "vaultspec.vault_cli:main"
 vaultspec-team = "vaultspec.team_cli:main"
 vaultspec-subagent = "vaultspec.subagent_cli:main"
@@ -145,6 +146,12 @@ unfixable = ["B"]
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**/*.py" = ["ARG"]
 "**/test_*.py" = ["ARG"]
+# Core CLI modules use argparse/Path as runtime parameter types — no need to move to TYPE_CHECKING
+"src/vaultspec/core/*.py" = ["TC003"]
+"src/vaultspec/mcp_server/subagent_tools.py" = ["TC002"]
+"src/vaultspec/orchestration/team_task_engine.py" = ["TC003"]
+# Protocol proxy methods intentionally use **kwargs as passthrough — not unused
+"src/vaultspec/protocol/acp/gemini_bridge.py" = ["ARG002"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["vaultspec"]
@@ -152,3 +159,7 @@ known-first-party = ["vaultspec"]
 [tool.ty.environment]
 python-version = "3.13"
 root = [".", "src"]
+
+[tool.ty.rules]
+# Optional RAG/ML/logging deps not installed in base venv — suppress
+unresolved-import = "ignore"

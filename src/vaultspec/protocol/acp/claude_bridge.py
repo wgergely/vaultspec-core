@@ -27,7 +27,7 @@ import sys
 import uuid
 from typing import TYPE_CHECKING, Any, cast
 
-from vaultspec.logging_config import configure_logging
+from ...logging_config import configure_logging
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -83,8 +83,8 @@ from claude_agent_sdk.types import (
     StreamEvent,
 )
 
-from vaultspec.protocol.providers import ClaudeModels
-from vaultspec.protocol.sandbox import (
+from ..providers import ClaudeModels
+from ..sandbox import (
     _make_sandbox_callback,
 )
 
@@ -112,6 +112,12 @@ def _convert_mcp_servers(
 
     ACP sends a *list* of pydantic models or dicts.  The SDK expects a *dict*
     keyed by server name.
+
+    Args:
+        acp_servers: List of ACP MCP server specs (pydantic models or dicts).
+
+    Returns:
+        A dict mapping server name to ``McpStdioServerConfig``.
     """
     result: dict[str, Any] = {}
     for server in acp_servers:
@@ -146,7 +152,14 @@ def _build_sdk_message_payload(
         | EmbeddedResourceContentBlock
     ],
 ) -> dict[str, Any]:
-    """Convert ACP prompt blocks into a Claude SDK message dict."""
+    """Convert ACP prompt blocks into a Claude SDK message dict.
+
+    Args:
+        prompt: List of ACP content blocks (text, image, audio, resource, etc.).
+
+    Returns:
+        A dict with ``type`` and ``message`` keys suitable for the Claude SDK.
+    """
     content: list[dict[str, Any]] = []
     text_parts: list[str] = []
 
@@ -190,7 +203,11 @@ def _build_sdk_message_payload(
 
 
 async def _to_async_iter(item: Any) -> Any:
-    """Wrap an item in an async iterable."""
+    """Wrap an item in an async iterable.
+
+    Args:
+        item: Any value to yield as a single-element async generator.
+    """
     yield item
 
 
@@ -198,6 +215,13 @@ def _map_tool_kind(tool_name: str) -> str:
     """Map a Claude tool name to an ACP tool kind via substring matching.
 
     Follows the reference pattern from acp-claude-code ``mapToolKind()``.
+
+    Args:
+        tool_name: The Claude tool name (e.g. ``"Read"``, ``"Bash"``).
+
+    Returns:
+        An ACP ``ToolKind`` string such as ``"read"``, ``"edit"``, or
+        ``"other"``.
     """
     name = tool_name.lower()
     for keyword, kind in (
@@ -235,6 +259,14 @@ def _get_tool_call_content(
 
     For ``Edit``/``MultiEdit`` tools, generates structured diff blocks.
     For all others, returns an empty list.
+
+    Args:
+        tool_name: The Claude tool name (e.g. ``"Edit"``, ``"MultiEdit"``).
+        tool_input: The tool's input parameters dict, or ``None``.
+
+    Returns:
+        A list of ACP content blocks — ``FileEditToolCallContent`` for edit
+        tools, empty list for everything else.
     """
     if tool_input is None:
         return []
@@ -266,7 +298,30 @@ def _get_tool_call_content(
 
 @dataclasses.dataclass
 class _SessionState:
-    """Per-session state tracked by the bridge."""
+    """Per-session state tracked by the Claude ACP bridge.
+
+    Attributes:
+        session_id: Bridge-level unique session identifier.
+        cwd: Working directory for this session.
+        model: Claude model identifier in use.
+        mode: Sandboxing mode (``"read-only"`` or ``"read-write"``).
+        mcp_servers: ACP MCP server configurations for this session.
+        created_at: ISO-8601 timestamp of session creation.
+        sdk_client: The active ``ClaudeSDKClient``, or ``None`` if not yet
+            connected.
+        connected: Whether the SDK client is currently connected.
+        claude_session_id: Claude's native session ID extracted from SDK
+            messages; used to resume multi-turn conversations.
+        cancel_event: Per-session asyncio event set by ``cancel()`` to
+            interrupt the active ``prompt()`` stream.
+        tool_call_contents: Accumulated ACP content blocks keyed by
+            ``tool_call_id``, used to build complete ``ToolCallProgress``
+            updates.
+        todo_write_tool_call_ids: IDs of ``TodoWrite`` tool calls that should
+            be converted to plan updates rather than tool call events.
+        permission_mode: SDK permission mode for this session (e.g.
+            ``"bypassPermissions"`` or ``"acceptEdits"``).
+    """
 
     session_id: str
     cwd: str
@@ -331,6 +386,31 @@ class ClaudeACPBridge(Agent):
         client_factory: Callable[..., Any] | None = None,
         options_factory: Callable[..., Any] | None = None,
     ) -> None:
+        """Initialise the ACP bridge with SDK configuration and DI overrides.
+
+        Config parameters default to ``None`` which causes them to be read from
+        the vaultspec config system (which itself falls back to env vars).
+
+        Args:
+            model: Claude model identifier (e.g. ``ClaudeModels.MEDIUM``).
+            debug: If True, emit verbose debug log messages.
+            mode: Sandboxing mode — ``"read-only"`` or ``"read-write"``.
+                Overrides the ``VAULTSPEC_AGENT_MODE`` env var.
+            max_turns: Maximum number of conversation turns.  Non-positive
+                values are ignored.
+            budget_usd: Maximum spend in USD.  Negative values are ignored.
+            allowed_tools: Explicit allow-list of tool names forwarded to the SDK.
+            disallowed_tools: Explicit deny-list of tool names forwarded to the SDK.
+            effort: Effort level string forwarded to the SDK.
+            output_format: Output format string (e.g. ``"json"``).
+            fallback_model: Model to fall back to on errors.
+            include_dirs: Additional directories to include in the SDK context.
+            system_prompt: System prompt appended after the preset.
+            client_factory: Callable ``(options) -> ClaudeSDKClient``.  Defaults
+                to the real ``ClaudeSDKClient``.
+            options_factory: Callable ``(**kwargs) -> ClaudeAgentOptions``.
+                Defaults to the real ``ClaudeAgentOptions``.
+        """
         self._model = model
         self._debug = debug
 
@@ -346,7 +426,7 @@ class ClaudeACPBridge(Agent):
         self._session_id: str | None = None
 
         # Config: DI param takes precedence, else config (which reads env vars)
-        from vaultspec.core import get_config
+        from ...config import get_config
 
         cfg = get_config()
 
@@ -413,6 +493,9 @@ class ClaudeACPBridge(Agent):
         The *conn* object exposes ``session_update()``,
         ``request_permission()``, etc. — mirroring ``SubagentClient``'s
         interface.
+
+        Args:
+            conn: The ACP client-side connection used to send notifications.
         """
         self._conn = conn
 
@@ -423,6 +506,17 @@ class ClaudeACPBridge(Agent):
         client_info: Implementation | None = None,
         **kwargs: Any,
     ) -> InitializeResponse:
+        """Return bridge capabilities in response to the ACP initialize handshake.
+
+        Args:
+            protocol_version: ACP protocol version negotiated by the client.
+            client_capabilities: Capabilities advertised by the client, if any.
+            client_info: Implementation info of the connecting client, if any.
+            **kwargs: Additional fields forwarded by the ACP library.
+
+        Returns:
+            An ``InitializeResponse`` advertising the bridge's capabilities.
+        """
         _ = protocol_version
         _ = client_capabilities
         _ = client_info
@@ -459,6 +553,16 @@ class ClaudeACPBridge(Agent):
         Centralises option construction so that ``new_session``,
         ``load_session``, ``resume_session``, and ``fork_session`` all
         use the same set of features.
+
+        Args:
+            cwd: Working directory for the SDK session.
+            sdk_mcp: MCP server configs in SDK format (name → config dict).
+            sandbox_cb: ``can_use_tool`` callback for permission enforcement.
+            permission_mode: SDK permission mode string (e.g.
+                ``"bypassPermissions"`` or ``"acceptEdits"``).
+
+        Returns:
+            A fully configured ``ClaudeAgentOptions`` instance.
         """
         kwargs: dict[str, Any] = {
             "model": self._model,
@@ -508,6 +612,20 @@ class ClaudeACPBridge(Agent):
         mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None,
         **kwargs: Any,
     ) -> NewSessionResponse:
+        """Create a new Claude SDK session.
+
+        Converts ACP MCP server specs to SDK format, builds a sandboxed
+        ``ClaudeAgentOptions``, creates a ``ClaudeSDKClient``, and opens
+        the SDK connection without an initial prompt.
+
+        Args:
+            cwd: Working directory for the session.
+            mcp_servers: Optional list of ACP MCP server configurations.
+            **kwargs: Additional fields forwarded by the ACP library.
+
+        Returns:
+            A ``NewSessionResponse`` containing the new session ID.
+        """
         _ = kwargs
         session_id = str(uuid.uuid4())
         self._session_id = session_id
@@ -565,6 +683,26 @@ class ClaudeACPBridge(Agent):
         session_id: str,
         **kwargs: Any,
     ) -> PromptResponse:
+        """Send a prompt to Claude and stream the response as ACP session updates.
+
+        Converts the ACP prompt blocks to an SDK message payload, queries the
+        SDK client, and forwards each SDK event (text deltas, tool calls, tool
+        results, system messages, result) as ``session/update`` notifications
+        on the parent ACP connection.  Handles dynamic permission mode
+        switching via magic strings embedded in the prompt.
+
+        Args:
+            prompt: List of ACP content blocks (text, image, resource, etc.).
+            session_id: The session ID returned by ``new_session``.
+            **kwargs: Additional fields forwarded by the ACP library.
+
+        Returns:
+            A ``PromptResponse`` with ``stop_reason`` set to ``"end_turn"``
+            or ``"cancelled"``.
+
+        Raises:
+            RuntimeError: If no active SDK session exists.
+        """
         _ = kwargs
         # Resolve per-session SDK client (fall back to bridge-level for compat)
         state = self._sessions.get(session_id)
@@ -745,6 +883,17 @@ class ClaudeACPBridge(Agent):
         return PromptResponse(stop_reason=stop_reason)
 
     async def cancel(self, session_id: str, **kwargs: Any) -> None:
+        """Cancel the active prompt for the given session.
+
+        Sets the per-session cancel event so the streaming loop in
+        ``prompt()`` terminates at the next iteration, then interrupts (but
+        does not disconnect) the SDK client so the session can receive future
+        prompts.
+
+        Args:
+            session_id: The session to cancel.
+            **kwargs: Additional fields forwarded by the ACP library.
+        """
         _ = kwargs
         # Set per-session cancel event (also set bridge-level for compat)
         self._cancelled = True
@@ -770,6 +919,14 @@ class ClaudeACPBridge(Agent):
         Claude SDK handles authentication internally — no protocol-level
         authentication is needed.  This method returns an empty
         ``AuthenticateResponse`` to satisfy ACP callers.
+
+        Args:
+            method_id: The authentication method identifier requested by the
+                client.
+            **kwargs: Additional fields forwarded by the ACP library.
+
+        Returns:
+            An empty ``AuthenticateResponse``.
         """
         _ = method_id
         _ = kwargs
@@ -800,6 +957,16 @@ class ClaudeACPBridge(Agent):
            The Claude SDK does not persist conversation history across
            client instances.  This restores the session *configuration*
            (model, mode, cwd, MCP servers) but not the chat context.
+
+        Args:
+            cwd: Working directory to use for the loaded session.
+            session_id: The session ID to load.
+            mcp_servers: Optional MCP server overrides; falls back to stored
+                config if ``None``.
+            **kwargs: Additional fields forwarded by the ACP library.
+
+        Returns:
+            An empty ``LoadSessionResponse`` on success.
         """
         _ = kwargs
         state = self._sessions.get(session_id)
@@ -877,6 +1044,16 @@ class ClaudeACPBridge(Agent):
 
            The Claude SDK does not support true session resumption with
            conversation history.  This restores configuration only.
+
+        Args:
+            cwd: Working directory for the resumed session.
+            session_id: The session ID to resume.
+            mcp_servers: Optional MCP server overrides; falls back to stored
+                config if ``None``.
+            **kwargs: Additional fields forwarded by the ACP library.
+
+        Returns:
+            An empty ``ResumeSessionResponse``.
         """
         _ = kwargs
         state = self._sessions.get(session_id)
@@ -934,7 +1111,18 @@ class ClaudeACPBridge(Agent):
         the source session but a new unique ID.  The new session becomes
         the active session.
 
-        Raises ``RuntimeError`` if the source session does not exist.
+        Args:
+            cwd: Working directory for the forked session.
+            session_id: The source session ID to fork from.
+            mcp_servers: Optional MCP server overrides; falls back to source
+                session config if ``None``.
+            **kwargs: Additional fields forwarded by the ACP library.
+
+        Returns:
+            A ``ForkSessionResponse`` containing the new session ID.
+
+        Raises:
+            RuntimeError: If the source session does not exist.
         """
         _ = kwargs
         source = self._sessions.get(session_id)
@@ -995,6 +1183,15 @@ class ClaudeACPBridge(Agent):
            Only sessions created during this bridge instance's lifetime
            are tracked.  The Claude SDK does not provide a session
            enumeration API.
+
+        Args:
+            cursor: Pagination cursor (unused; all sessions are returned).
+            cwd: Optional working-directory filter; only sessions whose
+                ``cwd`` matches are included.
+            **kwargs: Additional fields forwarded by the ACP library.
+
+        Returns:
+            A ``ListSessionsResponse`` containing matching session info objects.
         """
         _ = cursor
         _ = kwargs
@@ -1020,6 +1217,12 @@ class ClaudeACPBridge(Agent):
         Supported modes: ``read-only`` (writes restricted to ``.vault/``),
         ``read-write`` (no restrictions).  Updates the sandbox callback on
         the current SDK client options if a session is active.
+
+        Args:
+            mode_id: The new sandboxing mode (``"read-only"`` or
+                ``"read-write"``).
+            session_id: The session to update.
+            **kwargs: Additional fields forwarded by the ACP library.
         """
         _ = session_id
         _ = kwargs
@@ -1042,6 +1245,11 @@ class ClaudeACPBridge(Agent):
 
         The new model takes effect on the next ``prompt()`` call.  If
         a session is active, the SDK client options are updated in place.
+
+        Args:
+            model_id: The Claude model identifier to switch to.
+            session_id: The session to update.
+            **kwargs: Additional fields forwarded by the ACP library.
         """
         _ = session_id
         _ = kwargs
@@ -1059,7 +1267,16 @@ class ClaudeACPBridge(Agent):
     async def set_config_option(
         self, config_id: str, session_id: str, value: str, **_kwargs: Any
     ) -> None:
-        """Set a session configuration option. No-op for Claude bridge."""
+        """Set a session configuration option. No-op for Claude bridge.
+
+        Args:
+            config_id: The configuration key to set.
+            session_id: The session to configure.
+            value: The new value for the configuration key.
+
+        Returns:
+            ``None`` — this method is a no-op for the Claude bridge.
+        """
         _ = session_id  # required by ACP interface
         if self._debug:
             logger.debug("set_config_option(%s=%s) -- no-op", config_id, value)
@@ -1074,18 +1291,40 @@ class ClaudeACPBridge(Agent):
         self._sessions.clear()
 
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+        """Handle an ACP extension method call.  Returns an empty dict.
+
+        Args:
+            method: The extension method name.
+            params: Arbitrary parameters sent by the caller.
+
+        Returns:
+            An empty dict — no extension methods are implemented.
+        """
         _ = params
         if self._debug:
             logger.debug("ext_method: %s", method)
         return {}
 
     async def ext_notification(self, method: str, params: dict[str, Any]) -> None:
+        """Handle an ACP extension notification.  No-op.
+
+        Args:
+            method: The extension notification name.
+            params: Arbitrary parameters sent by the caller.
+        """
         _ = params
         if self._debug:
             logger.debug("ext_notification: %s", method)
 
     async def _emit_updates(self, message: Any, session_id: str) -> None:
-        """Map an SDK message to ACP ``session/update`` notifications."""
+        """Map an SDK message to ACP ``session/update`` notifications.
+
+        Args:
+            message: An SDK message object (``StreamEvent``,
+                ``AssistantMessage``, ``UserMessage``, ``SystemMessage``, or
+                ``ResultMessage``).
+            session_id: The session ID for routing ACP notifications.
+        """
         if self._conn is None:
             return
 
@@ -1117,6 +1356,11 @@ class ClaudeACPBridge(Agent):
           index → tool_call_id mapping for ``input_json_delta`` correlation.
         - ``input_json_delta`` to emit ``ToolCallProgress`` with partial
           tool arguments as they are streamed.
+
+        Args:
+            msg: The SDK ``StreamEvent`` containing the raw Anthropic API
+                event dict.
+            session_id: The session ID for routing ACP notifications.
         """
         event = msg.event
         event_type = event.get("type", "")
@@ -1242,6 +1486,10 @@ class ClaudeACPBridge(Agent):
         (``include_partial_messages=True`` is always on).  Only ToolUseBlock
         needs emission — streaming only tracks the block index mapping, not
         the full tool call notification.
+
+        Args:
+            msg: The SDK ``AssistantMessage`` containing content blocks.
+            session_id: The session ID for routing ACP notifications.
         """
         state = self._sessions.get(session_id)
         for block in msg.content:
@@ -1312,6 +1560,10 @@ class ClaudeACPBridge(Agent):
         Correlates with the cached tool use from the preceding
         AssistantMessage.  Checks ``ToolResultBlock.is_error`` to determine
         whether the status is ``completed`` or ``failed``.
+
+        Args:
+            msg: The SDK ``UserMessage`` carrying tool result blocks.
+            session_id: The session ID for routing ACP notifications.
         """
         tool_use_id = getattr(msg, "parent_tool_use_id", None) or ""
         if not tool_use_id:
@@ -1384,7 +1636,12 @@ class ClaudeACPBridge(Agent):
             )
 
     async def _emit_system_message(self, msg: SystemMessage, session_id: str) -> None:
-        """Emit a SessionInfoUpdate for system messages."""
+        """Emit a SessionInfoUpdate for system messages.
+
+        Args:
+            msg: The SDK ``SystemMessage`` (carries a ``subtype`` attribute).
+            session_id: The session ID for routing ACP notifications.
+        """
         title = str(getattr(msg, "subtype", "system"))
         await self._conn.session_update(
             session_id=session_id,
@@ -1395,7 +1652,12 @@ class ClaudeACPBridge(Agent):
         )
 
     async def _emit_result(self, msg: ResultMessage, session_id: str) -> None:
-        """Emit a final SessionInfoUpdate with result summary."""
+        """Emit a final SessionInfoUpdate with result summary.
+
+        Args:
+            msg: The SDK ``ResultMessage`` containing the final result text.
+            session_id: The session ID for routing ACP notifications.
+        """
         result_text = ""
         if msg.result:
             result_text = msg.result if isinstance(msg.result, str) else str(msg.result)
@@ -1410,6 +1672,11 @@ class ClaudeACPBridge(Agent):
 
 
 async def main() -> None:
+    """Entry point for the Claude ACP bridge subprocess.
+
+    Parses CLI arguments, configures logging, and runs the bridge with
+    ``acp.run_agent()`` until the connection closes.
+    """
     parser = argparse.ArgumentParser(
         description="ACP bridge server wrapping claude-agent-sdk",
     )

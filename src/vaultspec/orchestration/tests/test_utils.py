@@ -1,7 +1,8 @@
 import pytest
 
 from tests.constants import PROJECT_ROOT, TEST_PROJECT
-from vaultspec.orchestration import (
+
+from .. import (
     SecurityError,
     find_project_root,
     safe_read_text,
@@ -51,8 +52,7 @@ class TestSafeReadText:
 
 
 class TestFindProjectRoot:
-    def test_finds_git_root(self, monkeypatch):
+    def test_finds_git_root(self):
         # test-project is inside a git repo, so walking up should find .git
-        monkeypatch.chdir(TEST_PROJECT)
-        result = find_project_root()
+        result = find_project_root(start_dir=TEST_PROJECT)
         assert (result / ".git").exists()

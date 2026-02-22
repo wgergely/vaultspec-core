@@ -1,202 +1,182 @@
-"""Sub-agent CLI Interface.
-
-The authoritative entry point for all sub-agent operations:
-- run: Execute a sub-agent (ACP client mode)
-- serve: Run the subagent MCP server
-- list: List available agents
-"""
+"""Sub-agent CLI — entry point for running, serving, and listing sub-agents."""
 
 import argparse
-import asyncio
-import contextlib
-import pathlib
+import json
+import logging
+import re
 import sys
-import warnings
 from pathlib import Path
 
-from vaultspec.core import WorkspaceLayout, resolve_workspace
-from vaultspec.logging_config import configure_logging
+from .cli_common import (
+    add_common_args,
+    get_default_layout,
+    resolve_args_workspace,
+    run_async,
+    setup_logging,
+)
+from .mcp_server.app import main as server_main
+from .orchestration.subagent import (
+    AgentNotFoundError,
+    list_available_agents,
+    load_agent,
+    run_subagent,
+)
+from .protocol.acp import SubagentClient
+from .protocol.providers import ClaudeModels, GeminiModels
 
-# Resolve workspace layout at import time (replaces _paths.py bootstrap)
-_default_layout: WorkspaceLayout = resolve_workspace(framework_dir_name=".vaultspec")
-ROOT_DIR = _default_layout.output_root
-
-
-def _get_version() -> str:
-    """Read version from pyproject.toml."""
-    toml_path = ROOT_DIR / "pyproject.toml"
-    if toml_path.exists():
-        for line in toml_path.read_text(encoding="utf-8").splitlines():
-            if line.strip().startswith("version"):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return "unknown"
-
-
-try:
-    from vaultspec.orchestration.subagent import run_subagent
-    from vaultspec.protocol.acp import SubagentClient
-    from vaultspec.protocol.providers import ClaudeModels, GeminiModels
-    from vaultspec.subagent_server.server import main as server_main
-except ImportError as e:
-    print(f"Failed to import subagent library: {e}", file=sys.stderr)
-    sys.exit(1)
-
-
-def list_available_agents(content_root: Path):
-    """List all agents found in the workspace.
-
-    Parameters
-    ----------
-    content_root:
-        The content root directory (e.g. ``.vaultspec/``).  In split-root
-        mode this differs from the output root; agents always live under
-        the content tree.
-    """
-    agents_dir = content_root / "rules" / "agents"
-    if not agents_dir.exists():
-        print("No agents found.", file=sys.stderr)
-        return
-
-    print(f"Agents in {agents_dir}:")
-    for agent_file in sorted(agents_dir.glob("*.md")):
-        print(f"  {agent_file.stem}")
+logger = logging.getLogger(__name__)
 
 
 def command_run(args):
-    """Handle 'run' subcommand."""
+    """Execute a sub-agent in one-shot or interactive mode.
+
+    Resolves context files, plan file, and goal from ``args``, then
+    dispatches to ``run_subagent`` via the async runner.  Prints the
+    agent's response text when one is returned.
+
+    Args:
+        args: Parsed argument namespace from the ``run`` subparser.
+    """
     if not args.agent:
-        print("Error: --agent is required for 'run'", file=sys.stderr)
+        logger.error("Error: --agent is required for 'run'")
         sys.exit(1)
 
     # Resolve Context Files
     context_files = []
     if args.context:
         for ctx_path in args.context:
-            p = pathlib.Path(ctx_path)
+            p = Path(ctx_path)
             if not p.exists():
-                print(f"Warning: Context file not found: {p}", file=sys.stderr)
+                logger.warning("Warning: Context file not found: %s", p)
             else:
                 context_files.append(p)
 
     # Resolve Plan File
     plan_file = None
     if args.plan:
-        p = pathlib.Path(args.plan)
+        p = Path(args.plan)
         if not p.exists():
-            print(f"Error: Plan file not found: {p}", file=sys.stderr)
+            logger.error("Error: Plan file not found: %s", p)
             sys.exit(1)
         plan_file = p
 
     # Determine Task/Goal
     task_goal = args.goal or args.task or ""
     if not task_goal and not plan_file:
-        print("Error: You must provide a --goal, --task, or a --plan.", file=sys.stderr)
+        logger.error("Error: You must provide a --goal, --task, or a --plan.")
         sys.exit(1)
 
     # Legacy Task File Support
     if args.task_file:
-        p = pathlib.Path(args.task_file)
+        p = Path(args.task_file)
         if p.exists():
             content = p.read_text(encoding="utf-8")
             task_goal = f"{task_goal}\n\n{content}".strip()
-            # Simple regex to find agent in file if not provided
-            import re
-
             match = re.search(r"Agent:\s*([a-zA-Z0-9_-]+)", content)
             if match and not args.agent:
                 args.agent = match.group(1)
         else:
-            print(f"Task file not found: {args.task_file}", file=sys.stderr)
+            logger.error("Task file not found: %s", args.task_file)
             sys.exit(1)
 
     # Permission prompt for read-only
     if args.mode == "read-only":
-        from vaultspec.orchestration import READONLY_PERMISSION_PROMPT
+        from .orchestration.constants import READONLY_PERMISSION_PROMPT
 
         task_goal = READONLY_PERMISSION_PROMPT + task_goal
 
     project_root = args.root
 
-    if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    # Parse MCP servers JSON if provided
+    mcp_servers = None
+    if args.mcp_servers:
+        try:
+            mcp_servers = json.loads(args.mcp_servers)
+        except json.JSONDecodeError as e:
+            logger.error("Error: Invalid JSON for --mcp-servers: %s", e)
+            sys.exit(1)
 
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", ResourceWarning)
-            result = loop.run_until_complete(
-                run_subagent(
-                    agent_name=args.agent,
-                    initial_task=task_goal,
-                    context_files=context_files,
-                    plan_file=plan_file,
-                    root_dir=project_root,
-                    model_override=args.model,
-                    provider_override=args.provider,
-                    interactive=args.interactive,
-                    debug=args.debug,
-                    mode=args.mode,
-                    quiet=False,  # CLI should be noisy
-                    client_class=SubagentClient,
-                )
-            )
-        if result.response_text:
-            print("\n--- Response ---\n")
-            print(result.response_text)
-
-    except (KeyboardInterrupt, SystemExit):
-        pass
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        if args.debug:
-            import traceback
-
-            traceback.print_exc()
-    finally:
-        # Workaround for Windows ProactorEventLoop "I/O operation on closed pipe" error
-        # Allow pending callbacks to settle before closing the loop
-        if sys.platform == "win32":
-            with contextlib.suppress(Exception):
-                loop.run_until_complete(asyncio.sleep(0.250))
-        loop.close()
+    result = run_async(
+        run_subagent(
+            agent_name=args.agent,
+            initial_task=task_goal,
+            context_files=context_files,
+            plan_file=plan_file,
+            root_dir=project_root,
+            model_override=args.model,
+            provider_override=args.provider,
+            interactive=args.interactive,
+            debug=args.debug,
+            mode=args.mode,
+            quiet=False,  # CLI should be noisy
+            client_class=SubagentClient,
+            resume_session_id=args.resume_session,
+            max_turns=args.max_turns,
+            budget=args.budget,
+            effort=args.effort,
+            output_format=args.output_format,
+            mcp_servers=mcp_servers,
+        ),
+        debug=args.debug,
+    )
+    if result is not None and result.response_text:
+        print("\n--- Response ---\n")
+        print(result.response_text)
 
 
-def command_serve(args):
-    """Handle 'serve' subcommand."""
-    server_main(root_dir=args.root, content_root=args.content_root)
+def command_serve(_args):
+    """Start the subagent MCP server.
+
+    Args:
+        _args: Parsed argument namespace from the ``serve`` subparser.
+    """
+    server_main()
 
 
 def command_a2a_serve(args):
-    """Handle 'a2a-serve' subcommand — start an A2A HTTP server."""
+    """Start an A2A HTTP server backed by a Claude or Gemini executor.
+
+    Loads the agent definition, instantiates the appropriate executor, builds
+    an agent card, and serves the A2A ASGI app via uvicorn.
+
+    Args:
+        args: Parsed argument namespace from the ``a2a-serve`` subparser.
+    """
     import uvicorn
 
-    from vaultspec.protocol.a2a import agent_card_from_definition, create_app
+    from .protocol.a2a import agent_card_from_definition, create_app
 
     root = args.root
     content_root = args.content_root
     agent_name = args.agent or "vaultspec-researcher"
     port = args.port or 10010
 
-    # Load agent metadata (minimal — just name + description)
-    agents_dir = content_root / "rules" / "agents"
-    agent_file = agents_dir / f"{agent_name}.md"
-    agent_meta = {"name": agent_name, "description": f"Vaultspec agent: {agent_name}"}
-    if agent_file.exists():
-        agent_meta["description"] = f"Vaultspec {agent_name} agent via A2A"
+    try:
+        agent_meta, agent_persona = load_agent(
+            agent_name,
+            root,
+            content_root=content_root,
+        )
+    except AgentNotFoundError:
+        agent_meta = {
+            "name": agent_name,
+            "description": f"Vaultspec agent: {agent_name}",
+        }
+        agent_persona = None
 
     # Create executor based on --executor flag
     executor_type = args.executor or "claude"
     if executor_type == "claude":
-        from vaultspec.protocol.a2a.executors import ClaudeA2AExecutor
+        from .protocol.a2a.executors import ClaudeA2AExecutor
 
         executor = ClaudeA2AExecutor(
             model=args.model or ClaudeModels.MEDIUM,
             root_dir=str(root),
             mode=args.mode or "read-only",
+            system_prompt=agent_persona,
         )
     elif executor_type == "gemini":
-        from vaultspec.protocol.a2a.executors import GeminiA2AExecutor
+        from .protocol.a2a.executors import GeminiA2AExecutor
 
         executor = GeminiA2AExecutor(
             root_dir=root,
@@ -204,39 +184,35 @@ def command_a2a_serve(args):
             agent_name=agent_name,
         )
     else:
-        print(f"Unknown executor: {executor_type}", file=sys.stderr)
+        logger.error("Unknown executor: %s", executor_type)
         sys.exit(1)
 
     card = agent_card_from_definition(agent_name, agent_meta, port=port)
     app = create_app(executor, card)
 
-    from vaultspec.core import get_config
+    from .config import get_config
 
     cfg = get_config()
 
-    print(f"Starting A2A server: {agent_name} ({executor_type}) on port {port}")
+    logger.info(
+        "Starting A2A server: %s (%s) on port %d", agent_name, executor_type, port
+    )
     uvicorn.run(app, host=cfg.mcp_host, port=port)
 
 
 def command_list(args):
-    """Handle 'list' subcommand."""
+    """Print all available agents found under the content root.
+
+    Args:
+        args: Parsed argument namespace from the ``list`` subparser.
+    """
     list_available_agents(args.content_root)
 
 
 def main() -> None:
+    """Parse arguments and dispatch to the appropriate subcommand handler."""
     parser = argparse.ArgumentParser(description="Sub-agent CLI")
-    parser.add_argument(
-        "--root", type=Path, default=None, help="Workspace root directory"
-    )
-    parser.add_argument(
-        "--content-dir",
-        type=Path,
-        default=None,
-        help="Content source directory (rules, agents, skills)",
-    )
-    parser.add_argument(
-        "--version", "-V", action="version", version=f"%(prog)s {_get_version()}"
-    )
+    add_common_args(parser)
     subparsers = parser.add_subparsers(
         dest="command", required=True, help="Command to execute"
     )
@@ -284,13 +260,43 @@ def main() -> None:
         help="Keep the session open for multi-turn interaction.",
     )
     run_parser.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Enable verbose output (INFO level)",
+        "--resume-session",
+        type=str,
+        default=None,
+        help="Resume an existing ACP session by ID.",
     )
     run_parser.add_argument(
-        "--debug", action="store_true", help="Enable debug logging (DEBUG level)"
+        "--max-turns",
+        type=int,
+        default=None,
+        help="Maximum number of agent turns.",
+    )
+    run_parser.add_argument(
+        "--budget",
+        type=float,
+        default=None,
+        help="Token budget limit for the agent run.",
+    )
+    run_parser.add_argument(
+        "--effort",
+        choices=["low", "medium", "high"],
+        default=None,
+        help="Effort level for the agent run.",
+    )
+    run_parser.add_argument(
+        "--output-format",
+        choices=["text", "json", "stream-json"],
+        default=None,
+        help="Output format for agent responses.",
+    )
+    run_parser.add_argument(
+        "--mcp-servers",
+        type=str,
+        default=None,
+        help=(
+            "MCP server configuration as JSON string "
+            '(e.g. \'{"server": {"command": "..."}}\').'
+        ),
     )
     run_parser.set_defaults(func=command_run)
 
@@ -337,37 +343,10 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    # Resolve workspace layout when overrides are provided
-    if args.root is not None or getattr(args, "content_dir", None) is not None:
-        _layout = resolve_workspace(
-            root_override=args.root,
-            content_override=getattr(args, "content_dir", None),
-            framework_dir_name=".vaultspec",
-        )
-        args.root = _layout.output_root
-        args.content_root = _layout.content_root
-    else:
-        args.root = ROOT_DIR
-        args.content_root = _default_layout.content_root
-
-    args.root = args.root.resolve()
-    args.content_root = args.content_root.resolve()
-
-    if getattr(args, "debug", False):
-        configure_logging(level="DEBUG")
-    elif getattr(args, "verbose", False):
-        configure_logging(level="INFO")
-    else:
-        # Default CLI format: clean message only
-        configure_logging(log_format="%(message)s")
+    resolve_args_workspace(args, get_default_layout())
+    setup_logging(args, default_format="%(message)s")
 
     if hasattr(args, "func"):
-        # Suppress ProactorEventLoop pipe warnings on Windows
-        if sys.platform == "win32":
-            warnings.filterwarnings(
-                "ignore", category=ResourceWarning, message="unclosed transport"
-            )
-
         args.func(args)
     else:
         parser.print_help()

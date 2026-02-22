@@ -14,6 +14,9 @@ related:
   - "[[{yyyy-mm-dd-*}]]"
 ---
 
+<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
+     outside the YAML frontmatter above -->
+
 # `{feature}` code review
 
 <!-- STATUS MUST BE ONE OF: PASS | FAIL | REVISION REQUIRED -->

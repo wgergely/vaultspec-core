@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from vaultspec.core import reset_config
+from ...config import reset_config
 
 pytestmark = [pytest.mark.unit]
 
@@ -27,7 +27,7 @@ class TestSessionLogger:
     def test_creates_log_directory(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
         monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
-        from vaultspec.orchestration import SessionLogger
+        from .. import SessionLogger
 
         logger = SessionLogger(tmp_path, "test-agent", task_id="abcd1234-0000")
         assert logger.log_dir.exists()
@@ -36,7 +36,7 @@ class TestSessionLogger:
     def test_filename_format(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
         monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
-        from vaultspec.orchestration import SessionLogger
+        from .. import SessionLogger
 
         logger = SessionLogger(tmp_path, "my-agent", task_id="deadbeef-1234-5678")
         name = logger.log_file.name
@@ -48,7 +48,7 @@ class TestSessionLogger:
     def test_session_start_header(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
         monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
-        from vaultspec.orchestration import SessionLogger
+        from .. import SessionLogger
 
         logger = SessionLogger(tmp_path, "test-agent", task_id="abcd1234-0000")
         content = logger.log_file.read_text(encoding="utf-8").strip()
@@ -62,7 +62,7 @@ class TestSessionLogger:
     def test_log_appends_jsonl(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
         monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
-        from vaultspec.orchestration import SessionLogger
+        from .. import SessionLogger
 
         logger = SessionLogger(tmp_path, "test-agent", task_id="abcd1234")
         logger.log("session_update", {"key": "value"})
@@ -75,7 +75,7 @@ class TestSessionLogger:
     def test_log_path_workspace_relative(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
         monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
-        from vaultspec.orchestration import SessionLogger
+        from .. import SessionLogger
 
         logger = SessionLogger(tmp_path, "test-agent", task_id="abcd1234")
         rel = logger.log_path
@@ -87,7 +87,7 @@ class TestSessionLogger:
     def test_auto_generates_task_id(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
         monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
-        from vaultspec.orchestration import SessionLogger
+        from .. import SessionLogger
 
         logger = SessionLogger(tmp_path, "test-agent")
         assert logger._task_id is not None
@@ -101,7 +101,7 @@ class TestCleanupOldLogs:
         monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
         monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
         monkeypatch.setenv("VAULTSPEC_LOG_RETENTION_DAYS", "7")
-        from vaultspec.orchestration import cleanup_old_logs
+        from .. import cleanup_old_logs
 
         log_dir = tmp_path / ".vault" / "logs"
         log_dir.mkdir(parents=True)
@@ -123,7 +123,7 @@ class TestCleanupOldLogs:
         monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
         monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
         monkeypatch.setenv("VAULTSPEC_LOG_RETENTION_DAYS", "1")
-        from vaultspec.orchestration import cleanup_old_logs
+        from .. import cleanup_old_logs
 
         log_dir = tmp_path / ".vault" / "logs"
         log_dir.mkdir(parents=True)
@@ -136,7 +136,7 @@ class TestCleanupOldLogs:
     def test_returns_zero_when_no_dir(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
         monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
-        from vaultspec.orchestration import cleanup_old_logs
+        from .. import cleanup_old_logs
 
         assert cleanup_old_logs(tmp_path) == 0
 
@@ -145,13 +145,13 @@ class TestDocTypeLogs:
     """Verify LOGS is recognized in vault structure."""
 
     def test_logs_is_valid_doctype(self):
-        from vaultspec.vaultcore import DocType, VaultConstants
+        from ...vaultcore import DocType, VaultConstants
 
         assert DocType.LOGS == "logs"
         assert "logs" in VaultConstants.SUPPORTED_DIRECTORIES
 
     def test_validate_vault_structure_accepts_logs(self, tmp_path: Path):
-        from vaultspec.vaultcore import VaultConstants
+        from ...vaultcore import VaultConstants
 
         logs_dir = tmp_path / ".vault" / "logs"
         logs_dir.mkdir(parents=True)

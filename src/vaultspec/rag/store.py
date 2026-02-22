@@ -24,6 +24,7 @@ EMBEDDING_DIM = 768  # nomic-embed-text-v1.5 default
 
 
 def _check_rag_deps() -> None:
+    """Raise ImportError if the ``lancedb`` RAG dependency is not installed."""
     try:
         import lancedb
 
@@ -40,6 +41,12 @@ def _sanitize_filter_value(value: str) -> str:
     Escapes single quotes (SQL injection vector) and strips control
     characters. LanceDB does not support parameterized queries, so
     string escaping is the only defense.
+
+    Args:
+        value: Raw filter value to sanitize.
+
+    Returns:
+        Sanitized string safe for embedding in a SQL literal.
     """
     sanitized = value.replace("'", "''")
     sanitized = "".join(c for c in sanitized if c.isprintable())
@@ -52,6 +59,12 @@ def _parse_json_list(value: str) -> list[str]:
     If *value* is a valid JSON array it is returned as-is.  Otherwise the
     string is split on commas so that callers who stored plain
     comma-separated values don't cause a crash.
+
+    Args:
+        value: A JSON array string or comma-separated string to parse.
+
+    Returns:
+        A Python list of strings, or an empty list for blank/empty input.
     """
     if not value or value == "[]":
         return []
@@ -67,7 +80,22 @@ def _parse_json_list(value: str) -> list[str]:
 
 @dataclass
 class VaultDocument:
-    """Schema for a single vault document in the vector store."""
+    """Schema for a single vault document in the vector store.
+
+    Attributes:
+        id: Document stem used as the primary key (e.g. ``"2026-02-12-rag-plan"``).
+        path: Relative path within the docs directory
+            (e.g. ``"plan/2026-02-12-rag-plan.md"``).
+        doc_type: Document type string — one of ``"adr"``, ``"audit"``, ``"exec"``,
+            ``"plan"``, ``"research"``, or ``"reference"``.
+        feature: Feature tag without the leading ``#`` (e.g. ``"rag"``).
+        date: ISO date string parsed from the document frontmatter.
+        tags: JSON-serialized list of frontmatter tags.
+        related: JSON-serialized list of related wiki-link strings.
+        title: H1 heading extracted from the document body.
+        content: Full markdown body text used for BM25 full-text search.
+        vector: Embedding vector; populated during the indexing step.
+    """
 
     id: str  # document stem (e.g., "2026-02-12-rag-plan")
     path: str  # relative path (e.g., "plan/2026-02-12-rag-plan.md")
@@ -81,7 +109,11 @@ class VaultDocument:
     vector: list[float] = field(default_factory=list)  # embedding vector
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dict for LanceDB insertion."""
+        """Convert to dict for LanceDB insertion.
+
+        Returns:
+            Dictionary with all document fields, ready for ``table.add()``.
+        """
         return {
             "id": self.id,
             "path": self.path,
@@ -97,10 +129,26 @@ class VaultDocument:
 
     @staticmethod
     def tags_to_json(tags: list[str]) -> str:
+        """Serialize a list of tag strings to a JSON array string.
+
+        Args:
+            tags: List of tag strings (e.g. ``["#plan", "#rag"]``).
+
+        Returns:
+            JSON-encoded string representation of the list.
+        """
         return json.dumps(tags)
 
     @staticmethod
     def related_to_json(related: list[str]) -> str:
+        """Serialize a list of related wiki-link strings to a JSON array string.
+
+        Args:
+            related: List of wiki-link strings (e.g. ``["[[2026-02-12-rag-plan]]"]``).
+
+        Returns:
+            JSON-encoded string representation of the list.
+        """
         return json.dumps(related)
 
 
@@ -117,12 +165,23 @@ class VaultStore:
     def __init__(
         self, root_dir: pathlib.Path | str, embedding_dim: int | None = None
     ) -> None:
+        """Connect to (or create) the LanceDB store at ``{root_dir}/.lance/``.
+
+        Args:
+            root_dir: Workspace root directory; the ``.lance/`` subdirectory is
+                created here automatically if it does not exist.
+            embedding_dim: Dimensionality of the embedding vectors.  Defaults to
+                :data:`EMBEDDING_DIM` (768 for ``nomic-embed-text-v1.5``).
+
+        Raises:
+            ImportError: If the ``lancedb`` package is not installed.
+        """
         _check_rag_deps()
         import pathlib as _pathlib
 
         import lancedb
 
-        from vaultspec.core import get_config
+        from ..config import get_config
 
         cfg = get_config()
 
@@ -147,13 +206,15 @@ class VaultStore:
         exc_val: BaseException | None,
         exc_tb: Any,
     ) -> bool:
+        """Close the store on context-manager exit; does not suppress exceptions."""
         self.close()
         return False
 
     def ensure_table(self) -> Any:
         """Create the vault_docs table if it doesn't exist.
 
-        Returns the LanceDB Table handle.
+        Returns:
+            The LanceDB ``Table`` handle for ``vault_docs``.
         """
         if self._table is not None:
             return self._table
@@ -207,6 +268,9 @@ class VaultStore:
 
         Existing rows with matching ids are deleted first, then the new
         rows are appended.  The FTS index is marked dirty for lazy rebuild.
+
+        Args:
+            docs: Documents to insert or replace.
         """
         if not docs:
             return
@@ -223,7 +287,11 @@ class VaultStore:
         logger.info("Upserted %d document(s)", len(docs))
 
     def delete_documents(self, ids: list[str]) -> None:
-        """Remove documents by their ``id`` values."""
+        """Remove documents by their ``id`` values.
+
+        Args:
+            ids: List of document stem IDs to delete.
+        """
         if not ids:
             return
         self.ensure_table()
@@ -232,7 +300,11 @@ class VaultStore:
         logger.info("Deleted %d document(s)", len(ids))
 
     def get_all_ids(self) -> set[str]:
-        """Return the set of all document ``id`` values in the store."""
+        """Return the set of all document ``id`` values in the store.
+
+        Returns:
+            Set of document stem strings currently in the table.
+        """
         table = self.ensure_table()
         if table.count_rows() == 0:
             return set()
@@ -240,12 +312,24 @@ class VaultStore:
         return set(arrow_tbl.column("id").to_pylist())
 
     def count(self) -> int:
-        """Return total number of indexed documents."""
+        """Return total number of indexed documents.
+
+        Returns:
+            Row count of the ``vault_docs`` table.
+        """
         table = self.ensure_table()
         return table.count_rows()
 
     def get_by_id(self, doc_id: str) -> dict | None:
-        """Retrieve a single document by ID, or None if not found."""
+        """Retrieve a single document by ID, or None if not found.
+
+        Args:
+            doc_id: Document stem to look up (e.g. ``"2026-02-12-rag-plan"``).
+
+        Returns:
+            Document dict with ``tags`` and ``related`` deserialized to lists
+            and ``vector`` stripped, or ``None`` if the ID is not present.
+        """
         table = self.ensure_table()
         if table.count_rows() == 0:
             return None
@@ -327,7 +411,11 @@ class VaultStore:
         return results
 
     def _delete_by_ids(self, ids: list[str]) -> None:
-        """Delete rows whose ``id`` is in *ids* using a single predicate."""
+        """Delete rows whose ``id`` is in *ids* using a single predicate.
+
+        Args:
+            ids: List of document stem IDs to remove from the table.
+        """
         if not ids:
             return
         table = self.ensure_table()
@@ -342,6 +430,14 @@ class VaultStore:
         """Convert a filters dict into a LanceDB SQL WHERE clause.
 
         Filter values are sanitized to prevent SQL injection.
+
+        Args:
+            filters: Mapping of column name to filter value; ``None`` or empty
+                returns ``None``.
+
+        Returns:
+            A SQL WHERE clause string (e.g. ``"doc_type = 'adr'"``) or
+            ``None`` if no filters were provided.
         """
         if not filters:
             return None

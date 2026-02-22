@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from vaultspec.protocol.acp import SubagentClient
+from ..acp import SubagentClient
 
 pytestmark = [pytest.mark.unit]
 

@@ -8,7 +8,8 @@ from __future__ import annotations
 import pytest
 
 from tests.constants import TEST_PROJECT
-from vaultspec.protocol.sandbox import (
+
+from ...sandbox import (
     _SHELL_TOOLS,
     _is_vault_path,
     _make_sandbox_callback,

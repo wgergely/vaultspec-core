@@ -15,8 +15,27 @@ def agent_card_from_definition(
     host: str | None = None,
     port: int | None = None,
 ) -> AgentCard:
-    """Convert a vaultspec agent definition to an A2A Agent Card."""
-    from vaultspec.core import get_config
+    """Convert a vaultspec agent definition dict to an A2A AgentCard.
+
+    Reads host/port from config when not explicitly provided. The resulting
+    card declares streaming and state-transition-history capabilities, and
+    registers a single skill derived from the agent definition.
+
+    Args:
+        agent_name: Identifier for the agent (e.g. ``"vaultspec-researcher"``).
+        agent_meta: Dictionary of agent metadata, typically loaded from a
+            ``.vaultspec/rules/agents/`` definition file. Recognised keys:
+            ``"name"``, ``"description"``, ``"tags"``.
+        host: Override the hostname for the agent's URL. Defaults to the
+            value from ``get_config().a2a_host``.
+        port: Override the port for the agent's URL. Defaults to
+            ``get_config().a2a_default_port``.
+
+    Returns:
+        A fully-populated :class:`a2a.types.AgentCard` ready to be served
+        at ``/.well-known/agent.json``.
+    """
+    from ...config import get_config
 
     logger.info("Creating A2A agent card for agent: %s", agent_name)
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from vaultspec.protocol.providers import GeminiModels
+from ..providers import GeminiModels
 
 
 @pytest.fixture

@@ -27,7 +27,16 @@ _SHELL_TOOLS = frozenset({"Bash"})
 
 
 def _is_vault_path(file_path: str, root_dir: str) -> bool:
-    """Return True if *file_path* is inside ``<root_dir>/.vault/``."""
+    """Return True if *file_path* is inside ``<root_dir>/.vault/``.
+
+    Args:
+        file_path: Absolute or relative path to check.
+        root_dir: Project root directory used as the resolution base.
+
+    Returns:
+        True if the resolved path is ``.vault/`` or a descendant of it,
+        False otherwise (including on resolution errors).
+    """
     try:
         resolved = pathlib.Path(file_path).resolve()
         root = pathlib.Path(root_dir).resolve()
@@ -43,6 +52,16 @@ def _make_sandbox_callback(mode: str, root_dir: str) -> Any:
     In ``read-write`` mode no restrictions are applied (returns ``None``).
     In ``read-only`` mode write operations are only allowed when the target
     path is inside ``.vault/``.
+
+    Args:
+        mode: Agent permission mode — ``"read-only"`` enforces sandbox
+            restrictions; any other value disables them.
+        root_dir: Project root directory passed to :func:`_is_vault_path`
+            for path resolution.
+
+    Returns:
+        An async ``can_use_tool`` callback when ``mode`` is ``"read-only"``,
+        or ``None`` when no restrictions should be applied.
     """
     if mode != "read-only":
         return None
@@ -52,6 +71,19 @@ def _make_sandbox_callback(mode: str, root_dir: str) -> Any:
         tool_input: dict[str, Any],
         _context: ToolPermissionContext,
     ) -> PermissionResultAllow | PermissionResultDeny:
+        """Evaluate whether a tool call should be permitted in read-only mode.
+
+        Args:
+            tool_name: Name of the tool being invoked (e.g. ``"Write"``,
+                ``"Bash"``).
+            tool_input: Raw input dict provided to the tool; ``"file_path"``
+                is extracted for write-tool checks.
+            _context: SDK permission context (unused).
+
+        Returns:
+            :class:`PermissionResultDeny` for shell tools or writes outside
+            ``.vault/``; :class:`PermissionResultAllow` otherwise.
+        """
         if tool_name in _SHELL_TOOLS:
             logger.warning(
                 "Path access denied: %s (shell commands blocked)",

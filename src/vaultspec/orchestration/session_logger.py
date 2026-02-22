@@ -11,7 +11,7 @@ import logging
 import uuid
 from typing import TYPE_CHECKING, Any
 
-from vaultspec.core import get_config
+from ..config import get_config
 
 __all__ = ["SessionLogger", "cleanup_old_logs"]
 
@@ -24,8 +24,17 @@ logger = logging.getLogger(__name__)
 class SessionLogger:
     """Handles persistent logging of agent session events to disk.
 
+    Each logger creates a JSONL file under ``{root_dir}/{docs_dir}/{logs_dir}``
+    and writes a ``session_start`` entry on construction.  Subsequent events
+    are appended via :meth:`log`.
+
     Log files use the naming convention:
-        {YYYY-MM-DDTHH-MM-SS}_{agent_name}_{task_id_short}.jsonl
+        ``{YYYY-MM-DDTHH-MM-SS}_{agent_name}_{task_id_short}.jsonl``
+
+    Attributes:
+        start_time: UTC datetime when this logger was created.
+        log_dir: Resolved directory where the log file is written.
+        log_file: Full path to the JSONL log file for this session.
     """
 
     def __init__(
@@ -34,6 +43,15 @@ class SessionLogger:
         agent_name: str = "unknown",
         task_id: str | None = None,
     ):
+        """Initialize the session logger and write the session_start event.
+
+        Args:
+            root_dir: Workspace root used to resolve the log directory and to
+                make the log path workspace-relative.
+            agent_name: Human-readable name of the agent being logged.
+            task_id: Optional task identifier; a random UUID is generated when
+                not provided.
+        """
         cfg = get_config()
         self._root_dir = root_dir
         self._agent_name = agent_name
@@ -62,14 +80,31 @@ class SessionLogger:
 
     @property
     def log_path(self) -> str:
-        """Workspace-relative path to the log file."""
+        """Return the workspace-relative path to the log file.
+
+        Falls back to the absolute POSIX path if the log file is outside the
+        workspace root.
+
+        Returns:
+            Workspace-relative POSIX path string, or absolute POSIX path if the
+            log file lives outside the workspace root.
+        """
         try:
             return self.log_file.relative_to(self._root_dir).as_posix()
         except ValueError:
             return self.log_file.as_posix()
 
     def log(self, event_type: str, data: Any) -> None:
-        """Append a structured JSONL event to the log file."""
+        """Append a structured JSONL event to the log file.
+
+        Each line written has the shape:
+        ``{"timestamp": "<iso>", "type": "<event_type>", "data": <data>}``
+
+        Args:
+            event_type: Short string identifying the event category (e.g.
+                ``"session_start"``, ``"tool_call"``).
+            data: Arbitrary JSON-serialisable payload for the event.
+        """
         timestamp = datetime.datetime.now(datetime.UTC).isoformat()
         log_entry = {"timestamp": timestamp, "type": event_type, "data": data}
         with self.log_file.open("a", encoding="utf-8") as f:
@@ -82,9 +117,13 @@ def cleanup_old_logs(root_dir: pathlib.Path) -> int:
     Scans ``{root_dir}/{docs_dir}/{logs_dir}`` for ``.jsonl`` files whose
     filename starts with an ISO-8601 date-time prefix
     (``YYYY-MM-DDTHH-MM-SS``).  Files older than ``log_retention_days`` are
-    removed.
+    removed.  Files with an unrecognised name format are silently skipped.
 
-    Returns the number of files deleted.
+    Args:
+        root_dir: Workspace root used to resolve the log directory.
+
+    Returns:
+        The number of log files that were successfully deleted.
     """
     cfg = get_config()
     log_dir = root_dir / cfg.docs_dir / cfg.logs_dir

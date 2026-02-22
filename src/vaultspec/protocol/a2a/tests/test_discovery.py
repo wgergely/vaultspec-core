@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from vaultspec.protocol.a2a import (
+from .. import (
     generate_agent_md,
     write_agent_discovery,
     write_gemini_settings,

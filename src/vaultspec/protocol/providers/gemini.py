@@ -1,3 +1,5 @@
+"""Agent provider implementation for Google Gemini via the Gemini CLI ACP bridge."""
+
 from __future__ import annotations
 
 import contextlib
@@ -44,18 +46,40 @@ _CLAUDE_ONLY_FEATURES = (
 _MIN_VERSION_WINDOWS = (0, 9, 0)  # v0.9.0 fixes Windows ACP hang
 _MIN_VERSION_RECOMMENDED = (0, 27, 0)  # v0.27.0 has stable agent skills
 
+# Public OAuth client credentials for the Gemini CLI (installed-app pattern).
+# Safe to embed: https://developers.google.com/identity/protocols/oauth2#installed
+_GEMINI_CLI_CLIENT_ID = (
+    "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com"
+)
+_GEMINI_CLI_CLIENT_SECRET = "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"
+
 # Cache for version check result
 _cached_version: tuple[int, ...] | None = None
 
 # Overridable which function for testing
 _which_fn: Callable[[str], str | None] = shutil.which
 
+# Overridable default creds path for testing (None → ~/.gemini/oauth_creds.json)
+_default_creds_path: pathlib.Path | None = None
+
 
 def _load_gemini_oauth_creds(
     creds_path: pathlib.Path | None = None,
 ) -> dict | None:
-    """Load ~/.gemini/oauth_creds.json and return its parsed contents, or None."""
-    path = creds_path or pathlib.Path.home() / ".gemini" / "oauth_creds.json"
+    """Load ``~/.gemini/oauth_creds.json`` and return its parsed contents.
+
+    Args:
+        creds_path: Path to the credentials file. Defaults to
+            ``~/.gemini/oauth_creds.json``. Injectable for testing.
+
+    Returns:
+        Parsed JSON dict, or ``None`` if the file is missing or unreadable.
+    """
+    path = (
+        creds_path
+        or _default_creds_path
+        or pathlib.Path.home() / ".gemini" / "oauth_creds.json"
+    )
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
@@ -69,18 +93,33 @@ def _refresh_gemini_oauth_token(
 ) -> dict | None:
     """Refresh the Gemini OAuth access token using the stored refresh_token.
 
+    Uses the Gemini CLI's public OAuth client credentials as defaults when
+    ``client_id`` / ``client_secret`` are absent from the credentials dict
+    (the CLI embeds them in its binary rather than storing them on disk).
+
     On success, writes the updated creds atomically back to the credentials file
     and returns the updated dict. On failure, logs a warning and returns None.
-    """
-    url = token_url or creds.get("token_uri", "https://oauth2.googleapis.com/token")
-    refresh_token = creds.get("refresh_token")
-    client_id = creds.get("client_id")
-    client_secret = creds.get("client_secret")
 
-    if not all([refresh_token, client_id, client_secret]):
+    Args:
+        creds: Parsed credentials dict (as returned by
+            :func:`_load_gemini_oauth_creds`).
+        token_url: OAuth token endpoint URL. Defaults to
+            ``https://oauth2.googleapis.com/token``.
+        creds_path: Path to write refreshed creds back to. Defaults to
+            ``~/.gemini/oauth_creds.json``.
+
+    Returns:
+        Updated credentials dict with a fresh ``access_token`` and
+        ``expiry_date``, or ``None`` on any failure.
+    """
+    url = token_url or "https://oauth2.googleapis.com/token"
+    refresh_token = creds.get("refresh_token")
+    client_id = creds.get("client_id", _GEMINI_CLI_CLIENT_ID)
+    client_secret = creds.get("client_secret", _GEMINI_CLI_CLIENT_SECRET)
+
+    if not refresh_token:
         logger.warning(
-            "Gemini OAuth token refresh skipped: missing refresh_token,"
-            " client_id, or client_secret in credentials."
+            "Gemini OAuth token refresh skipped: missing refresh_token in credentials."
         )
         return None
 
@@ -117,10 +156,8 @@ def _refresh_gemini_oauth_token(
         "access_token", creds.get("access_token")
     )
     expires_in = response_data.get("expires_in", 3600)
-    expiry_dt = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
-        seconds=int(expires_in)
-    )
-    updated["expiry"] = expiry_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    now_ms = int(datetime.datetime.now(datetime.UTC).timestamp() * 1000)
+    updated["expiry_date"] = now_ms + int(expires_in) * 1000
 
     # Atomic write-back
     target = creds_path or pathlib.Path.home() / ".gemini" / "oauth_creds.json"
@@ -138,44 +175,82 @@ def _refresh_gemini_oauth_token(
 
 
 def _is_gemini_token_expired(creds: dict) -> bool:
-    """Return True if the OAuth access_token expires within 5 minutes."""
-    expiry_str = creds.get("expiry")
-    if not expiry_str:
+    """Return True if the OAuth access_token expires within 5 minutes.
+
+    Gemini CLI stores ``expiry_date`` as milliseconds since Unix epoch.
+
+    Args:
+        creds: Parsed credentials dict containing an ``expiry_date`` key
+            (milliseconds since epoch).
+
+    Returns:
+        ``True`` if the token is absent, unparseable, or expires within
+        300 seconds; ``False`` otherwise.
+    """
+    expiry_ms = creds.get("expiry_date")
+    if expiry_ms is None:
         return True
     try:
-        expiry_str_normalized = expiry_str.replace("Z", "+00:00")
-        expiry_dt = datetime.datetime.fromisoformat(expiry_str_normalized)
-    except ValueError:
-        try:
-            expiry_dt = datetime.datetime.strptime(
-                expiry_str, "%Y-%m-%dT%H:%M:%SZ"
-            ).replace(tzinfo=datetime.UTC)
-        except ValueError:
-            return True
-    buffer = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=300)
-    return expiry_dt <= buffer
+        expiry_s = int(expiry_ms) / 1000
+    except (TypeError, ValueError):
+        return True
+    now_s = datetime.datetime.now(datetime.UTC).timestamp()
+    return expiry_s <= now_s + 300
 
 
 class GeminiProvider(AgentProvider):
-    """Provider for Google Gemini models via Gemini CLI."""
+    """Provider for Google Gemini models via the Gemini CLI ACP bridge.
+
+    Spawns ``vaultspec.protocol.acp.gemini_bridge`` as a subprocess and
+    handles OAuth credential refresh, system-prompt temp-file injection, and
+    environment variable forwarding for Gemini-specific agent features.
+    """
 
     @property
     def name(self) -> str:
+        """Return the provider identifier string.
+
+        Returns:
+            The string ``"gemini"``.
+        """
         return "gemini"
 
     @property
     def models(self) -> ModelRegistry:
+        """Return the Gemini model registry.
+
+        Returns:
+            The :class:`GeminiModels` registry class.
+        """
         return GeminiModels
 
     def load_system_prompt(self, root_dir: pathlib.Path) -> str:
-        """Loads .gemini/SYSTEM.md if it exists (deployed by CLI sync)."""
+        """Load ``.gemini/SYSTEM.md`` if it exists (deployed by CLI sync).
+
+        Args:
+            root_dir: Workspace root directory.
+
+        Returns:
+            File contents as a string, or an empty string if the file is absent.
+        """
         system_file = root_dir / ".gemini" / "SYSTEM.md"
         if not system_file.exists():
             return ""
         return system_file.read_text(encoding="utf-8")
 
     def load_rules(self, root_dir: pathlib.Path) -> str:
-        """Loads and resolves nested rules from .gemini/rules/."""
+        """Load and inline-resolve rules from ``.gemini/rules/``.
+
+        All ``*.md`` files in the rules directory are read in sorted order and
+        their ``@include`` directives are resolved recursively.
+
+        Args:
+            root_dir: Workspace root directory.
+
+        Returns:
+            Concatenated rules text, or an empty string if the directory does
+            not exist.
+        """
         rules_dir = root_dir / ".gemini" / "rules"
         if not rules_dir.exists():
             return ""
@@ -194,8 +269,17 @@ class GeminiProvider(AgentProvider):
     ) -> tuple[int, ...] | None:
         """Check Gemini CLI version and warn/fail based on known-good baselines.
 
-        Returns the parsed version tuple or None if version could not be determined.
-        Pass ``run_fn`` to inject a replacement for ``subprocess.run`` (testing).
+        Args:
+            executable: Path or name of the ``gemini`` CLI binary to check.
+            run_fn: Replacement for ``subprocess.run`` (injectable for testing).
+
+        Returns:
+            Parsed version tuple (e.g. ``(0, 27, 0)``), or ``None`` if the
+            version could not be determined.
+
+        Raises:
+            RuntimeError: If the CLI version is below the Windows minimum
+                (:data:`_MIN_VERSION_WINDOWS`) when running on Windows.
         """
         global _cached_version
         if _cached_version:
@@ -244,6 +328,34 @@ class GeminiProvider(AgentProvider):
         *,
         creds_path: pathlib.Path | None = None,
     ) -> ProcessSpec:
+        """Build a ProcessSpec for launching the Gemini CLI ACP bridge subprocess.
+
+        Validates the Gemini CLI version, loads system prompt and rules,
+        performs OAuth token refresh if needed, writes the system prompt to a
+        temporary file for ``GEMINI_SYSTEM_MD``, selects the appropriate model,
+        and maps agent YAML metadata to environment variables consumed by the bridge.
+
+        Args:
+            agent_name: Name of the agent being dispatched (unused but kept
+                for interface consistency).
+            agent_meta: Parsed metadata from the agent's YAML front matter.
+            agent_persona: Agent persona / behavioural instructions.
+            task_context: Initial task description passed to the agent.
+            root_dir: Workspace root directory.
+            model_override: Optional model ID to use instead of the tier
+                default derived from ``agent_meta``.
+            mode: Sandbox mode forwarded to the bridge (``"read-only"`` or
+                ``"read-write"``).
+            creds_path: Override path for the Gemini OAuth credentials file.
+                Defaults to ``~/.gemini/oauth_creds.json``. Injectable for testing.
+
+        Returns:
+            ProcessSpec ready for the orchestration layer to spawn.
+
+        Raises:
+            RuntimeError: If the Gemini CLI is below the minimum supported version
+                on Windows.
+        """
         _ = agent_name
 
         # Warn on Claude-only features
@@ -255,12 +367,12 @@ class GeminiProvider(AgentProvider):
                     self.name,
                 )
 
-        #  Locate executable and check version
+        # Validate Gemini CLI is available and meets minimum version.
+        # The bridge spawns the CLI internally, but we fail fast here.
         _raw_executable = _which_fn("gemini") or "gemini"
         self.check_version(_raw_executable)
-        executable, prefix_args = resolve_executable("gemini", _which_fn)
 
-        #  Load system instructions, rules, and construct full prompt
+        # Load system instructions, rules, and construct full prompt
         system_instructions = self.load_system_prompt(root_dir)
         rules = self.load_rules(root_dir)
         system_prompt = self.construct_system_prompt(
@@ -269,7 +381,7 @@ class GeminiProvider(AgentProvider):
             system_instructions,
         )
 
-        #  Prepare Environment
+        # Prepare Environment
         env = os.environ.copy()
 
         # Auth wrangling — see
@@ -302,9 +414,10 @@ class GeminiProvider(AgentProvider):
 
         cleanup_paths: list[pathlib.Path] = []
 
-        # Write system prompt to temp file for GEMINI_SYSTEM_MD
+        # Write system prompt to temp file for GEMINI_SYSTEM_MD.
+        # The bridge forwards GEMINI_* env vars to the child CLI process.
         if system_prompt:
-            from vaultspec.core import get_config
+            from ...config import get_config
 
             tmp_dir = root_dir / get_config().framework_dir / ".tmp"
             tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -313,43 +426,40 @@ class GeminiProvider(AgentProvider):
             env["GEMINI_SYSTEM_MD"] = str(system_file)
             cleanup_paths.append(system_file)
 
-        #  Determine Model
+        # Determine Model
         model = model_override or agent_meta.get("model")
         if not model:
             tier = agent_meta.get("tier", "MEDIUM")
             model = self.get_best_model_for_capability(CapabilityLevel[tier.upper()])
 
-        #  Build Args (Gemini CLI has no --system flag)
-        args = ["--experimental-acp", "--model", model]
-        if mode == "read-only":
-            args.append("--sandbox")
+        # Bridge configuration via environment variables.
+        # The bridge reads these in its constructor and forwards them
+        # to the child Gemini CLI process as appropriate flags.
+        env["VAULTSPEC_ROOT_DIR"] = str(root_dir)
+        env["VAULTSPEC_AGENT_MODE"] = mode
 
-        # Tool control
-        allowed = agent_meta.get("allowed_tools", "")
-        if allowed:
-            for tool in (t.strip() for t in allowed.split(",") if t.strip()):
-                args.extend(["--allowed-tools", tool])
+        if agent_meta.get("allowed_tools"):
+            env["VAULTSPEC_ALLOWED_TOOLS"] = agent_meta["allowed_tools"]
 
-        # Approval mode (Gemini-specific: default|auto_edit|yolo|plan)
         approval = agent_meta.get("approval_mode")
         if approval and approval != "default":
-            args.extend(["--approval-mode", approval])
+            env["VAULTSPEC_GEMINI_APPROVAL_MODE"] = approval
 
-        # Output format (text|json|stream-json)
         fmt = agent_meta.get("output_format")
         if fmt and fmt != "text":
-            args.extend(["--output-format", fmt])
+            env["VAULTSPEC_OUTPUT_FORMAT"] = fmt
 
-        # Additional workspace directories (validated against traversal)
         include_dirs = agent_meta.get("include_dirs", "")
         if include_dirs:
-            for d in self._validate_include_dirs(include_dirs, root_dir):
-                args.extend(["--include-directories", d])
+            validated = self._validate_include_dirs(include_dirs, root_dir)
+            if validated:
+                env["VAULTSPEC_INCLUDE_DIRS"] = ",".join(validated)
 
         return ProcessSpec(
-            executable=executable,
-            args=prefix_args + args,
+            executable=sys.executable,
+            args=["-m", "vaultspec.protocol.acp.gemini_bridge", "--model", model],
             env=env,
             cleanup_paths=cleanup_paths,
             initial_prompt_override=task_context,
+            session_meta={"model": model},
         )

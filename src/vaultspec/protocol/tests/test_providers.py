@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import datetime
 import inspect
+import json
 import logging
 import subprocess
 
 import pytest
 
 from tests.constants import TEST_PROJECT
-from vaultspec.orchestration.subagent import get_provider_for_model
-from vaultspec.protocol.providers import (
+
+from ...orchestration import get_provider_for_model
+from ..providers import (
     AgentProvider,
     CapabilityLevel,
     ClaudeModels,
@@ -20,6 +23,34 @@ from vaultspec.protocol.providers import (
 )
 
 pytestmark = [pytest.mark.unit]
+
+
+@pytest.fixture(autouse=True)
+def _isolate_gemini_oauth(tmp_path):
+    """Provide fake valid OAuth creds so unit tests never hit real ~/.gemini/.
+
+    Uses the same module-level DI pattern as ``_which_fn`` / ``_cached_version``.
+    The token expiry is 1 h in the future, so the auth path sees "valid, no
+    refresh needed" and never touches the network.
+    """
+    from ..providers import gemini as gmod
+
+    creds_file = tmp_path / "oauth_creds.json"
+    now_ms = int(datetime.datetime.now(datetime.UTC).timestamp() * 1000)
+    creds_file.write_text(
+        json.dumps(
+            {
+                "access_token": "ya29.fake-unit-test-token",
+                "refresh_token": "1//fake-refresh",
+                "expiry_date": now_ms + 3_600_000,
+                "token_type": "Bearer",
+            }
+        ),
+        encoding="utf-8",
+    )
+    gmod._default_creds_path = creds_file
+    yield
+    gmod._default_creds_path = None
 
 
 class TestSharedResolveIncludes:
@@ -47,7 +78,7 @@ class TestGeminiProvider:
     @pytest.fixture(autouse=True)
     def _seed_version_cache(self):
         """Pre-seed the module-level version cache to skip real subprocess."""
-        from vaultspec.protocol.providers import gemini as gmod
+        from ..providers import gemini as gmod
 
         gmod._cached_version = (0, 27, 0)
         yield
@@ -78,14 +109,17 @@ class TestGeminiProvider:
             model_override=GeminiModels.LOW,
         )
         assert isinstance(spec, ProcessSpec)
-        assert "--experimental-acp" in spec.args
-        assert "--system" not in spec.args
+        assert "-m" in spec.args
+        assert "vaultspec.protocol.acp.gemini_bridge" in spec.args
         assert spec.initial_prompt_override == "Do something."
         # System prompt delivered via GEMINI_SYSTEM_MD temp file
         assert len(spec.cleanup_paths) == 1
         assert spec.env.get("GEMINI_SYSTEM_MD")
         system_content = spec.cleanup_paths[0].read_text(encoding="utf-8")
         assert "AGENT PERSONA" in system_content
+        # Bridge config env vars
+        assert spec.env["VAULTSPEC_ROOT_DIR"] == str(TEST_PROJECT)
+        assert spec.env["VAULTSPEC_AGENT_MODE"] == "read-write"
 
     def test_prepare_process_includes_system_md(self, provider, tmp_path):
         """SYSTEM.md content goes to GEMINI_SYSTEM_MD temp file."""
@@ -147,7 +181,7 @@ class TestGeminiProvider:
 class TestGeminiVersionCheck:
     @pytest.fixture(autouse=True)
     def _clear_version_cache(self):
-        from vaultspec.protocol.providers import gemini as gmod
+        from ..providers import gemini as gmod
 
         gmod._cached_version = None
         yield
@@ -252,14 +286,14 @@ class TestGeminiSandboxFlag:
 
     @pytest.fixture(autouse=True)
     def _seed_version_cache(self):
-        from vaultspec.protocol.providers import gemini as gmod
+        from ..providers import gemini as gmod
 
         gmod._cached_version = (0, 27, 0)
         yield
         gmod._cached_version = None
 
     def test_gemini_sandbox_flag_readonly(self, provider):
-        """prepare_process(..., mode='read-only') includes --sandbox in args."""
+        """prepare_process(..., mode='read-only') sets VAULTSPEC_AGENT_MODE."""
         spec = provider.prepare_process(
             agent_name="test-agent",
             agent_meta={"model": GeminiModels.LOW},
@@ -269,10 +303,10 @@ class TestGeminiSandboxFlag:
             model_override=GeminiModels.LOW,
             mode="read-only",
         )
-        assert "--sandbox" in spec.args
+        assert spec.env["VAULTSPEC_AGENT_MODE"] == "read-only"
 
     def test_gemini_no_sandbox_flag_readwrite(self, provider):
-        """prepare_process(..., mode='read-write') does NOT include --sandbox."""
+        """prepare_process(..., mode='read-write') sets VAULTSPEC_AGENT_MODE."""
         spec = provider.prepare_process(
             agent_name="test-agent",
             agent_meta={"model": GeminiModels.LOW},
@@ -282,7 +316,7 @@ class TestGeminiSandboxFlag:
             model_override=GeminiModels.LOW,
             mode="read-write",
         )
-        assert "--sandbox" not in spec.args
+        assert spec.env["VAULTSPEC_AGENT_MODE"] == "read-write"
 
 
 class TestClaudeModePassthrough:
@@ -458,7 +492,7 @@ class TestClaudeFeaturePassthrough:
 
 
 class TestGeminiFeaturePassthrough:
-    """Verify GeminiProvider adds CLI flags from agent_meta fields."""
+    """Verify GeminiProvider sets VAULTSPEC_* env vars from agent_meta fields."""
 
     @pytest.fixture
     def provider(self):
@@ -466,7 +500,7 @@ class TestGeminiFeaturePassthrough:
 
     @pytest.fixture(autouse=True)
     def _seed_version_cache(self):
-        from vaultspec.protocol.providers import gemini as gmod
+        from ..providers import gemini as gmod
 
         gmod._cached_version = (0, 27, 0)
         yield
@@ -482,52 +516,39 @@ class TestGeminiFeaturePassthrough:
             root_dir=TEST_PROJECT,
         )
 
-    def test_allowed_tools_flags(self, provider):
+    def test_allowed_tools_env(self, provider):
         spec = self._make_spec(provider, allowed_tools="Glob, Read")
-        assert "--allowed-tools" in spec.args
-        idx = spec.args.index("--allowed-tools")
-        assert spec.args[idx + 1] == "Glob"
-        # Second occurrence
-        remaining = spec.args[idx + 2 :]
-        assert "--allowed-tools" in remaining
-        idx2 = remaining.index("--allowed-tools")
-        assert remaining[idx2 + 1] == "Read"
+        assert spec.env["VAULTSPEC_ALLOWED_TOOLS"] == "Glob, Read"
 
-    def test_approval_mode_flag(self, provider):
+    def test_approval_mode_env(self, provider):
         spec = self._make_spec(provider, approval_mode="yolo")
-        assert "--approval-mode" in spec.args
-        idx = spec.args.index("--approval-mode")
-        assert spec.args[idx + 1] == "yolo"
+        assert spec.env["VAULTSPEC_GEMINI_APPROVAL_MODE"] == "yolo"
 
     def test_approval_mode_default_not_added(self, provider):
         spec = self._make_spec(provider, approval_mode="default")
-        assert "--approval-mode" not in spec.args
+        assert "VAULTSPEC_GEMINI_APPROVAL_MODE" not in spec.env
 
-    def test_output_format_flag(self, provider):
+    def test_output_format_env(self, provider):
         spec = self._make_spec(provider, output_format="json")
-        assert "--output-format" in spec.args
-        idx = spec.args.index("--output-format")
-        assert spec.args[idx + 1] == "json"
+        assert spec.env["VAULTSPEC_OUTPUT_FORMAT"] == "json"
 
     def test_output_format_text_not_added(self, provider):
         spec = self._make_spec(provider, output_format="text")
-        assert "--output-format" not in spec.args
+        assert "VAULTSPEC_OUTPUT_FORMAT" not in spec.env
 
-    def test_include_directories_flags(self, provider):
+    def test_include_dirs_env(self, provider):
         spec = self._make_spec(provider, include_dirs=".vault, src")
-        assert "--include-directories" in spec.args
-        idx = spec.args.index("--include-directories")
-        assert spec.args[idx + 1] == ".vault"
+        assert spec.env["VAULTSPEC_INCLUDE_DIRS"] == ".vault,src"
 
-    def test_empty_meta_no_extra_flags(self, provider):
+    def test_empty_meta_no_env_vars(self, provider):
         spec = self._make_spec(provider)
-        for flag in (
-            "--allowed-tools",
-            "--approval-mode",
-            "--output-format",
-            "--include-directories",
+        for key in (
+            "VAULTSPEC_ALLOWED_TOOLS",
+            "VAULTSPEC_GEMINI_APPROVAL_MODE",
+            "VAULTSPEC_OUTPUT_FORMAT",
+            "VAULTSPEC_INCLUDE_DIRS",
         ):
-            assert flag not in spec.args
+            assert key not in spec.env
 
 
 class TestProviderAPIParity:
@@ -660,7 +681,7 @@ class TestProviderFeatureWarnings:
         )
 
     def test_gemini_warns_on_max_turns(self, caplog):
-        from vaultspec.protocol.providers import gemini as gmod
+        from ..providers import gemini as gmod
 
         gmod._cached_version = (0, 27, 0)
         try:
@@ -687,7 +708,7 @@ class TestProviderFeatureWarnings:
             gmod._cached_version = None
 
     def test_gemini_warns_on_budget(self, caplog):
-        from vaultspec.protocol.providers import gemini as gmod
+        from ..providers import gemini as gmod
 
         gmod._cached_version = (0, 27, 0)
         try:

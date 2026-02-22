@@ -12,8 +12,8 @@ import httpx
 import pytest
 from a2a.types import AgentCard
 
-from vaultspec.protocol.a2a import create_app
-from vaultspec.protocol.a2a.tests.conftest import (
+from .. import create_app
+from .conftest import (
     EchoExecutor,
     PrefixExecutor,
     _make_card,

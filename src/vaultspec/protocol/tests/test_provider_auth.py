@@ -22,16 +22,17 @@ if TYPE_CHECKING:
 import pytest
 
 from tests.constants import TEST_PROJECT
-from vaultspec.protocol.providers import (
+
+from ..providers import (
     ClaudeModels,
     ClaudeProvider,
     GeminiModels,
     GeminiProvider,
 )
-from vaultspec.protocol.providers.claude import (
+from ..providers.claude import (
     _load_claude_oauth_token,
 )
-from vaultspec.protocol.providers.gemini import (
+from ..providers.gemini import (
     _is_gemini_token_expired,
     _load_gemini_oauth_creds,
     _refresh_gemini_oauth_token,
@@ -223,30 +224,25 @@ class TestClaudeLoadOAuthToken:
 # ---------------------------------------------------------------------------
 
 
-def _gemini_expiry_str(delta_seconds: int) -> str:
-    """ISO8601 UTC timestamp ``delta_seconds`` from now."""
-    dt = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=delta_seconds)
-    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+def _gemini_expiry_ms(delta_seconds: int) -> int:
+    """Milliseconds-since-epoch timestamp ``delta_seconds`` from now."""
+    now_ms = int(datetime.datetime.now(datetime.UTC).timestamp() * 1000)
+    return now_ms + delta_seconds * 1000
 
 
 def _write_gemini_creds(
     path: pathlib.Path,
     access_token: str = "ya29.valid-token",
-    expiry: str | None = None,
+    expiry_date: int | None = None,
     refresh_token: str = "1//refresh-token",
-    client_id: str = "client-id.apps.googleusercontent.com",
-    client_secret: str = "GOCSPX-secret",
-    token_uri: str = "https://oauth2.googleapis.com/token",
 ) -> None:
-    data = {
+    data: dict[str, object] = {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "token_uri": token_uri,
+        "token_type": "Bearer",
     }
-    if expiry is not None:
-        data["expiry"] = expiry
+    if expiry_date is not None:
+        data["expiry_date"] = expiry_date
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
@@ -258,7 +254,7 @@ class TestGeminiLoadOAuthCreds:
     def test_valid_token_returned_no_refresh(self, tmp_path):
         """Token expires 1h from now: dict returned without warning; file untouched."""
         creds_file = tmp_path / "oauth_creds.json"
-        _write_gemini_creds(creds_file, expiry=_gemini_expiry_str(3600))
+        _write_gemini_creds(creds_file, expiry_date=_gemini_expiry_ms(3600))
         mtime_before = creds_file.stat().st_mtime
 
         creds = _load_gemini_oauth_creds(creds_path=creds_file)
@@ -273,7 +269,7 @@ class TestGeminiLoadOAuthCreds:
     def test_expired_token_refresh_succeeds(self, tmp_path):
         """Expired token: real POST, file updated atomically, updated dict returned."""
         creds_file = tmp_path / "oauth_creds.json"
-        _write_gemini_creds(creds_file, expiry=_gemini_expiry_str(-7200))  # 2h ago
+        _write_gemini_creds(creds_file, expiry_date=_gemini_expiry_ms(-7200))  # 2h ago
 
         creds = _load_gemini_oauth_creds(creds_path=creds_file)
         assert creds is not None
@@ -293,18 +289,16 @@ class TestGeminiLoadOAuthCreds:
         # File must reflect the refreshed token
         written = json.loads(creds_file.read_text(encoding="utf-8"))
         assert written["access_token"] == "ya29.refreshed"
-        # New expiry must be in the future
-        new_expiry = datetime.datetime.fromisoformat(
-            written["expiry"].replace("Z", "+00:00")
-        )
-        assert new_expiry > datetime.datetime.now(datetime.UTC)
+        # New expiry_date (ms epoch) must be in the future
+        now_ms = int(datetime.datetime.now(datetime.UTC).timestamp() * 1000)
+        assert written["expiry_date"] > now_ms
 
     # --- scenario 3: expired token, refresh fails (server 500) ---
 
     def test_expired_token_refresh_fails_500(self, tmp_path, caplog):
         """Server 500: warning logged, None returned, file unchanged."""
         creds_file = tmp_path / "oauth_creds.json"
-        _write_gemini_creds(creds_file, expiry=_gemini_expiry_str(-7200))
+        _write_gemini_creds(creds_file, expiry_date=_gemini_expiry_ms(-7200))
         original_content = creds_file.read_text(encoding="utf-8")
 
         creds = _load_gemini_oauth_creds(creds_path=creds_file)
@@ -333,7 +327,7 @@ class TestGeminiLoadOAuthCreds:
         records that fire during the auth phase.
         """
         env_backup = os.environ.pop("GEMINI_API_KEY", None)
-        from vaultspec.protocol.providers import gemini as gmod
+        from ..providers import gemini as gmod
 
         gmod._cached_version = (0, 27, 0)
         try:
@@ -374,7 +368,7 @@ class TestGeminiLoadOAuthCreds:
         prepare_process() may raise ModuleNotFoundError from core.config later in
         the system-prompt write path; that is unrelated to the auth branch under test.
         """
-        from vaultspec.protocol.providers import gemini as gmod
+        from ..providers import gemini as gmod
 
         gmod._cached_version = (0, 27, 0)
         env_backup = os.environ.pop("GEMINI_API_KEY", None)

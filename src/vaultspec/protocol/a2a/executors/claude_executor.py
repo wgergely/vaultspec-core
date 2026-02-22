@@ -43,17 +43,38 @@ _STATUS_THROTTLE_SECS = 0.25
 
 
 def _default_client_factory(options: Any) -> ClaudeSDKClient:
-    """Default factory: create a real ClaudeSDKClient."""
+    """Create a real ClaudeSDKClient from the given options.
+
+    Args:
+        options: A ``ClaudeAgentOptions`` instance used to configure the client.
+
+    Returns:
+        A new ``ClaudeSDKClient`` instance.
+    """
     return ClaudeSDKClient(options)
 
 
 def _default_options_factory(**kwargs: Any) -> ClaudeAgentOptions:
-    """Default factory: create real ClaudeAgentOptions."""
+    """Create a real ``ClaudeAgentOptions`` from the given keyword arguments.
+
+    Args:
+        **kwargs: Option fields forwarded directly to ``ClaudeAgentOptions``.
+
+    Returns:
+        A new ``ClaudeAgentOptions`` instance.
+    """
     return ClaudeAgentOptions(**kwargs)
 
 
 def _is_rate_limit_parse_error(exc: MessageParseError) -> bool:
-    """Return True if a MessageParseError looks rate-limit-related."""
+    """Return True if a ``MessageParseError`` looks rate-limit-related.
+
+    Args:
+        exc: The parse error raised by the SDK.
+
+    Returns:
+        True if the stringified exception contains ``"rate_limit"``.
+    """
     return "rate_limit" in str(exc).lower()
 
 
@@ -97,6 +118,21 @@ class ClaudeA2AExecutor(AgentExecutor):
         max_retries: int = 3,
         retry_base_delay: float = 1.0,
     ) -> None:
+        """Initialise the executor with SDK configuration and DI overrides.
+
+        Args:
+            model: Claude model identifier (e.g. ``ClaudeModels.MEDIUM``).
+            root_dir: Workspace root directory for the agent subprocess.
+            mode: Sandboxing mode — ``"read-only"`` or ``"read-write"``.
+            mcp_servers: Optional MCP server configs forwarded to the SDK.
+            system_prompt: Optional system prompt prepended to every conversation.
+            client_factory: Callable ``(options) -> client``.  Defaults to
+                ``_default_client_factory``.
+            options_factory: Callable ``(**kwargs) -> options``.  Defaults to
+                ``_default_options_factory``.
+            max_retries: Maximum retries on rate-limit errors before failing.
+            retry_base_delay: Base delay in seconds for exponential back-off.
+        """
         self._model = model
         self._root_dir = root_dir
         self._mode = mode
@@ -114,6 +150,18 @@ class ClaudeA2AExecutor(AgentExecutor):
         self._cancel_events: dict[str, asyncio.Event] = {}
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+        """Execute an A2A task by streaming a Claude SDK conversation.
+
+        Connects to the Claude SDK, sends the user prompt, and streams
+        assistant content back as A2A task lifecycle events.  Implements
+        exponential back-off retry on rate-limit errors.
+
+        Args:
+            context: The A2A request context carrying the task ID, context ID,
+                and user input prompt.
+            event_queue: The A2A event queue used to emit status updates,
+                artifacts, and terminal events.
+        """
         task_id = context.task_id or ""
         context_id = context.context_id or ""
         updater = TaskUpdater(event_queue, task_id, context_id)
@@ -251,8 +299,17 @@ class ClaudeA2AExecutor(AgentExecutor):
     ) -> bool:
         """Execute one query+stream cycle.
 
-        Returns True if the caller should retry (rate-limit hit), False
-        otherwise (task completed, failed, or cancelled).
+        Args:
+            sdk_client: Connected Claude SDK client used to send the prompt
+                and stream the response.
+            prompt: The user-facing prompt text to send.
+            updater: Task updater used to emit status and artifact events.
+            context_id: A2A context identifier for the current task.
+            cancel_event: Asyncio event; when set the stream loop exits early.
+
+        Returns:
+            True if the caller should retry (rate-limit hit), False
+            otherwise (task completed, failed, or cancelled).
         """
         await sdk_client.query(prompt)
         collected: list[str] = []
@@ -337,6 +394,16 @@ class ClaudeA2AExecutor(AgentExecutor):
         return False
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+        """Cancel a running A2A task.
+
+        Sets the cancel event so the streaming loop terminates at the next
+        iteration, then interrupts the SDK client without disconnecting it so
+        the session can be resumed later.
+
+        Args:
+            context: The A2A request context carrying the task ID to cancel.
+            event_queue: The A2A event queue used to emit the cancelled status.
+        """
         task_id = context.task_id or ""
         context_id = context.context_id or ""
         updater = TaskUpdater(event_queue, task_id, context_id)

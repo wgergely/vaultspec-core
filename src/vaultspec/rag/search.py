@@ -14,8 +14,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import pathlib
 
-    from vaultspec.graph import VaultGraph
-
+    from ..graph import VaultGraph
     from .embeddings import EmbeddingModel
     from .store import VaultStore
 
@@ -42,7 +41,13 @@ _FILTER_KEY_MAP = {
 
 @dataclass
 class ParsedQuery:
-    """A parsed search query with extracted metadata filters."""
+    """A parsed search query with extracted metadata filters.
+
+    Attributes:
+        text: Natural language portion of the query after filter tokens are removed.
+        filters: Metadata filters extracted from the query
+            (e.g. ``{"doc_type": "adr"}``).
+    """
 
     text: str  # natural language portion
     filters: dict[str, str]  # extracted metadata filters
@@ -50,7 +55,18 @@ class ParsedQuery:
 
 @dataclass
 class SearchResult:
-    """A single search result from the vault."""
+    """A single search result from the vault.
+
+    Attributes:
+        id: Document stem identifier (e.g. ``"2026-02-12-rag-plan"``).
+        path: Relative path within the vault docs directory.
+        title: H1 heading extracted from the document body.
+        doc_type: Document type string (e.g. ``"adr"``, ``"plan"``).
+        feature: Feature tag without the leading ``#`` (e.g. ``"rag"``).
+        date: ISO date string from the document frontmatter.
+        score: Relevance score after re-ranking (higher is better).
+        snippet: First 200 characters of the document content.
+    """
 
     id: str
     path: str
@@ -67,6 +83,14 @@ def parse_query(raw_query: str) -> ParsedQuery:
 
     Extracts filter tokens (type:adr, feature:rag, date:2026-02, tag:#research)
     and returns the remaining text as the natural language query.
+
+    Args:
+        raw_query: Raw search string, optionally containing ``key:value``
+            filter tokens.
+
+    Returns:
+        A ``ParsedQuery`` with ``text`` as the natural language portion and
+        ``filters`` as the extracted metadata constraints.
 
     Examples::
 
@@ -116,9 +140,12 @@ def rerank_with_graph(
         root_dir: Path to vault root (used if graph is None).
         query: Parsed query with filters.
         graph: Optional pre-built VaultGraph. If None, one is constructed.
+
+    Returns:
+        The same ``results`` list, sorted in descending order by adjusted score.
     """
     if graph is None:
-        from vaultspec.graph import VaultGraph as _VaultGraph
+        from ..graph import VaultGraph as _VaultGraph
 
         try:
             graph = _VaultGraph(root_dir)
@@ -171,8 +198,17 @@ class VaultSearcher:
         *,
         graph_ttl_seconds: float | None = None,
     ) -> None:
+        """Initialize the searcher with a workspace root, embedding model, and store.
+
+        Args:
+            root_dir: Path to the vault workspace root.
+            model: Embedding model used to encode query text.
+            store: Vector store to search against.
+            graph_ttl_seconds: TTL for the cached VaultGraph in seconds.
+                Defaults to the configured value from ``get_config()``.
+        """
         if graph_ttl_seconds is None:
-            from vaultspec.core import get_config
+            from ..config import get_config
 
             graph_ttl_seconds = get_config().graph_ttl_seconds
         self.root_dir = root_dir
@@ -183,8 +219,12 @@ class VaultSearcher:
         self._graph_built_at: float = 0.0
 
     def _get_graph(self) -> VaultGraph | None:
-        """Return a cached VaultGraph, rebuilding if TTL expired."""
-        from vaultspec.graph import VaultGraph as _VaultGraph
+        """Return a cached VaultGraph, rebuilding if TTL expired.
+
+        Returns:
+            A live ``VaultGraph`` instance, or ``None`` if construction fails.
+        """
+        from ..graph import VaultGraph as _VaultGraph
 
         now = time.monotonic()
         if self._cached_graph is None or (now - self._graph_built_at) > self._graph_ttl:

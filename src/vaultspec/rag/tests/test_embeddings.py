@@ -94,7 +94,7 @@ class TestDeviceInfo:
     """Tests for device detection utility."""
 
     def test_get_device_info(self):
-        from vaultspec.rag import get_device_info
+        from .. import get_device_info
 
         info = get_device_info()
         assert info["device"] == "cuda"

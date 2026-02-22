@@ -13,7 +13,7 @@ from acp.schema import (
     ToolCallUpdate,
 )
 
-from vaultspec.protocol.acp import SubagentClient
+from ..acp import SubagentClient
 
 pytestmark = [pytest.mark.unit]
 

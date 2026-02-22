@@ -20,8 +20,7 @@ if TYPE_CHECKING:
     from .embeddings import EmbeddingModel
     from .store import VaultStore
 
-from vaultspec.vaultcore import DocType, get_doc_type, parse_vault_metadata, scan_vault
-
+from ..vaultcore import DocType, get_doc_type, parse_vault_metadata, scan_vault
 from .store import VaultDocument
 
 logger = logging.getLogger(__name__)
@@ -31,7 +30,16 @@ __all__ = ["IndexResult", "VaultIndexer", "prepare_document"]
 
 @dataclass
 class IndexResult:
-    """Result of an indexing operation."""
+    """Result of an indexing operation.
+
+    Attributes:
+        total: Total number of docs in the index after the operation.
+        added: Number of newly indexed documents.
+        updated: Number of re-indexed (modified) documents.
+        removed: Number of documents removed from the index.
+        duration_ms: Wall-clock time for the operation in milliseconds.
+        device: Compute device used for embeddings (e.g. ``"cuda"``, ``"cpu"``).
+    """
 
     total: int  # total docs in index after operation
     added: int  # newly indexed
@@ -42,7 +50,14 @@ class IndexResult:
 
 
 def _extract_title(body: str) -> str:
-    """Extract first H1 heading from markdown body, or return empty string."""
+    """Extract first H1 heading from markdown body, or return empty string.
+
+    Args:
+        body: Raw markdown text to scan.
+
+    Returns:
+        The heading text (without the leading ``# ``), or ``""`` if none found.
+    """
     for line in body.splitlines():
         line = line.strip()
         if line.startswith("# "):
@@ -51,7 +66,14 @@ def _extract_title(body: str) -> str:
 
 
 def _extract_feature(metadata_tags: list[str]) -> str:
-    """Extract the feature tag (non-directory tag) from the tag list."""
+    """Extract the feature tag (non-directory tag) from the tag list.
+
+    Args:
+        metadata_tags: List of frontmatter tag strings (e.g. ``["#plan", "#rag"]``).
+
+    Returns:
+        The feature tag value without the leading ``#``, or ``""`` if none found.
+    """
     for tag in metadata_tags:
         if not DocType.from_tag(tag):
             return tag.lstrip("#")
@@ -65,6 +87,14 @@ def prepare_document(
 
     Reads the file, parses metadata, and constructs a VaultDocument
     with all fields except the vector (which is filled during embedding).
+
+    Args:
+        path: Absolute path to the markdown document file.
+        root_dir: Workspace root directory used to compute the relative path.
+
+    Returns:
+        A ``VaultDocument`` with an empty vector, or ``None`` if the file
+        cannot be read or has no recognised doc type.
     """
     try:
         content = path.read_text(encoding="utf-8")
@@ -78,7 +108,7 @@ def prepare_document(
     if doc_type_enum is None:
         return None
 
-    from vaultspec.core import get_config
+    from ..config import get_config
 
     docs_dir = root_dir / get_config().docs_dir
     try:
@@ -115,7 +145,14 @@ class VaultIndexer:
         model: EmbeddingModel,
         store: VaultStore,
     ) -> None:
-        from vaultspec.core import get_config
+        """Initialize the indexer with a workspace root, embedding model, and store.
+
+        Args:
+            root_dir: Path to the vault workspace root.
+            model: Embedding model used to encode document text.
+            store: Vector store where indexed documents are persisted.
+        """
+        from ..config import get_config
 
         cfg = get_config()
 
@@ -128,6 +165,10 @@ class VaultIndexer:
         """Full re-index of all vault documents.
 
         Scans all documents, embeds them, and replaces the entire store.
+
+        Returns:
+            An ``IndexResult`` where ``added`` equals the total number of
+            documents written and ``updated``/``removed`` are both zero.
         """
         start = time.time()
 
@@ -198,6 +239,10 @@ class VaultIndexer:
         """Incremental index: only re-index new and modified documents.
 
         Compares file mtimes against stored metadata to identify changes.
+
+        Returns:
+            An ``IndexResult`` with counts for newly added, updated, and
+            removed documents since the last index run.
         """
         start = time.time()
 
@@ -270,9 +315,13 @@ class VaultIndexer:
         )
 
     def _save_meta(self, docs: list[VaultDocument]) -> None:
-        """Save index metadata (file mtimes) from VaultDocument list."""
+        """Save index metadata (file mtimes) from VaultDocument list.
+
+        Args:
+            docs: List of indexed documents whose paths are used to read mtimes.
+        """
         meta = {}
-        from vaultspec.core import get_config
+        from ..config import get_config
 
         docs_dir = self.root_dir / get_config().docs_dir
         for doc in docs:
@@ -285,6 +334,9 @@ class VaultIndexer:
         """Save index metadata (file mtimes) directly from path dict.
 
         Avoids re-parsing documents just to record their mtimes.
+
+        Args:
+            docs: Mapping of document stem to its absolute ``Path``.
         """
         meta = {}
         for doc_id, path in docs.items():
@@ -293,12 +345,21 @@ class VaultIndexer:
         self._write_meta(meta)
 
     def _write_meta(self, meta: dict[str, float]) -> None:
-        """Write mtime metadata to the sidecar JSON file."""
+        """Write mtime metadata to the sidecar JSON file.
+
+        Args:
+            meta: Mapping of document stem to ``st_mtime`` float value.
+        """
         self._meta_path.parent.mkdir(parents=True, exist_ok=True)
         self._meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
     def _load_meta(self) -> dict[str, float]:
-        """Load index metadata from the sidecar JSON file."""
+        """Load index metadata from the sidecar JSON file.
+
+        Returns:
+            Mapping of document stem to ``st_mtime`` float, or an empty
+            dict if the file does not exist or cannot be parsed.
+        """
         if not self._meta_path.exists():
             return {}
         try:

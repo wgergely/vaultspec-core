@@ -71,7 +71,15 @@ _VALID_TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
 
 
 def is_terminal(status: TaskStatus) -> bool:
-    """True if the status represents a final, immutable state."""
+    """Return whether a status represents a final, immutable state.
+
+    Args:
+        status: The ``TaskStatus`` value to test.
+
+    Returns:
+        ``True`` if ``status`` is ``COMPLETED``, ``FAILED``, or ``CANCELLED``;
+        ``False`` otherwise.
+    """
     return status in (
         TaskStatus.COMPLETED,
         TaskStatus.FAILED,
@@ -81,7 +89,23 @@ def is_terminal(status: TaskStatus) -> bool:
 
 @dataclass
 class SubagentTask:
-    """In-memory representation of a background sub-agent execution."""
+    """In-memory representation of a background sub-agent execution.
+
+    Attributes:
+        task_id: Unique identifier for this task.
+        agent: Name of the agent executing the task.
+        status: Current lifecycle state.
+        created_at: Monotonic timestamp at task creation.
+        updated_at: Monotonic timestamp of the last status change.
+        completed_at: Monotonic timestamp when the task reached a terminal
+            state, or ``None`` if still in progress.
+        model: Optional model override for the agent.
+        mode: Permission mode, either ``'read-write'`` or ``'read-only'``.
+        status_message: Optional human-readable status description.
+        result: Structured result payload set on successful completion.
+        error: Error description set when the task fails.
+        session_id: ACP internal session identifier, if one has been assigned.
+    """
 
     task_id: str
     agent: str
@@ -122,7 +146,11 @@ class InvalidTransitionError(Exception):
 
 
 def generate_task_id() -> str:
-    """Generate a unique identifier for a new task."""
+    """Generate a unique identifier for a new task.
+
+    Returns:
+        A random UUID4 string.
+    """
     return str(uuid.uuid4())
 
 
@@ -136,12 +164,17 @@ class LockManager:
 
     @staticmethod
     def _readonly_allowed_prefixes() -> tuple[str, ...]:
-        """Paths allowed for read-only mode (workspace-relative prefixes)."""
-        from vaultspec.core import get_config
+        """Return the workspace-relative path prefixes permitted for read-only tasks.
+
+        Returns:
+            A tuple of allowed prefix strings (e.g. ``(".vault/",)``).
+        """
+        from ..config import get_config
 
         return (f"{get_config().docs_dir}/",)
 
     def __init__(self) -> None:
+        """Initialize the LockManager with an empty advisory lock registry."""
         self._locks: dict[str, FileLock] = {}
         self._lock = threading.Lock()
 
@@ -191,12 +224,26 @@ class LockManager:
         return lock, warnings
 
     def release_lock(self, task_id: str) -> bool:
-        """Release the advisory lock held by a task."""
+        """Release the advisory lock held by a task.
+
+        Args:
+            task_id: The task whose lock should be released.
+
+        Returns:
+            ``True`` if a lock was found and removed; ``False`` otherwise.
+        """
         with self._lock:
             return self._locks.pop(task_id, None) is not None
 
     def check_conflicts(self, paths: set[str]) -> list[str]:
-        """Check if paths conflict with active locks."""
+        """Check whether any of the given paths conflict with active advisory locks.
+
+        Args:
+            paths: Workspace-relative paths to check.
+
+        Returns:
+            List of human-readable conflict descriptions; empty if no conflicts.
+        """
         frozen = frozenset(paths)
         conflicts: list[str] = []
 
@@ -214,18 +261,39 @@ class LockManager:
         return conflicts
 
     def get_lock(self, task_id: str) -> FileLock | None:
-        """Get the lock held by a specific task, or None."""
+        """Return the advisory lock held by the given task, or None if not found.
+
+        Args:
+            task_id: The task whose lock to retrieve.
+
+        Returns:
+            The ``FileLock``, or ``None``.
+        """
         with self._lock:
             return self._locks.get(task_id)
 
     def get_locks(self) -> list[FileLock]:
-        """Return all active advisory locks."""
+        """Return a snapshot of all currently active advisory locks.
+
+        Returns:
+            List of all held ``FileLock`` instances.
+        """
         with self._lock:
             return list(self._locks.values())
 
     @staticmethod
     def validate_readonly_paths(paths: set[str]) -> list[str]:
-        """Validate paths are in the read-only zone."""
+        """Return paths that violate the read-only zone restriction.
+
+        Read-only tasks may only write to the ``.vault/`` directory.  Any path
+        that does not start with the allowed prefix is a violation.
+
+        Args:
+            paths: Workspace-relative paths to validate.
+
+        Returns:
+            List of violating paths; empty if all paths are permitted.
+        """
         violations: list[str] = []
         for path in paths:
             normalized = path.replace("\\", "/")
@@ -254,7 +322,7 @@ class TaskEngine:
             max_working_seconds: Max time a task may stay in WORKING state.
         """
         if ttl_seconds is None:
-            from vaultspec.core import get_config
+            from ..config import get_config
 
             ttl_seconds = get_config().task_engine_ttl_seconds
         self._tasks: dict[str, SubagentTask] = {}
@@ -266,7 +334,11 @@ class TaskEngine:
         self._events: dict[str, asyncio.Event] = {}
 
     def _release_lock(self, task_id: str) -> None:
-        """Release advisory lock for a task."""
+        """Release advisory lock for a task.
+
+        Args:
+            task_id: The task whose advisory lock should be released.
+        """
         if self._lock_manager is not None:
             released = self._lock_manager.release_lock(task_id)
             if released:
@@ -307,7 +379,20 @@ class TaskEngine:
         mode: str = "read-write",
         task_id: str | None = None,
     ) -> SubagentTask:
-        """Create a new task."""
+        """Create a new task in the WORKING state.
+
+        Args:
+            agent: Name of the agent that will execute the task.
+            model: Optional model override for the agent.
+            mode: Permission mode, either ``'read-write'`` or ``'read-only'``.
+            task_id: Optional explicit task ID; generated if not provided.
+
+        Returns:
+            The newly created ``SubagentTask``.
+
+        Raises:
+            ValueError: If a task with the given ``task_id`` already exists.
+        """
         tid = task_id or generate_task_id()
         now = time.monotonic()
 
@@ -330,19 +415,50 @@ class TaskEngine:
         return task
 
     def get_task(self, task_id: str) -> SubagentTask | None:
-        """Get a task by ID."""
+        """Return the task with the given ID, or None if not found or expired.
+
+        Args:
+            task_id: The unique task identifier.
+
+        Returns:
+            The matching ``SubagentTask``, or ``None``.
+        """
         with self._lock:
             self._cleanup_expired()
             return self._tasks.get(task_id)
 
     def set_session_id(self, task_id: str, session_id: str) -> None:
-        """Store the ACP session ID."""
+        """Store the ACP session ID associated with a task.
+
+        Args:
+            task_id: The unique task identifier.
+            session_id: The ACP session ID to store.
+
+        Raises:
+            TaskNotFoundError: If the task does not exist.
+        """
         with self._lock:
             task = self._tasks.get(task_id)
             if task is None:
                 raise TaskNotFoundError(f"Task not found: {task_id}")
             task.session_id = session_id
             task.updated_at = time.monotonic()
+
+    def get_session_id(self, task_id: str) -> str | None:
+        """Retrieve the stored ACP session ID for a task, if any.
+
+        Args:
+            task_id: The unique task identifier.
+
+        Returns:
+            The ACP session ID, or ``None`` if the task is not found or has
+            no session ID recorded.
+        """
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if task is None:
+                return None
+            return task.session_id
 
     def update_status(
         self,
@@ -351,7 +467,22 @@ class TaskEngine:
         *,
         status_message: str | None = None,
     ) -> SubagentTask:
-        """Transition a task to a new status."""
+        """Transition a task to a new lifecycle status.
+
+        Args:
+            task_id: The unique task identifier.
+            status: The target ``TaskStatus``.
+            status_message: Optional human-readable message describing the
+                status change.
+
+        Returns:
+            The updated ``SubagentTask``.
+
+        Raises:
+            TaskNotFoundError: If the task does not exist.
+            InvalidTransitionError: If the requested transition is not allowed
+                by the lifecycle state machine.
+        """
         with self._lock:
             task = self._tasks.get(task_id)
             if task is None:
@@ -388,7 +519,20 @@ class TaskEngine:
         task_id: str,
         result: dict[str, Any],
     ) -> SubagentTask:
-        """Mark a task as completed."""
+        """Mark a task as completed and attach its result payload.
+
+        Args:
+            task_id: The unique task identifier.
+            result: Structured result data to store on the task.
+
+        Returns:
+            The updated ``SubagentTask``.
+
+        Raises:
+            TaskNotFoundError: If the task does not exist.
+            InvalidTransitionError: If the task cannot transition to COMPLETED
+                from its current state.
+        """
         with self._lock:
             task = self._tasks.get(task_id)
             if task is None:
@@ -414,7 +558,20 @@ class TaskEngine:
         task_id: str,
         error: str,
     ) -> SubagentTask:
-        """Mark a task as failed."""
+        """Mark a task as failed and record the error description.
+
+        Args:
+            task_id: The unique task identifier.
+            error: Human-readable description of the failure.
+
+        Returns:
+            The updated ``SubagentTask``.
+
+        Raises:
+            TaskNotFoundError: If the task does not exist.
+            InvalidTransitionError: If the task cannot transition to FAILED
+                from its current state.
+        """
         with self._lock:
             task = self._tasks.get(task_id)
             if task is None:
@@ -436,17 +593,40 @@ class TaskEngine:
         return task
 
     def cancel_task(self, task_id: str) -> SubagentTask:
-        """Cancel a task."""
+        """Transition a task to the CANCELLED state.
+
+        Args:
+            task_id: The unique task identifier.
+
+        Returns:
+            The updated ``SubagentTask``.
+
+        Raises:
+            TaskNotFoundError: If the task does not exist.
+            InvalidTransitionError: If the task cannot be cancelled from its
+                current state.
+        """
         return self.update_status(task_id, TaskStatus.CANCELLED)
 
     def list_tasks(self) -> list[SubagentTask]:
-        """Return all non-expired tasks."""
+        """Return all tasks that have not yet been evicted by the TTL.
+
+        Returns:
+            List of currently tracked ``SubagentTask`` instances.
+        """
         with self._lock:
             self._cleanup_expired()
             return list(self._tasks.values())
 
     def delete_task(self, task_id: str) -> bool:
-        """Remove a task from the engine entirely."""
+        """Remove a task from the engine regardless of its current state.
+
+        Args:
+            task_id: The unique task identifier.
+
+        Returns:
+            ``True`` if the task existed and was removed; ``False`` otherwise.
+        """
         with self._lock:
             removed = self._tasks.pop(task_id, None) is not None
             self._expiry.pop(task_id, None)
@@ -456,7 +636,16 @@ class TaskEngine:
     # -- Async wait/notify --
 
     async def wait_for_update(self, task_id: str, timeout: float | None = None) -> None:
-        """Wait until the task's status changes."""
+        """Suspend until the task's status changes or the timeout elapses.
+
+        Args:
+            task_id: The unique task identifier.
+            timeout: Maximum seconds to wait.  Waits indefinitely if ``None``.
+
+        Raises:
+            TaskNotFoundError: If the task does not exist.
+            asyncio.TimeoutError: If the timeout expires before a status change.
+        """
         with self._lock:
             if task_id not in self._tasks:
                 raise TaskNotFoundError(f"Task not found: {task_id}")
@@ -473,6 +662,9 @@ class TaskEngine:
 
         Must be called from the event loop thread
         (asyncio.Event.set is not thread-safe).
+
+        Args:
+            task_id: The task whose waiters should be notified.
         """
         with self._lock:
             event = self._events.pop(task_id, None)

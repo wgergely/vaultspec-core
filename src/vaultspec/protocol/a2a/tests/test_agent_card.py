@@ -2,8 +2,8 @@
 
 import pytest
 
-from vaultspec.core import reset_config
-from vaultspec.protocol.a2a import agent_card_from_definition
+from ....config import reset_config
+from .. import agent_card_from_definition
 
 pytestmark = [pytest.mark.unit]
 

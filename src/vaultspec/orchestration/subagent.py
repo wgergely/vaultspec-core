@@ -1,3 +1,5 @@
+"""Subagent dispatch: spawn ACP agent processes and collect their output."""
+
 from __future__ import annotations
 
 import asyncio
@@ -5,14 +7,14 @@ import contextlib
 import gc
 import logging
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import pathlib
 
     from acp.client.connection import ClientSideConnection
 
-    from vaultspec.protocol.providers import AgentProvider
+    from ..protocol.providers import AgentProvider
 
 from acp import spawn_agent_process
 from acp.schema import (
@@ -22,27 +24,44 @@ from acp.schema import (
     TextContentBlock,
 )
 
-from vaultspec.vaultcore import parse_frontmatter
-
+from ..vaultcore import parse_frontmatter
 from .utils import safe_read_text
 
 __all__ = [
     "AgentNotFoundError",
     "get_provider_for_model",
+    "list_available_agents",
     "load_agent",
     "run_subagent",
 ]
-from vaultspec.protocol.acp import (
+
+from ..protocol.acp import (
     SessionLogger,
     SubagentClient,
     SubagentError,
     SubagentResult,
 )
-from vaultspec.protocol.providers import ClaudeProvider, GeminiProvider
+from ..protocol.providers import ClaudeProvider, GeminiProvider
 
 logger = logging.getLogger(__name__)
 
+# Timeout (seconds) for the ACP handshake sequence (initialize + session setup).
+_ACP_HANDSHAKE_TIMEOUT: float = 30.0
+
 _CLAUDE_PATTERNS = ("claude-",)
+
+
+def list_available_agents(content_root: pathlib.Path) -> None:
+    agents_dir = content_root / "rules" / "agents"
+    if not agents_dir.exists():
+        logger.error("No agents found.")
+        return
+
+    print(f"Agents in {agents_dir}:")
+    for agent_file in sorted(agents_dir.glob("*.md")):
+        print(f"  {agent_file.stem}")
+
+
 _GEMINI_PATTERNS = ("gemini-",)
 
 
@@ -55,6 +74,9 @@ def _kill_process_tree(pid: int) -> None:
 
     On Unix, orphaned children are reparented to PID 1 and eventually reaped
     by init/systemd, so no intervention is needed.
+
+    Args:
+        pid: Process ID of the root process to terminate.
     """
     if sys.platform != "win32":
         return
@@ -69,7 +91,7 @@ def _kill_process_tree(pid: int) -> None:
 
 
 class AgentNotFoundError(Exception):
-    """Raised when an agent definition cannot be located."""
+    """Raised when an agent definition file cannot be located on disk."""
 
     pass
 
@@ -81,17 +103,32 @@ def load_agent(
     *,
     content_root: pathlib.Path | None = None,
 ) -> tuple[dict[str, str], str]:
-    """Loads an agent definition, searching provider-specific then
-    canonical directories.
+    """Load an agent definition, searching provider-specific then canonical directories.
 
-    Parameters
-    ----------
-    content_root:
-        Explicit content root (e.g. ``.vaultspec/``).  In split-root mode
-        agents live under the content tree, not ``root_dir``.  When
-        ``None``, falls back to ``root_dir / framework_dir``.
+    Resolution order:
+    1. ``{agents_base}/{provider_name}/{agent_name}.md`` (provider-specific)
+    2. ``{agents_base}/{agent_name}.md`` (canonical fallback)
+
+    Args:
+        agent_name: Name of the agent to load (without ``.md`` extension).
+        root_dir: Workspace root; used to resolve the framework directory when
+            ``content_root`` is not supplied.
+        provider_name: Optional provider subdirectory to search first (e.g.
+            ``"claude"`` or ``"gemini"``).
+        content_root: Explicit content root (e.g. ``.vaultspec/``).  In
+            split-root mode agents live under the content tree, not
+            ``root_dir``.  When ``None``, falls back to
+            ``root_dir / framework_dir``.
+
+    Returns:
+        A ``(metadata_dict, persona_text)`` tuple parsed from the agent's
+        Markdown frontmatter.
+
+    Raises:
+        AgentNotFoundError: If the agent file is not found in any search
+            location.
     """
-    from vaultspec.core import get_config
+    from ..config import get_config
 
     if content_root is not None:
         agents_base = content_root / "rules" / "agents"
@@ -117,7 +154,18 @@ def load_agent(
 
 
 def get_provider_for_model(model_name: str | None) -> AgentProvider:
-    """Selects the appropriate provider for the requested model."""
+    """Select the appropriate provider for the requested model name.
+
+    Matches ``claude-*`` patterns to :class:`ClaudeProvider` and
+    ``gemini-*`` patterns to :class:`GeminiProvider`.  Falls back to
+    :class:`GeminiProvider` when the model name is ``None`` or unrecognised.
+
+    Args:
+        model_name: Model identifier string (e.g. ``"claude-opus-4-6"``).
+
+    Returns:
+        An instantiated :class:`AgentProvider` appropriate for the model.
+    """
     if not model_name:
         return GeminiProvider()
 
@@ -137,7 +185,22 @@ def _build_task_prompt(
     plan_file: pathlib.Path | None,
     root_dir: pathlib.Path,
 ) -> str:
-    """Constructs a structured task prompt from goal and context files."""
+    """Construct a structured task prompt from a goal, optional plan, and context files.
+
+    Sections are ordered: plan (if any), context files (if any), then the task
+    goal.  Each section is separated by a blank line.
+
+    Args:
+        goal: The primary task description for the agent.
+        context_files: Additional files whose contents are inlined into the
+            prompt under ``# CONTEXT FILES``.
+        plan_file: Optional plan document to include under ``# CURRENT PLAN``.
+        root_dir: Workspace root passed to :func:`safe_read_text` for safe
+            file reading.
+
+    Returns:
+        A multi-section Markdown string suitable for use as the agent prompt.
+    """
     parts = []
 
     if plan_file:
@@ -164,7 +227,25 @@ async def _interactive_loop(
     proc: asyncio.subprocess.Process,
     logger_instance: SessionLogger | None,
 ) -> None:
-    """Run an interactive conversation loop with the agent."""
+    """Run a conversation loop with the agent, optionally accepting stdin input.
+
+    Sends ``initial_prompt`` (if provided), then — when ``interactive`` is
+    ``True`` — reads further prompts from stdin until the user types
+    ``exit``/``quit``/``bye`` or EOF, or until the agent process exits.
+
+    Args:
+        conn: Active ACP client-side connection to the spawned agent process.
+        session_id: ACP session identifier for the current session.
+        agent_name: Agent name, reserved for future logging use.
+        initial_prompt: First prompt to send; skipped when ``None``.
+        debug: When ``True``, log agent responses and process exit codes at
+            DEBUG level.
+        interactive: When ``True``, read additional prompts from stdin after
+            the initial prompt.
+        proc: The underlying agent subprocess, used to detect early exit.
+        logger_instance: Optional session logger; reserved for future event
+            logging.
+    """
     _ = agent_name
     _ = logger_instance
     current_prompt = initial_prompt
@@ -217,8 +298,58 @@ async def run_subagent(
     effort: str | None = None,
     output_format: str | None = None,
     content_root: pathlib.Path | None = None,
+    mcp_servers: dict[str, Any] | None = None,
 ) -> SubagentResult:
-    """Orchestrates the agent lifecycle with fallback support."""
+    """Orchestrate the full agent lifecycle: load, spawn, converse, and clean up.
+
+    Resolves the provider, loads the agent definition (with provider-specific
+    fallback), spawns the ACP agent process, performs the ACP handshake and
+    session setup, runs the conversation loop, and then shuts everything down.
+
+    Runtime parameter overrides (``max_turns``, ``budget``, ``effort``,
+    ``output_format``) take precedence over values embedded in the agent's
+    YAML frontmatter.
+
+    Args:
+        agent_name: Name of the agent definition to load (without extension).
+        root_dir: Workspace root; passed to the agent process as its ``cwd``.
+        initial_task: Task description sent as the first prompt.
+        context_files: Extra files whose contents are inlined into the prompt.
+        plan_file: Optional plan document inlined before the task prompt.
+        model_override: Override the model specified in the agent definition.
+        provider_override: Force a specific provider (``"claude"`` or
+            ``"gemini"``); takes precedence over model-name detection.
+        interactive: When ``True``, read further prompts from stdin after the
+            initial task.
+        debug: Enable verbose DEBUG-level logging for the session.
+        quiet: Suppress non-essential output from the client.
+        mode: Filesystem permission mode for the agent (``"read-write"`` or
+            ``"read-only"``).
+        client_ref: If provided, the constructed :class:`SubagentClient` is
+            appended to this list so callers can inspect it after the call.
+        resume_session_id: ACP session ID to resume rather than starting a new
+            session.
+        client_class: :class:`SubagentClient` subclass to instantiate.
+        provider_instance: Pre-constructed provider; skips provider resolution
+            when supplied.
+        max_turns: Override maximum conversation turns from the agent spec.
+        budget: Override token/cost budget from the agent spec.
+        effort: Override effort level from the agent spec.
+        output_format: Override output format from the agent spec.
+        content_root: Explicit content root for agent resolution in split-root
+            mode.
+        mcp_servers: Additional MCP server configurations merged with those
+            from the agent spec.
+
+    Returns:
+        A :class:`SubagentResult` containing the session ID, concatenated
+        response text, and the list of files written by the agent.
+
+    Raises:
+        ValueError: If ``max_turns`` is not positive or ``budget`` is negative.
+        SubagentError: If the agent process raises an unexpected exception
+            during execution.
+    """
     if max_turns is not None and max_turns <= 0:
         raise ValueError(f"max_turns must be positive, got {max_turns}")
     if budget is not None and budget < 0:
@@ -228,6 +359,7 @@ async def run_subagent(
         context_files = []
 
     current_model = model_override
+    effective_mcp_servers = mcp_servers or {}
 
     # 1. Resolve Provider and Load Agent
     provider_map = {"gemini": GeminiProvider, "claude": ClaudeProvider}
@@ -297,7 +429,12 @@ async def run_subagent(
         async with contextlib.AsyncExitStack() as stack:
             # Internal context manager for stderr consumption
             async def _read_stderr(proc: asyncio.subprocess.Process, debug: bool):
-                """Consumes stderr to prevent buffer filling and hangs."""
+                """Consumes stderr to prevent buffer filling and hangs.
+
+                Args:
+                    proc: The subprocess whose stderr stream to drain.
+                    debug: When ``True``, log each line at DEBUG level.
+                """
                 if proc.stderr:
                     with contextlib.suppress(asyncio.CancelledError, Exception):
                         while True:
@@ -324,30 +461,88 @@ async def run_subagent(
                 t.add_done_callback(background_tasks.discard)
 
                 # Protocol Handshake (ACP spec: protocolVersion=1, uint16)
-                init_res = await conn.initialize(
-                    protocol_version=1,
-                    client_capabilities=ClientCapabilities(
-                        terminal=True,
-                        fs=FileSystemCapability(
-                            read_text_file=True,
-                            write_text_file=True,
+                try:
+                    init_res = await asyncio.wait_for(
+                        conn.initialize(
+                            protocol_version=1,
+                            client_capabilities=ClientCapabilities(
+                                terminal=True,
+                                fs=FileSystemCapability(
+                                    read_text_file=True,
+                                    write_text_file=True,
+                                ),
+                            ),
+                            client_info=Implementation(
+                                name="vaultspec-mcp",
+                                version="0.1.0",
+                            ),
                         ),
-                    ),
-                    client_info=Implementation(
-                        name="vaultspec-mcp",
-                        version="0.1.0",
-                    ),
-                )
+                        timeout=_ACP_HANDSHAKE_TIMEOUT,
+                    )
+                except TimeoutError:
+                    raise SubagentError(
+                        f"Agent '{agent_name}' failed to complete ACP "
+                        f"initialize within {_ACP_HANDSHAKE_TIMEOUT:.0f}s "
+                        "— the agent process may be stuck on authentication "
+                        "or unresponsive"
+                    ) from None
                 logger.debug(f"Handshake Result: {init_res}")
 
                 # Session setup
                 # Note: We pass MCP servers if supported by the provider/spec
-                mcp_servers = getattr(spec, "mcp_servers", [])
+                spec_mcp_servers = getattr(spec, "mcp_servers", {})
+                if isinstance(spec_mcp_servers, list):
+                    # Handle legacy list format if any
+                    spec_mcp_servers = {
+                        s.get("name", str(i)): s for i, s in enumerate(spec_mcp_servers)
+                    }
 
-                session = await conn.new_session(
-                    cwd=str(root_dir),
-                    mcp_servers=mcp_servers,
-                )
+                merged_dict = {**spec_mcp_servers, **effective_mcp_servers}
+
+                # Convert dict to list of objects for ACP protocol
+                # Each object must have 'name', 'command', 'args', etc.
+                final_mcp_servers_list = []
+                for name, config in merged_dict.items():
+                    server_obj = dict(config)
+                    server_obj["name"] = name
+
+                    # Fix env: ACP expects a list of {'name': ..., 'value': ...}
+                    if "env" in server_obj and isinstance(server_obj["env"], dict):
+                        server_obj["env"] = [
+                            {"name": k, "value": str(v)}
+                            for k, v in server_obj["env"].items()
+                        ]
+
+                    final_mcp_servers_list.append(server_obj)
+
+                try:
+                    if resume_session_id:
+                        await asyncio.wait_for(
+                            conn.resume_session(
+                                cwd=str(root_dir),
+                                session_id=resume_session_id,
+                                mcp_servers=final_mcp_servers_list,
+                            ),
+                            timeout=_ACP_HANDSHAKE_TIMEOUT,
+                        )
+                        session = type(
+                            "_Session", (), {"session_id": resume_session_id}
+                        )()
+                    else:
+                        session = await asyncio.wait_for(
+                            conn.new_session(
+                                cwd=str(root_dir),
+                                mcp_servers=final_mcp_servers_list,
+                            ),
+                            timeout=_ACP_HANDSHAKE_TIMEOUT,
+                        )
+                except TimeoutError:
+                    raise SubagentError(
+                        f"Agent '{agent_name}' failed to complete ACP "
+                        f"session setup within {_ACP_HANDSHAKE_TIMEOUT:.0f}s "
+                        "— the agent process may be stuck on authentication "
+                        "or unresponsive"
+                    ) from None
 
                 # Initial Task
                 initial_prompt = spec.initial_prompt_override or task_context

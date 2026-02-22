@@ -26,7 +26,8 @@ import pytest
 
 from tests.constants import LIB_SRC as _LIB_SRC
 from tests.constants import TEST_PROJECT as _TEST_PROJECT
-from vaultspec.protocol.providers import ClaudeModels
+
+from ...providers import ClaudeModels
 
 pytestmark = [pytest.mark.integration, pytest.mark.claude]
 
@@ -317,6 +318,7 @@ class TestMultiTurnContext:
             resp, _ = await _collect_until_response(reader, expected_id=2)
             if resp is None or "result" not in resp:
                 pytest.fail(f"session/new failed: {resp}")
+            assert resp is not None
             session_id = resp["result"]["sessionId"]
 
             # 3. Turn 1: Establish Secret
@@ -367,6 +369,7 @@ class TestMultiTurnContext:
             assert "BANANA" in full_response.upper()
             if resp is None or "result" not in resp:
                 pytest.fail(f"session/prompt failed: {resp}")
+            assert resp is not None
             assert resp["result"]["stopReason"] == "end_turn"
 
         finally:
@@ -386,7 +389,7 @@ class TestSandboxEnforcement:
 
         This does not spawn a process -- it tests the module-level function.
         """
-        from vaultspec.protocol.acp.claude_bridge import _make_sandbox_callback
+        from ..claude_bridge import _make_sandbox_callback
 
         # Read-only sandbox
         callback = _make_sandbox_callback(mode="read-only", root_dir=str(project_root))
@@ -411,7 +414,7 @@ class TestSandboxEnforcement:
     @pytest.mark.asyncio
     async def test_read_write_mode_no_restrictions(self):
         """In read-write mode, no sandbox callback is created."""
-        from vaultspec.protocol.acp.claude_bridge import _make_sandbox_callback
+        from ..claude_bridge import _make_sandbox_callback
 
         callback = _make_sandbox_callback(
             mode="read-write", root_dir=str(_TEST_PROJECT)
@@ -431,7 +434,7 @@ class TestJeanClaudePersona:
 
     def test_persona_has_frontmatter(self, project_root):
         """The persona file has valid frontmatter with tier and mode."""
-        from vaultspec.vaultcore import parse_frontmatter
+        from ....vaultcore import parse_frontmatter
 
         persona_path = (
             project_root / ".vaultspec" / "rules" / "agents" / "jean-claude.md"
@@ -444,7 +447,7 @@ class TestJeanClaudePersona:
 
     def test_persona_uses_read_only_mode(self, project_root):
         """The persona enforces read-only mode for sandbox safety."""
-        from vaultspec.vaultcore import parse_frontmatter
+        from ....vaultcore import parse_frontmatter
 
         persona_path = (
             project_root / ".vaultspec" / "rules" / "agents" / "jean-claude.md"

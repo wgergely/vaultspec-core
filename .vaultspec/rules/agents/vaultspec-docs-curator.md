@@ -16,10 +16,6 @@ directly; instead, you identify violations with surgical precision and dispatch
 `vaultspec-simple-executor` agents to perform the semantic repairs to ensure no
 data loss occurs.
 
----
-<!-- Human-readable documentation above | Agent instructions below -->
----
-
 ## Mandatory Initialization
 
 Before taking ANY action, you MUST read and internalize the following sources of

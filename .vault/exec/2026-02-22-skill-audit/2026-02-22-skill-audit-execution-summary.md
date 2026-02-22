@@ -1,0 +1,28 @@
+---
+tags: ["#exec", "#skill-audit"]
+related: ["[[2026-02-22-skill-audit-plan.md]]"]
+date: 2026-02-22
+---
+
+# Execution Summary: Skill Audit Refactor
+
+## Overview
+Successfully audited and refactored the `.vaultspec/rules/skills` directory to comply with Agent Skills v1.0 specification.
+
+## Actions Taken
+1.  **Audit:** Identified that skills were flat files missing required metadata.
+2.  **Research:** Documented findings in `[[2026-02-22-skill-audit-research.md]]`.
+3.  **Decision:** Formalized the restructure in `[[2026-02-22-skill-audit-adr.md]]`.
+4.  **Plan:** Created execution plan in `[[2026-02-22-skill-audit-plan.md]]`.
+5.  **Migration:**
+    - Converted all 15 skills from `vaultspec-*.md` to `vaultspec-*/SKILL.md`.
+    - Injected `name: <skill-name>` into the YAML frontmatter of each skill.
+6.  **Tooling Update:**
+    - Updated `src/vaultspec/cli.py` to support directory-based skills in `collect_skills`, `skills_add`, `resource_show`, `resource_edit`, `resource_remove`, and `resource_rename`.
+7.  **Validation:**
+    - Installed official `skills-ref` library.
+    - Verified all skills pass `skills-ref validate`.
+    - Verified `src/vaultspec/cli.py` correctly discovers the refactored skills.
+
+## Outcome
+The `.vaultspec` skills are now fully compliant with the specification, enabling compatibility with `skills-ref` tooling and proper progressive disclosure in agent prompts. The project CLI has been updated to seamlessly manage the new structure.

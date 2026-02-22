@@ -1,7 +1,7 @@
 import pytest
 
-from vaultspec.metrics import VaultSummary, get_vault_metrics
-from vaultspec.vaultcore import DocType
+from ...vaultcore import DocType
+from ..api import VaultSummary, get_vault_metrics
 
 pytestmark = [pytest.mark.unit]
 
@@ -65,7 +65,7 @@ class TestVaultSummaryEdgeCases:
 
     def test_features_deduplicated(self, vault_root):
         """Same feature across multiple docs counted once."""
-        from vaultspec.verification import list_features
+        from ...verification import list_features
 
         features = list_features(vault_root)
         # list_features returns a set, so features are inherently unique

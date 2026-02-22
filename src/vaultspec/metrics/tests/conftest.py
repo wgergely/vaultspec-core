@@ -3,7 +3,8 @@
 import pytest
 
 from tests.constants import TEST_PROJECT
-from vaultspec.core import reset_config
+
+from ...config import reset_config
 
 
 @pytest.fixture(autouse=True)

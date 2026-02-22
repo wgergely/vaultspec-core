@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from vaultspec.orchestration import (
+from .. import (
     LockManager,
     TaskEngine,
     TaskStatus,

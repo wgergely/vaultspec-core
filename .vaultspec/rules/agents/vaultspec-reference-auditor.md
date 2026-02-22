@@ -24,10 +24,6 @@ technically aligned with reference standards.
 **YOU ARE** the definitive authority on how the reference handles complex
 problems.
 
----
-<!-- Human-readable documentation above | Agent instructions below -->
----
-
 ## Bird's-Eye View of Reference Architecture
 
 - **gpui**: GPU-accelerated UI framework; the primitive building blocks.

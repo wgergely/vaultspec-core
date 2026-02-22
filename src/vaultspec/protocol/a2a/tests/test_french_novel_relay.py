@@ -22,10 +22,11 @@ import httpx
 import pytest
 
 from tests.constants import PROJECT_ROOT as _TEST_ROOT
-from vaultspec.orchestration.team import TeamCoordinator, extract_artifact_text
-from vaultspec.protocol.a2a import create_app
-from vaultspec.protocol.a2a.tests.conftest import _make_card
-from vaultspec.protocol.providers import ClaudeModels, GeminiModels
+
+from ....orchestration import TeamCoordinator, extract_artifact_text
+from ...providers import ClaudeModels, GeminiModels
+from .. import create_app
+from .conftest import _make_card
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +196,7 @@ class TestFrenchNovelRelayLive:
     @pytest.mark.asyncio
     async def test_three_turn_french_story(self):
         """GOLD STANDARD: Claude → Gemini → Claude creative relay in French."""
-        from vaultspec.protocol.a2a.executors import (
+        from ..executors import (
             ClaudeA2AExecutor,
             GeminiA2AExecutor,
         )

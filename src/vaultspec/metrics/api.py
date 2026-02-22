@@ -1,10 +1,12 @@
+"""Vault metrics: aggregate document counts and feature statistics."""
+
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from vaultspec.vaultcore import DocType, get_doc_type, scan_vault
+from ..vaultcore import DocType, get_doc_type, scan_vault
 
 if TYPE_CHECKING:
     import pathlib
@@ -16,7 +18,13 @@ __all__ = ["VaultSummary", "get_vault_metrics"]
 
 @dataclass
 class VaultSummary:
-    """Aggregate statistics for the vault."""
+    """Aggregate statistics for the vault.
+
+    Attributes:
+        total_docs: Total number of documents found in the vault.
+        counts_by_type: Document count broken down by DocType category.
+        total_features: Number of distinct features referenced across all documents.
+    """
 
     total_docs: int
     counts_by_type: dict[DocType, int]
@@ -24,7 +32,18 @@ class VaultSummary:
 
 
 def get_vault_metrics(root_dir: pathlib.Path) -> VaultSummary:
-    """Calculates summary statistics for the vault."""
+    """Calculate summary statistics for the vault.
+
+    Scans all documents under ``root_dir``, tallies them by DocType, and
+    counts the number of distinct features present.
+
+    Args:
+        root_dir: Root directory of the vault workspace.
+
+    Returns:
+        A VaultSummary containing total document count, per-type counts,
+        and the number of distinct features.
+    """
     logger.info("Collecting vault metrics from %s", root_dir)
 
     counts = dict.fromkeys(DocType, 0)
@@ -32,7 +51,7 @@ def get_vault_metrics(root_dir: pathlib.Path) -> VaultSummary:
 
     # We'll use a simplified feature extraction here to avoid double-parsing
     # if we just want quick stats. But for robustness we can import list_features.
-    from vaultspec.verification import list_features
+    from ..verification import list_features
 
     for path in scan_vault(root_dir):
         total += 1

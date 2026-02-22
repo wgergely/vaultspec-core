@@ -11,8 +11,8 @@ import pytest
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-from vaultspec.protocol.acp import ClaudeACPBridge
-from vaultspec.protocol.providers import ClaudeModels
+from ...providers import ClaudeModels
+from .. import ClaudeACPBridge
 
 
 class AsyncItemIterator:

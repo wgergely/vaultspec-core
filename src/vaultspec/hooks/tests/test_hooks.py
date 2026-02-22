@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from vaultspec.hooks import (
+from ...hooks import (
     SUPPORTED_EVENTS,
     Hook,
     HookAction,
     load_hooks,
     trigger,
 )
-from vaultspec.hooks.engine import (
+from ...hooks.engine import (
     _interpolate,
     _parse_action,
     _parse_hook,

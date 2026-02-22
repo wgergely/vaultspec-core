@@ -17,8 +17,8 @@ from acp.schema import (
 )
 
 from tests.constants import TEST_PROJECT
-from vaultspec.protocol.acp.claude_bridge import _build_sdk_message_payload
 
+from ..claude_bridge import _build_sdk_message_payload
 from .conftest import (
     SDKClientRecorder,
     make_di_bridge,

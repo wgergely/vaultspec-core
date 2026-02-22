@@ -1,3 +1,5 @@
+"""Domain models for vault document types, metadata, and structural constants."""
+
 from __future__ import annotations
 
 import re
@@ -24,12 +26,23 @@ class DocType(StrEnum):
 
     @property
     def tag(self) -> str:
-        """The mandatory directory tag associated with this type."""
+        """The mandatory directory tag associated with this type.
+
+        Returns:
+            Hashtag string such as ``#adr`` or ``#exec``.
+        """
         return f"#{self.value}"
 
     @classmethod
     def from_tag(cls, tag: str) -> DocType | None:
-        """Resolves a DocType from its #tag representation."""
+        """Return the DocType that owns the given ``#tag`` string.
+
+        Args:
+            tag: Hashtag string such as ``#adr`` or ``#exec``.
+
+        Returns:
+            Matching ``DocType``, or ``None`` if the tag is not recognised.
+        """
         for dt in cls:
             if dt.tag == tag:
                 return dt
@@ -38,14 +51,24 @@ class DocType(StrEnum):
 
 @dataclass
 class DocumentMetadata:
-    """Rigid representation of YAML frontmatter for all .vault/ files."""
+    """Rigid representation of YAML frontmatter for all .vault/ files.
+
+    Attributes:
+        tags: Exactly two tags — one directory tag and one feature tag.
+        date: ISO 8601 creation date (``YYYY-MM-DD``).
+        related: List of Obsidian-style ``[[wiki-link]]`` strings.
+    """
 
     tags: list[str] = field(default_factory=list)
     date: str | None = None
     related: list[str] = field(default_factory=list)
 
     def validate(self) -> list[str]:
-        """Validates the metadata against the rigid vault schema rules."""
+        """Validate the metadata against the vault schema rules.
+
+        Returns:
+            A list of human-readable violation messages; empty list means valid.
+        """
         errors = []
 
         #  The "Rule of Two" for Tags
@@ -105,7 +128,12 @@ class VaultConstants:
 
     @staticmethod
     def _get_docs_dir() -> str:
-        from vaultspec.core import get_config
+        """Return the configured docs directory name (e.g. ``.vault``).
+
+        Returns:
+            Directory name string such as ``".vault"``.
+        """
+        from ..config import get_config
 
         return get_config().docs_dir
 
@@ -117,12 +145,26 @@ class VaultConstants:
 
     @classmethod
     def is_supported_directory(cls, dirname: str) -> bool:
-        """Return whether *dirname* is a recognized vault subdirectory."""
+        """Return whether *dirname* is a recognized vault subdirectory.
+
+        Args:
+            dirname: Bare directory name (e.g. ``"adr"``, ``"exec"``).
+
+        Returns:
+            ``True`` if the directory is in ``SUPPORTED_DIRECTORIES``.
+        """
         return dirname in cls.SUPPORTED_DIRECTORIES
 
     @classmethod
     def get_tag_for_directory(cls, dirname: str) -> str | None:
-        """Return the ``#tag`` for a directory name, or ``None`` if unsupported."""
+        """Return the ``#tag`` for a directory name, or ``None`` if unsupported.
+
+        Args:
+            dirname: Bare directory name (e.g. ``"adr"``, ``"plan"``).
+
+        Returns:
+            Hashtag string such as ``"#adr"``, or ``None`` if not recognised.
+        """
         try:
             return DocType(dirname).tag
         except ValueError:
@@ -130,7 +172,14 @@ class VaultConstants:
 
     @classmethod
     def validate_vault_structure(cls, root_dir: Path) -> list[str]:
-        """Ensures .vault/ only contains supported subdirectories."""
+        """Ensure the docs directory only contains recognised subdirectories.
+
+        Args:
+            root_dir: Project root containing the docs directory.
+
+        Returns:
+            List of violation message strings; empty when the structure is valid.
+        """
         docs_dir_name = cls._get_docs_dir()
         docs_dir = root_dir / docs_dir_name
         if not docs_dir.exists():
@@ -164,9 +213,17 @@ class VaultConstants:
     def validate_filename(
         cls, filename: str, doc_type: DocType | None = None
     ) -> list[str]:
-        """Validates a filename against the rigid naming convention.
+        """Validate a filename against the vault naming convention.
 
-        Pattern: yyyy-mm-dd-<feature>-<type>.md
+        Expected pattern: ``yyyy-mm-dd-<feature>-<type>.md``.
+
+        Args:
+            filename: Bare filename (no directory component) to validate.
+            doc_type: When provided, also checks that the filename's type
+                suffix matches this ``DocType``.
+
+        Returns:
+            List of violation message strings; empty when the filename is valid.
         """
         errors = []
 

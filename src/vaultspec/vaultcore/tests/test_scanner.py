@@ -1,8 +1,9 @@
 import pytest
 
 from tests.constants import TEST_PROJECT
-from vaultspec.core import reset_config
-from vaultspec.vaultcore import DocType, get_doc_type, scan_vault
+
+from ...config import reset_config
+from .. import DocType, get_doc_type, scan_vault
 
 pytestmark = [pytest.mark.unit]
 

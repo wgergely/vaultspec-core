@@ -1,3 +1,5 @@
+"""Agent provider implementation for Anthropic Claude via the Python ACP bridge."""
+
 from __future__ import annotations
 
 import json
@@ -37,13 +39,26 @@ def _load_claude_oauth_token(
     creds_path: pathlib.Path | None = None,
     token_url: str | None = None,
 ) -> str | None:
-    """Read and (if needed) refresh the OAuth access token from credentials file.
+    """Read and, if necessary, refresh the Claude OAuth access token.
 
     The child ``claude`` binary spawned by the SDK requires an explicit
-    ``CLAUDE_CODE_OAUTH_TOKEN`` when ``CLAUDE_CODE_ENTRYPOINT=sdk-py`` is set —
-    it skips the interactive credential-file auth flow in that mode.
+    ``CLAUDE_CODE_OAUTH_TOKEN`` env var when ``CLAUDE_CODE_ENTRYPOINT=sdk-py``
+    is set — it skips the interactive credentials-file auth flow in that mode.
 
-    ``creds_path`` and ``token_url`` are injectable for testing without mocks.
+    If the stored token is absent, expired, or expiring within the refresh
+    buffer, a token refresh is attempted using the stored ``refreshToken``.
+    On success the refreshed token is written back to the credentials file
+    atomically.
+
+    Args:
+        creds_path: Path to the Claude credentials JSON file. Defaults to
+            ``~/.claude/.credentials.json``. Injectable for testing.
+        token_url: OAuth token endpoint URL. Defaults to the Anthropic console
+            endpoint. Injectable for testing.
+
+    Returns:
+        A valid access token string, or ``None`` if authentication cannot be
+        established (missing file, missing refresh token, network error, etc.).
     """
     if creds_path is None:
         creds_path = _DEFAULT_CREDS_PATH
@@ -153,25 +168,58 @@ def _load_claude_oauth_token(
 
 
 class ClaudeProvider(AgentProvider):
-    """Provider for Anthropic Claude models via Python ACP bridge."""
+    """Provider for Anthropic Claude models via the Python ACP bridge.
+
+    Spawns ``vaultspec.protocol.acp.claude_bridge`` as a subprocess and
+    handles credential wrangling, system-prompt construction, and environment
+    variable forwarding for all Claude-specific agent features.
+    """
 
     @property
     def name(self) -> str:
+        """Return the provider identifier string.
+
+        Returns:
+            The string ``"claude"``.
+        """
         return "claude"
 
     @property
     def models(self) -> ModelRegistry:
+        """Return the Claude model registry.
+
+        Returns:
+            The :class:`ClaudeModels` registry class.
+        """
         return ClaudeModels
 
     def load_system_prompt(self, root_dir: pathlib.Path) -> str:
-        """Load .claude/CLAUDE.md if it exists."""
+        """Load ``.claude/CLAUDE.md`` if it exists.
+
+        Args:
+            root_dir: Workspace root directory.
+
+        Returns:
+            File contents as a string, or an empty string if the file is absent.
+        """
         system_file = root_dir / ".claude" / "CLAUDE.md"
         if not system_file.exists():
             return ""
         return system_file.read_text(encoding="utf-8")
 
     def load_rules(self, root_dir: pathlib.Path) -> str:
-        """Loads and resolves nested rules from .claude/rules/."""
+        """Load and inline-resolve rules from ``.claude/rules/``.
+
+        All ``*.md`` files in the rules directory are read in sorted order and
+        their ``@include`` directives are resolved recursively.
+
+        Args:
+            root_dir: Workspace root directory.
+
+        Returns:
+            Concatenated rules text, or an empty string if the directory does
+            not exist.
+        """
         rules_dir = root_dir / ".claude" / "rules"
         if not rules_dir.exists():
             return ""
@@ -194,6 +242,27 @@ class ClaudeProvider(AgentProvider):
         model_override: str | None = None,
         mode: str = "read-write",
     ) -> ProcessSpec:
+        """Build a ProcessSpec for launching the Claude ACP bridge subprocess.
+
+        Loads system prompt and rules, selects the appropriate model,
+        handles OAuth credential injection, and maps agent YAML metadata to
+        environment variables consumed by the bridge.
+
+        Args:
+            agent_name: Name of the agent being dispatched (unused but kept
+                for interface consistency).
+            agent_meta: Parsed metadata from the agent's YAML front matter.
+            agent_persona: Agent persona / behavioural instructions.
+            task_context: Initial task description passed to the agent.
+            root_dir: Workspace root directory.
+            model_override: Optional model ID to use instead of the tier
+                default derived from ``agent_meta``.
+            mode: Sandbox mode forwarded to the bridge (``"read-only"`` or
+                ``"read-write"``).
+
+        Returns:
+            ProcessSpec ready for the orchestration layer to spawn.
+        """
         _ = agent_name
 
         # Warn on Gemini-only features

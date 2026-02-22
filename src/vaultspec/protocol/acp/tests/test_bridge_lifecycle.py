@@ -20,13 +20,13 @@ if TYPE_CHECKING:
 from claude_agent_sdk import ResultMessage
 
 from tests.constants import TEST_PROJECT
-from vaultspec.protocol.acp import ClaudeACPBridge
-from vaultspec.protocol.acp.claude_bridge import (
+
+from ...providers import ClaudeModels
+from .. import ClaudeACPBridge
+from ..claude_bridge import (
     _build_sdk_message_payload,
     _convert_mcp_servers,
 )
-from vaultspec.protocol.providers import ClaudeModels
-
 from .conftest import (
     SDKClientRecorder,
     make_di_bridge,
@@ -449,7 +449,7 @@ class TestBridgeLifecycleUnit:
 
     def test_provider_prepares_bridge_command(self):
         """ClaudeProvider.prepare_process() returns correct bridge spawn command."""
-        from vaultspec.protocol.providers import ClaudeProvider
+        from ...providers import ClaudeProvider
 
         provider = ClaudeProvider()
         spec = provider.prepare_process(
@@ -470,7 +470,7 @@ class TestBridgeLifecycleUnit:
     @pytest.mark.asyncio
     async def test_run_subagent_with_provider(self, tmp_path):
         """run_subagent() accepts a provider_instance and uses it."""
-        from vaultspec.protocol.providers import ClaudeProvider
+        from ...providers import ClaudeProvider
 
         # Create minimal agent file
         agents_dir = tmp_path / ".vaultspec" / "rules" / "agents"
@@ -490,7 +490,7 @@ class TestBridgeLifecycleUnit:
         )
 
         # Verify the ProcessSpec is well-formed
-        from vaultspec.protocol.providers import ProcessSpec
+        from ...providers import ProcessSpec
 
         assert isinstance(spec, ProcessSpec)
         assert spec.initial_prompt_override == "Do something."
@@ -1058,7 +1058,7 @@ class TestSessionTracking:
     @pytest.mark.asyncio
     async def test_new_session_stores_session_state(self):
         """new_session stores a _SessionState in self._sessions."""
-        from vaultspec.protocol.acp.claude_bridge import _SessionState
+        from ..claude_bridge import _SessionState
 
         bridge, _holder, _captured = make_di_bridge()
         await bridge.new_session(cwd=str(TEST_PROJECT))

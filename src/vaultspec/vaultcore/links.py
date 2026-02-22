@@ -1,3 +1,5 @@
+"""Utilities for extracting Obsidian-style wiki-links from vault documents."""
+
 from __future__ import annotations
 
 import logging
@@ -9,7 +11,17 @@ logger = logging.getLogger(__name__)
 
 
 def extract_wiki_links(content: str) -> set[str]:
-    """Extracts all [[wiki-links]] from the content."""
+    """Extract all ``[[wiki-link]]`` targets from a markdown string.
+
+    Handles both ``[[Target]]`` and ``[[Target|Display]]`` forms; only the
+    target (left-hand) portion is returned.
+
+    Args:
+        content: Raw markdown text to scan.
+
+    Returns:
+        Set of unique link target strings with surrounding whitespace stripped.
+    """
     # Matches [[Link Name]] or [[Link Name|Display Name]]
     pattern = r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]"
     matches = re.findall(pattern, content)
@@ -17,7 +29,17 @@ def extract_wiki_links(content: str) -> set[str]:
 
 
 def extract_related_links(related: list[str]) -> set[str]:
-    """Extracts link targets from the 'related' metadata field."""
+    """Extract link targets from the ``related`` YAML frontmatter field.
+
+    Each entry is expected to be a ``[[wiki-link]]`` string.  Malformed
+    entries are logged and skipped.
+
+    Args:
+        related: List of raw ``related`` values from parsed frontmatter.
+
+    Returns:
+        Set of resolved link target strings.
+    """
     links = set()
     malformed_count = 0
     for link in related:

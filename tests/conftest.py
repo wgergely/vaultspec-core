@@ -16,7 +16,7 @@ from tests.constants import (
     PROJECT_ROOT,
     TEST_PROJECT,
 )
-from vaultspec.core import VaultSpecConfig, get_config, reset_config
+from vaultspec.config import VaultSpecConfig, get_config, reset_config
 
 # CPU is NOT supported.  All tests require CUDA GPU.
 # If running without GPU, tests that need RAG components will be skipped.

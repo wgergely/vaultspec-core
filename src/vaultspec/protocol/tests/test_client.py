@@ -20,7 +20,8 @@ from acp.schema import (
 )
 
 from tests.constants import TEST_PROJECT
-from vaultspec.protocol.acp import SubagentClient
+
+from ..acp import SubagentClient
 
 pytestmark = [pytest.mark.unit]
 

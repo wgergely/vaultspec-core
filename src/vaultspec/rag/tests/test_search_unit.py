@@ -2,7 +2,7 @@
 
 import pytest
 
-from vaultspec.rag import ParsedQuery, SearchResult, parse_query
+from .. import ParsedQuery, SearchResult, parse_query
 
 pytestmark = [pytest.mark.unit]
 

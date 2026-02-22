@@ -237,8 +237,8 @@ Manage skill definitions in `.vaultspec/rules/skills/`.
 
 #### `skills list`
 
-List all managed skills (files matching
-`vaultspec-*.md`).
+List all managed skills (directories matching
+`vaultspec-*`).
 
 ```bash
 python .vaultspec/lib/scripts/cli.py skills list

@@ -1,3 +1,5 @@
+"""Abstract base classes and shared utilities for agent provider implementations."""
+
 from __future__ import annotations
 
 import abc
@@ -21,13 +23,23 @@ __all__ = [
 
 
 class CapabilityLevel(IntEnum):
+    """Tiered capability levels used to select an appropriate model."""
+
     LOW = 1
     MEDIUM = 2
     HIGH = 3
 
 
 class ClaudeModels:
-    """Single source of truth for Claude model identifiers."""
+    """Single source of truth for Claude model identifiers.
+
+    Attributes:
+        HIGH: Model ID for the highest capability tier (Opus).
+        MEDIUM: Model ID for the medium capability tier (Sonnet).
+        LOW: Model ID for the low capability tier (Haiku).
+        ALL: All model IDs ordered from highest to lowest capability.
+        BY_LEVEL: Mapping from CapabilityLevel to model ID.
+    """
 
     HIGH = "claude-opus-4-6"
     MEDIUM = "claude-sonnet-4-5"
@@ -43,7 +55,15 @@ class ClaudeModels:
 
 
 class GeminiModels:
-    """Single source of truth for Gemini model identifiers."""
+    """Single source of truth for Gemini model identifiers.
+
+    Attributes:
+        HIGH: Model ID for the highest capability tier (Pro).
+        MEDIUM: Model ID for the medium capability tier (Flash).
+        LOW: Model ID for the low capability tier (Flash 2.5).
+        ALL: All model IDs ordered from highest to lowest capability.
+        BY_LEVEL: Mapping from CapabilityLevel to model ID.
+    """
 
     HIGH = "gemini-3-pro-preview"
     MEDIUM = "gemini-3-flash-preview"
@@ -64,7 +84,19 @@ ModelRegistry = type[ClaudeModels] | type[GeminiModels]
 
 @dataclass
 class ProcessSpec:
-    """Specification for launching an agent process."""
+    """Specification for launching an agent subprocess.
+
+    Attributes:
+        executable: Path or name of the executable to run.
+        args: Command-line arguments to pass to the executable.
+        env: Full environment dictionary for the subprocess.
+        cleanup_paths: Temporary files to delete after the process exits.
+        session_meta: Arbitrary metadata to attach to the session record
+            (e.g., model name used).
+        initial_prompt_override: If set, replaces the task context passed
+            as the first user message.
+        mcp_servers: MCP server configurations to expose to the agent.
+    """
 
     executable: str
     args: list[str]
@@ -78,12 +110,25 @@ class ProcessSpec:
 def resolve_includes(
     content: str, base_dir: pathlib.Path, root_dir: pathlib.Path
 ) -> str:
-    """Recursively resolves @path/to/file.md includes within markdown content.
+    """Recursively resolve ``@path/to/file.md`` includes within Markdown content.
 
-    Resolution strategy:
-       Try resolving relative to base_dir (directory of the including file)
-       Fall back to resolving relative to root_dir (workspace root)
-       Security: resolved path must be within root_dir
+    Lines beginning with ``@`` are treated as include directives. Paths are
+    resolved relative to ``base_dir`` first, then relative to ``root_dir``
+    as a fallback. Resolved paths must remain inside ``root_dir`` to prevent
+    path-traversal reads.
+
+    Args:
+        content: Markdown source text that may contain ``@include`` lines.
+        base_dir: Directory of the file being processed (used for relative
+            resolution first).
+        root_dir: Workspace root used as the fallback resolution base and as
+            the security boundary.
+
+    Returns:
+        Markdown string with all include directives replaced by the content
+        of the referenced files, wrapped in HTML comments indicating the
+        source path. Missing or out-of-bounds includes are replaced with
+        an HTML error comment.
     """
     resolved_root = root_dir.resolve()
     lines = content.split("\n")
@@ -150,6 +195,11 @@ def resolve_executable(name: str, which_fn=None) -> tuple[str, list[str]]:
     asyncio.create_subprocess_exec. This function wraps them with
     ``cmd.exe /c`` so they execute correctly.
 
+    Args:
+        name: Executable name to resolve (e.g. ``"gemini"``).
+        which_fn: Optional replacement for ``shutil.which`` (injectable for
+            testing).
+
     Returns:
         (executable, prefix_args) — prepend prefix_args to the command's
         argument list when constructing the subprocess call.
@@ -179,16 +229,39 @@ class AgentProvider(abc.ABC):
         """The model registry class for this provider."""
 
     def get_best_model_for_capability(self, level: CapabilityLevel) -> str:
-        """Look up best model from the registry. Defaults to MEDIUM."""
+        """Return the model ID that best matches the requested capability level.
+
+        Args:
+            level: Desired capability tier.
+
+        Returns:
+            Model ID string; falls back to the MEDIUM model when the level
+            is not found in the registry.
+        """
         return self.models.BY_LEVEL.get(level, self.models.MEDIUM)
 
     @abc.abstractmethod
     def load_system_prompt(self, root_dir: pathlib.Path) -> str:
-        """Load provider-specific system prompt file."""
+        """Load the provider-specific top-level system prompt file.
+
+        Args:
+            root_dir: Workspace root directory.
+
+        Returns:
+            System prompt text, or an empty string if no file exists.
+        """
 
     @abc.abstractmethod
     def load_rules(self, root_dir: pathlib.Path) -> str:
-        """Load and resolve provider-specific rules."""
+        """Load and inline-resolve provider-specific rules files.
+
+        Args:
+            root_dir: Workspace root directory.
+
+        Returns:
+            Concatenated rules text with all ``@include`` directives resolved,
+            or an empty string if no rules directory exists.
+        """
 
     def construct_system_prompt(
         self,
@@ -196,7 +269,21 @@ class AgentProvider(abc.ABC):
         rules: str,
         system_instructions: str = "",
     ) -> str:
-        """Combine system instructions, persona, and rules."""
+        """Build a combined system prompt from instructions, persona, and rules.
+
+        Sections are labelled with Markdown headings and joined with blank
+        lines. Empty sections are omitted.
+
+        Args:
+            persona: Agent persona / behavioural instructions.
+            rules: Pre-resolved rules text.
+            system_instructions: Optional global system instructions to
+                prepend before the persona section.
+
+        Returns:
+            Combined system prompt string, or an empty string when all inputs
+            are blank.
+        """
         parts = []
         if system_instructions.strip():
             parts.append(f"# SYSTEM INSTRUCTIONS\n{system_instructions}")
@@ -211,7 +298,18 @@ class AgentProvider(abc.ABC):
         include_dirs: str,
         root_dir: pathlib.Path,
     ) -> list[str]:
-        """Validate and filter include_dirs against path traversal."""
+        """Validate a comma-separated list of include directories for path traversal.
+
+        Each directory is resolved relative to ``root_dir`` and kept only if the
+        resolved path stays within ``root_dir``.
+
+        Args:
+            include_dirs: Comma-separated directory paths (relative to root).
+            root_dir: Workspace root used as the security boundary.
+
+        Returns:
+            List of validated directory strings that are safe to pass to the agent.
+        """
         validated: list[str] = []
         for d in (x.strip() for x in include_dirs.split(",") if x.strip()):
             try:

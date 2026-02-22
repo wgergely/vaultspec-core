@@ -21,17 +21,17 @@ from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.tasks import TaskUpdater
 from a2a.types import Part, TextPart
 
-from vaultspec.orchestration.team import (
+from ...protocol.a2a import create_app
+from ...protocol.a2a.tests.conftest import (
+    EchoExecutor,
+    PrefixExecutor,
+    _make_card,
+)
+from ..team import (
     MemberStatus,
     TeamCoordinator,
     TeamStatus,
     extract_artifact_text,
-)
-from vaultspec.protocol.a2a import create_app
-from vaultspec.protocol.a2a.tests.conftest import (
-    EchoExecutor,
-    PrefixExecutor,
-    _make_card,
 )
 
 if TYPE_CHECKING:
@@ -317,7 +317,7 @@ async def test_dispatch_parallel_partial_failure():
         # Inject a fake non-existent member to simulate failure
         from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 
-        from vaultspec.orchestration.team import MemberStatus, TeamMember
+        from ..team import MemberStatus, TeamMember
 
         bad_card = AgentCard(
             name="bad-agent",
@@ -383,7 +383,7 @@ async def test_ping_agents_unreachable_returns_false():
         session = coordinator.session
         from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 
-        from vaultspec.orchestration.team import MemberStatus, TeamMember
+        from ..team import MemberStatus, TeamMember
 
         ghost_card = AgentCard(
             name="ghost-agent",

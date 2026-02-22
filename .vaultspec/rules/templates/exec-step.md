@@ -14,6 +14,9 @@ related:
   - "[[{yyyy-mm-dd-*-plan}]]"
 ---
 
+<!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
+     outside the YAML frontmatter above -->
+
 # `{feature}` `{phase}` `{step}`
 
 Brief summary of work done.

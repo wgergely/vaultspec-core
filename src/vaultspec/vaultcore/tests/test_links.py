@@ -1,6 +1,6 @@
 import pytest
 
-from vaultspec.vaultcore import extract_related_links, extract_wiki_links
+from .. import extract_related_links, extract_wiki_links
 
 pytestmark = [pytest.mark.unit]
 

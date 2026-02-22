@@ -55,12 +55,25 @@ def write_agent_discovery(
 ) -> Path:
     """Write a Gemini CLI agent discovery file to ``.gemini/agents/``.
 
-    Creates the directory structure if it doesn't exist.
+    Creates the ``.gemini/agents/`` directory structure under ``root_dir`` if
+    it doesn't already exist, then writes an agent discovery markdown file
+    pointing to the agent's ``/.well-known/agent.json`` endpoint.
+
+    Args:
+        root_dir: Project root directory under which ``.gemini/agents/`` is
+            created.
+        agent_name: Name of the agent; used as the markdown filename stem.
+        host: Hostname for the agent card URL. Defaults to
+            ``get_config().a2a_host``.
+        port: Port for the agent card URL. Defaults to
+            ``get_config().a2a_default_port``.
+        description: Optional human-readable description embedded in the
+            markdown file.
 
     Returns:
-        Path to the created markdown file.
+        Path to the created ``.gemini/agents/<agent_name>.md`` file.
     """
-    from vaultspec.core import get_config
+    from ...config import get_config
 
     logger.info("Writing agent discovery for %s to %s", agent_name, root_dir)
 
@@ -85,12 +98,18 @@ def write_gemini_settings(
     root_dir: Path,
     enable_agents: bool = True,
 ) -> Path:
-    """Write or update ``.gemini/settings.json`` with agent support.
+    """Write or update ``.gemini/settings.json`` with experimental agent support.
 
-    Preserves any existing keys in the settings file.
+    Merges the ``experimental.enableAgents`` key into the existing settings
+    file, preserving all other keys. Creates the file if it doesn't exist.
+
+    Args:
+        root_dir: Project root directory containing the ``.gemini/`` folder.
+        enable_agents: Value to set for ``experimental.enableAgents``.
+            Defaults to ``True``.
 
     Returns:
-        Path to the settings file.
+        Path to the ``.gemini/settings.json`` file.
     """
     logger.info(
         "Updating Gemini settings at %s (enable_agents=%s)", root_dir, enable_agents

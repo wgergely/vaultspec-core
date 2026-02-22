@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from vaultspec.protocol.providers import GeminiModels
-from vaultspec.vaultcore import parse_frontmatter
+from ...protocol.providers import GeminiModels
+from .. import parse_frontmatter
 
 pytestmark = [pytest.mark.unit]
 

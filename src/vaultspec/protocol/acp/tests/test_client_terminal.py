@@ -10,7 +10,8 @@ import shutil
 import pytest
 
 from tests.constants import TEST_PROJECT
-from vaultspec.protocol.acp import SubagentClient
+
+from .. import SubagentClient
 
 pytestmark = [pytest.mark.unit]
 

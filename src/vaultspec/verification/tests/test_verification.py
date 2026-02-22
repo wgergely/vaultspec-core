@@ -1,6 +1,6 @@
 import pytest
 
-from vaultspec.verification import (
+from .. import (
     FixResult,
     VerificationError,
     fix_violations,

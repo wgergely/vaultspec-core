@@ -3,9 +3,10 @@
 import pytest
 
 from tests.constants import TEST_PROJECT
-from vaultspec.core import reset_config
-from vaultspec.rag import IndexResult, prepare_document
-from vaultspec.rag.indexer import (
+
+from ...config import reset_config
+from .. import IndexResult, prepare_document
+from ..indexer import (
     _extract_feature,
     _extract_title,
 )

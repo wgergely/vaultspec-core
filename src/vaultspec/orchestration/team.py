@@ -107,6 +107,12 @@ def extract_artifact_text(task: Task) -> str:
 
     Navigates task.status.message.parts[0].text.  Returns an empty string if
     any part of the path is absent.
+
+    Args:
+        task: The A2A ``Task`` whose status message to inspect.
+
+    Returns:
+        The text content of the first ``TextPart``, or ``""`` if not present.
     """
     try:
         parts = task.status.message.parts  # type: ignore[union-attr]
@@ -146,6 +152,14 @@ class TeamCoordinator:
         api_key: str | None = None,
         collect_timeout: float = _DEFAULT_COLLECT_TIMEOUT,
     ) -> None:
+        """Initialize the TeamCoordinator.
+
+        Args:
+            api_key: Optional API key forwarded as ``X-API-Key`` on every
+                outbound HTTP request.
+            collect_timeout: Maximum seconds to wait when polling in-flight
+                tasks to completion via ``collect_results``.
+        """
         self._api_key = api_key
         self._collect_timeout = collect_timeout
         self._session: TeamSession | None = None
@@ -163,13 +177,15 @@ class TeamCoordinator:
     # ------------------------------------------------------------------
 
     async def __aenter__(self) -> TeamCoordinator:
+        """Open the shared HTTP client for use in an async context manager."""
         headers: dict[str, str] = {}
         if self._api_key:
             headers["X-API-Key"] = self._api_key
-        self._http_client = httpx.AsyncClient(headers=headers)
+        self._http_client = httpx.AsyncClient(headers=headers, timeout=60.0)
         return self
 
     async def __aexit__(self, *_: object) -> None:
+        """Close the shared HTTP client on context manager exit."""
         await self._close_http()
 
     # ------------------------------------------------------------------
@@ -177,21 +193,33 @@ class TeamCoordinator:
     # ------------------------------------------------------------------
 
     def _ensure_http_client(self) -> httpx.AsyncClient:
-        """Return the shared HTTP client, creating it if necessary."""
+        """Return the shared HTTP client, creating it lazily if necessary.
+
+        Returns:
+            The active ``httpx.AsyncClient`` instance.
+        """
         if self._http_client is None:
             headers: dict[str, str] = {}
             if self._api_key:
                 headers["X-API-Key"] = self._api_key
-            self._http_client = httpx.AsyncClient(headers=headers)
+            self._http_client = httpx.AsyncClient(headers=headers, timeout=60.0)
         return self._http_client
 
     async def _close_http(self) -> None:
+        """Close the shared httpx.AsyncClient if one is open."""
         if self._http_client is not None:
             await self._http_client.aclose()
             self._http_client = None
 
     def _get_client(self, agent_name: str) -> A2AClient:
-        """Return (or lazily create) the A2AClient for the given agent."""
+        """Return (or lazily create) the A2AClient for the given agent.
+
+        Args:
+            agent_name: Name of the team member whose client to retrieve.
+
+        Returns:
+            The ``A2AClient`` bound to the member's ``AgentCard``.
+        """
         if agent_name not in self._clients:
             member = self._session_member(agent_name)
             self._clients[agent_name] = A2AClient(
@@ -201,6 +229,18 @@ class TeamCoordinator:
         return self._clients[agent_name]
 
     def _session_member(self, agent_name: str) -> TeamMember:
+        """Return the TeamMember for the given agent name.
+
+        Args:
+            agent_name: Name of the agent to look up.
+
+        Returns:
+            The corresponding ``TeamMember``.
+
+        Raises:
+            RuntimeError: If no active team session exists.
+            KeyError: If the agent is not a member of the current team.
+        """
         if self._session is None:
             raise RuntimeError("No active team session. Call form_team() first.")
         member = self._session.members.get(agent_name)
@@ -210,6 +250,14 @@ class TeamCoordinator:
 
     @property
     def session(self) -> TeamSession:
+        """Return the active team session.
+
+        Returns:
+            The current ``TeamSession``.
+
+        Raises:
+            RuntimeError: If no team session has been formed yet.
+        """
         if self._session is None:
             raise RuntimeError("No active team session.")
         return self._session
@@ -219,7 +267,16 @@ class TeamCoordinator:
         parts: list[Part],
         reference_task_ids: list[str] | None = None,
     ) -> Message:
-        """Build an outbound A2A Message stamped with the team context."""
+        """Build an outbound A2A Message stamped with the team context.
+
+        Args:
+            parts: Message content parts to include.
+            reference_task_ids: Optional list of task IDs to reference.
+
+        Returns:
+            A ``Message`` with a fresh ``message_id`` and the session's
+            ``context_id`` set.
+        """
         if self._session is None:
             raise RuntimeError("No active team session. Call form_team() first.")
         return Message(
@@ -236,7 +293,15 @@ class TeamCoordinator:
         parts: list[Part],
         reference_task_ids: list[str] | None = None,
     ) -> SendMessageRequest:
-        """Build a SendMessageRequest with a unique JSON-RPC id."""
+        """Build a SendMessageRequest with a unique JSON-RPC id.
+
+        Args:
+            parts: Message content parts to include.
+            reference_task_ids: Optional list of task IDs to reference.
+
+        Returns:
+            A ``SendMessageRequest`` wrapping the constructed message.
+        """
         return SendMessageRequest(
             id=str(uuid.uuid4()),
             params=MessageSendParams(
@@ -249,7 +314,15 @@ class TeamCoordinator:
         agent_name: str,
         task_id: str,
     ) -> Task:
-        """Poll tasks/get until the task reaches a terminal state."""
+        """Poll tasks/get until the task reaches a terminal state.
+
+        Args:
+            agent_name: Name of the team member that owns the task.
+            task_id: The A2A task ID to poll.
+
+        Returns:
+            The ``Task`` once it has reached a terminal state.
+        """
         client = self._get_client(agent_name)
         wait = 0.1
         async with asyncio.timeout(self._collect_timeout):
@@ -276,7 +349,15 @@ class TeamCoordinator:
         agent_name: str,
         request: SendMessageRequest,
     ) -> Task:
-        """Send a single message and return the resulting Task (always terminal)."""
+        """Send a single message and return the resulting Task (always terminal).
+
+        Args:
+            agent_name: Name of the team member to send the message to.
+            request: The ``SendMessageRequest`` to dispatch.
+
+        Returns:
+            The terminal ``Task`` produced by the agent.
+        """
         client = self._get_client(agent_name)
         response = await client.send_message(request)
         result = response.root
@@ -300,6 +381,9 @@ class TeamCoordinator:
 
         Used by CLI tools that reload session state from disk. Clears any cached
         per-member clients since the HTTP client may have changed.
+
+        Args:
+            session: A ``TeamSession`` previously obtained from ``form_team``.
         """
         self._session = session
         self._clients.clear()
@@ -451,6 +535,15 @@ class TeamCoordinator:
             self._session_member(name).status = MemberStatus.WORKING
 
         async def _send_one(agent_name: str, text: str) -> tuple[str, Task]:
+            """Dispatch a single text task to one agent and return the result.
+
+            Args:
+                agent_name: Name of the target team member.
+                text: Task text to send.
+
+            Returns:
+                A ``(agent_name, Task)`` tuple for the completed task.
+            """
             request = self._make_send_request(
                 parts=[Part(root=TextPart(text=text))],
             )
@@ -487,6 +580,15 @@ class TeamCoordinator:
             raise RuntimeError("No active team session. Call form_team() first.")
 
         async def _poll_one(agent_name: str, task_id: str) -> tuple[str, str]:
+            """Poll a single in-flight task until terminal and extract its text.
+
+            Args:
+                agent_name: Name of the team member that owns the task.
+                task_id: The A2A task ID to poll.
+
+            Returns:
+                A ``(agent_name, artifact_text)`` tuple.
+            """
             client = self._get_client(agent_name)
             wait = 0.1
             while True:
@@ -518,6 +620,54 @@ class TeamCoordinator:
             results[agent_name] = text
 
         return results
+
+    async def collect_tasks(self) -> dict[str, Task]:
+        """Poll all in-flight tasks until terminal and return the Task objects.
+
+        Like :meth:`collect_results` but returns full ``Task`` objects instead
+        of extracted text, for callers that need to pass tasks to
+        :meth:`relay_output`.
+
+        Returns:
+            Mapping of agent name → completed ``Task``.
+        """
+        if self._session is None:
+            raise RuntimeError("No active team session. Call form_team() first.")
+
+        async def _poll_one_task(agent_name: str, task_id: str) -> tuple[str, Task]:
+            client = self._get_client(agent_name)
+            wait = 0.1
+            while True:
+                response = await client.get_task(
+                    GetTaskRequest(
+                        id=str(uuid.uuid4()),
+                        params=TaskQueryParams(id=task_id),
+                    )
+                )
+                result = response.root
+                if hasattr(result, "error"):
+                    raise RuntimeError(f"task error: {result.error}")
+                task = result.result
+                if task.status.state in _TERMINAL_STATES:
+                    return agent_name, task
+                await asyncio.sleep(wait)
+                wait = min(wait * 2, 5.0)
+
+        coros = [
+            _poll_one_task(name, task_id) for name, task_id in self._in_flight.items()
+        ]
+        tasks: dict[str, Task] = {}
+        async with asyncio.timeout(self._collect_timeout):
+            outcomes = await asyncio.gather(*coros, return_exceptions=True)
+
+        for item in outcomes:
+            if isinstance(item, BaseException):
+                logger.error("collect_tasks poll error: %s", item)
+                continue
+            agent_name, task = item
+            tasks[agent_name] = task
+
+        return tasks
 
     async def relay_output(
         self,
@@ -650,6 +800,14 @@ class TeamCoordinator:
         http = self._ensure_http_client()
 
         async def _ping(member: TeamMember) -> tuple[str, bool]:
+            """Ping a single team member's well-known endpoint.
+
+            Args:
+                member: The ``TeamMember`` to check reachability for.
+
+            Returns:
+                A ``(member_name, reachable)`` tuple.
+            """
             try:
                 resolver = A2ACardResolver(httpx_client=http, base_url=member.url)
                 await resolver.get_agent_card()

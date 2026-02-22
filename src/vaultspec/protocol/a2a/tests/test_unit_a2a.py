@@ -15,12 +15,12 @@ from a2a.types import (
     TextPart,
 )
 
-from vaultspec.protocol.a2a import (
+from .. import (
     A2A_TO_VAULTSPEC,
     VAULTSPEC_TO_A2A,
     agent_card_from_definition,
 )
-from vaultspec.protocol.a2a.tests.conftest import (
+from .conftest import (
     EchoExecutor,
     PrefixExecutor,
     make_request_context,

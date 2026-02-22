@@ -18,20 +18,20 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
-from vaultspec.orchestration.team import (
+from ...protocol.a2a.tests.conftest import (
+    EchoExecutor,
+    _make_card,
+)
+from ..team import (
     MemberStatus,
     TeamCoordinator,
     TeamStatus,
-)
-from vaultspec.protocol.a2a.tests.conftest import (
-    EchoExecutor,
-    _make_card,
 )
 
 
 def _build_app_transport(name: str, port: int) -> httpx.ASGITransport:
     """Build an in-process ASGI transport for a minimal echo A2A server."""
-    from vaultspec.protocol.a2a import create_app
+    from ...protocol.a2a import create_app
 
     card = _make_card(name, port)
     app = create_app(EchoExecutor(), card)

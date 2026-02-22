@@ -5,7 +5,7 @@ truth) for convenient import by ``ClaudeA2AExecutor`` and
 ``GeminiA2AExecutor``.
 """
 
-from vaultspec.protocol.sandbox import (
+from ...sandbox import (
     _SHELL_TOOLS,
     _WRITE_TOOLS,
     _is_vault_path,
