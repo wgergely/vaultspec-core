@@ -305,7 +305,6 @@ class TestA2AMultiAgentDispatch:
         )
         try:
             url_a = next(u for u in agent_urls if "30102" in u)
-            url_b = next(u for u in agent_urls if "30103" in u)
 
             # Only dispatch to agent A.
             results = await coordinator.dispatch_parallel({url_a: "only A"})

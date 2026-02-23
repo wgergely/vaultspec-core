@@ -103,11 +103,11 @@ vaultspec vault index --full
 
 ### How Incremental Indexing Works
 
-1. On first run, all `.vault/` markdown files are indexed and their
-   modification times recorded in `.lance/index_meta.json`
-2. On subsequent runs, only files with newer mtimes are re-embedded and upserted
-3. Documents are sorted by length before batching to minimise GPU padding overhead
-4. Long documents are truncated to 8000 characters before embedding
+- On first run, all `.vault/` markdown files are indexed and their
+  modification times recorded in `.lance/index_meta.json`
+- On subsequent runs, only files with newer mtimes are re-embedded and upserted
+- Documents are sorted by length before batching to minimise GPU padding overhead
+- Long documents are truncated to 8000 characters before embedding
 
 ### Performance
 

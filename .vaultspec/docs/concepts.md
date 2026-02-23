@@ -325,14 +325,14 @@ Governance in vaultspec comes from three mechanisms:
 
 The `.vault/` directory is the persistent memory of the project:
 
-| Directory        | Content                                    | Tag         |
-| ---------------- | ------------------------------------------ | ----------- |
-| `.vault/adr/`    | Architecture Decision Records              | `#adr`      |
-| `.vault/audit/`  | Audit reports and assessments              | `#audit`    |
-| `.vault/exec/`   | Execution records (steps and summaries)    | `#exec`     |
-| `.vault/plan/`   | Implementation plans                       | `#plan`     |
-| `.vault/reference/` | Reference audits and blueprints         | `#reference`|
-| `.vault/research/`  | Research and brainstorming              | `#research` |
+| Directory           | Content                                    | Tag          |
+| ------------------- | ------------------------------------------ | ------------ |
+| `.vault/adr/`       | Architecture Decision Records              | `#adr`       |
+| `.vault/audit/`     | Audit reports and assessments              | `#audit`     |
+| `.vault/exec/`      | Execution records (steps and summaries)    | `#exec`      |
+| `.vault/plan/`      | Implementation plans                       | `#plan`      |
+| `.vault/reference/` | Reference audits and blueprints            | `#reference` |
+| `.vault/research/`  | Research and brainstorming                 | `#research`  |
 
 **Why it matters:**
 
@@ -359,8 +359,8 @@ Execution records nest under a feature directory:
 
 Every document has exactly two tags:
 
-1. **Directory tag** — matches the subdirectory (`#adr`, `#research`, etc.)
-2. **Feature tag** — groups related documents (`#rag`, `#protocol`)
+- **Directory tag** — matches the subdirectory (`#adr`, `#research`, etc.)
+- **Feature tag** — groups related documents (`#rag`, `#protocol`)
 
 ### Hooks
 

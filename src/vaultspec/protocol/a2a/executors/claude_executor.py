@@ -196,7 +196,7 @@ class ClaudeA2AExecutor(AgentExecutor):
         else:
             sandbox_cb = _make_sandbox_callback(self._mode, self._root_dir)
             # The SDK merges options.env ON TOP of os.environ:
-            #   process_env = {**os.environ, **options.env, "CLAUDE_CODE_ENTRYPOINT": ...}
+            #   process_env = {**os.environ, **options.env, "CLAUDE_...": ..}
             # Simply omitting CLAUDECODE from options.env is not enough — the parent
             # value from os.environ would survive the merge.  Setting it to "" (empty
             # string) overrides the parent value; the Claude CLI treats an empty
@@ -322,7 +322,7 @@ class ClaudeA2AExecutor(AgentExecutor):
                     self._active_clients.pop(task_id, None)
                     self._active_clients[context_id] = sdk_client
                 logger.debug(
-                    "Task %s cancelled — keeping SDK client alive for context %s resume",
+                    "Task %s cancelled: keeping SDK client alive for context %s",
                     task_id,
                     context_id,
                 )
@@ -338,7 +338,7 @@ class ClaudeA2AExecutor(AgentExecutor):
                 await sdk_client.disconnect()
             else:
                 # Successful completion: persist the live client under context_id
-                # so the next turn on the same context can reuse it without reconnecting.
+                # so the next turn can reuse it without reconnecting.
                 async with self._clients_lock:
                     self._active_clients.pop(task_id, None)
                     self._active_clients[context_id] = sdk_client
@@ -411,7 +411,7 @@ class ClaudeA2AExecutor(AgentExecutor):
 
                 elif isinstance(msg, ResultMessage):
                     logger.debug(
-                        "ResultMessage received for context %s (error=%s, session_id=%s)",
+                        "ResultMessage for context %s (error=%s, session_id=%s)",
                         context_id,
                         msg.is_error,
                         msg.session_id,

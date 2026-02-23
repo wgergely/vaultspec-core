@@ -151,39 +151,39 @@ The `--path` flag sets the `{path}` context variable in hook templates. The
 
 ## Creating a Hook
 
-1. Create a YAML file in `.vaultspec/rules/hooks/`:
+- Create a YAML file in `.vaultspec/rules/hooks/`:
 
-   ```bash
-   touch .vaultspec/rules/hooks/my-hook.yaml
-   ```
+  ```bash
+  touch .vaultspec/rules/hooks/my-hook.yaml
+  ```
 
-2. Choose one of the 4 supported events and set it:
+- Choose one of the 4 supported events and set it:
 
-   ```yaml
-   event: vault.document.created
-   ```
+  ```yaml
+  event: vault.document.created
+  ```
 
-3. Add one or more actions:
+- Add one or more actions:
 
-   ```yaml
-   actions:
-     - type: shell
-       command: "echo 'New doc created: {path}'"
-   ```
+  ```yaml
+  actions:
+    - type: shell
+      command: "echo 'New doc created: {path}'"
+  ```
 
-4. Set `enabled: true` (or omit it, since `true` is the default):
+- Set `enabled: true` (or omit it, since `true` is the default):
 
-   ```yaml
-   enabled: true
-   ```
+  ```yaml
+  enabled: true
+  ```
 
-5. Verify the hook loads correctly:
+- Verify the hook loads correctly:
 
-   ```bash
-   vaultspec hooks list
-   ```
+  ```bash
+  vaultspec hooks list
+  ```
 
-6. Test it manually before relying on the lifecycle trigger:
+- Test it manually before relying on the lifecycle trigger:
 
    ```bash
    vaultspec hooks run vault.document.created --path /path/to/doc.md

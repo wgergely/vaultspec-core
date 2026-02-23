@@ -168,6 +168,9 @@ cython_debug/
 # Gemini CLI
 .gemini/
 
+# Antigravity
+.agent/
+
 # LanceDB vector store
 .lance/
 **/.lance/
@@ -183,3 +186,5 @@ test-project/*
 
 # Temporary reference files
 tmp-ref/
+
+

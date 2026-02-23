@@ -1071,9 +1071,9 @@ variables are optional and have sensible defaults.
 
 Configuration is resolved in priority order:
 
-1. Explicit overrides (for dependency injection or testing)
-2. `VAULTSPEC_*` environment variable
-3. Dataclass default
+- Explicit overrides (for dependency injection or testing)
+- `VAULTSPEC_*` environment variable
+- Dataclass default
 
 Source: `src/vaultspec/config/config.py`
 
