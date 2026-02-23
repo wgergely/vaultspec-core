@@ -150,6 +150,7 @@ class TeamTaskEngine:
         with self._lock:
             task = self._tasks.get(task_id)
             if task is None:
+                logger.warning("complete_task called for unknown task_id=%s", task_id)
                 return
             task.status = TeamTaskStatus.COMPLETED
             task.result = result
@@ -169,6 +170,9 @@ class TeamTaskEngine:
         with self._lock:
             task = self._tasks.get(task_id)
             if task is None:
+                logger.warning(
+                    "fail_task: unknown task_id=%s (error=%s)", task_id, error
+                )
                 return
             task.status = TeamTaskStatus.FAILED
             task.error = error

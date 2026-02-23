@@ -17,6 +17,9 @@ import urllib.request
 import uuid
 from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 from .base import (
     AgentProvider,
     CapabilityLevel,
@@ -26,9 +29,6 @@ from .base import (
     resolve_executable,
     resolve_includes,
 )
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 

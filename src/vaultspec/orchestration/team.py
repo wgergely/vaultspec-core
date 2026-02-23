@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import signal
 import sys
 import time
 import uuid
@@ -43,6 +45,7 @@ __all__ = [
     "TeamSession",
     "TeamStatus",
     "extract_artifact_text",
+    "resolve_member_key",
 ]
 
 logger = logging.getLogger(__name__)
@@ -77,9 +80,16 @@ class TeamStatus(StrEnum):
 
 @dataclass
 class TeamMember:
-    """A single agent participating in a team."""
+    """A single agent participating in a team.
+
+    ``name`` is the dict key used to address this member (URL for agents
+    discovered via ``form_team``; caller-supplied logical name for agents
+    added via ``spawn_agent``).  ``display_name`` is the human-readable
+    name taken from the agent's ``AgentCard``.
+    """
 
     name: str
+    display_name: str
     url: str
     card: AgentCard
     status: MemberStatus = field(default=MemberStatus.IDLE)
@@ -100,6 +110,39 @@ class TeamSession:
     members: dict[str, TeamMember]
     status: TeamStatus
     created_at: float
+
+
+def resolve_member_key(members: dict[str, TeamMember], ref: str) -> str:
+    """Resolve a member reference to its dict key.
+
+    Accepts either the exact dict key (URL or logical name) or a
+    ``display_name`` match.  Raises ``KeyError`` if the reference is
+    ambiguous or not found.
+
+    Args:
+        members: The ``TeamSession.members`` dict.
+        ref: A URL key, logical name, or display_name to resolve.
+
+    Returns:
+        The resolved dict key into ``members``.
+
+    Raises:
+        KeyError: If ``ref`` cannot be resolved uniquely.
+    """
+    if ref in members:
+        return ref
+    # Fall back to display_name search.
+    matches = [key for key, m in members.items() if m.display_name == ref]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        keys = ", ".join(repr(k) for k in matches)
+        raise KeyError(
+            f"Ambiguous agent reference {ref!r}: matches multiple members ({keys}). "
+            "Use the full URL to disambiguate."
+        )
+    available = ", ".join(f"{m.display_name!r} ({key})" for key, m in members.items())
+    raise KeyError(f"Agent {ref!r} is not a member of this team. Members: {available}")
 
 
 def extract_artifact_text(task: Task) -> str:
@@ -171,6 +214,8 @@ class TeamCoordinator:
         self._http_client: httpx.AsyncClient | None = None
         # Map agent-name -> spawned subprocess (managed by spawn_agent / dissolve_team)
         self._spawned: dict[str, asyncio.subprocess.Process] = {}
+        # Map agent-name -> PID for processes restored from disk (no Process handle)
+        self._spawned_pids: dict[str, int] = {}
 
     # ------------------------------------------------------------------
     # Context manager support
@@ -211,42 +256,49 @@ class TeamCoordinator:
             await self._http_client.aclose()
             self._http_client = None
 
-    def _get_client(self, agent_name: str) -> A2AClient:
+    def _get_client(self, ref: str) -> A2AClient:
         """Return (or lazily create) the A2AClient for the given agent.
 
+        Accepts either the exact dict key (URL or logical name) or the
+        agent's display_name.  The client is cached under the resolved key.
+
         Args:
-            agent_name: Name of the team member whose client to retrieve.
+            ref: A URL key, logical name, or display_name.
 
         Returns:
             The ``A2AClient`` bound to the member's ``AgentCard``.
         """
-        if agent_name not in self._clients:
-            member = self._session_member(agent_name)
-            self._clients[agent_name] = A2AClient(
+        if self._session is None:
+            raise RuntimeError("No active team session. Call form_team() first.")
+        key = resolve_member_key(self._session.members, ref)
+        if key not in self._clients:
+            member = self._session.members[key]
+            self._clients[key] = A2AClient(
                 httpx_client=self._ensure_http_client(),
                 agent_card=member.card,
             )
-        return self._clients[agent_name]
+        return self._clients[key]
 
-    def _session_member(self, agent_name: str) -> TeamMember:
-        """Return the TeamMember for the given agent name.
+    def _session_member(self, ref: str) -> TeamMember:
+        """Return the TeamMember for the given reference.
+
+        Accepts either the exact dict key (URL or logical name) or the
+        agent's display_name.  Delegates to :func:`resolve_member_key`.
 
         Args:
-            agent_name: Name of the agent to look up.
+            ref: A URL key, logical name, or display_name to look up.
 
         Returns:
             The corresponding ``TeamMember``.
 
         Raises:
             RuntimeError: If no active team session exists.
-            KeyError: If the agent is not a member of the current team.
+            KeyError: If the reference cannot be resolved uniquely.
         """
         if self._session is None:
             raise RuntimeError("No active team session. Call form_team() first.")
-        member = self._session.members.get(agent_name)
-        if member is None:
-            raise KeyError(f"Agent {agent_name!r} is not a member of this team.")
-        return member
+        key = resolve_member_key(self._session.members, ref)
+        return self._session.members[key]
 
     @property
     def session(self) -> TeamSession:
@@ -376,7 +428,11 @@ class TeamCoordinator:
     # Public API
     # ------------------------------------------------------------------
 
-    def restore_session(self, session: TeamSession) -> None:
+    def restore_session(
+        self,
+        session: TeamSession,
+        spawned_pids: dict[str, int] | None = None,
+    ) -> None:
         """Restore a previously persisted session without re-fetching agent cards.
 
         Used by CLI tools that reload session state from disk. Clears any cached
@@ -384,9 +440,14 @@ class TeamCoordinator:
 
         Args:
             session: A ``TeamSession`` previously obtained from ``form_team``.
+            spawned_pids: Optional mapping of agent name to OS PID for
+                subprocesses that were spawned in a previous session.  These
+                are terminated by ``dissolve_team()`` via ``os.kill``.
         """
         self._session = session
         self._clients.clear()
+        if spawned_pids:
+            self._spawned_pids = dict(spawned_pids)
 
     async def form_team(
         self,
@@ -421,17 +482,21 @@ class TeamCoordinator:
 
         members: dict[str, TeamMember] = {}
         for url in agent_urls:
+            # Normalise: ensure trailing slash so the key is stable.
+            if not url.endswith("/"):
+                url = url + "/"
             resolver = A2ACardResolver(httpx_client=http, base_url=url)
             card = await resolver.get_agent_card()
-            # Use the card name as the member key; fall back to URL if blank.
-            member_name = card.name or url
-            members[member_name] = TeamMember(
-                name=member_name,
+            display_name = card.name or url
+            # Key by URL (unique); display_name is the human-readable label.
+            members[url] = TeamMember(
+                name=url,
+                display_name=display_name,
                 url=url,
                 card=card,
                 status=MemberStatus.IDLE,
             )
-            logger.debug("Recruited agent %r from %s", member_name, url)
+            logger.debug("Recruited agent %r (%s) from %s", display_name, url, url)
 
         self._session = TeamSession(
             team_id=team_id,
@@ -485,7 +550,7 @@ class TeamCoordinator:
         self._in_flight.clear()
         self._clients.clear()
 
-        # Terminate all spawned subprocesses.
+        # Terminate all spawned subprocesses (live handles from spawn_agent).
         for agent_name, proc in list(self._spawned.items()):
             try:
                 proc.terminate()
@@ -500,6 +565,24 @@ class TeamCoordinator:
             except ProcessLookupError:
                 logger.debug("Spawned process for %s already exited", agent_name)
         self._spawned.clear()
+
+        # Terminate processes restored from disk (PIDs only, no Process handle).
+        for agent_name, pid in list(self._spawned_pids.items()):
+            try:
+                os.kill(pid, signal.SIGTERM)
+                logger.debug("Terminated restored process %s (pid=%d)", agent_name, pid)
+            except ProcessLookupError:
+                logger.debug(
+                    "Restored process %s (pid=%d) already exited", agent_name, pid
+                )
+            except OSError as exc:
+                logger.warning(
+                    "Failed to terminate restored process %s (pid=%d): %s",
+                    agent_name,
+                    pid,
+                    exc,
+                )
+        self._spawned_pids.clear()
 
         # Mark all members terminated
         for member in self._session.members.values():
@@ -531,39 +614,45 @@ class TeamCoordinator:
         if self._session is None:
             raise RuntimeError("No active team session. Call form_team() first.")
 
-        for name in assignments:
-            self._session_member(name).status = MemberStatus.WORKING
+        # Resolve all refs to canonical keys up-front so _in_flight and status
+        # are always indexed by the canonical key (URL or logical spawn name).
+        resolved: dict[str, str] = {
+            ref: resolve_member_key(self._session.members, ref) for ref in assignments
+        }
+        for key in resolved.values():
+            self._session.members[key].status = MemberStatus.WORKING
 
-        async def _send_one(agent_name: str, text: str) -> tuple[str, Task]:
+        async def _send_one(key: str, text: str) -> tuple[str, Task]:
             """Dispatch a single text task to one agent and return the result.
 
             Args:
-                agent_name: Name of the target team member.
+                key: Canonical member key.
                 text: Task text to send.
 
             Returns:
-                A ``(agent_name, Task)`` tuple for the completed task.
+                A ``(key, Task)`` tuple for the completed task.
             """
             request = self._make_send_request(
                 parts=[Part(root=TextPart(text=text))],
             )
-            task = await self._dispatch_one(agent_name, request)
-            self._in_flight[agent_name] = task.id
-            return agent_name, task
+            task = await self._dispatch_one(key, request)
+            self._in_flight[key] = task.id
+            return key, task
 
         results: dict[str, Task] = {}
-        agent_names = list(assignments.keys())
-        coros = [_send_one(name, text) for name, text in assignments.items()]
+        canonical_keys = list(resolved.values())
+        coros = [_send_one(key, assignments[ref]) for ref, key in resolved.items()]
         outcomes = await asyncio.gather(*coros, return_exceptions=True)
 
         for i, item in enumerate(outcomes):
             if isinstance(item, BaseException):
                 logger.error("dispatch_parallel agent error: %s", item)
-                self._session_member(agent_names[i]).status = MemberStatus.IDLE
+                key = canonical_keys[i]
+                self._session.members[key].status = MemberStatus.IDLE
                 continue
-            agent_name, task = item
-            results[agent_name] = task
-            self._session_member(agent_name).status = MemberStatus.IDLE
+            key, task = item
+            results[key] = task
+            self._session.members[key].status = MemberStatus.IDLE
 
         return results
 
@@ -635,6 +724,15 @@ class TeamCoordinator:
             raise RuntimeError("No active team session. Call form_team() first.")
 
         async def _poll_one_task(agent_name: str, task_id: str) -> tuple[str, Task]:
+            """Poll a single in-flight task until terminal and return it.
+
+            Args:
+                agent_name: Name of the team member that owns the task.
+                task_id: The A2A task ID to poll.
+
+            Returns:
+                A ``(agent_name, Task)`` tuple for the completed task.
+            """
             client = self._get_client(agent_name)
             wait = 0.1
             while True:
@@ -748,11 +846,16 @@ class TeamCoordinator:
         card_url = f"{base_url}/.well-known/agent-card.json"
         http = self._ensure_http_client()
 
-        deadline = asyncio.get_event_loop().time() + 10.0
+        deadline = asyncio.get_running_loop().time() + 10.0
         while True:
             # Check that the subprocess has not exited prematurely.
             if process.returncode is not None:
                 stderr_bytes = await process.stderr.read() if process.stderr else b""
+                logger.error(
+                    "Spawned process for %r exited prematurely with code %s",
+                    name,
+                    process.returncode,
+                )
                 raise RuntimeError(
                     f"Spawned process for {name!r} exited with code "
                     f"{process.returncode}: {stderr_bytes.decode(errors='replace')}"
@@ -764,7 +867,7 @@ class TeamCoordinator:
             except (httpx.ConnectError, httpx.ReadError, httpx.TimeoutException):
                 pass
 
-            if asyncio.get_event_loop().time() >= deadline:
+            if asyncio.get_running_loop().time() >= deadline:
                 process.terminate()
                 raise RuntimeError(
                     f"Agent {name!r} on port {port} did not become reachable "
@@ -777,6 +880,7 @@ class TeamCoordinator:
         card = await resolver.get_agent_card()
         member = TeamMember(
             name=name,
+            display_name=card.name or name,
             url=f"{base_url}/",
             card=card,
             status=MemberStatus.IDLE,

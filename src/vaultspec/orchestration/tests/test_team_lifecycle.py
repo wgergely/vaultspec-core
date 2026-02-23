@@ -133,8 +133,10 @@ async def test_full_lifecycle_with_session_persistence(workspace, mux_transport)
 
     assert session.status == TeamStatus.ACTIVE
     assert len(session.members) == 2
-    assert "alpha" in session.members
-    assert "beta" in session.members
+    # Members are keyed by URL after the M1 URL-keying fix; check display names.
+    member_display_names = {m.display_name for m in session.members.values()}
+    assert "alpha" in member_display_names
+    assert "beta" in member_display_names
 
     # Step 2: Persist session to disk (same path MCP create_team uses)
     _save_session(workspace, session)
@@ -157,10 +159,10 @@ async def test_full_lifecycle_with_session_persistence(workspace, mux_transport)
     async with restored:
         restored._http_client = httpx.AsyncClient(transport=mux_transport)
 
-        # Step 5: Dispatch task to one agent
+        # Step 5: Dispatch task to one agent (result keyed by canonical URL).
         results = await restored.dispatch_parallel({"alpha": "ping from lifecycle"})
-        assert "alpha" in results
-        text = extract_artifact_text(results["alpha"])
+        assert len(results) == 1
+        text = extract_artifact_text(next(iter(results.values())))
         assert "Echo: ping from lifecycle" in text
 
         # Step 6: Dispatch to both agents (broadcast-style)
@@ -226,7 +228,7 @@ def test_unified_server_registers_team_tools():
 
 
 def test_executor_accepts_mcp_servers_config():
-    """ClaudeA2AExecutor can be constructed with mcp_servers for team tools.
+    """ClaudeA2AExecutor stores mcp_servers config correctly on construction.
 
     The executor passes mcp_servers through to ClaudeAgentOptions, allowing
     the Claude subprocess to connect to team tools. This test verifies the
@@ -248,8 +250,9 @@ def test_executor_accepts_mcp_servers_config():
         root_dir="/workspace",
         mode="read-write",
         mcp_servers=team_tools_config,
-        options_factory=lambda **kwargs: kwargs,
-        client_factory=lambda opts: None,
     )
 
     assert executor._mcp_servers == team_tools_config
+    assert executor._model == "claude-sonnet-4-20250514"
+    assert executor._root_dir == "/workspace"
+    assert executor._mode == "read-write"

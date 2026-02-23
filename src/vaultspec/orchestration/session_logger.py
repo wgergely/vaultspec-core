@@ -105,10 +105,15 @@ class SessionLogger:
                 ``"session_start"``, ``"tool_call"``).
             data: Arbitrary JSON-serialisable payload for the event.
         """
-        timestamp = datetime.datetime.now(datetime.UTC).isoformat()
-        log_entry = {"timestamp": timestamp, "type": event_type, "data": data}
-        with self.log_file.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(log_entry) + "\n")
+        try:
+            timestamp = datetime.datetime.now(datetime.UTC).isoformat()
+            log_entry = {"timestamp": timestamp, "type": event_type, "data": data}
+            with self.log_file.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, default=str) + "\n")
+        except Exception as exc:
+            logger.warning(
+                "Failed to write session log event '%s': %s", event_type, exc
+            )
 
 
 def cleanup_old_logs(root_dir: pathlib.Path) -> int:

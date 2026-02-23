@@ -213,6 +213,8 @@ class TestRegisterTools:
 
         for name in ("team_status", "list_teams"):
             tool = tools[name]
+            assert tool.annotations is not None
+            assert hasattr(tool.annotations, "readOnlyHint")
             assert tool.annotations.readOnlyHint is True, (
                 f"{name} should be readOnlyHint=True"
             )
@@ -223,7 +225,10 @@ class TestRegisterTools:
         register_tools(mcp)
         tools = mcp._tool_manager._tools
 
-        assert tools["dissolve_team"].annotations.destructiveHint is True
+        annotations = tools["dissolve_team"].annotations
+        assert annotations is not None
+        assert hasattr(annotations, "destructiveHint")
+        assert annotations.destructiveHint is True
 
 
 # ---------------------------------------------------------------------------
@@ -300,7 +305,9 @@ class TestCreateTeam:
         data = json.loads(result)
         assert data["name"] == "mcp-create-test"
         assert data["status"] == "active"
-        assert "echo-alpha" in data["members"]
+        # Members are now keyed by URL; verify by checking display_name values.
+        display_names = [m["display_name"] for m in data["members"].values()]
+        assert "echo-alpha" in display_names
 
 
 class TestTeamStatus:
@@ -386,7 +393,9 @@ class TestDispatchTask:
                 {"echo-alpha": "hello from test"}
             )
 
-        task_result = results["echo-alpha"]
+        # Results keyed by canonical URL key; get the single result.
+        assert len(results) == 1
+        task_result = next(iter(results.values()))
         assert task_result.status.state.value == "completed"
 
         # Verify the echo text
@@ -506,7 +515,9 @@ class TestSendMessage:
             restored._http_client = httpx.AsyncClient(transport=mux)
             results = await restored.dispatch_parallel({"echo-alpha": "direct message"})
 
-        task = results["echo-alpha"]
+        # Results keyed by canonical URL key.
+        assert len(results) == 1
+        task = next(iter(results.values()))
         assert task.status.state.value == "completed"
 
         from ...orchestration import extract_artifact_text

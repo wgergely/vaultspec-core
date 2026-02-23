@@ -1,9 +1,15 @@
-"""Sub-agent CLI — entry point for running, serving, and listing sub-agents."""
+"""Sub-agent CLI — entry point for running, serving, and listing sub-agents.
+
+Commands:
+    run:       Execute a named sub-agent one-shot or interactively.
+    serve:     Start the subagent MCP server.
+    a2a-serve: Start an A2A HTTP server backed by a Claude or Gemini executor.
+    list:      Print all available agents discovered under the content root.
+"""
 
 import argparse
 import json
 import logging
-import re
 import sys
 from pathlib import Path
 
@@ -72,9 +78,6 @@ def command_run(args):
         if p.exists():
             content = p.read_text(encoding="utf-8")
             task_goal = f"{task_goal}\n\n{content}".strip()
-            match = re.search(r"Agent:\s*([a-zA-Z0-9_-]+)", content)
-            if match and not args.agent:
-                args.agent = match.group(1)
         else:
             logger.error("Task file not found: %s", args.task_file)
             sys.exit(1)
@@ -120,8 +123,8 @@ def command_run(args):
         debug=args.debug,
     )
     if result is not None and result.response_text:
-        print("\n--- Response ---\n")
-        print(result.response_text)
+        args.printer.out("\n--- Response ---\n")
+        args.printer.out(result.response_text)
 
 
 def command_serve(_args):
@@ -158,6 +161,7 @@ def command_a2a_serve(args):
             content_root=content_root,
         )
     except AgentNotFoundError:
+        logger.warning("Agent '%s' not found — starting with stub metadata", agent_name)
         agent_meta = {
             "name": agent_name,
             "description": f"Vaultspec agent: {agent_name}",
@@ -209,8 +213,8 @@ def command_list(args):
     list_available_agents(args.content_root)
 
 
-def main() -> None:
-    """Parse arguments and dispatch to the appropriate subcommand handler."""
+def _make_parser() -> argparse.ArgumentParser:
+    """Build and return the subagent CLI argument parser."""
     parser = argparse.ArgumentParser(description="Sub-agent CLI")
     add_common_args(parser)
     subparsers = parser.add_subparsers(
@@ -341,6 +345,12 @@ def main() -> None:
     list_parser = subparsers.add_parser("list", help="List available agents")
     list_parser.set_defaults(func=command_list)
 
+    return parser
+
+
+def main() -> None:
+    """Parse arguments and dispatch to the appropriate subcommand handler."""
+    parser = _make_parser()
     args = parser.parse_args()
 
     resolve_args_workspace(args, get_default_layout())

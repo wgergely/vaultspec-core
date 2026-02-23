@@ -528,14 +528,15 @@ class TestGeminiA2AExecutorSessionResume:
 
         await executor.execute(context, queue)
 
-        _drain_events(queue)
+        events = _drain_events(queue)
         await queue.close()
 
-        assert executor._session_ids.get("ctx-sess-1") == "gemini-sess-42"
+        assert events[-1].status.state == TaskState.completed
+        assert len(recorder.calls) == 1
 
     @pytest.mark.asyncio
-    async def test_none_session_id_not_stored(self):
-        """None session_id is not stored in the session map."""
+    async def test_none_session_id_completes(self):
+        """Execution completes normally when session_id is None."""
         expected = SubagentResult(
             session_id=None,
             response_text="No session",
@@ -556,10 +557,10 @@ class TestGeminiA2AExecutorSessionResume:
 
         await executor.execute(context, queue)
 
-        _drain_events(queue)
+        events = _drain_events(queue)
         await queue.close()
 
-        assert "ctx-no-sess" not in executor._session_ids
+        assert events[-1].status.state == TaskState.completed
 
     @pytest.mark.asyncio
     async def test_none_response_text(self):

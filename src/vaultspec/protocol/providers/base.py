@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import abc
+import logging
 from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
     import pathlib
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "AgentProvider",
@@ -42,7 +45,7 @@ class ClaudeModels:
     """
 
     HIGH = "claude-opus-4-6"
-    MEDIUM = "claude-sonnet-4-5"
+    MEDIUM = "claude-sonnet-4-6"
     LOW = "claude-haiku-4-5"
 
     ALL: ClassVar[list[str]] = [HIGH, MEDIUM, LOW]
@@ -160,6 +163,10 @@ def resolve_includes(
                 include_path = candidate
 
         if include_path is None:
+            logger.warning(
+                "Include resolution failed: %s — path not found",
+                include_path_str,
+            )
             resolved_lines.append(
                 f"<!-- ERROR: Missing include: {include_path_str} -->"
             )
@@ -167,6 +174,10 @@ def resolve_includes(
 
         try:
             if not include_path.is_relative_to(resolved_root):
+                logger.warning(
+                    "Include resolution failed: %s — path outside workspace",
+                    include_path_str,
+                )
                 resolved_lines.append(
                     f"<!-- ERROR: Path outside workspace: {include_path_str} -->"
                 )
@@ -182,6 +193,7 @@ def resolve_includes(
             )
             resolved_lines.append(f"\n<!-- End of {display_path} -->\n")
         except Exception as e:
+            logger.warning("Include resolution failed: %s — %s", include_path_str, e)
             resolved_lines.append(f"<!-- ERROR: Include failed: {e} -->")
 
     return "\n".join(resolved_lines)
@@ -190,7 +202,7 @@ def resolve_includes(
 def resolve_executable(name: str, which_fn=None) -> tuple[str, list[str]]:
     """Resolve an executable name, handling Windows .cmd/.bat wrappers.
 
-    On Windows, tools installed via npm/pip often appear as .cmd batch
+    On Windows, tools installed via npm/uv often appear as .cmd batch
     scripts that cannot be directly launched by subprocess or
     asyncio.create_subprocess_exec. This function wraps them with
     ``cmd.exe /c`` so they execute correctly.
@@ -316,8 +328,13 @@ class AgentProvider(abc.ABC):
                 resolved = (root_dir / d).resolve()
                 if resolved.is_relative_to(root_dir.resolve()):
                     validated.append(d)
-            except (ValueError, OSError):
-                pass
+                else:
+                    logger.warning(
+                        "include_dirs path '%s' rejected: outside workspace root",
+                        d,
+                    )
+            except (ValueError, OSError) as exc:
+                logger.warning("include_dirs path '%s' rejected: %s", d, exc)
         return validated
 
     @abc.abstractmethod

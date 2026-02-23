@@ -22,13 +22,11 @@ import json
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
-
 import pytest
 from mcp.client.session import ClientSession
 from mcp.server.fastmcp import FastMCP
 from mcp.shared.memory import create_connected_server_and_client_session
+from mcp.types import TextContent, TextResourceContents
 
 from tests.constants import PROJECT_ROOT, TEST_PROJECT
 
@@ -39,6 +37,9 @@ from ..subagent_tools import initialize_server
 from ..subagent_tools import register_tools as register_subagent_tools
 from ..team_tools import register_tools as register_team_tools
 from ..team_tools import set_root_dir
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 pytestmark = [pytest.mark.api]
 
@@ -301,8 +302,9 @@ class TestResourceDiscovery:
             read_result = await session.read_resource(uri)
             assert read_result.contents, "read_resource returned empty contents"
 
-            text = read_result.contents[0].text
-            data = json.loads(text)
+            content_item = read_result.contents[0]
+            assert isinstance(content_item, TextResourceContents)
+            data = json.loads(content_item.text)
             assert "name" in data, "Agent resource JSON missing 'name' field"
 
 
@@ -321,7 +323,9 @@ class TestSubagentToolsRoundTrip:
 
             result = await session.call_tool("list_agents", {})
             assert result.isError is not True
-            data = json.loads(result.content[0].text)
+            content = result.content[0]
+            assert isinstance(content, TextContent)
+            data = json.loads(content.text)
             assert len(data["agents"]) == 1
             assert data["agents"][0]["name"] == "vaultspec-simple-executor"
 
@@ -340,7 +344,9 @@ class TestSubagentToolsRoundTrip:
                 {"agent": "vaultspec-simple-executor", "task": "Bake baguettes"},
             )
             assert result.isError is not True
-            data = json.loads(result.content[0].text)
+            content = result.content[0]
+            assert isinstance(content, TextContent)
+            data = json.loads(content.text)
             assert data["status"] == "working"
             assert data["agent"] == "vaultspec-simple-executor"
             assert "taskId" in data
@@ -360,7 +366,9 @@ class TestSubagentToolsRoundTrip:
                 {"task_id": "proto-cs-001"},
             )
             assert result.isError is not True
-            data = json.loads(result.content[0].text)
+            content = result.content[0]
+            assert isinstance(content, TextContent)
+            data = json.loads(content.text)
             assert data["status"] == "working"
             assert data["taskId"] == "proto-cs-001"
 
@@ -379,7 +387,9 @@ class TestSubagentToolsRoundTrip:
                 {"task_id": "proto-cs-002"},
             )
             assert result.isError is not True
-            data = json.loads(result.content[0].text)
+            content = result.content[0]
+            assert isinstance(content, TextContent)
+            data = json.loads(content.text)
             assert data["status"] == "cancelled"
 
     async def test_get_locks_via_protocol(self):
@@ -391,7 +401,9 @@ class TestSubagentToolsRoundTrip:
             # Empty locks
             result = await session.call_tool("get_locks", {})
             assert result.isError is not True
-            data = json.loads(result.content[0].text)
+            content = result.content[0]
+            assert isinstance(content, TextContent)
+            data = json.loads(content.text)
             assert data["locks"] == []
             assert data["count"] == 0
 
@@ -408,7 +420,9 @@ class TestSubagentToolsRoundTrip:
 
             result = await session.call_tool("get_locks", {})
             assert result.isError is not True
-            data = json.loads(result.content[0].text)
+            content = result.content[0]
+            assert isinstance(content, TextContent)
+            data = json.loads(content.text)
             assert data["count"] == 1
             assert data["locks"][0]["agent"] == "vaultspec-simple-executor"
 
@@ -435,7 +449,9 @@ class TestErrorPropagation:
                 {"agent": "phantom-baker", "task": "Bake nothing"},
             )
             assert result.isError is True
-            assert "not found" in result.content[0].text.lower()
+            content = result.content[0]
+            assert isinstance(content, TextContent)
+            assert "not found" in content.text.lower()
 
     async def test_get_status_missing_task_returns_error(self):
         """Polling a nonexistent task returns isError."""
@@ -448,7 +464,9 @@ class TestErrorPropagation:
                 {"task_id": "nonexistent-task"},
             )
             assert result.isError is True
-            assert "not found" in result.content[0].text.lower()
+            content = result.content[0]
+            assert isinstance(content, TextContent)
+            assert "not found" in content.text.lower()
 
     async def test_cancel_missing_task_returns_error(self):
         """Cancelling a nonexistent task returns isError."""

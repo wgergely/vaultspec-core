@@ -371,8 +371,11 @@ class TestGetToolCallContent:
 class TestGeminiBridgeLifecycle:
     async def test_initialize(self, bridge: GeminiACPBridge) -> None:
         res = await bridge.initialize(protocol_version=1)
+        assert res.agent_info is not None
         assert res.agent_info.name == "gemini-acp-bridge"
+        assert res.agent_capabilities is not None
         assert res.agent_capabilities.load_session is True
+        assert res.agent_capabilities.session_capabilities is not None
         assert res.agent_capabilities.session_capabilities.fork is not None
         assert res.agent_capabilities.session_capabilities.list is not None
         assert res.agent_capabilities.session_capabilities.resume is not None
@@ -382,7 +385,9 @@ class TestGeminiBridgeLifecycle:
         bridge: GeminiACPBridge,
     ) -> None:
         res = await bridge.initialize(protocol_version=1)
+        assert res.agent_capabilities is not None
         caps = res.agent_capabilities.prompt_capabilities
+        assert caps is not None
         assert caps.image is True
         assert caps.audio is True
         assert caps.embedded_context is True
@@ -406,6 +411,7 @@ class TestGeminiBridgeLifecycle:
             protocol_version=1,
             extra_field="ignored",
         )
+        assert res.agent_info is not None
         assert res.agent_info.name == "gemini-acp-bridge"
 
     async def test_on_connect_stores_connection(
@@ -1507,59 +1513,6 @@ class TestGeminiBridgeSessionManagement:
         assert "gemini-2.5-pro" in args
         assert "--sandbox" in args
 
-    async def test_resume_session(
-        self,
-        bridge: GeminiACPBridge,
-        conn: ConnRecorder,
-    ) -> None:
-        bridge.on_connect(conn)
-        res = await bridge.new_session(cwd="/tmp")
-
-        resume_res = await bridge.resume_session(
-            cwd="/tmp",
-            session_id=res.session_id,
-        )
-        assert resume_res is not None
-
-    async def test_resume_session_unknown_returns_response(
-        self,
-        bridge: GeminiACPBridge,
-        conn: ConnRecorder,
-    ) -> None:
-        """resume_session on unknown session_id creates recovery and returns."""
-        from acp.schema import ResumeSessionResponse
-
-        bridge.on_connect(conn)
-        result = await bridge.resume_session(
-            cwd="/tmp",
-            session_id="unknown-resume-id",
-        )
-        assert isinstance(result, ResumeSessionResponse)
-        # load_session creates a recovery session for unknown IDs
-        assert "unknown-resume-id" in bridge._sessions
-
-    async def test_resume_session_delegates_to_load(
-        self,
-        bridge: GeminiACPBridge,
-        conn: ConnRecorder,
-    ) -> None:
-        """resume_session delegates to load_session internally."""
-        bridge.on_connect(conn)
-        res = await bridge.new_session(cwd="/tmp")
-        session_id = res.session_id
-
-        # Simulate child death
-        bridge._sessions[session_id].child_proc.returncode = 1
-        original_conn = bridge._sessions[session_id].child_conn
-
-        resume_res = await bridge.resume_session(
-            cwd="/tmp",
-            session_id=session_id,
-        )
-        assert resume_res is not None
-        # Should have respawned
-        assert bridge._sessions[session_id].child_conn is not original_conn
-
     async def test_set_session_mode(
         self,
         bridge: GeminiACPBridge,
@@ -1574,18 +1527,19 @@ class TestGeminiBridgeSessionManagement:
         )
 
         assert bridge._sessions[res.session_id].mode == "read-only"
-        assert bridge._mode == "read-only"
+        assert bridge._mode != "read-only"
 
     async def test_set_session_mode_no_session(
         self,
         bridge: GeminiACPBridge,
     ) -> None:
-        """set_session_mode works without a session, updates bridge-level."""
+        """set_session_mode with unknown session_id is a no-op."""
+        original_mode = bridge._mode
         await bridge.set_session_mode(
             mode_id="read-only",
             session_id="nonexistent",
         )
-        assert bridge._mode == "read-only"
+        assert bridge._mode == original_mode
 
     async def test_set_session_model(
         self,
@@ -1601,18 +1555,19 @@ class TestGeminiBridgeSessionManagement:
         )
 
         assert bridge._sessions[res.session_id].model == "gemini-2.5-pro"
-        assert bridge._model == "gemini-2.5-pro"
+        assert bridge._model != "gemini-2.5-pro"
 
     async def test_set_session_model_no_session(
         self,
         bridge: GeminiACPBridge,
     ) -> None:
-        """set_session_model works without a session, updates bridge-level."""
+        """set_session_model with unknown session_id is a no-op."""
+        original_model = bridge._model
         await bridge.set_session_model(
             model_id="gemini-2.5-pro",
             session_id="nonexistent",
         )
-        assert bridge._model == "gemini-2.5-pro"
+        assert bridge._model == original_model
 
     async def test_set_config_option_noop(
         self,
@@ -2150,6 +2105,7 @@ class TestHandshakeTimeout:
         res = await bridge.new_session(cwd="/tmp")
         assert res.session_id in bridge._sessions
 
-    def test_timeout_constant_value(self) -> None:
-        """Sanity check that the default timeout constant is 30 seconds."""
-        assert _ACP_HANDSHAKE_TIMEOUT == 30.0
+
+def test_handshake_timeout_constant_value() -> None:
+    """Sanity check that the default timeout constant is 30 seconds."""
+    assert _ACP_HANDSHAKE_TIMEOUT == 30.0

@@ -329,16 +329,18 @@ async def test_dispatch_parallel_partial_failure():
             capabilities=AgentCapabilities(streaming=False),
             skills=[AgentSkill(id="x", name="X", description="X", tags=[])],
         )
-        session.members["bad-agent"] = TeamMember(
-            name="bad-agent",
-            url="http://localhost:19931/",
+        bad_url = "http://localhost:19931/"
+        session.members[bad_url] = TeamMember(
+            name=bad_url,
+            display_name="bad-agent",
+            url=bad_url,
             card=bad_card,
             status=MemberStatus.IDLE,
         )
 
         assignments = {
             good_agent: "good task",
-            "bad-agent": "bad task",
+            bad_url: "bad task",
         }
         results = await coordinator.dispatch_parallel(assignments)
 
@@ -395,15 +397,17 @@ async def test_ping_agents_unreachable_returns_false():
             capabilities=AgentCapabilities(streaming=False),
             skills=[AgentSkill(id="x", name="X", description="X", tags=[])],
         )
-        session.members["ghost-agent"] = TeamMember(
-            name="ghost-agent",
-            url="http://localhost:19942/",
+        ghost_url = "http://localhost:19942/"
+        session.members[ghost_url] = TeamMember(
+            name=ghost_url,
+            display_name="ghost-agent",
+            url=ghost_url,
             card=ghost_card,
             status=MemberStatus.IDLE,
         )
 
         reachability = await coordinator.ping_agents()
-        assert reachability.get("ghost-agent") is False, (
+        assert reachability.get(ghost_url) is False, (
             "Expected ghost-agent to be unreachable"
         )
     finally:
@@ -438,13 +442,19 @@ async def test_dispatch_parallel_degrades_gracefully_on_failure():
         name="degrade-team",
     )
     try:
+        from ..team import resolve_member_key
+
+        session = coordinator.session
+        fast_key = resolve_member_key(session.members, "echo-fast")
+        broken_key = resolve_member_key(session.members, "broken-agent")
+
         results = await coordinator.dispatch_parallel(
-            {"echo-fast": "quick task", "broken-agent": "this will fail"}
+            {fast_key: "quick task", broken_key: "this will fail"}
         )
-        assert "echo-fast" in results, "fast agent must appear in results"
-        assert "broken-agent" not in results, "failed agent must be omitted"
+        assert fast_key in results, "fast agent must appear in results"
+        assert broken_key not in results, "failed agent must be omitted"
         # Failed member must NOT be stuck at WORKING — status must be reset to IDLE
-        assert coordinator.session.members["broken-agent"].status == MemberStatus.IDLE
+        assert coordinator.session.members[broken_key].status == MemberStatus.IDLE
     finally:
         await coordinator.dissolve_team()
 

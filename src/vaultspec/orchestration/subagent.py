@@ -7,6 +7,7 @@ import contextlib
 import gc
 import logging
 import sys
+import uuid
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -36,11 +37,11 @@ __all__ = [
 ]
 
 from ..protocol.acp import (
-    SessionLogger,
     SubagentClient,
     SubagentError,
     SubagentResult,
 )
+from ..protocol.acp.client import SessionLogger as _AcpSessionLogger
 from ..protocol.providers import ClaudeProvider, GeminiProvider
 
 logger = logging.getLogger(__name__)
@@ -52,9 +53,14 @@ _CLAUDE_PATTERNS = ("claude-",)
 
 
 def list_available_agents(content_root: pathlib.Path) -> None:
+    """Print all agent names found under ``content_root/rules/agents/``.
+
+    Args:
+        content_root: Root directory of the vaultspec framework content tree.
+    """
     agents_dir = content_root / "rules" / "agents"
     if not agents_dir.exists():
-        logger.error("No agents found.")
+        logger.warning("No agents directory found at %s", agents_dir)
         return
 
     print(f"Agents in {agents_dir}:")
@@ -82,12 +88,14 @@ def _kill_process_tree(pid: int) -> None:
         return
     import subprocess
 
-    with contextlib.suppress(Exception):
+    try:
         subprocess.run(
             ["taskkill", "/F", "/T", "/PID", str(pid)],
             capture_output=True,
             timeout=5,
         )
+    except Exception as exc:
+        logger.debug("Process tree kill for PID %s failed: %s", pid, exc)
 
 
 class AgentNotFoundError(Exception):
@@ -176,6 +184,7 @@ def get_provider_for_model(model_name: str | None) -> AgentProvider:
         return GeminiProvider()
 
     # Fallback: default to Gemini
+    logger.warning("Unrecognised model '%s', defaulting to GeminiProvider", model_name)
     return GeminiProvider()
 
 
@@ -225,7 +234,7 @@ async def _interactive_loop(
     debug: bool,
     interactive: bool,
     proc: asyncio.subprocess.Process,
-    logger_instance: SessionLogger | None,
+    logger_instance: Any,
 ) -> None:
     """Run a conversation loop with the agent, optionally accepting stdin input.
 
@@ -255,7 +264,7 @@ async def _interactive_loop(
             prompt_blocks = [TextContentBlock(type="text", text=current_prompt)]
             res = await conn.prompt(prompt=prompt_blocks, session_id=session_id)
             if debug:
-                logger.debug(f"Agent Response: {res}")
+                logger.debug("Agent Response: %s", res)
 
         if not interactive:
             break
@@ -263,7 +272,7 @@ async def _interactive_loop(
         # Check if process is still alive
         if proc.returncode is not None:
             if debug:
-                logger.debug(f"Process exited with {proc.returncode}")
+                logger.debug("Process exited with %s", proc.returncode)
             break
 
         try:
@@ -408,8 +417,8 @@ async def run_subagent(
         mode=mode,
     )
     # 4. Spawn and Connect
-    session_id = resume_session_id or str(asyncio.get_running_loop().time())
-    logger_instance = SessionLogger(session_id, root_dir)
+    correlation_id = str(uuid.uuid4())
+    logger_instance = _AcpSessionLogger(correlation_id, root_dir)
 
     client = client_class(
         root_dir=root_dir,
@@ -441,11 +450,12 @@ async def run_subagent(
                             line = await proc.stderr.readline()
                             if not line:
                                 break
-                            if debug:
-                                with contextlib.suppress(Exception):
-                                    logger.debug(
-                                        f"[AGENT-STDERR] {line.decode().strip()}"
-                                    )
+                            with contextlib.suppress(Exception):
+                                text = line.decode().strip()
+                                if debug:
+                                    logger.debug("[AGENT-STDERR] %s", text)
+                                else:
+                                    logger.warning("[AGENT-STDERR] %s", text)
 
             # Main Execution Block
             async with spawn_agent_process(
@@ -486,7 +496,7 @@ async def run_subagent(
                         "— the agent process may be stuck on authentication "
                         "or unresponsive"
                     ) from None
-                logger.debug(f"Handshake Result: {init_res}")
+                logger.debug("Handshake Result: %s", init_res)
 
                 # Session setup
                 # Note: We pass MCP servers if supported by the provider/spec
@@ -565,6 +575,11 @@ async def run_subagent(
                 # Windows: kill the entire bridge process tree so node.exe
                 # children (spawned by claude-agent-sdk) don't become orphans.
                 _kill_process_tree(_proc.pid)
+                try:
+                    await asyncio.wait_for(_proc.wait(), timeout=5.0)
+                except TimeoutError:
+                    _proc.kill()
+                    await _proc.wait()
 
                 t.cancel()
                 with contextlib.suppress(asyncio.CancelledError):

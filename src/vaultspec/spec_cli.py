@@ -1,10 +1,25 @@
 """Primary vaultspec CLI — resource management for rules, agents, skills, configs, and
-system prompts."""
+system prompts.
+
+Commands:
+    rules:    List, add, show, edit, remove, rename, and sync rules.
+    agents:   List, add, show, edit, remove, rename, sync, and set-tier agents.
+    skills:   List, add, show, edit, remove, rename, and sync skills.
+    config:   Show or sync tool configuration files (CLAUDE.md, GEMINI.md).
+    system:   Show or sync system prompt fragments.
+    sync-all: Sync rules, agents, skills, system prompts, and configs in one pass.
+    test:     Run the vaultspec test suite (unit, api, search, index, quality).
+    doctor:   Check prerequisites and overall system health.
+    init:     Scaffold the .vaultspec/ directory structure in a project.
+    readiness: Assess codebase governance readiness.
+    hooks:    List or trigger event-driven hooks.
+"""
 
 from __future__ import annotations
 
 import argparse
 import logging
+import sys
 
 from .cli_common import (
     add_common_args,
@@ -12,6 +27,7 @@ from .cli_common import (
     resolve_args_workspace,
     setup_logging,
 )
+from .config import WorkspaceError as _WorkspaceError
 from .core import (
     agents_add,
     agents_list,
@@ -45,8 +61,12 @@ from .core.commands import (
 
 logger = logging.getLogger(__name__)
 
-_default_layout = get_default_layout()
-init_paths(_default_layout)
+try:
+    _default_layout = get_default_layout()
+    init_paths(_default_layout)
+except _WorkspaceError as _e:
+    logger.error("%s", _e)
+    sys.exit(1)
 
 
 def add_sync_flags(parser: argparse.ArgumentParser) -> None:
@@ -59,8 +79,8 @@ def add_sync_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--dry-run", action="store_true", help="Preview changes")
 
 
-def main() -> None:
-    """Parse CLI arguments and dispatch to the appropriate resource command handler."""
+def _make_parser() -> argparse.ArgumentParser:
+    """Build and return the spec CLI argument parser."""
     parser = argparse.ArgumentParser(
         description="Manage rules, agents, and skills across tool destinations.",
         prog="vaultspec",
@@ -225,7 +245,16 @@ def main() -> None:
     test_parser.add_argument(
         "--module",
         "-m",
-        choices=["cli", "rag", "vault", "protocol", "orchestration", "subagent"],
+        choices=[
+            "cli",
+            "rag",
+            "vault",
+            "protocol",
+            "orchestration",
+            "subagent",
+            "core",
+            "mcp_tools",
+        ],
         help="Filter by module",
     )
     test_parser.add_argument("extra_args", nargs="*", help="Extra pytest arguments")
@@ -257,6 +286,13 @@ def main() -> None:
     hooks_run_parser.add_argument("event", help="Event name")
     hooks_run_parser.add_argument("--path", help="Context path variable")
 
+    return parser
+
+
+def main() -> None:
+    """Parse CLI arguments and dispatch to the appropriate resource command handler."""
+    parser = _make_parser()
+
     args = parser.parse_args()
 
     setup_logging(args)
@@ -281,7 +317,7 @@ def main() -> None:
         elif args.command == "sync":
             rules_sync(args)
         else:
-            rules_parser.print_help()
+            parser.print_help()
     elif args.resource == "agents":
         if args.command == "list":
             agents_list(args)
@@ -300,7 +336,7 @@ def main() -> None:
         elif args.command == "set-tier":
             agents_set_tier(args)
         else:
-            agents_parser.print_help()
+            parser.print_help()
     elif args.resource == "skills":
         if args.command == "list":
             skills_list(args)
@@ -317,21 +353,21 @@ def main() -> None:
         elif args.command == "sync":
             skills_sync(args)
         else:
-            skills_parser.print_help()
+            parser.print_help()
     elif args.resource == "config":
         if args.command == "show":
             config_show(args)
         elif args.command == "sync":
             config_sync(args)
         else:
-            config_parser.print_help()
+            parser.print_help()
     elif args.resource == "system":
         if args.command == "show":
             system_show(args)
         elif args.command == "sync":
             system_sync(args)
         else:
-            system_parser.print_help()
+            parser.print_help()
     elif args.resource == "test":
         test_run(args)
     elif args.resource == "sync-all":
@@ -341,6 +377,13 @@ def main() -> None:
         skills_sync(args)
         system_sync(args)
         config_sync(args)
+
+        from .hooks import fire_hooks
+
+        fire_hooks(
+            "config.synced",
+            {"root": str(_t.ROOT_DIR), "event": "config.synced"},
+        )
         logger.info("Done.")
     elif args.resource == "doctor":
         doctor_run(args)
@@ -354,6 +397,10 @@ def main() -> None:
         elif args.command == "run":
             hooks_run(args)
         else:
-            hooks_parser.print_help()
+            parser.print_help()
     else:
         parser.print_help()
+
+
+if __name__ == "__main__":
+    main()

@@ -16,6 +16,7 @@ Future phases will add:
 from __future__ import annotations
 
 import asyncio
+import logging
 import sys
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
@@ -33,6 +34,8 @@ from .subagent_tools import (
 )
 from .team_tools import register_tools as register_team_tools
 from .team_tools import set_root_dir as set_team_root_dir
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -86,8 +89,10 @@ def main() -> None:
     unified MCP server over stdio transport.
     """
     from ..config import get_config
+    from ..logging_config import configure_logging
     from .subagent_tools import initialize_server
 
+    configure_logging()  # Routes to stderr only; safe for MCP stdio transport
     cfg = get_config()
 
     root_dir = cfg.mcp_root_dir
@@ -97,6 +102,7 @@ def main() -> None:
             "or the config to provide a root directory."
         )
 
+    logger.info("Starting vaultspec-mcp server root=%s", root_dir)
     initialize_server(
         root_dir=root_dir,
         ttl_seconds=cfg.mcp_ttl_seconds,

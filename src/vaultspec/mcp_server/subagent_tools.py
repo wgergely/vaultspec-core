@@ -380,12 +380,10 @@ def _snapshot_mtimes() -> dict[str, float]:
 
 
 def _has_changes() -> bool:
-    """Return True if any agent file has been added, removed, or modified since last
-    snapshot.
-
+    """Return True if any agent file changed since last snapshot.
 
     Returns:
-        ``True`` if the current agent file set differs from the last snapshot,
+        ``True`` if the agent file set differs from the snapshot,
         ``False`` if nothing has changed.
     """
     current = _snapshot_mtimes()
@@ -479,8 +477,7 @@ def _refresh_if_changed() -> bool:
 
 
 async def _send_list_changed() -> None:
-    """Send a ``resources/list_changed`` notification to the active MCP session if one
-    exists."""
+    """Send ``resources/list_changed`` to the active session."""
     if _mcp_ref is None:
         return
     try:
@@ -546,12 +543,10 @@ async def dispatch_agent(
     output_format: str | None = None,
     resume_session_id: str | None = None,
 ) -> str:
-    """Run a sub-agent asynchronously to perform a task and return immediately with a
-    task ID.
+    """Run a sub-agent asynchronously and return a task ID.
 
-
-    Optional overrides (``max_turns``, ``budget``, ``effort``, ``output_format``)
-    take precedence over the agent's YAML-defined defaults.
+    Optional overrides (``max_turns``, ``budget``, ``effort``,
+    ``output_format``) take precedence over the agent's defaults.
 
     Args:
         agent: Name of the agent to dispatch (must appear in the agent cache).
@@ -632,7 +627,13 @@ async def dispatch_agent(
                     p = ROOT_DIR / task
                     if p.exists() and p.is_file():
                         task_content = safe_read_text(p, ROOT_DIR)
-                except Exception:
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to resolve task file %s: %s",
+                        task,
+                        exc,
+                        exc_info=True,
+                    )
                     pass
 
             full_task = _inject_permission_prompt(task_content, effective_mode)
@@ -685,6 +686,7 @@ async def dispatch_agent(
             task_engine.cancel_task(task_id)
             raise
         except SubagentError as e:
+            logger.error("Subagent failed task_id=%s agent=%s: %s", task_id, agent, e)
             task_engine.fail_task(task_id, str(e))
         except Exception as e:
             logger.exception("Unexpected error in background subagent")

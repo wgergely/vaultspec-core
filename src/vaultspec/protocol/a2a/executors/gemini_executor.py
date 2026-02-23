@@ -125,8 +125,6 @@ class GeminiA2AExecutor(AgentExecutor):
         self._running_tasks: dict[str, asyncio.Task] = {}
         self._cancel_events: dict[str, asyncio.Event] = {}
         self._tasks_lock = asyncio.Lock()
-        self._session_ids: dict[str, str] = {}
-        self._session_ids_lock = asyncio.Lock()
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         """Execute an A2A task by delegating to the Gemini subagent.
@@ -170,16 +168,12 @@ class GeminiA2AExecutor(AgentExecutor):
                     "Running subagent for task %s (attempt %d)", task_id, attempt
                 )
 
-                async with self._session_ids_lock:
-                    prev_session = self._session_ids.get(context_id)
-
                 subagent_task = asyncio.create_task(
                     self._run_subagent(
                         agent_name=self._agent_name,
                         root_dir=self._root_dir,
                         initial_task=prompt,
                         model_override=self._model,
-                        resume_session_id=prev_session,
                     )
                 )
                 async with self._tasks_lock:
@@ -197,15 +191,11 @@ class GeminiA2AExecutor(AgentExecutor):
                     return
                 except Exception as exc:
                     if not _is_retryable(exc) or attempt >= self._max_retries:
-                        if attempt >= self._max_retries:
-                            logger.error(
-                                "GeminiA2AExecutor exhausted %d retries for task %s",
-                                self._max_retries,
-                                task_id,
-                            )
                         logger.error(
-                            "GeminiA2AExecutor error for task %s",
+                            "GeminiA2AExecutor error for task %s (attempt %d/%d)",
                             task_id,
+                            attempt,
+                            self._max_retries,
                             exc_info=True,
                         )
                         await updater.failed(
@@ -260,10 +250,6 @@ class GeminiA2AExecutor(AgentExecutor):
                         self._running_tasks.pop(task_id, None)
 
                 # Success path.
-                if result.session_id:
-                    async with self._session_ids_lock:
-                        self._session_ids[context_id] = result.session_id
-
                 text = result.response_text or ""
                 if text:
                     logger.debug("Got response for task %s, adding artifact", task_id)

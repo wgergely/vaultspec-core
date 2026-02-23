@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import contextlib
 import dataclasses
 import datetime
 import logging
@@ -876,8 +875,7 @@ class ClaudeACPBridge(Agent):
                 break
 
             if not result_seen:
-                if self._debug:
-                    logger.debug("Stream ended without ResultMessage")
+                logger.warning("Stream ended without ResultMessage")
                 break
 
         return PromptResponse(stop_reason=stop_reason)
@@ -1058,8 +1056,7 @@ class ClaudeACPBridge(Agent):
         _ = kwargs
         state = self._sessions.get(session_id)
         if state is None:
-            if self._debug:
-                logger.debug("resume_session(%s) — not found", session_id)
+            logger.warning("resume_session(%s) — session not found", session_id)
             return ResumeSessionResponse()
 
         # Disconnect current session if active
@@ -1286,8 +1283,10 @@ class ClaudeACPBridge(Agent):
         """Close all active sessions and disconnect SDK clients."""
         for state in list(self._sessions.values()):
             if state.sdk_client:
-                with contextlib.suppress(Exception):
+                try:
                     await state.sdk_client.disconnect()
+                except Exception as exc:
+                    logger.debug("SDK client disconnect failed: %s", exc)
         self._sessions.clear()
 
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:

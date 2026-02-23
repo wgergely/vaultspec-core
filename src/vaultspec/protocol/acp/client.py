@@ -461,6 +461,8 @@ class SubagentClient(Client):
                     terminal.total_bytes += len(chunk)
             except asyncio.CancelledError:
                 raise
+            except Exception as exc:
+                logger.warning("Terminal reader error: %s", exc)
 
         terminal.reader_task = asyncio.create_task(_reader())
         self._terminals[terminal_id] = terminal
@@ -644,8 +646,14 @@ class SubagentClient(Client):
             if terminal.proc.returncode is None:
                 with contextlib.suppress(ProcessLookupError):
                     terminal.proc.kill()
-                with contextlib.suppress(Exception):
+                try:
                     await terminal.proc.wait()
+                except Exception as exc:
+                    logger.debug(
+                        "proc.wait() failed for terminal %s: %s",
+                        terminal_id,
+                        exc,
+                    )
 
     async def graceful_cancel(self) -> None:
         """Send ACP session/cancel notification before termination."""

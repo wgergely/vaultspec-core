@@ -46,7 +46,6 @@ from acp.schema import (
     PlanEntryStatus,
     PromptCapabilities,
     PromptResponse,
-    ResumeSessionResponse,
     SessionCapabilities,
     SessionForkCapabilities,
     SessionInfo,
@@ -678,8 +677,8 @@ class GeminiACPBridge(Agent):
                                 logger.debug("[GEMINI-STDERR] %s", text)
                         else:
                             logger.warning("[GEMINI-STDERR] %s", text)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Stderr reader error: %s", exc)
 
             bg_tasks.append(asyncio.create_task(_read_stderr(proc)))
 
@@ -1113,33 +1112,6 @@ class GeminiACPBridge(Agent):
 
         return LoadSessionResponse()
 
-    # -- Protocol: resume_session -------------------------------------------
-
-    async def resume_session(
-        self,
-        cwd: str,
-        session_id: str,
-        mcp_servers: list[Any] | None = None,
-        **kwargs: Any,
-    ) -> ResumeSessionResponse:
-        """Resume a previously created session.
-
-        Functionally equivalent to ``load_session`` — reconnects the
-        child process if it has exited.
-
-        Args:
-            cwd: Working directory used if a new child process must be spawned.
-            session_id: The bridge-level session ID to resume.
-            mcp_servers: Optional MCP server configurations forwarded to
-                ``load_session``.
-            **kwargs: Additional fields forwarded by the ACP library.
-
-        Returns:
-            A ``ResumeSessionResponse`` (empty acknowledgement).
-        """
-        await self.load_session(cwd, session_id, mcp_servers)
-        return ResumeSessionResponse()
-
     # -- Protocol: list_sessions --------------------------------------------
 
     async def list_sessions(
@@ -1239,7 +1211,6 @@ class GeminiACPBridge(Agent):
         state = self._sessions.get(session_id)
         if state:
             state.mode = mode_id
-        self._mode = mode_id
         if self._debug:
             logger.debug("Session mode changed to: %s", mode_id)
 
@@ -1261,7 +1232,6 @@ class GeminiACPBridge(Agent):
         state = self._sessions.get(session_id)
         if state:
             state.model = model_id
-        self._model = model_id
         if self._debug:
             logger.debug("Session model changed to: %s", model_id)
 
@@ -1361,7 +1331,7 @@ async def main() -> None:
 
     bridge = GeminiACPBridge(model=args.model, debug=args.debug)
     try:
-        await run_agent(bridge)
+        await run_agent(bridge, use_unstable_protocol=True)
     finally:
         await bridge.close()
 

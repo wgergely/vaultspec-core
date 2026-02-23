@@ -12,6 +12,7 @@ import logging
 import os
 import shutil
 import time
+import uuid
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -167,12 +168,18 @@ class ClaudeA2AExecutor(AgentExecutor):
         updater = TaskUpdater(event_queue, task_id, context_id)
         prompt = context.get_user_input()
 
-        await updater.start_work()
-
         cancel_event = asyncio.Event()
         self._cancel_events[task_id] = cancel_event
 
         sandbox_cb = _make_sandbox_callback(self._mode, self._root_dir)
+        # The SDK merges options.env ON TOP of os.environ:
+        #   process_env = {**os.environ, **options.env, "CLAUDE_CODE_ENTRYPOINT": ...}
+        # Simply omitting CLAUDECODE from options.env is not enough — the parent
+        # value from os.environ would survive the merge.  Setting it to "" (empty
+        # string) overrides the parent value; the Claude CLI treats an empty
+        # CLAUDECODE as falsy and allows the subprocess to start normally.
+        sdk_env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+        sdk_env["CLAUDECODE"] = ""  # empty string overrides parent "1" in SDK merge
         kwargs: dict[str, Any] = {
             "model": self._model,
             "cwd": self._root_dir,
@@ -180,6 +187,7 @@ class ClaudeA2AExecutor(AgentExecutor):
             "can_use_tool": sandbox_cb,
             "permission_mode": "bypassPermissions",
             "system_prompt": self._system_prompt,
+            "env": sdk_env,
         }
         if self._cli_path:
             kwargs["cli_path"] = self._cli_path
@@ -196,16 +204,13 @@ class ClaudeA2AExecutor(AgentExecutor):
         async with self._clients_lock:
             self._active_clients[task_id] = sdk_client
 
-        # Build a clean env for the SDK subprocess — strip CLAUDECODE so the
-        # child claude process doesn't refuse to start inside an existing
-        # Claude Code session.  We use a copy to avoid thread-unsafe mutation
-        # of os.environ when multiple executors run concurrently.
-        sdk_env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-        options.env = sdk_env
-
         cancelled = False
         try:
             await sdk_client.connect()
+
+            # Only signal working after the subprocess is confirmed started —
+            # avoids a window where the task appears working but connect failed.
+            await updater.start_work()
 
             attempt = 0
             while True:
@@ -312,8 +317,13 @@ class ClaudeA2AExecutor(AgentExecutor):
             otherwise (task completed, failed, or cancelled).
         """
         await sdk_client.query(prompt)
+        # Fixed artifact_id for this stream: all append=True chunks and the
+        # final last_chunk=True emit share the same ID so the client assembles
+        # them into one artifact object.
+        artifact_id = str(uuid.uuid4())
         collected: list[str] = []
-        last_status_time = 0.0
+        chunk_emitted = False
+        last_chunk_time = 0.0
 
         try:
             async for msg in sdk_client.receive_response():
@@ -321,23 +331,27 @@ class ClaudeA2AExecutor(AgentExecutor):
                     return False
 
                 if isinstance(msg, AssistantMessage):
-                    if msg.error == "rate_limit":
+                    if msg.error and "rate_limit" in str(msg.error).lower():
                         return True
 
+                    new_text = ""
                     for block in msg.content:
                         if isinstance(block, TextBlock):
                             collected.append(block.text)
+                            new_text += block.text
 
-                    # Throttled streaming progress updates.
+                    # Throttled incremental artifact chunks (append=True).
                     now = time.monotonic()
-                    if now - last_status_time >= _STATUS_THROTTLE_SECS and collected:
-                        await updater.update_status(
-                            TaskState.working,
-                            message=updater.new_agent_message(
-                                parts=[Part(root=TextPart(text="".join(collected)))]
-                            ),
+                    if now - last_chunk_time >= _STATUS_THROTTLE_SECS and new_text:
+                        await updater.add_artifact(
+                            parts=[Part(root=TextPart(text=new_text))],
+                            artifact_id=artifact_id,
+                            name="response",
+                            append=chunk_emitted,
+                            last_chunk=False,
                         )
-                        last_status_time = now
+                        chunk_emitted = True
+                        last_chunk_time = now
 
                 elif isinstance(msg, ResultMessage):
                     # Persist session_id for future resume.
@@ -349,7 +363,10 @@ class ClaudeA2AExecutor(AgentExecutor):
                     if text:
                         await updater.add_artifact(
                             parts=[Part(root=TextPart(text=text))],
+                            artifact_id=artifact_id,
                             name="response",
+                            append=chunk_emitted,
+                            last_chunk=True,
                         )
                     if msg.is_error:
                         await updater.failed(
@@ -374,11 +391,15 @@ class ClaudeA2AExecutor(AgentExecutor):
                 return True
 
         # Stream ended without a ResultMessage — fall back to collected text.
+        logger.warning("Task %s: stream ended without ResultMessage", context_id)
         text = "".join(collected)
         if text:
             await updater.add_artifact(
                 parts=[Part(root=TextPart(text=text))],
+                artifact_id=artifact_id,
                 name="response",
+                append=chunk_emitted,
+                last_chunk=True,
             )
             await updater.complete(
                 message=updater.new_agent_message(
@@ -400,16 +421,23 @@ class ClaudeA2AExecutor(AgentExecutor):
         iteration, then interrupts the SDK client without disconnecting it so
         the session can be resumed later.
 
+        Only emits the ``TaskState.canceled`` terminal event when the task is
+        actually in flight (i.e. its cancel_event was registered by execute()).
+        This prevents duplicate terminal-state events when cancel() races with
+        a naturally completing execute().
+
         Args:
             context: The A2A request context carrying the task ID to cancel.
             event_queue: The A2A event queue used to emit the cancelled status.
         """
         task_id = context.task_id or ""
         context_id = context.context_id or ""
-        updater = TaskUpdater(event_queue, task_id, context_id)
 
-        # Signal the streaming loop to break.
+        # Signal the streaming loop to break.  cancel_event is present only
+        # while execute() is in flight — if it's absent the task has already
+        # reached a terminal state and we must not emit a second one.
         cancel_event = self._cancel_events.get(task_id)
+        in_flight = cancel_event is not None
         if cancel_event is not None:
             cancel_event.set()
 
@@ -419,8 +447,10 @@ class ClaudeA2AExecutor(AgentExecutor):
             client = self._active_clients.get(task_id)
         if client is not None:
             try:
-                client.interrupt()
+                await client.interrupt()
             except Exception:
                 logger.exception("Error interrupting SDK client for task %s", task_id)
 
-        await updater.cancel()
+        if in_flight:
+            updater = TaskUpdater(event_queue, task_id, context_id)
+            await updater.cancel()

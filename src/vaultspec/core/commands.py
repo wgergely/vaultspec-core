@@ -86,11 +86,12 @@ def test_run(args: argparse.Namespace) -> None:
     sys.exit(result.returncode)
 
 
-def doctor_run(_args: argparse.Namespace) -> None:
+def doctor_run(args: argparse.Namespace) -> None:
     """Check prerequisites and system health.
 
     Args:
-        _args: Parsed CLI arguments (unused).
+        args: Parsed CLI arguments. Expected attributes: ``printer`` (Printer
+            instance for output).
     """
     import importlib
 
@@ -98,11 +99,11 @@ def doctor_run(_args: argparse.Namespace) -> None:
 
     # Python version
     ver = sys.version_info
-    print(f"Python: {ver.major}.{ver.minor}.{ver.micro}", end="")
+    args.printer.out(f"Python: {ver.major}.{ver.minor}.{ver.micro}", end="")
     if ver >= (3, 13):
-        print(" [OK]")
+        args.printer.out(" [OK]")
     else:
-        print(" [WARN] Python 3.13+ recommended")
+        args.printer.out(" [WARN] Python 3.13+ recommended")
         logger.warning("Python 3.13+ recommended")
         issues.append("Python 3.13+ recommended")
 
@@ -114,14 +115,14 @@ def doctor_run(_args: argparse.Namespace) -> None:
             props = torch.cuda.get_device_properties(0)
             mem = getattr(props, "total_memory", None) or getattr(props, "total_mem", 0)
             mem_gb = mem / (1024**3)
-            print(f"CUDA: {torch.version.cuda} [OK]")
-            print(f"GPU: {props.name} ({mem_gb:.1f} GB) [OK]")
+            args.printer.out(f"CUDA: {torch.version.cuda} [OK]")
+            args.printer.out(f"GPU: {props.name} ({mem_gb:.1f} GB) [OK]")
         else:
-            print("CUDA: Not available [FAIL]")
+            args.printer.out("CUDA: Not available [FAIL]")
             logger.warning("CUDA not available - GPU required")
             issues.append("CUDA not available - GPU required")
     except ImportError:
-        print("PyTorch: Not installed [FAIL]")
+        args.printer.out("PyTorch: Not installed [FAIL]")
         logger.warning("PyTorch not installed")
         issues.append("PyTorch not installed")
 
@@ -134,9 +135,11 @@ def doctor_run(_args: argparse.Namespace) -> None:
     ]:
         try:
             importlib.import_module(pkg)
-            print(f"{pkg}: installed [OK]")
+            args.printer.out(f"{pkg}: installed [OK]")
         except ImportError:
-            print(f"{pkg}: not installed [WARN] (install with uv sync --extra {group})")
+            args.printer.out(
+                f"{pkg}: not installed [WARN] (install with uv sync --extra {group})"
+            )
             logger.warning("%s not installed", pkg)
             issues.append(f"{pkg} not installed")
 
@@ -145,17 +148,19 @@ def doctor_run(_args: argparse.Namespace) -> None:
     if lance_dir.exists():
         size = sum(f.stat().st_size for f in lance_dir.rglob("*") if f.is_file())
         size_mb = size / (1024 * 1024)
-        print(f".lance index: {size_mb:.1f} MB [OK]")
+        args.printer.out(f".lance index: {size_mb:.1f} MB [OK]")
     else:
-        print(".lance index: not built [INFO] (run 'vaultspec vault index' to build)")
+        args.printer.out(
+            ".lance index: not built [INFO] (run 'vaultspec vault index' to build)"
+        )
 
     # Summary
     if issues:
-        print(f"\n{len(issues)} issue(s) found:")
+        args.printer.out(f"\n{len(issues)} issue(s) found:")
         for issue in issues:
-            print(f"  - {issue}")
+            args.printer.out(f"  - {issue}")
     else:
-        print("\nAll checks passed.")
+        args.printer.out("\nAll checks passed.")
 
 
 def init_run(args: argparse.Namespace) -> None:
@@ -228,12 +233,11 @@ def init_run(args: argparse.Namespace) -> None:
         mcp_json.write_text(json.dumps(mcp_config, indent=2) + "\n", encoding="utf-8")
         created.append(str(mcp_json.relative_to(_t.ROOT_DIR)))
 
-    print("Initialized vaultspec structure:")
+    args.printer.out("Initialized vaultspec structure:")
     for path in created:
-        print(f"  {path}")
-        logger.info("  %s", path)
-    logger.info(
-        "Created %d directories/files. Run 'vaultspec sync-all' to sync.", len(created)
+        args.printer.out(f"  {path}")
+    args.printer.out(
+        f"Created {len(created)} directories/files. Run 'vaultspec sync-all' to sync."
     )
 
 
@@ -250,7 +254,6 @@ def readiness_run(args: argparse.Namespace) -> None:
     Returns:
         None. Prints a formatted readiness table (or JSON) to stdout.
     """
-    import json
 
     from vaultspec.config import get_config
     from vaultspec.vaultcore import parse_frontmatter
@@ -556,11 +559,11 @@ def readiness_run(args: argparse.Namespace) -> None:
             "max_total": max_total,
             "recommendations": recommendations,
         }
-        print(json.dumps(result, indent=2))
+        args.printer.out_json(result)
     else:
-        print("vaultspec Readiness Assessment")
-        print("=" * 62)
-        print()
+        args.printer.out("vaultspec Readiness Assessment")
+        args.printer.out("=" * 62)
+        args.printer.out()
 
         def _bar(score: int, max_score: int = 5) -> str:
             """Render a simple ASCII progress bar for a score.
@@ -590,16 +593,16 @@ def readiness_run(args: argparse.Namespace) -> None:
             bar = _bar(int(dim["score"]), int(dim["max"]))
             score_str = f"{dim['score']}/{dim['max']}"
             detail = dim["detail"]
-            print(f"{label:<22} {bar} {score_str:>3}  ({detail})")
+            args.printer.out(f"{label:<22} {bar} {score_str:>3}  ({detail})")
 
-        print()
-        print(f"Overall: {overall:.1f}/5 ({total_score}/{max_total})")
+        args.printer.out()
+        args.printer.out(f"Overall: {overall:.1f}/5 ({total_score}/{max_total})")
 
         if recommendations:
-            print()
-            print("Recommendations:")
+            args.printer.out()
+            args.printer.out("Recommendations:")
             for rec in recommendations:
-                print(f"  - {rec}")
+                args.printer.out(f"  - {rec}")
 
 
 def hooks_list(_args: argparse.Namespace) -> None:
@@ -612,20 +615,21 @@ def hooks_list(_args: argparse.Namespace) -> None:
 
     hooks = load_hooks(_t.HOOKS_DIR)
     if not hooks:
-        logger.info("No hooks defined.")
-        logger.info("  Add .yaml files to %s/", _t.HOOKS_DIR.relative_to(_t.ROOT_DIR))
-        logger.info("\nSupported events: %s", ", ".join(sorted(SUPPORTED_EVENTS)))
+        _args.printer.out("No hooks defined.")
+        rel = _t.HOOKS_DIR.relative_to(_t.ROOT_DIR)
+        _args.printer.out(f"  Add .yaml files to {rel}/")
+        _args.printer.out(f"\nSupported events: {', '.join(sorted(SUPPORTED_EVENTS))}")
         return
 
     for hook in hooks:
         status = "enabled" if hook.enabled else "disabled"
-        print(f"  {hook.name} [{status}]")
-        print(f"    event: {hook.event}")
+        _args.printer.out(f"  {hook.name} [{status}]")
+        _args.printer.out(f"    event: {hook.event}")
         for action in hook.actions:
             if action.action_type == "shell":
-                print(f"    -> shell: {action.command}")
+                _args.printer.out(f"    -> shell: {action.command}")
             elif action.action_type == "agent":
-                print(f"    -> agent: {action.agent_name}")
+                _args.printer.out(f"    -> agent: {action.agent_name}")
 
 
 def hooks_run(args: argparse.Namespace) -> None:
@@ -658,9 +662,9 @@ def hooks_run(args: argparse.Namespace) -> None:
     results = trigger(hooks, event, ctx)
     for r in results:
         icon = "[OK]" if r.success else "[FAIL]"
-        print(f"  {r.hook_name} ({r.action_type}): {icon}")
+        args.printer.out(f"  {r.hook_name} ({r.action_type}): {icon}")
         if r.output:
             for line in r.output.splitlines()[:5]:
-                print(f"    {line}")
+                args.printer.out(f"    {line}")
         if r.error:
-            print(f"    error: {r.error}")
+            args.printer.out(f"    error: {r.error}")

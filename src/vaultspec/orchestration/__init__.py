@@ -22,6 +22,7 @@ from .team import TeamMember as TeamMember
 from .team import TeamSession as TeamSession
 from .team import TeamStatus as TeamStatus
 from .team import extract_artifact_text as extract_artifact_text
+from .team import resolve_member_key as resolve_member_key
 from .team_session import SessionNotFoundError as SessionNotFoundError
 from .team_session import delete_session as delete_session
 from .team_session import load_session as load_session

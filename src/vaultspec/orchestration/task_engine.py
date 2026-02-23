@@ -345,7 +345,7 @@ class TaskEngine:
                 logger.debug(f"Released advisory lock for task {task_id}")
 
     def _cleanup_expired(self) -> None:
-        """Remove tasks that have exceeded their TTL and evict stuck WORKING tasks."""
+        """Remove tasks past their TTL and fail tasks stuck in WORKING state."""
         now = time.monotonic()
         expired = [tid for tid, exp in self._expiry.items() if now >= exp]
         for tid in expired:
@@ -369,7 +369,7 @@ class TaskEngine:
             task.completed_at = now
             self._expiry[tid] = now + self._ttl_seconds
             self._release_lock(tid)
-            logger.warning("Evicted stuck WORKING task %s", tid)
+            logger.warning("Evicted stuck WORKING task %s (agent=%s)", tid, task.agent)
 
     def create_task(
         self,

@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 from a2a.server.events import EventQueue
-from a2a.types import TaskState, TaskStatusUpdateEvent
+from a2a.types import TaskArtifactUpdateEvent, TaskState, TaskStatusUpdateEvent
 from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock
 from claude_agent_sdk._errors import MessageParseError
 
@@ -113,7 +113,7 @@ class _InProcessSDKClient:
         self.disconnect_calls += 1
         return _AwaitableNone()
 
-    def interrupt(self):
+    async def interrupt(self):
         self.interrupt_calls += 1
 
     def receive_messages(self):
@@ -227,10 +227,9 @@ class TestClaudeA2AExecutor:
         await queue.close()
 
         status_events = [e for e in events if isinstance(e, TaskStatusUpdateEvent)]
-        assert len(status_events) >= 2
+        # connect() raises before start_work() — only one terminal event (failed)
+        assert len(status_events) >= 1
 
-        # First: working, then: failed
-        assert status_events[0].status.state == TaskState.working
         last = status_events[-1]
         assert last.status.state == TaskState.failed
         assert last.final is True
@@ -304,7 +303,7 @@ class TestClaudeA2AExecutor:
 
     @pytest.mark.asyncio
     async def test_claude_executor_cancel_no_active_client(self):
-        """Cancel when no active client just sends canceled status."""
+        """Cancel when no in-flight task emits no events (M4 guard)."""
         test_client = _InProcessSDKClient()
 
         executor = _make_executor(client=test_client)
@@ -318,8 +317,9 @@ class TestClaudeA2AExecutor:
         await queue.close()
 
         status_events = [e for e in events if isinstance(e, TaskStatusUpdateEvent)]
-        assert len(status_events) == 1
-        assert status_events[0].status.state == TaskState.canceled
+        # M4 fix: cancel() only emits canceled when execute() is in flight
+        # (cancel_event present). No in-flight task means no terminal event.
+        assert len(status_events) == 0
 
     @pytest.mark.asyncio
     async def test_claude_executor_sandbox_callback(self):
@@ -365,6 +365,45 @@ class TestClaudeA2AExecutor:
         assert _OptionsRecorder.last_call is not None
         assert _OptionsRecorder.last_call.get("can_use_tool") is None, (
             "read-write mode should not apply sandbox callback"
+        )
+
+    @pytest.mark.asyncio
+    async def test_claudecode_env_override(self):
+        """CLAUDECODE is set to '' so SDK merge doesn't inherit it.
+
+        The SDK does ``{**os.environ, **options.env, ...}``.
+        Omitting CLAUDECODE would leave the parent value intact.
+        We set it to empty string so the CLI treats it as falsy.
+        """
+        import os
+
+        test_client = _InProcessSDKClient(
+            messages=[_make_result(result="done", is_error=False)]
+        )
+        executor = _make_executor(client=test_client)
+
+        # Simulate running inside a Claude Code session
+        original = os.environ.get("CLAUDECODE")
+        os.environ["CLAUDECODE"] = "1"
+        try:
+            queue = EventQueue()
+            context = make_request_context("claudecode env test")
+            await executor.execute(context, queue)
+            _drain_events(queue)
+            await queue.close()
+        finally:
+            if original is None:
+                os.environ.pop("CLAUDECODE", None)
+            else:
+                os.environ["CLAUDECODE"] = original
+
+        assert _OptionsRecorder.last_call is not None
+        env = _OptionsRecorder.last_call.get("env", {})
+        assert "CLAUDECODE" in env, (
+            "CLAUDECODE must be present in env to override parent"
+        )
+        assert env["CLAUDECODE"] == "", (
+            "CLAUDECODE must be empty string to suppress nested-session check"
         )
 
     # ------------------------------------------------------------------
@@ -506,7 +545,7 @@ class TestClaudeA2AExecutor:
 
     @pytest.mark.asyncio
     async def test_streaming_progress_events(self):
-        """Intermediate status updates are emitted between working and completed."""
+        """Incremental artifact chunks are emitted between working and completed."""
         test_client = _InProcessSDKClient(
             messages=[
                 AssistantMessage(
@@ -532,17 +571,24 @@ class TestClaudeA2AExecutor:
         await queue.close()
 
         status_events = [e for e in events if isinstance(e, TaskStatusUpdateEvent)]
+        artifact_events = [e for e in events if isinstance(e, TaskArtifactUpdateEvent)]
 
-        # At minimum: working, then at least one progress update, then completed
-        assert len(status_events) >= 3
+        # Status: working then completed
+        assert len(status_events) >= 2
         assert status_events[0].status.state == TaskState.working
-
-        # All intermediate statuses should be 'working'
-        for se in status_events[1:-1]:
-            assert se.status.state == TaskState.working
-
         assert status_events[-1].status.state == TaskState.completed
         assert status_events[-1].final is True
+
+        # M1 fix: incremental chunks arrive as artifact events, not working status
+        # events.  At least one artifact event should be present.
+        assert len(artifact_events) >= 1
+
+        # All artifact events for this stream share one artifact_id.
+        artifact_ids = {e.artifact.artifact_id for e in artifact_events}
+        assert len(artifact_ids) == 1, "all chunks must share a single artifact_id"
+
+        # The final artifact event must have last_chunk=True.
+        assert artifact_events[-1].last_chunk is True
 
     @pytest.mark.asyncio
     async def test_assistant_message_error(self):

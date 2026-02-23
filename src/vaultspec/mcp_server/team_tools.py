@@ -24,13 +24,32 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 from ..orchestration import (
-    MemberStatus,
     TeamCoordinator,
-    TeamMember,
     TeamSession,
-    TeamStatus,
     TeamTaskEngine,
     extract_artifact_text,
+    resolve_member_key,
+)
+from ..orchestration.team_session import (
+    SessionNotFoundError,
+)
+from ..orchestration.team_session import (
+    delete_session as _delete_session,
+)
+from ..orchestration.team_session import (
+    load_session as _load_session_canonical,
+)
+from ..orchestration.team_session import (
+    load_spawned_pids as _load_spawned_pids,
+)
+from ..orchestration.team_session import (
+    restore_coordinator as _restore_coordinator,
+)
+from ..orchestration.team_session import (
+    save_session as _save_session,
+)
+from ..orchestration.team_session import (
+    teams_dir as _teams_dir,
 )
 
 __all__ = [
@@ -101,159 +120,16 @@ def _get_root_dir() -> Path:
     return _root_dir
 
 
-# ---------------------------------------------------------------------------
-# Session persistence helpers (mirrors team_cli.py private functions)
-# ---------------------------------------------------------------------------
-
-
-def _teams_dir(root: Path) -> Path:
-    """Return the directory where team session JSON files are stored.
-
-    Args:
-        root: Workspace root directory.
-
-    Returns:
-        Path to ``{root}/.vault/logs/teams/``.
-    """
-    return root / ".vault" / "logs" / "teams"
-
-
-def _session_path(root: Path, name: str) -> Path:
-    """Return the JSON file path for a named team session.
-
-    Args:
-        root: Workspace root directory.
-        name: Team name used as the filename stem.
-
-    Returns:
-        Path to ``{root}/.vault/logs/teams/{name}.json``.
-    """
-    return _teams_dir(root) / f"{name}.json"
-
-
-def _save_session(
-    root: Path,
-    session: TeamSession,
-    spawned_pids: dict[str, int] | None = None,
-) -> None:
-    """Persist a TeamSession to JSON on disk.
-
-    Args:
-        root: Workspace root directory.
-        session: The session to persist.
-        spawned_pids: Optional mapping of agent name to OS PID for spawned
-            subprocesses.  Stored alongside the session so that future
-            ``dissolve_team`` calls can terminate them.
-    """
-    teams_dir = _teams_dir(root)
-    teams_dir.mkdir(parents=True, exist_ok=True)
-    data: dict[str, object] = {
-        "team_id": session.team_id,
-        "name": session.name,
-        "context_id": session.context_id,
-        "status": session.status.value,
-        "created_at": session.created_at,
-        "members": {
-            member_name: {
-                "name": m.name,
-                "url": m.url,
-                "status": m.status.value,
-                "card": m.card.model_dump(mode="json"),
-            }
-            for member_name, m in session.members.items()
-        },
-    }
-    if spawned_pids:
-        data["spawned_pids"] = spawned_pids
-    path = _session_path(root, session.name)
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
-
 def _load_session(root: Path, name: str) -> TeamSession:
-    """Load a TeamSession from disk. Raises ToolError on missing/corrupt file.
+    """Load a TeamSession from disk. Raises ToolError on missing file.
 
-    Args:
-        root: Workspace root directory.
-        name: Team name whose session file to load.
-
-    Returns:
-        A reconstructed :class:`TeamSession` from the persisted JSON.
-
-    Raises:
-        ToolError: If the session file does not exist.
+    Thin wrapper around :func:`team_session.load_session` that converts
+    :class:`SessionNotFoundError` to :class:`ToolError` for the MCP layer.
     """
-    path = _session_path(root, name)
-    if not path.exists():
-        raise ToolError(f"No team session found: {name!r} (looked in {path})")
-
-    from a2a.types import AgentCard
-
-    data = json.loads(path.read_text(encoding="utf-8"))
-    members: dict[str, TeamMember] = {}
-    for mname, mdata in data.get("members", {}).items():
-        card = AgentCard.model_validate(mdata["card"])
-        members[mname] = TeamMember(
-            name=mdata["name"],
-            url=mdata["url"],
-            card=card,
-            status=MemberStatus(mdata["status"]),
-        )
-
-    return TeamSession(
-        team_id=data["team_id"],
-        name=data["name"],
-        context_id=data["context_id"],
-        status=TeamStatus(data["status"]),
-        created_at=data["created_at"],
-        members=members,
-    )
-
-
-def _load_spawned_pids(root: Path, name: str) -> dict[str, int]:
-    """Load spawned process PIDs from a persisted session file.
-
-    Args:
-        root: Workspace root directory.
-        name: Team name whose session file to read.
-
-    Returns:
-        Mapping of agent name to OS PID; empty dict if no ``spawned_pids``
-        entry exists or the session file is absent.
-    """
-    path = _session_path(root, name)
-    if not path.exists():
-        return {}
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return {str(k): int(v) for k, v in data.get("spawned_pids", {}).items()}
-
-
-def _delete_session(root: Path, name: str) -> None:
-    """Delete the persisted session JSON file for a team.
-
-    Args:
-        root: Workspace root directory.
-        name: Team name whose session file should be removed.
-    """
-    path = _session_path(root, name)
-    if path.exists():
-        path.unlink()
-
-
-def _restore_coordinator(
-    session: TeamSession, api_key: str | None = None
-) -> TeamCoordinator:
-    """Re-create a TeamCoordinator from a loaded session (no network needed).
-
-    Args:
-        session: Previously loaded :class:`TeamSession` to restore from.
-        api_key: Optional API key to pass to the coordinator constructor.
-
-    Returns:
-        A :class:`TeamCoordinator` with its session already restored.
-    """
-    coordinator = TeamCoordinator(api_key=api_key)
-    coordinator.restore_session(session)
-    return coordinator
+    try:
+        return _load_session_canonical(root, name)
+    except SessionNotFoundError as exc:
+        raise ToolError(str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -363,6 +239,7 @@ async def team_status(name: str) -> str:
             "created_at": session.created_at,
             "members": {
                 mname: {
+                    "display_name": m.display_name,
                     "url": m.url,
                     "status": m.status.value,
                 }
@@ -417,36 +294,42 @@ async def dispatch_task(team_name: str, agent_name: str, task: str) -> str:
     )
 
     session = _load_session(root, team_name)
-    if agent_name not in session.members:
-        raise ToolError(
-            f"Agent {agent_name!r} is not a member of team {team_name!r}. "
-            f"Members: {', '.join(session.members.keys())}"
-        )
+    try:
+        resolved_key = resolve_member_key(session.members, agent_name)
+    except KeyError as exc:
+        raise ToolError(str(exc)) from exc
 
-    tt = _team_task_engine.create_task(team_name, "dispatch_task", agent=agent_name)
+    tt = _team_task_engine.create_task(team_name, "dispatch_task", agent=resolved_key)
 
     async def _run():
         """Dispatch the task to the target agent and record the result."""
         try:
             coordinator = _restore_coordinator(session)
             async with coordinator:
-                results = await coordinator.dispatch_parallel({agent_name: task})
-            task_result = results.get(agent_name)
+                results = await coordinator.dispatch_parallel({resolved_key: task})
+            task_result = results.get(resolved_key)
             if task_result is None:
                 _team_task_engine.fail_task(
-                    tt.task_id, f"Dispatch to {agent_name!r} returned no result."
+                    tt.task_id, f"Dispatch to {resolved_key!r} returned no result."
                 )
             else:
                 _team_task_engine.complete_task(
                     tt.task_id,
                     {
-                        "agent": agent_name,
+                        "agent": resolved_key,
                         "task_id": task_result.id,
                         "state": task_result.status.state.value,
                         "result": extract_artifact_text(task_result),
                     },
                 )
         except Exception as exc:
+            logger.error(
+                "dispatch_task failed team=%s agent=%s: %s",
+                team_name,
+                resolved_key,
+                exc,
+                exc_info=True,
+            )
             _team_task_engine.fail_task(tt.task_id, str(exc))
 
     bg = asyncio.create_task(_run())
@@ -454,7 +337,7 @@ async def dispatch_task(team_name: str, agent_name: str, task: str) -> str:
     _team_task_engine.register_bg_task(tt.task_id, bg)
 
     return json.dumps(
-        {"status": "working", "taskId": tt.task_id, "agent": agent_name},
+        {"status": "working", "taskId": tt.task_id, "agent": resolved_key},
         indent=2,
     )
 
@@ -500,6 +383,12 @@ async def broadcast_message(team_name: str, message: str) -> str:
                 },
             )
         except Exception as exc:
+            logger.error(
+                "broadcast_message failed team=%s: %s",
+                team_name,
+                exc,
+                exc_info=True,
+            )
             _team_task_engine.fail_task(tt.task_id, str(exc))
 
     bg = asyncio.create_task(_run())
@@ -531,36 +420,42 @@ async def send_message(team_name: str, to: str, message: str) -> str:
     )
 
     session = _load_session(root, team_name)
-    if to not in session.members:
-        raise ToolError(
-            f"Agent {to!r} is not a member of team {team_name!r}. "
-            f"Members: {', '.join(session.members.keys())}"
-        )
+    try:
+        resolved_to = resolve_member_key(session.members, to)
+    except KeyError as exc:
+        raise ToolError(str(exc)) from exc
 
-    tt = _team_task_engine.create_task(team_name, "send_message", to=to)
+    tt = _team_task_engine.create_task(team_name, "send_message", to=resolved_to)
 
     async def _run():
         """Send the message to the target agent and record the result."""
         try:
             coordinator = _restore_coordinator(session)
             async with coordinator:
-                results = await coordinator.dispatch_parallel({to: message})
-            task_result = results.get(to)
+                results = await coordinator.dispatch_parallel({resolved_to: message})
+            task_result = results.get(resolved_to)
             if task_result is None:
                 _team_task_engine.fail_task(
-                    tt.task_id, f"Dispatch to {to!r} returned no result."
+                    tt.task_id, f"Dispatch to {resolved_to!r} returned no result."
                 )
             else:
                 _team_task_engine.complete_task(
                     tt.task_id,
                     {
-                        "to": to,
+                        "to": resolved_to,
                         "task_id": task_result.id,
                         "state": task_result.status.state.value,
                         "result": extract_artifact_text(task_result),
                     },
                 )
         except Exception as exc:
+            logger.error(
+                "send_message failed team=%s to=%s: %s",
+                team_name,
+                resolved_to,
+                exc,
+                exc_info=True,
+            )
             _team_task_engine.fail_task(tt.task_id, str(exc))
 
     bg = asyncio.create_task(_run())
@@ -568,7 +463,7 @@ async def send_message(team_name: str, to: str, message: str) -> str:
     _team_task_engine.register_bg_task(tt.task_id, bg)
 
     return json.dumps(
-        {"status": "working", "taskId": tt.task_id, "to": to},
+        {"status": "working", "taskId": tt.task_id, "to": resolved_to},
         indent=2,
     )
 
@@ -653,7 +548,12 @@ async def get_team_task_status(task_id: str) -> str:
     return json.dumps(res, indent=2)
 
 
-async def relay_output(team_name: str, from_agent: str, to_agent: str) -> str:
+async def relay_output(
+    team_name: str,
+    from_agent: str,
+    to_agent: str,
+    instructions: str = "",
+) -> str:
     """Relay the output of one agent to another within the same team.
 
     Fetches the latest task from ``from_agent`` and sends its artifact
@@ -663,6 +563,8 @@ async def relay_output(team_name: str, from_agent: str, to_agent: str) -> str:
         team_name: Name of the team.
         from_agent: Source agent whose output to relay.
         to_agent: Destination agent to receive the relayed output.
+        instructions: Optional instructions to pass to the destination agent
+            alongside the relayed output.
 
     Returns:
         JSON string with the relay task result.
@@ -676,25 +578,24 @@ async def relay_output(team_name: str, from_agent: str, to_agent: str) -> str:
     )
 
     session = _load_session(root, team_name)
-    for agent in (from_agent, to_agent):
-        if agent not in session.members:
-            raise ToolError(
-                f"Agent {agent!r} is not a member of team {team_name!r}. "
-                f"Members: {', '.join(session.members.keys())}"
-            )
+    try:
+        resolved_from = resolve_member_key(session.members, from_agent)
+        resolved_to = resolve_member_key(session.members, to_agent)
+    except KeyError as exc:
+        raise ToolError(str(exc)) from exc
 
     coordinator = _restore_coordinator(session)
     async with coordinator:
         tasks = await coordinator.collect_tasks()
-        src_task = tasks.get(from_agent)
+        src_task = tasks.get(resolved_from)
         if src_task is None:
             raise ToolError(f"No results available from {from_agent!r}.")
-        relayed = await coordinator.relay_output(src_task, to_agent, "")
+        relayed = await coordinator.relay_output(src_task, resolved_to, instructions)
 
     return json.dumps(
         {
-            "from": from_agent,
-            "to": to_agent,
+            "from": resolved_from,
+            "to": resolved_to,
             "task_id": relayed.id,
             "state": relayed.status.state.value,
             "result": extract_artifact_text(relayed),
@@ -706,9 +607,9 @@ async def relay_output(team_name: str, from_agent: str, to_agent: str) -> str:
 async def dissolve_team(team_name: str) -> str:
     """Dissolve a team session.
 
-    Restores the coordinator, calls ``dissolve_team()``, terminates any
-    spawned subprocesses tracked by PID, and deletes the session file
-    from disk.
+    Restores the coordinator with persisted spawned PIDs, calls
+    ``dissolve_team()`` (which terminates spawned processes internally),
+    and deletes the session file from disk.
 
     Args:
         team_name: Name of the team to dissolve.
@@ -716,33 +617,15 @@ async def dissolve_team(team_name: str) -> str:
     Returns:
         JSON string confirming dissolution.
     """
-    import os
-    import signal
-
     root = _get_root_dir()
     logger.info("MCP: dissolve_team team=%s", team_name)
 
     spawned_pids = _load_spawned_pids(root, team_name)
     session = _load_session(root, team_name)
 
-    coordinator = _restore_coordinator(session)
+    coordinator = _restore_coordinator(session, spawned_pids=spawned_pids)
     async with coordinator:
         await coordinator.dissolve_team()
-
-    # Terminate spawned processes that were persisted across tool calls.
-    for agent_name, pid in spawned_pids.items():
-        try:
-            os.kill(pid, signal.SIGTERM)
-            logger.debug("Terminated spawned process %s (pid=%d)", agent_name, pid)
-        except ProcessLookupError:
-            logger.debug("Spawned process %s (pid=%d) already exited", agent_name, pid)
-        except OSError as exc:
-            logger.warning(
-                "Failed to terminate spawned process %s (pid=%d): %s",
-                agent_name,
-                pid,
-                exc,
-            )
 
     _delete_session(root, team_name)
 

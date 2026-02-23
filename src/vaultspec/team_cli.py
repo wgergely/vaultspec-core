@@ -1,4 +1,15 @@
-"""Team CLI — multi-agent team lifecycle management (create, assign, dissolve, etc.)."""
+"""Team CLI — multi-agent team lifecycle management.
+
+Commands:
+    create:    Form a new named team from one or more A2A agent URLs.
+    status:    Print the status of a team session and its members.
+    list:      List all persisted team sessions.
+    assign:    Dispatch a task to a single named team member.
+    broadcast: Send the same message to every team member in parallel.
+    message:   Send a message (or relay output) to a specific team member.
+    spawn:     Spawn a new agent subprocess and register it as a team member.
+    dissolve:  Dissolve a team session and terminate any spawned processes.
+"""
 
 import argparse
 import json
@@ -15,13 +26,13 @@ from .cli_common import (
 )
 from .orchestration.team import TeamCoordinator
 from .orchestration.team_session import (
-    SessionNotFoundError,
     delete_session,
     load_session,
     load_spawned_pids,
     parse_agents,
     restore_coordinator,
     save_session,
+    session_path,
     teams_dir,
 )
 
@@ -67,10 +78,16 @@ def command_create(args) -> None:
             )
         return session
 
+    if not args.force and session_path(args.root, args.name).exists():
+        logger.error(
+            "Error: team %r already exists. Use --force to overwrite.", args.name
+        )
+        sys.exit(1)
+
     with cli_error_handler(args.debug):
         session = run_async(_create(), debug=args.debug)
         save_session(args.root, session)
-        print(session.team_id)
+        args.printer.out(session.team_id)
         if args.verbose:
             logger.info("Team %r formed (id=%s)", session.name, session.team_id)
             logger.info("Members: %s", ", ".join(session.members.keys()))
@@ -82,17 +99,17 @@ def command_status(args) -> None:
     Args:
         args: Parsed argument namespace from the ``status`` subparser.
     """
-    try:
+    with cli_error_handler(args.debug):
         session = load_session(args.root, args.name)
-    except SessionNotFoundError as exc:
-        logger.error("%s", exc)
-        sys.exit(1)
-    print(f"Team: {session.name}")
-    print(f"  ID:       {session.team_id}")
-    print(f"  Status:   {session.status.value}")
-    print(f"  Members ({len(session.members)}):")
-    for name, member in session.members.items():
-        print(f"    {name}: {member.status.value} ({member.url})")
+        args.printer.out(f"Team: {session.name}")
+        args.printer.out(f"  ID:       {session.team_id}")
+        args.printer.out(f"  Status:   {session.status.value}")
+        args.printer.out(f"  Members ({len(session.members)}):")
+        for name, member in session.members.items():
+            args.printer.out(
+                f"    {member.display_name} [{name}]:"
+                f" {member.status.value} ({member.url})"
+            )
 
 
 def command_list(args) -> None:
@@ -103,15 +120,17 @@ def command_list(args) -> None:
     """
     tdir = teams_dir(args.root)
     if not tdir.exists() or not any(tdir.glob("*.json")):
-        print("No active teams.")
+        args.printer.out("No active teams.")
         return
 
     for path in sorted(tdir.glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            print(f"{data['name']}: id={data['team_id']} status={data['status']}")
+            args.printer.out(
+                f"{data['name']}: id={data['team_id']} status={data['status']}"
+            )
         except (KeyError, json.JSONDecodeError):
-            print(f"(corrupt session file: {path.name})")
+            args.printer.out(f"(corrupt session file: {path.name})")
 
 
 def command_assign(args) -> None:
@@ -123,13 +142,8 @@ def command_assign(args) -> None:
     Returns:
         None. Prints the resulting task ID and state to stdout.
     """
-    try:
-        session = load_session(args.root, args.name)
-    except SessionNotFoundError as exc:
-        logger.error("%s", exc)
-        sys.exit(1)
 
-    async def _assign():
+    async def _assign(session):
         """Dispatch the task and return the resulting A2A task object.
 
         Returns:
@@ -140,13 +154,13 @@ def command_assign(args) -> None:
             results = await coordinator.dispatch_parallel({args.agent: args.task})
             task = results.get(args.agent)
             if task is None:
-                logger.error("Error: dispatch to %r failed.", args.agent)
-                sys.exit(1)
+                raise RuntimeError(f"dispatch to {args.agent!r} failed.")
             return task
 
     with cli_error_handler(args.debug):
-        task = run_async(_assign(), debug=args.debug)
-        print(f"Task {task.id}: {task.status.state.value}")
+        session = load_session(args.root, args.name)
+        task = run_async(_assign(session), debug=args.debug)
+        args.printer.out(f"Task {task.id}: {task.status.state.value}")
 
 
 def command_broadcast(args) -> None:
@@ -158,13 +172,8 @@ def command_broadcast(args) -> None:
     Returns:
         None. Prints each agent's task ID and state to stdout.
     """
-    try:
-        session = load_session(args.root, args.name)
-    except SessionNotFoundError as exc:
-        logger.error("%s", exc)
-        sys.exit(1)
 
-    async def _broadcast():
+    async def _broadcast(session):
         """Broadcast to all members and return the task result mapping.
 
         Returns:
@@ -177,9 +186,12 @@ def command_broadcast(args) -> None:
             return results
 
     with cli_error_handler(args.debug):
-        results = run_async(_broadcast(), debug=args.debug)
+        session = load_session(args.root, args.name)
+        results = run_async(_broadcast(session), debug=args.debug)
         for agent_name, task in results.items():
-            print(f"{agent_name}: task={task.id} state={task.status.state.value}")
+            args.printer.out(
+                f"{agent_name}: task={task.id} state={task.status.state.value}"
+            )
 
 
 def command_message(args) -> None:
@@ -194,13 +206,8 @@ def command_message(args) -> None:
     Returns:
         None. Prints the resulting task ID and state to stdout.
     """
-    try:
-        session = load_session(args.root, args.name)
-    except SessionNotFoundError as exc:
-        logger.error("%s", exc)
-        sys.exit(1)
 
-    async def _message():
+    async def _message(session):
         """Send or relay the message and return the resulting A2A task object.
 
         Returns:
@@ -211,8 +218,7 @@ def command_message(args) -> None:
             if args.from_agent:
                 # Relay mode: fetch src task from args.src_task_id, relay to --to
                 if not args.src_task_id:
-                    logger.error("Error: --src-task-id is required when using --from")
-                    sys.exit(1)
+                    raise ValueError("--src-task-id is required when using --from")
                 import uuid as _uuid
 
                 from a2a.types import (
@@ -243,13 +249,13 @@ def command_message(args) -> None:
                 results = await coordinator.dispatch_parallel({args.to: args.content})
                 task = results.get(args.to)
                 if task is None:
-                    logger.error("Error: dispatch to %r failed.", args.to)
-                    sys.exit(1)
+                    raise RuntimeError(f"dispatch to {args.to!r} failed.")
             return task
 
     with cli_error_handler(args.debug):
-        task = run_async(_message(), debug=args.debug)
-        print(f"Task {task.id}: {task.status.state.value}")
+        session = load_session(args.root, args.name)
+        task = run_async(_message(session), debug=args.debug)
+        args.printer.out(f"Task {task.id}: {task.status.state.value}")
 
 
 def command_spawn(args) -> None:
@@ -265,14 +271,8 @@ def command_spawn(args) -> None:
     Returns:
         None. Logs the spawned agent name, port, and URL.
     """
-    try:
-        session = load_session(args.root, args.name)
-    except SessionNotFoundError as exc:
-        logger.error("%s", exc)
-        sys.exit(1)
-    existing_pids = load_spawned_pids(args.root, args.name)
 
-    async def _spawn():
+    async def _spawn(session, _existing_pids):
         """Spawn the agent process and return spawn results.
 
         Returns:
@@ -293,7 +293,11 @@ def command_spawn(args) -> None:
             return member, coordinator.session, new_pids
 
     with cli_error_handler(args.debug):
-        member, updated_session, new_pids = run_async(_spawn(), debug=args.debug)
+        session = load_session(args.root, args.name)
+        existing_pids = load_spawned_pids(args.root, args.name)
+        member, updated_session, new_pids = run_async(
+            _spawn(session, existing_pids), debug=args.debug
+        )
         all_pids = {**existing_pids, **new_pids}
         save_session(args.root, updated_session, spawned_pids=all_pids)
         logger.info("Spawned %s on port %d (%s)", member.name, args.port, member.url)
@@ -303,20 +307,14 @@ def command_dissolve(args) -> None:
     """Dissolve a team session and terminate any spawned agent processes.
 
     Prompts for confirmation unless ``--force`` is passed.  Sends the
-    dissolve signal via the coordinator, then SIGTERMs any previously
-    spawned processes and removes the session file.
+    dissolve signal via the coordinator (which terminates spawned processes
+    internally) and removes the session file.
 
     Args:
         args: Parsed argument namespace from the ``dissolve`` subparser.
     """
-    import os
-    import signal
-
-    try:
+    with cli_error_handler(args.debug):
         session = load_session(args.root, args.name)
-    except SessionNotFoundError as exc:
-        logger.error("%s", exc)
-        sys.exit(1)
     spawned_pids = load_spawned_pids(args.root, args.name)
 
     if not args.force:
@@ -327,28 +325,14 @@ def command_dissolve(args) -> None:
 
     async def _dissolve():
         """Send the dissolve signal via the coordinator."""
-        coordinator = restore_coordinator(session, api_key=args.api_key)
+        coordinator = restore_coordinator(
+            session, api_key=args.api_key, spawned_pids=spawned_pids
+        )
         async with coordinator:
             await coordinator.dissolve_team()
 
     with cli_error_handler(args.debug):
         run_async(_dissolve(), debug=args.debug)
-
-        for agent_name, pid in spawned_pids.items():
-            try:
-                os.kill(pid, signal.SIGTERM)
-                logger.debug("Terminated spawned process %s (pid=%d)", agent_name, pid)
-            except ProcessLookupError:
-                logger.debug(
-                    "Spawned process %s (pid=%d) already exited", agent_name, pid
-                )
-            except OSError as exc:
-                logger.warning(
-                    "Failed to terminate spawned process %s (pid=%d): %s",
-                    agent_name,
-                    pid,
-                    exc,
-                )
 
         delete_session(args.root, args.name)
         if args.verbose:
@@ -380,6 +364,9 @@ def main() -> None:
     )
     create_parser.add_argument(
         "--api-key", default=None, help="API key for X-API-Key header"
+    )
+    create_parser.add_argument(
+        "--force", action="store_true", help="Overwrite existing team session"
     )
     create_parser.set_defaults(func=command_create)
 

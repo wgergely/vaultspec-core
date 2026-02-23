@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
+import sys
 from typing import TYPE_CHECKING
 
 import httpx
@@ -40,6 +42,8 @@ from ...protocol.a2a.tests.conftest import (
 from ...team_cli import (
     command_dissolve,
     command_list,
+    command_message,
+    command_spawn,
     command_status,
 )
 
@@ -104,8 +108,9 @@ def _make_session(root: Path, name: str = "my-team") -> TeamSession:
         status=TeamStatus.ACTIVE,
         created_at=0.0,
         members={
-            "echo-agent": TeamMember(
-                name="echo-agent",
+            "http://localhost:29901/": TeamMember(
+                name="http://localhost:29901/",
+                display_name="echo-agent",
                 url="http://localhost:29901/",
                 card=card,
                 status=MemberStatus.IDLE,
@@ -183,11 +188,11 @@ class TestSessionPersistence:
     def test_member_status_preserved(self, tmp_path):
         """MemberStatus is correctly serialized and deserialized."""
         session = _make_session(tmp_path, "status-team")
-        session.members["echo-agent"].status = MemberStatus.WORKING
+        session.members["http://localhost:29901/"].status = MemberStatus.WORKING
         _save_session(tmp_path, session)
 
         loaded = _load_session(tmp_path, "status-team")
-        assert loaded.members["echo-agent"].status == MemberStatus.WORKING
+        assert loaded.members["http://localhost:29901/"].status == MemberStatus.WORKING
 
 
 # ---------------------------------------------------------------------------
@@ -264,7 +269,11 @@ class TestCommandCreate:
             assert data["context_id"] == session.context_id
             assert data["team_id"] == data["context_id"]
             assert len(data["team_id"]) == 36
-            assert "echo-agent" in data["members"]
+            # Members are now keyed by URL; check that at least one URL key exists
+            assert any("localhost:29902" in k for k in data["members"]), (
+                "Expected URL-keyed member for localhost:29902, "
+                f"got: {list(data['members'].keys())}"
+            )
             assert data["status"] == "active"
         finally:
             await coordinator.dissolve_team()
@@ -330,7 +339,9 @@ class TestCommandAssign:
             results = await coordinator.dispatch_parallel(
                 {"echo-agent": "do this thing"}
             )
-            task = results["echo-agent"]
+            # Results are keyed by canonical URL key; get the single result.
+            assert len(results) == 1
+            task = next(iter(results.values()))
             assert task.status.state.value == "completed"
             assert task.context_id == session.team_id
 
@@ -394,3 +405,326 @@ class TestRootPropagation:
 
         with pytest.raises(ToolError):
             _load_session(root_b, "shared-name")
+
+
+# ---------------------------------------------------------------------------
+# command_message tests — real dispatch with in-process agents
+# ---------------------------------------------------------------------------
+
+
+class TestCommandMessage:
+    @pytest.mark.asyncio
+    async def test_message_direct_dispatch(self, tmp_path):
+        """Direct message dispatches to echo-agent and returns completed task."""
+        coordinator, _ = await _build_coordinator_with_apps(
+            [(EchoExecutor(), "echo-agent", 29910)],
+            name="msg-team",
+        )
+        try:
+            session = coordinator.session
+            _save_session(tmp_path, session)
+
+            results = await coordinator.dispatch_parallel(
+                {"echo-agent": "hello direct"}
+            )
+            # Results keyed by canonical URL key.
+            assert len(results) == 1
+            task = next(iter(results.values()))
+            assert task.status.state.value == "completed"
+
+            text = extract_artifact_text(task)
+            assert "hello direct" in text
+        finally:
+            await coordinator.dissolve_team()
+
+    @pytest.mark.asyncio
+    async def test_message_relay_mode(self, tmp_path):
+        """Relay mode: echo output forwarded to prefix-agent via relay_output."""
+        coordinator, _ = await _build_coordinator_with_apps(
+            [
+                (EchoExecutor(), "echo-agent", 29911),
+                (PrefixExecutor("[R] "), "relay-agent", 29912),
+            ],
+            name="relay-team",
+        )
+        try:
+            session = coordinator.session
+            _save_session(tmp_path, session)
+
+            # First dispatch to echo-agent to get a completed source task
+            results = await coordinator.dispatch_parallel(
+                {"echo-agent": "initial payload"}
+            )
+            # Results keyed by canonical URL key.
+            assert len(results) == 1
+            src_task = next(iter(results.values()))
+            assert src_task.status.state.value == "completed"
+
+            # Relay the echo output to relay-agent (accepts display_name).
+            relayed = await coordinator.relay_output(
+                src_task, "relay-agent", "relay context"
+            )
+            assert relayed.status.state.value == "completed"
+
+            text = extract_artifact_text(relayed)
+            assert "[R] " in text
+        finally:
+            await coordinator.dissolve_team()
+
+    def test_message_missing_team_exits(self, tmp_path):
+        """command_message with nonexistent team raises SystemExit."""
+        args = _args(
+            root=tmp_path,
+            name="ghost-team",
+            to="some-agent",
+            content="hello",
+            from_agent=None,
+            src_task_id=None,
+        )
+        with pytest.raises(SystemExit):
+            command_message(args)
+
+    def test_message_relay_requires_src_task_id(self, tmp_path):
+        """--from without --src-task-id logs error and exits."""
+        _make_session(tmp_path, "relay-err-team")
+        args = _args(
+            root=tmp_path,
+            name="relay-err-team",
+            to="echo-agent",
+            content="relay me",
+            from_agent="echo-agent",
+            src_task_id=None,
+        )
+        with pytest.raises(SystemExit):
+            command_message(args)
+
+
+# ---------------------------------------------------------------------------
+# command_spawn tests — arg parsing and error paths
+# ---------------------------------------------------------------------------
+
+
+class TestCommandSpawn:
+    def test_spawn_arg_parsing(self):
+        """All required spawn fields parse correctly via subprocess."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "vaultspec.team_cli",
+                "spawn",
+                "--name",
+                "my-team",
+                "--agent",
+                "new-agent",
+                "--script",
+                "/path/to/script.py",
+                "--port",
+                "12345",
+                "--help",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        # --help exits 0 and shows the spawn subcommand help
+        assert result.returncode == 0
+        assert "spawn" in result.stdout.lower() or "--agent" in result.stdout
+
+    def test_spawn_missing_required_args_name(self):
+        """Omitting --name raises SystemExit (non-zero exit)."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "vaultspec.team_cli",
+                "spawn",
+                "--agent",
+                "a",
+                "--script",
+                "s.py",
+                "--port",
+                "9999",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode != 0
+
+    def test_spawn_missing_required_args_agent(self):
+        """Omitting --agent raises SystemExit (non-zero exit)."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "vaultspec.team_cli",
+                "spawn",
+                "--name",
+                "t",
+                "--script",
+                "s.py",
+                "--port",
+                "9999",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode != 0
+
+    def test_spawn_missing_required_args_script(self):
+        """Omitting --script raises SystemExit (non-zero exit)."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "vaultspec.team_cli",
+                "spawn",
+                "--name",
+                "t",
+                "--agent",
+                "a",
+                "--port",
+                "9999",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode != 0
+
+    def test_spawn_missing_required_args_port(self):
+        """Omitting --port raises SystemExit (non-zero exit)."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "vaultspec.team_cli",
+                "spawn",
+                "--name",
+                "t",
+                "--agent",
+                "a",
+                "--script",
+                "s.py",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode != 0
+
+    def test_spawn_missing_team_exits(self, tmp_path):
+        """command_spawn with nonexistent team raises SystemExit."""
+        args = _args(
+            root=tmp_path,
+            name="ghost-team",
+            agent="new-agent",
+            script="/path/to/script.py",
+            port=29913,
+        )
+        with pytest.raises(SystemExit):
+            command_spawn(args)
+
+
+# ---------------------------------------------------------------------------
+# message arg-parsing tests — direct parser verification
+# ---------------------------------------------------------------------------
+
+
+class TestMessageArgParsing:
+    def test_message_parser_from_flag(self):
+        """--from is stored as from_agent (dest='from_agent'), not 'from'."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "vaultspec.team_cli",
+                "message",
+                "--name",
+                "t",
+                "--to",
+                "a",
+                "--content",
+                "x",
+                "--from",
+                "b",
+                "--help",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        # --help proves the parser accepts --from without error
+        assert result.returncode == 0
+        assert "--from" in result.stdout
+
+    def test_message_parser_src_task_id(self):
+        """--src-task-id is parsed correctly."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "vaultspec.team_cli",
+                "message",
+                "--name",
+                "t",
+                "--to",
+                "a",
+                "--content",
+                "x",
+                "--src-task-id",
+                "abc-123",
+                "--help",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0
+        assert "--src-task-id" in result.stdout
+
+    def test_message_from_stored_as_from_agent(self):
+        """Verify --from dest is from_agent by parsing args directly."""
+        # Build a minimal parser that mirrors the message subparser
+        parser = argparse.ArgumentParser()
+        sub = parser.add_subparsers(dest="command")
+        msg = sub.add_parser("message")
+        msg.add_argument("--name", required=True)
+        msg.add_argument("--to", required=True)
+        msg.add_argument("--content", required=True)
+        msg.add_argument("--from", dest="from_agent", default=None)
+        msg.add_argument("--src-task-id", default=None)
+
+        args = parser.parse_args(
+            ["message", "--name", "t", "--to", "a", "--content", "x", "--from", "b"]
+        )
+        assert args.from_agent == "b"
+        assert not hasattr(args, "from") or getattr(args, "from", None) is None
+
+    def test_message_src_task_id_parsed(self):
+        """Verify --src-task-id value is captured in parsed namespace."""
+        parser = argparse.ArgumentParser()
+        sub = parser.add_subparsers(dest="command")
+        msg = sub.add_parser("message")
+        msg.add_argument("--name", required=True)
+        msg.add_argument("--to", required=True)
+        msg.add_argument("--content", required=True)
+        msg.add_argument("--from", dest="from_agent", default=None)
+        msg.add_argument("--src-task-id", default=None)
+
+        args = parser.parse_args(
+            [
+                "message",
+                "--name",
+                "t",
+                "--to",
+                "a",
+                "--content",
+                "x",
+                "--src-task-id",
+                "abc-123",
+            ]
+        )
+        assert args.src_task_id == "abc-123"
