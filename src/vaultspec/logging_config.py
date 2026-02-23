@@ -14,7 +14,7 @@ _logging_configured = False
 # Shared Rich console instance (stderr, no syntax highlighting)
 _console: Console | None = None
 
-_PLAIN_FORMAT = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
+_DEBUG_FORMAT = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
 
 
 def get_console() -> Console:
@@ -22,6 +22,9 @@ def get_console() -> Console:
 
     Creates the instance on first call. Safe to call before or after
     ``configure_logging()``.
+
+    Returns:
+        The shared :class:`rich.console.Console` writing to ``stderr``.
     """
     global _console
     if _console is None:
@@ -63,6 +66,9 @@ def configure_logging(
         log_level = getattr(logging, level.upper(), logging.INFO)
     else:
         env_level = os.environ.get("VAULTSPEC_LOG_LEVEL", "INFO").upper()
+        if not hasattr(logging, env_level):
+            msg = f"Unknown VAULTSPEC_LOG_LEVEL={env_level!r}"
+            print(f"Warning: {msg}, defaulting to INFO", file=sys.stderr)
         log_level = getattr(logging, env_level, logging.INFO)
 
     # Get root logger
@@ -80,15 +86,16 @@ def configure_logging(
         handler = RichHandler(
             console=get_console(),
             rich_tracebacks=True,
-            tracebacks_show_locals=False,
+            tracebacks_show_locals=debug,
             markup=False,
-            show_path=False,
-            show_time=True,
-            show_level=True,
+            show_path=debug,
+            show_time=debug,
+            show_level=debug,
         )
     else:
+        fmt = _DEBUG_FORMAT if debug else "%(message)s"
         handler = logging.StreamHandler(sys.stderr)
-        handler.setFormatter(logging.Formatter(_PLAIN_FORMAT))
+        handler.setFormatter(logging.Formatter(fmt))
 
     handler.setLevel(log_level)
     root_logger.addHandler(handler)
