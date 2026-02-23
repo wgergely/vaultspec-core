@@ -41,11 +41,6 @@ from ..providers.gemini import (
 pytestmark = [pytest.mark.unit]
 
 
-# ---------------------------------------------------------------------------
-# Local HTTP server helpers
-# ---------------------------------------------------------------------------
-
-
 def _start_server(
     response_body: bytes, status: int = 200
 ) -> tuple[str, threading.Thread]:
@@ -71,11 +66,6 @@ def _start_server(
     thread = threading.Thread(target=server.handle_request, daemon=True)
     thread.start()
     return f"http://127.0.0.1:{port}", thread
-
-
-# ---------------------------------------------------------------------------
-# Claude auth tests
-# ---------------------------------------------------------------------------
 
 
 class TestClaudeLoadOAuthToken:
@@ -217,11 +207,6 @@ class TestClaudeLoadOAuthToken:
             del os.environ["ANTHROPIC_API_KEY"]
             if env_backup_oauth is not None:
                 os.environ["CLAUDE_CODE_OAUTH_TOKEN"] = env_backup_oauth
-
-
-# ---------------------------------------------------------------------------
-# Gemini auth tests
-# ---------------------------------------------------------------------------
 
 
 def _gemini_expiry_ms(delta_seconds: int) -> int:

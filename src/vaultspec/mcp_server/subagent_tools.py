@@ -49,11 +49,6 @@ __all__ = [
 # configure_logging() - Removed to avoid side effects on import
 logger = logging.getLogger(__name__)
 
-
-# ---------------------------------------------------------------------------
-# Globals -- must be initialized via initialize_server() before use.
-# Thread-safe: single-event-loop assumption (one asyncio loop per process).
-# ---------------------------------------------------------------------------
 ROOT_DIR: pathlib.Path
 CONTENT_ROOT: pathlib.Path
 AGENTS_DIR: pathlib.Path
@@ -113,11 +108,6 @@ def initialize_server(
         AGENTS_DIR,
         ttl_seconds,
     )
-
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
 
 
 def _resolve_effective_mode(agent: str, mode: str | None) -> str:
@@ -499,11 +489,6 @@ async def _poll_agent_files() -> None:
             logger.exception("Error in agent file poll loop")
 
 
-# ---------------------------------------------------------------------------
-# Tool functions (undecorated -- registered by register_tools())
-# ---------------------------------------------------------------------------
-
-
 async def list_agents() -> str:
     """Return a list of all available sub-agents and their tiers.
 
@@ -850,8 +835,6 @@ def register_tools(mcp: FastMCP) -> None:
     """
     global _mcp_ref
     _mcp_ref = mcp
-
-    # -- Tools ---------------------------------------------------------------
 
     mcp.tool(
         title="List Available Agents",

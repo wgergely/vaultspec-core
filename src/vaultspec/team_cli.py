@@ -18,6 +18,7 @@ import sys
 
 from .cli_common import (
     add_common_args,
+    add_verbosity_args,
     cli_error_handler,
     get_default_layout,
     resolve_args_workspace,
@@ -37,11 +38,6 @@ from .orchestration.team_session import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Command implementations
-# ---------------------------------------------------------------------------
 
 
 def command_create(args) -> None:
@@ -339,11 +335,6 @@ def command_dissolve(args) -> None:
             logger.info("Team %r dissolved.", args.name)
 
 
-# ---------------------------------------------------------------------------
-# CLI wiring
-# ---------------------------------------------------------------------------
-
-
 def main() -> None:
     """Parse arguments and dispatch to the appropriate team subcommand handler."""
     parser = argparse.ArgumentParser(
@@ -356,6 +347,7 @@ def main() -> None:
 
     # --- CREATE ---
     create_parser = subparsers.add_parser("create", help="Form a new team")
+    add_verbosity_args(create_parser)
     create_parser.add_argument("--name", required=True, help="Team name")
     create_parser.add_argument(
         "--agents",
@@ -372,17 +364,20 @@ def main() -> None:
 
     # --- STATUS ---
     status_parser = subparsers.add_parser("status", help="Show team session status")
+    add_verbosity_args(status_parser)
     status_parser.add_argument("--name", required=True, help="Team name")
     status_parser.set_defaults(func=command_status)
 
     # --- LIST ---
     list_parser = subparsers.add_parser("list", help="List all active teams")
+    add_verbosity_args(list_parser)
     list_parser.set_defaults(func=command_list)
 
     # --- ASSIGN ---
     assign_parser = subparsers.add_parser(
         "assign", help="Dispatch a task to one member"
     )
+    add_verbosity_args(assign_parser)
     assign_parser.add_argument("--name", required=True, help="Team name")
     assign_parser.add_argument("--agent", required=True, help="Agent name to assign to")
     assign_parser.add_argument("--task", required=True, help="Task description")
@@ -393,6 +388,7 @@ def main() -> None:
     broadcast_parser = subparsers.add_parser(
         "broadcast", help="Send the same message to all members"
     )
+    add_verbosity_args(broadcast_parser)
     broadcast_parser.add_argument("--name", required=True, help="Team name")
     broadcast_parser.add_argument("--message", required=True, help="Message text")
     broadcast_parser.add_argument("--api-key", default=None, help="API key")
@@ -402,6 +398,7 @@ def main() -> None:
     message_parser = subparsers.add_parser(
         "message", help="Send a message to a specific member"
     )
+    add_verbosity_args(message_parser)
     message_parser.add_argument("--name", required=True, help="Team name")
     message_parser.add_argument("--to", required=True, help="Destination agent name")
     message_parser.add_argument("--content", required=True, help="Message content")
@@ -423,6 +420,7 @@ def main() -> None:
     spawn_parser = subparsers.add_parser(
         "spawn", help="Spawn a new agent process and add it to the team"
     )
+    add_verbosity_args(spawn_parser)
     spawn_parser.add_argument("--name", required=True, help="Team name")
     spawn_parser.add_argument(
         "--agent", required=True, help="Logical name for the new agent"
@@ -440,6 +438,7 @@ def main() -> None:
 
     # --- DISSOLVE ---
     dissolve_parser = subparsers.add_parser("dissolve", help="Dissolve a team session")
+    add_verbosity_args(dissolve_parser)
     dissolve_parser.add_argument("--name", required=True, help="Team name")
     dissolve_parser.add_argument(
         "--force", action="store_true", help="Skip confirmation prompt"

@@ -23,7 +23,7 @@ The five phases map to five skills:
 | Execute  | vaultspec-execute  | `.vault/exec/.../steps`       |
 | Verify   | vaultspec-review   | `.vault/exec/.../review`      |
 
-### 1. Setup
+### Setup
 
 Clone the repository and install dependencies:
 
@@ -42,7 +42,7 @@ vaultspec --help
 The `.vault/` directory is created automatically the first time you invoke a
 skill. It holds all your project's documented decisions and execution records.
 
-### 2. Research
+### Research
 
 Before writing any code, you gather evidence. The `vaultspec-research` skill
 dispatches a research sub-agent that searches the codebase, queries
@@ -109,7 +109,7 @@ shallow JSON liveness check.
 **Verify:** The file exists and contains a `## Findings` section with populated
 content.
 
-### 3. Specify
+### Specify
 
 With research in hand, you formalise the decision in an Architecture Decision
 Record. The `vaultspec-adr` skill reads the research artifact and produces a
@@ -170,7 +170,7 @@ check is sufficient for a liveness probe.
 > **Important:** The ADR represents a decision. Edit it before proceeding if
 > you disagree with the agent's recommendation.
 
-### 4. Plan
+### Plan
 
 With an accepted ADR, you produce an execution plan. The `vaultspec-write`
 skill reads the ADR and breaks the work into concrete, assignable steps.
@@ -205,7 +205,7 @@ The agent produces:
 > **Approval gate:** Review the plan and confirm before continuing. Once you
 > approve, execution begins.
 
-### 5. Execute
+### Execute
 
 With an approved plan, you dispatch implementation sub-agents.
 
@@ -244,7 +244,7 @@ Added an async handler that reads the package version via
 with `{"status": "ok", "version": version}`.
 ```
 
-### 6. Verify
+### Verify
 
 After execution, `vaultspec-review` performs a holistic audit.
 
@@ -296,11 +296,11 @@ the ADR and understand exactly why the endpoint was built the way it was.
 Spec-Driven Development (SDD) is a methodology where every code change flows
 through a structured pipeline:
 
-1. **Research** the problem space
-2. **Specify** the decision in an Architecture Decision Record
-3. **Plan** the implementation steps
-4. **Execute** the plan with specialized agents
-5. **Verify** the output against the plan
+- **Research** the problem space
+- **Specify** the decision in an Architecture Decision Record
+- **Plan** the implementation steps
+- **Execute** the plan with specialized agents
+- **Verify** the output against the plan
 
 The key insight: AI agents are fast but forgetful. They lose context between
 sessions, skip steps under pressure, and produce inconsistent output. SDD adds

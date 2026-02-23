@@ -26,11 +26,6 @@ __all__ = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Data types
-# ---------------------------------------------------------------------------
-
-
 class LayoutMode(Enum):
     """How VaultSpec was invoked and where paths point."""
 
@@ -78,11 +73,6 @@ class WorkspaceLayout:
     framework_root: Path
     mode: LayoutMode
     git: GitInfo | None
-
-
-# ---------------------------------------------------------------------------
-# Git detection helpers
-# ---------------------------------------------------------------------------
 
 
 def _strip_unc(path: Path) -> Path:
@@ -276,11 +266,6 @@ def discover_git(start: Path) -> GitInfo | None:
     )
 
 
-# ---------------------------------------------------------------------------
-# Validation
-# ---------------------------------------------------------------------------
-
-
 class WorkspaceError(Exception):
     """Raised when workspace layout validation fails."""
 
@@ -308,11 +293,6 @@ def _validate(layout: WorkspaceLayout) -> None:
             f"output_root parent does not exist: {layout.output_root.parent}\n"
             f"Set VAULTSPEC_ROOT_DIR to a valid output directory."
         )
-
-
-# ---------------------------------------------------------------------------
-# Resolution
-# ---------------------------------------------------------------------------
 
 
 def resolve_workspace(

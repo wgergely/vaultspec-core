@@ -406,10 +406,6 @@ class TestClaudeA2AExecutor:
             "CLAUDECODE must be empty string to suppress nested-session check"
         )
 
-    # ------------------------------------------------------------------
-    # New tests: retry, session resume, cancel semantics, progress
-    # ------------------------------------------------------------------
-
     @pytest.mark.asyncio
     async def test_retry_on_rate_limit(self):
         """MessageParseError with rate_limit triggers retry, then succeeds."""

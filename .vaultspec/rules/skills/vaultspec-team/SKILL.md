@@ -14,7 +14,7 @@ any scenario where parallel execution and peer-to-peer agent communication
 
 ## Usage
 
-### 1. Form a Team
+### Form a Team
 
 Use the `create_team` tool to assemble specialized agents.
 
@@ -26,7 +26,7 @@ create_team(
 )
 ```
 
-### 2. Dispatch Tasks
+### Dispatch Tasks
 
 Use `dispatch_task` or `broadcast_message` to assign work to team members.
 
@@ -39,7 +39,7 @@ dispatch_task(
 )
 ```
 
-### 3. Coordinate & Monitor
+### Coordinate & Monitor
 
 - Use `team_status` to track progress and member states.
 - Use `send_message` for direct agent-to-agent communication.

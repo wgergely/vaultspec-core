@@ -43,11 +43,6 @@ from ..team_tools import (
 pytestmark = [pytest.mark.integration]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _make_card(name: str, port: int) -> AgentCard:
     return AgentCard(
         name=name,
@@ -79,11 +74,6 @@ def _build_a2a_app(executor, card: AgentCard):
         http_handler=handler,
     )
     return a2a_app.build()
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -176,11 +166,6 @@ class _MuxTransport(httpx.AsyncBaseTransport):
         return await transport.handle_async_request(request)
 
 
-# ---------------------------------------------------------------------------
-# Registration tests
-# ---------------------------------------------------------------------------
-
-
 class TestRegisterTools:
     """Verify that register_tools() registers all 7 tools."""
 
@@ -268,11 +253,6 @@ class TestSessionPersistence:
         """Loading a nonexistent session raises ToolError."""
         with pytest.raises(ToolError, match="No team session found"):
             _load_session(workspace, "nonexistent-team")
-
-
-# ---------------------------------------------------------------------------
-# Tool function tests (with real in-process A2A servers)
-# ---------------------------------------------------------------------------
 
 
 class TestCreateTeam:
@@ -586,11 +566,6 @@ class TestDissolveTeam:
         """dissolve_team raises ToolError for a nonexistent team."""
         with pytest.raises(ToolError, match="No team session found"):
             await dissolve_team("no-such-team")
-
-
-# ---------------------------------------------------------------------------
-# URL parsing tests
-# ---------------------------------------------------------------------------
 
 
 class TestParseAgentUrls:

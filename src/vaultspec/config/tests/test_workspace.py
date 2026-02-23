@@ -15,10 +15,6 @@ from ..workspace import (
     resolve_workspace,
 )
 
-# ---------------------------------------------------------------------------
-# Helpers to scaffold filesystem fixtures
-# ---------------------------------------------------------------------------
-
 
 def _make_framework(root: Path, fw_name: str = ".vaultspec") -> Path:
     """Create a minimal framework directory structure."""
@@ -44,11 +40,6 @@ def _make_git_file(worktree: Path, gitdir_target: Path) -> Path:
     git_file = worktree / ".git"
     git_file.write_text(f"gitdir: {gitdir_target}\n")
     return git_file
-
-
-# ---------------------------------------------------------------------------
-# discover_git tests
-# ---------------------------------------------------------------------------
 
 
 class TestDiscoverGit:
@@ -149,11 +140,6 @@ class TestDiscoverGit:
         assert info is not None
         assert info.is_worktree is True
         assert info.repo_root == main_repo
-
-
-# ---------------------------------------------------------------------------
-# resolve_workspace tests
-# ---------------------------------------------------------------------------
 
 
 class TestResolveWorkspace:

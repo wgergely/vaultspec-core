@@ -43,10 +43,6 @@ if TYPE_CHECKING:
 
 pytestmark = [pytest.mark.api]
 
-# ---------------------------------------------------------------------------
-# Expected tools (keep in sync with app.py / register_tools)
-# ---------------------------------------------------------------------------
-
 EXPECTED_SUBAGENT_TOOLS = {
     "list_agents",
     "dispatch_agent",
@@ -69,11 +65,6 @@ EXPECTED_TEAM_TOOLS = {
 }
 
 ALL_EXPECTED_TOOLS = EXPECTED_SUBAGENT_TOOLS | EXPECTED_TEAM_TOOLS
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 async def _noop_run_subagent(**_kwargs):
@@ -176,21 +167,11 @@ async def _connected_session_no_lifespan() -> AsyncIterator[ClientSession]:
         yield session
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture(autouse=True)
 def _cleanup_globals():
     """Reset module-level state after every test."""
     yield
     _reset_subagent_globals()
-
-
-# ---------------------------------------------------------------------------
-# TestProtocolHandshake
-# ---------------------------------------------------------------------------
 
 
 class TestProtocolHandshake:
@@ -221,11 +202,6 @@ class TestProtocolHandshake:
         async with _connected_session_no_lifespan() as session:
             result = await session.send_ping()
             assert result is not None
-
-
-# ---------------------------------------------------------------------------
-# TestToolDiscovery
-# ---------------------------------------------------------------------------
 
 
 class TestToolDiscovery:
@@ -261,11 +237,6 @@ class TestToolDiscovery:
             tools_result = await session.list_tools()
             for tool in tools_result.tools:
                 assert tool.annotations is not None, f"{tool.name} missing annotations"
-
-
-# ---------------------------------------------------------------------------
-# TestResourceDiscovery
-# ---------------------------------------------------------------------------
 
 
 class TestResourceDiscovery:
@@ -306,11 +277,6 @@ class TestResourceDiscovery:
             assert isinstance(content_item, TextResourceContents)
             data = json.loads(content_item.text)
             assert "name" in data, "Agent resource JSON missing 'name' field"
-
-
-# ---------------------------------------------------------------------------
-# TestSubagentToolsRoundTrip
-# ---------------------------------------------------------------------------
 
 
 class TestSubagentToolsRoundTrip:
@@ -427,11 +393,6 @@ class TestSubagentToolsRoundTrip:
             assert data["locks"][0]["agent"] == "vaultspec-simple-executor"
 
 
-# ---------------------------------------------------------------------------
-# TestErrorPropagation
-# ---------------------------------------------------------------------------
-
-
 class TestErrorPropagation:
     """Verify that ToolError becomes CallToolResult(isError=True) via protocol.
 
@@ -479,11 +440,6 @@ class TestErrorPropagation:
                 {"task_id": "nonexistent-task"},
             )
             assert result.isError is True
-
-
-# ---------------------------------------------------------------------------
-# TestConcurrentCalls
-# ---------------------------------------------------------------------------
 
 
 class TestConcurrentCalls:

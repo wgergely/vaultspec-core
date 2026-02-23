@@ -217,10 +217,6 @@ class TeamCoordinator:
         # Map agent-name -> PID for processes restored from disk (no Process handle)
         self._spawned_pids: dict[str, int] = {}
 
-    # ------------------------------------------------------------------
-    # Context manager support
-    # ------------------------------------------------------------------
-
     async def __aenter__(self) -> TeamCoordinator:
         """Open the shared HTTP client for use in an async context manager."""
         headers: dict[str, str] = {}
@@ -232,10 +228,6 @@ class TeamCoordinator:
     async def __aexit__(self, *_: object) -> None:
         """Close the shared HTTP client on context manager exit."""
         await self._close_http()
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
 
     def _ensure_http_client(self) -> httpx.AsyncClient:
         """Return the shared HTTP client, creating it lazily if necessary.
@@ -411,6 +403,7 @@ class TeamCoordinator:
             The terminal ``Task`` produced by the agent.
         """
         client = self._get_client(agent_name)
+        logger.debug("Sending A2A message to %r", agent_name)
         response = await client.send_message(request)
         result = response.root
         # Unwrap: result is SendMessageSuccessResponse | JSONRPCErrorResponse
@@ -418,15 +411,26 @@ class TeamCoordinator:
             raise RuntimeError(f"A2A error from {agent_name!r}: {result.error}")
         task = result.result
         if isinstance(task, Task):
+            logger.debug(
+                "Task %s created for %r (state=%s)",
+                task.id,
+                agent_name,
+                task.status.state.value,
+            )
             if task.status.state not in _TERMINAL_STATES:
+                logger.debug(
+                    "Polling task %s for %r to terminal state", task.id, agent_name
+                )
                 task = await self._poll_task_to_terminal(agent_name, task.id)
+            logger.info(
+                "Task %s for %r reached terminal state: %s",
+                task.id,
+                agent_name,
+                task.status.state.value,
+            )
             return task
         # result.result might be a Message for streaming responses; guard it.
         raise TypeError(f"Expected Task from {agent_name!r}, got {type(task).__name__}")
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
 
     def restore_session(
         self,
@@ -477,6 +481,12 @@ class TeamCoordinator:
             self._http_client = httpx.AsyncClient(headers={"X-API-Key": effective_key})
             self._clients.clear()
 
+        logger.info(
+            "Forming team %r from %d agent(s): %s",
+            name,
+            len(agent_urls),
+            ", ".join(agent_urls),
+        )
         team_id = str(uuid.uuid4())
         http = self._ensure_http_client()
 
@@ -613,6 +623,12 @@ class TeamCoordinator:
         """
         if self._session is None:
             raise RuntimeError("No active team session. Call form_team() first.")
+
+        logger.info(
+            "dispatch_parallel: dispatching to %d agent(s): %s",
+            len(assignments),
+            ", ".join(assignments.keys()),
+        )
 
         # Resolve all refs to canonical keys up-front so _in_flight and status
         # are always indexed by the canonical key (URL or logical spawn name).
@@ -789,6 +805,12 @@ class TeamCoordinator:
             The resulting ``Task`` from the destination agent.
         """
         text = extract_artifact_text(src_task)
+        logger.info(
+            "relay_output: src_task=%s -> dst=%r (text_len=%d)",
+            src_task.id,
+            dst_agent,
+            len(text),
+        )
         request = self._make_send_request(
             parts=[
                 Part(root=TextPart(text=text)),

@@ -17,11 +17,6 @@ from vaultspec.printer import Printer
 pytestmark = [pytest.mark.unit]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def make_printer(quiet: bool = False) -> tuple[Printer, StringIO, StringIO]:
     """Return a Printer wired to in-memory buffers plus the buffers themselves."""
     out_buf = StringIO()
@@ -32,11 +27,6 @@ def make_printer(quiet: bool = False) -> tuple[Printer, StringIO, StringIO]:
         stderr_console=Console(file=err_buf, highlight=False, force_terminal=False),
     )
     return printer, out_buf, err_buf
-
-
-# ---------------------------------------------------------------------------
-# out()
-# ---------------------------------------------------------------------------
 
 
 class TestOut:
@@ -52,11 +42,6 @@ class TestOut:
         printer, out_buf, _ = make_printer(quiet=True)
         printer.out("still visible")
         assert "still visible" in out_buf.getvalue()
-
-
-# ---------------------------------------------------------------------------
-# out_json()
-# ---------------------------------------------------------------------------
 
 
 class TestOutJson:
@@ -82,11 +67,6 @@ class TestOutJson:
         assert json.loads(out_buf.getvalue()) == {"a": 1}
 
 
-# ---------------------------------------------------------------------------
-# status()
-# ---------------------------------------------------------------------------
-
-
 class TestStatus:
     """Printer.status() writes when quiet=False and is silent when quiet=True."""
 
@@ -101,11 +81,6 @@ class TestStatus:
         printer.status("this should be suppressed")
         assert err_buf.getvalue() == ""
         assert out_buf.getvalue() == ""
-
-
-# ---------------------------------------------------------------------------
-# warn()
-# ---------------------------------------------------------------------------
 
 
 class TestWarn:
@@ -123,11 +98,6 @@ class TestWarn:
         assert "still a warning" in err_buf.getvalue()
 
 
-# ---------------------------------------------------------------------------
-# error()
-# ---------------------------------------------------------------------------
-
-
 class TestError:
     """Printer.error() always writes to the stderr stream regardless of quiet."""
 
@@ -141,11 +111,6 @@ class TestError:
         printer, _, err_buf = make_printer(quiet=True)
         printer.error("still an error")
         assert "still an error" in err_buf.getvalue()
-
-
-# ---------------------------------------------------------------------------
-# Constructor defaults
-# ---------------------------------------------------------------------------
 
 
 class TestConstructorDefaults:

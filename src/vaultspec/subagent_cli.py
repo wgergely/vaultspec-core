@@ -15,6 +15,7 @@ from pathlib import Path
 
 from .cli_common import (
     add_common_args,
+    add_verbosity_args,
     get_default_layout,
     resolve_args_workspace,
     run_async,
@@ -225,6 +226,7 @@ def _make_parser() -> argparse.ArgumentParser:
     run_parser = subparsers.add_parser(
         "run", help="Run a sub-agent interactively or one-shot"
     )
+    add_verbosity_args(run_parser)
     run_parser.add_argument("--agent", "-a", help="Sub-agent name")
 
     # New Structured Args
@@ -306,6 +308,7 @@ def _make_parser() -> argparse.ArgumentParser:
 
     # --- SERVE ---
     serve_parser = subparsers.add_parser("serve", help="Run the subagent MCP server")
+    add_verbosity_args(serve_parser)
     serve_parser.set_defaults(func=command_serve)
 
     # --- A2A-SERVE ---
@@ -313,6 +316,7 @@ def _make_parser() -> argparse.ArgumentParser:
         "a2a-serve",
         help="Start an A2A HTTP server for agent-to-agent communication",
     )
+    add_verbosity_args(a2a_serve_parser)
     a2a_serve_parser.add_argument(
         "--executor",
         "-e",
@@ -343,6 +347,7 @@ def _make_parser() -> argparse.ArgumentParser:
 
     # --- LIST ---
     list_parser = subparsers.add_parser("list", help="List available agents")
+    add_verbosity_args(list_parser)
     list_parser.set_defaults(func=command_list)
 
     return parser

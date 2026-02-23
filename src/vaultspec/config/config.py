@@ -36,10 +36,6 @@ __all__ = [
     "reset_config",
 ]
 
-# ---------------------------------------------------------------------------
-# Helper parsers (defined before the registry so they can be referenced)
-# ---------------------------------------------------------------------------
-
 
 def parse_csv_list(value: str) -> list[str]:
     """Split a comma-separated string into a list of stripped, non-empty items.
@@ -81,11 +77,6 @@ def parse_float_or_none(value: str) -> float | None:
         return float(value)
     except (ValueError, TypeError):
         return None
-
-
-# ---------------------------------------------------------------------------
-# VaultSpecConfig
-# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -361,10 +352,6 @@ def _parse_raw(var: ConfigVariable, raw: str, source: str | None) -> Any:
         )
         return _SENTINEL
 
-
-# ---------------------------------------------------------------------------
-# ConfigVariable registry
-# ---------------------------------------------------------------------------
 
 # Type sentinels for Optional[int] / Optional[float] — we cannot use
 # ``int | None`` as a registry *value* because the registry needs a single
@@ -710,10 +697,6 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
     ),
 ]
 
-
-# ---------------------------------------------------------------------------
-# Global singleton management
-# ---------------------------------------------------------------------------
 
 _cached_config: VaultSpecConfig | None = None
 

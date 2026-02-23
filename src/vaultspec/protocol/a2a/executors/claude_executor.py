@@ -168,45 +168,75 @@ class ClaudeA2AExecutor(AgentExecutor):
         updater = TaskUpdater(event_queue, task_id, context_id)
         prompt = context.get_user_input()
 
+        logger.info(
+            "ClaudeA2AExecutor executing task %s (context=%s, model=%s, prompt_len=%d)",
+            task_id,
+            context_id,
+            self._model,
+            len(prompt),
+        )
+
         cancel_event = asyncio.Event()
         self._cancel_events[task_id] = cancel_event
 
-        sandbox_cb = _make_sandbox_callback(self._mode, self._root_dir)
-        # The SDK merges options.env ON TOP of os.environ:
-        #   process_env = {**os.environ, **options.env, "CLAUDE_CODE_ENTRYPOINT": ...}
-        # Simply omitting CLAUDECODE from options.env is not enough — the parent
-        # value from os.environ would survive the merge.  Setting it to "" (empty
-        # string) overrides the parent value; the Claude CLI treats an empty
-        # CLAUDECODE as falsy and allows the subprocess to start normally.
-        sdk_env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-        sdk_env["CLAUDECODE"] = ""  # empty string overrides parent "1" in SDK merge
-        kwargs: dict[str, Any] = {
-            "model": self._model,
-            "cwd": self._root_dir,
-            "mcp_servers": self._mcp_servers,
-            "can_use_tool": sandbox_cb,
-            "permission_mode": "bypassPermissions",
-            "system_prompt": self._system_prompt,
-            "env": sdk_env,
-        }
-        if self._cli_path:
-            kwargs["cli_path"] = self._cli_path
-
-        # Session resume: reuse session_id from a previous execution on the
-        # same context_id so the SDK can restore conversation state.
-        async with self._session_ids_lock:
-            prev_session = self._session_ids.get(context_id)
-        if prev_session:
-            kwargs["resume"] = prev_session
-
-        options = self._options_factory(**kwargs)
-        sdk_client = self._client_factory(options)
+        # Check for a live persistent client from a previous turn on this context.
         async with self._clients_lock:
-            self._active_clients[task_id] = sdk_client
+            existing_client = self._active_clients.get(context_id)
+
+        if existing_client is not None:
+            sdk_client = existing_client
+            logger.debug(
+                "Reusing persistent SDK client for context %s (task %s)",
+                context_id,
+                task_id,
+            )
+            # Register under task_id so cancel() can interrupt it.
+            async with self._clients_lock:
+                self._active_clients[task_id] = sdk_client
+        else:
+            sandbox_cb = _make_sandbox_callback(self._mode, self._root_dir)
+            # The SDK merges options.env ON TOP of os.environ:
+            #   process_env = {**os.environ, **options.env, "CLAUDE_CODE_ENTRYPOINT": ...}
+            # Simply omitting CLAUDECODE from options.env is not enough — the parent
+            # value from os.environ would survive the merge.  Setting it to "" (empty
+            # string) overrides the parent value; the Claude CLI treats an empty
+            # CLAUDECODE as falsy and allows the subprocess to start normally.
+            sdk_env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+            sdk_env["CLAUDECODE"] = ""  # empty string overrides parent "1" in SDK merge
+            kwargs: dict[str, Any] = {
+                "model": self._model,
+                "cwd": self._root_dir,
+                "mcp_servers": self._mcp_servers,
+                "can_use_tool": sandbox_cb,
+                "permission_mode": "bypassPermissions",
+                "system_prompt": self._system_prompt,
+                "env": sdk_env,
+            }
+            if self._cli_path:
+                kwargs["cli_path"] = self._cli_path
+
+            # Session resume: reuse session_id from a previous execution on the
+            # same context_id so the SDK can restore conversation state.
+            async with self._session_ids_lock:
+                prev_session = self._session_ids.get(context_id)
+            if prev_session:
+                kwargs["resume"] = prev_session
+                logger.debug(
+                    "Resuming session %s for context %s", prev_session, context_id
+                )
+
+            options = self._options_factory(**kwargs)
+            sdk_client = self._client_factory(options)
+            async with self._clients_lock:
+                self._active_clients[task_id] = sdk_client
 
         cancelled = False
+        errored = False
         try:
-            await sdk_client.connect()
+            if existing_client is None:
+                logger.debug("Connecting SDK client for task %s", task_id)
+                await sdk_client.connect()
+                logger.debug("SDK client connected for task %s", task_id)
 
             # Only signal working after the subprocess is confirmed started —
             # avoids a window where the task appears working but connect failed.
@@ -277,6 +307,7 @@ class ClaudeA2AExecutor(AgentExecutor):
                 await asyncio.sleep(delay)
 
         except Exception as e:
+            errored = True
             logger.exception("ClaudeA2AExecutor error for task %s", task_id)
             await updater.failed(
                 message=updater.new_agent_message(
@@ -284,13 +315,38 @@ class ClaudeA2AExecutor(AgentExecutor):
                 )
             )
         finally:
-            # Only disconnect and remove from active clients when NOT
-            # cancelled — cancel() leaves the client alive so the SDK
-            # session can be resumed later.
-            if not cancelled:
-                await sdk_client.disconnect()
+            if cancelled:
+                # Cancelled: keep the client alive under context_id for future resume.
+                # Remove the task_id entry but store the client under context_id.
                 async with self._clients_lock:
                     self._active_clients.pop(task_id, None)
+                    self._active_clients[context_id] = sdk_client
+                logger.debug(
+                    "Task %s cancelled — keeping SDK client alive for context %s resume",
+                    task_id,
+                    context_id,
+                )
+            elif errored:
+                # Error path: disconnect and evict so the next attempt starts fresh.
+                async with self._clients_lock:
+                    self._active_clients.pop(task_id, None)
+                    if self._active_clients.get(context_id) is sdk_client:
+                        self._active_clients.pop(context_id, None)
+                logger.debug(
+                    "Disconnecting SDK client for task %s after error", task_id
+                )
+                await sdk_client.disconnect()
+            else:
+                # Successful completion: persist the live client under context_id
+                # so the next turn on the same context can reuse it without reconnecting.
+                async with self._clients_lock:
+                    self._active_clients.pop(task_id, None)
+                    self._active_clients[context_id] = sdk_client
+                    logger.debug(
+                        "Persisting SDK client for context %s after task %s completion",
+                        context_id,
+                        task_id,
+                    )
             self._cancel_events.pop(task_id, None)
 
     async def _run_stream(
@@ -354,10 +410,21 @@ class ClaudeA2AExecutor(AgentExecutor):
                         last_chunk_time = now
 
                 elif isinstance(msg, ResultMessage):
+                    logger.debug(
+                        "ResultMessage received for context %s (error=%s, session_id=%s)",
+                        context_id,
+                        msg.is_error,
+                        msg.session_id,
+                    )
                     # Persist session_id for future resume.
                     if msg.session_id:
                         async with self._session_ids_lock:
                             self._session_ids[context_id] = msg.session_id
+                        logger.debug(
+                            "Persisted session_id %s for context %s",
+                            msg.session_id,
+                            context_id,
+                        )
 
                     text = "".join(collected) or msg.result or ""
                     if text:
@@ -454,3 +521,18 @@ class ClaudeA2AExecutor(AgentExecutor):
         if in_flight:
             updater = TaskUpdater(event_queue, task_id, context_id)
             await updater.cancel()
+
+    async def cleanup(self) -> None:
+        """Disconnect all persistent SDK clients.
+
+        Call this on server shutdown to cleanly terminate any Claude subprocesses
+        kept alive for multi-turn resume.
+        """
+        async with self._clients_lock:
+            clients = list(self._active_clients.values())
+            self._active_clients.clear()
+        for client in clients:
+            try:
+                await client.disconnect()
+            except Exception:
+                logger.exception("Error disconnecting SDK client during cleanup")

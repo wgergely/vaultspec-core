@@ -12,10 +12,6 @@ from __future__ import annotations
 
 import pathlib
 
-# ---------------------------------------------------------------------------
-# Project paths
-# ---------------------------------------------------------------------------
-
 #: Repository root (one directory above: tests/ -> repo)
 PROJECT_ROOT: pathlib.Path = pathlib.Path(__file__).resolve().parent.parent
 
@@ -30,10 +26,6 @@ TEST_PROJECT: pathlib.Path = PROJECT_ROOT / "test-project"
 
 #: test-project/.vault/ documentation vault
 TEST_VAULT: pathlib.Path = TEST_PROJECT / ".vault"
-
-# ---------------------------------------------------------------------------
-# GPU fast corpus (13 representative docs covering all 5 doc_types)
-# ---------------------------------------------------------------------------
 
 GPU_FAST_CORPUS_STEMS: frozenset[str] = frozenset(
     [
@@ -58,25 +50,13 @@ GPU_FAST_CORPUS_STEMS: frozenset[str] = frozenset(
     ]
 )
 
-# ---------------------------------------------------------------------------
-# Lance directory suffixes (test isolation)
-# ---------------------------------------------------------------------------
-
 LANCE_SUFFIX_FAST: str = "-fast"
 LANCE_SUFFIX_FULL: str = "-full"
 LANCE_SUFFIX_UNIT: str = "-fast-unit"
 
-# ---------------------------------------------------------------------------
-# Test port constants
-# ---------------------------------------------------------------------------
-
 TEST_PORT_BASE: int = 10001
 TEST_PORT_A2A_BASE: int = 10020
 TEST_PORT_SUBAGENT: int = 10010
-
-# ---------------------------------------------------------------------------
-# Timeout constants (seconds)
-# ---------------------------------------------------------------------------
 
 TIMEOUT_QUICK: int = 15
 TIMEOUT_INTEGRATION: int = 120
@@ -87,17 +67,9 @@ TIMEOUT_MCP_E2E: int = 180
 TIMEOUT_FULL_CYCLE: int = 180
 TIMEOUT_A2A_E2E: int = 300
 
-# ---------------------------------------------------------------------------
-# Delay constants (seconds) -- used in asyncio.sleep / time.sleep
-# ---------------------------------------------------------------------------
-
 DELAY_SHORT: float = 0.2
 DELAY_MEDIUM: float = 0.3
 DELAY_LONG: float = 1.0
-
-# ---------------------------------------------------------------------------
-# ACP test helper timeouts (seconds)
-# ---------------------------------------------------------------------------
 
 ACP_TIMEOUT_READ: float = 10.0
 ACP_TIMEOUT_MESSAGE: float = 30.0

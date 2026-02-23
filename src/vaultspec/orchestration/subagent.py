@@ -367,6 +367,15 @@ async def run_subagent(
     if context_files is None:
         context_files = []
 
+    logger.info(
+        "run_subagent: agent=%s model=%s provider=%s mode=%s task_len=%d",
+        agent_name,
+        model_override or "(from-spec)",
+        provider_override or "(auto)",
+        mode,
+        len(initial_task),
+    )
+
     current_model = model_override
     effective_mcp_servers = mcp_servers or {}
 
@@ -392,6 +401,7 @@ async def run_subagent(
             root_dir,
             content_root=content_root,
         )
+    logger.debug("Loaded agent %r (model=%s)", agent_name, agent_meta.get("model"))
 
     # 1b. Apply runtime overrides (take precedence over YAML defaults)
     if max_turns is not None:
@@ -458,6 +468,11 @@ async def run_subagent(
                                     logger.warning("[AGENT-STDERR] %s", text)
 
             # Main Execution Block
+            logger.debug(
+                "Spawning agent process: %s %s",
+                spec.executable,
+                " ".join(str(a) for a in spec.args[:3]),
+            )
             async with spawn_agent_process(
                 client,
                 spec.executable,
@@ -465,6 +480,7 @@ async def run_subagent(
                 env=spec.env,
                 cwd=str(root_dir),
             ) as (conn, _proc):
+                logger.debug("Agent process spawned (pid=%s)", _proc.pid)
                 # Start stderr consumer
                 t = asyncio.create_task(_read_stderr(_proc, debug))
                 background_tasks.add(t)
@@ -496,6 +512,7 @@ async def run_subagent(
                         "— the agent process may be stuck on authentication "
                         "or unresponsive"
                     ) from None
+                logger.info("ACP handshake complete for agent %r", agent_name)
                 logger.debug("Handshake Result: %s", init_res)
 
                 # Session setup
@@ -553,6 +570,12 @@ async def run_subagent(
                         "— the agent process may be stuck on authentication "
                         "or unresponsive"
                     ) from None
+
+                logger.info(
+                    "ACP session ready for agent %r (session_id=%s)",
+                    agent_name,
+                    session.session_id,
+                )
 
                 # Initial Task
                 initial_prompt = spec.initial_prompt_override or task_context

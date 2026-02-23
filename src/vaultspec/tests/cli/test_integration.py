@@ -38,11 +38,6 @@ def test_cli_list_agents():
     assert "agents" in result.stdout or "[]" in result.stdout
 
 
-# ---------------------------------------------------------------------------
-# --content-dir CLI integration
-# ---------------------------------------------------------------------------
-
-
 class TestContentDirCLI:
     """Verify --content-dir routes content from a separate directory."""
 
@@ -119,11 +114,6 @@ class TestContentDirCLI:
         assert "test-rule.md" in sources
 
 
-# ---------------------------------------------------------------------------
-# _paths.py env var bridge
-# ---------------------------------------------------------------------------
-
-
 class TestPathsEnvBridge:
     """Verify resolve_workspace honours env-var-sourced overrides."""
 
@@ -173,11 +163,6 @@ class TestPathsEnvBridge:
         assert layout.content_root == content
         # output_root derived from structural fallback (framework_root.parent)
         assert layout.output_root == project
-
-
-# ---------------------------------------------------------------------------
-# Validation edge cases
-# ---------------------------------------------------------------------------
 
 
 class TestValidationEdgeCases:

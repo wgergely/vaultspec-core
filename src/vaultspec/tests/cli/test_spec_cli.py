@@ -18,10 +18,6 @@ from .conftest import make_ns, setup_rules_dir
 
 pytestmark = [pytest.mark.unit]
 
-# ---------------------------------------------------------------------------
-# Helper: run spec_cli as subprocess
-# ---------------------------------------------------------------------------
-
 
 def run_spec(*args: str, check: bool = False) -> subprocess.CompletedProcess[str]:
     """Run vaultspec.spec_cli as subprocess and return the result."""
@@ -32,11 +28,6 @@ def run_spec(*args: str, check: bool = False) -> subprocess.CompletedProcess[str
         check=check,
         timeout=30,
     )
-
-
-# ===================================================================
-# Help text (subprocess-based)
-# ===================================================================
 
 
 class TestSpecCliHelp:
@@ -107,11 +98,6 @@ class TestSpecCliHelp:
         result = run_spec("init", "--help")
         assert result.returncode == 0
         assert "--force" in result.stdout
-
-
-# ===================================================================
-# Argument parsing (direct parser access)
-# ===================================================================
 
 
 class TestSpecCliArgParsing:
@@ -207,11 +193,6 @@ class TestSpecCliArgParsing:
         assert args.new_name == "new-name"
 
 
-# ===================================================================
-# Functional tests (subprocess + test-project / tmp_path)
-# ===================================================================
-
-
 class TestSpecCliFunctional:
     """Functional tests exercising real CLI commands."""
 
@@ -256,11 +237,6 @@ class TestSpecCliFunctional:
         (tmp_path / ".vaultspec").mkdir()
         result = run_spec("--root", str(tmp_path), "hooks", "list")
         assert result.returncode == 0
-
-
-# ===================================================================
-# Direct handler dispatch routing
-# ===================================================================
 
 
 class TestSpecCliDispatchRouting:

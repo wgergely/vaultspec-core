@@ -71,10 +71,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Module-level configuration -- set by register_tools() caller or tests.
-# ---------------------------------------------------------------------------
-
 _root_dir: Path | None = None
 _team_task_engine = TeamTaskEngine()
 
@@ -130,11 +126,6 @@ def _load_session(root: Path, name: str) -> TeamSession:
         return _load_session_canonical(root, name)
     except SessionNotFoundError as exc:
         raise ToolError(str(exc)) from exc
-
-
-# ---------------------------------------------------------------------------
-# Tool functions (undecorated -- registered by register_tools())
-# ---------------------------------------------------------------------------
 
 
 def _parse_agent_urls(agents_str: str) -> list[str]:
@@ -637,11 +628,6 @@ async def dissolve_team(team_name: str) -> str:
         },
         indent=2,
     )
-
-
-# ---------------------------------------------------------------------------
-# Registration API -- used by the unified server (vaultspec.server)
-# ---------------------------------------------------------------------------
 
 
 def register_tools(mcp: FastMCP) -> None:

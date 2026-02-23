@@ -35,10 +35,6 @@ from ..gemini_bridge import (
     _SessionState,
 )
 
-# ---------------------------------------------------------------------------
-# Test doubles — plain classes, no mocking
-# ---------------------------------------------------------------------------
-
 
 class FakeChildConn:
     """Records calls made to the child ACP connection."""
@@ -159,11 +155,6 @@ class ConnRecorder:
         return None
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture
 def bridge() -> GeminiACPBridge:
     return GeminiACPBridge(
@@ -176,11 +167,6 @@ def bridge() -> GeminiACPBridge:
 @pytest.fixture
 def conn() -> ConnRecorder:
     return ConnRecorder()
-
-
-# ---------------------------------------------------------------------------
-# Helper function tests: _map_tool_kind
-# ---------------------------------------------------------------------------
 
 
 class TestMapToolKind:
@@ -256,11 +242,6 @@ class TestMapToolKind:
     def test_first_match_wins(self) -> None:
         # "readwrite" contains both "read" and "write" — "read" comes first
         assert _map_tool_kind("readwrite") == "read"
-
-
-# ---------------------------------------------------------------------------
-# Helper function tests: _get_tool_call_content
-# ---------------------------------------------------------------------------
 
 
 class TestGetToolCallContent:
@@ -360,11 +341,6 @@ class TestGetToolCallContent:
     def test_unknown_tool_returns_empty(self) -> None:
         result = _get_tool_call_content("Bash", {"command": "ls"})
         assert result == []
-
-
-# ---------------------------------------------------------------------------
-# Lifecycle tests
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -822,11 +798,6 @@ class TestGeminiBridgeLifecycle:
         assert len(bridge._sessions) == 0
 
 
-# ---------------------------------------------------------------------------
-# Constructor and DI tests (ADR D7)
-# ---------------------------------------------------------------------------
-
-
 class TestConstructorDI:
     """Test DI pattern and constructor configuration (ADR D7)."""
 
@@ -924,11 +895,6 @@ class TestConstructorDI:
             gemini_path="/fake/gemini",
         )
         assert bridge._include_dirs == []
-
-
-# ---------------------------------------------------------------------------
-# Protocol normalization tests
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -1251,11 +1217,6 @@ class TestGeminiBridgeNormalization:
 
         assert len(conn.session_update_calls) == 1
         assert conn.session_update_calls[0]["update"].text == "thinking..."
-
-
-# ---------------------------------------------------------------------------
-# Session management tests
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -1598,11 +1559,6 @@ class TestGeminiBridgeSessionManagement:
         await bridge.ext_notification("test", {})
 
 
-# ---------------------------------------------------------------------------
-# Session state dataclass tests (ADR D4)
-# ---------------------------------------------------------------------------
-
-
 class TestSessionState:
     """Test _SessionState dataclass fields and defaults."""
 
@@ -1687,11 +1643,6 @@ class TestSessionState:
         )
         state_a.mcp_servers.append("server-a")
         assert "server-a" not in state_b.mcp_servers
-
-
-# ---------------------------------------------------------------------------
-# Proxy client tests
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -1787,11 +1738,6 @@ class TestGeminiProxyClient:
         assert await proxy.release_terminal() is None
 
 
-# ---------------------------------------------------------------------------
-# Session isolation tests
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.asyncio
 class TestSessionIsolation:
     """Test per-session state isolation."""
@@ -1836,11 +1782,6 @@ class TestSessionIsolation:
 
         bridge._sessions[res1.session_id].todo_write_tool_call_ids.add("tw1")
         assert "tw1" not in bridge._sessions[res2.session_id].todo_write_tool_call_ids
-
-
-# ---------------------------------------------------------------------------
-# Cleanup tests
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -1971,11 +1912,6 @@ class TestCleanup:
 
         assert len(stack_closed) == 1
         assert len(bridge._sessions) == 0
-
-
-# ---------------------------------------------------------------------------
-# Handshake timeout tests
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio

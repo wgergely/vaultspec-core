@@ -13,10 +13,6 @@ import pytest
 
 pytestmark = [pytest.mark.unit]
 
-# ---------------------------------------------------------------------------
-# Helper: run vaultspec as subprocess
-# ---------------------------------------------------------------------------
-
 
 def run_vaultspec(*args: str) -> subprocess.CompletedProcess[str]:
     """Run ``python -m vaultspec`` as a subprocess and return the result."""
@@ -26,11 +22,6 @@ def run_vaultspec(*args: str) -> subprocess.CompletedProcess[str]:
         text=True,
         timeout=30,
     )
-
-
-# ===================================================================
-# --help text
-# ===================================================================
 
 
 class TestMainHelp:
@@ -75,11 +66,6 @@ class TestMainHelp:
         assert "vaultspec" in result.stdout
 
 
-# ===================================================================
-# --version
-# ===================================================================
-
-
 class TestMainVersion:
     """Verify --version and -V print the version string."""
 
@@ -100,11 +86,6 @@ class TestMainVersion:
         result = run_vaultspec("-V")
         assert result.returncode == 0
         assert expected_version in result.stdout
-
-
-# ===================================================================
-# Namespace routing
-# ===================================================================
 
 
 class TestNamespaceRouting:
@@ -140,11 +121,6 @@ class TestNamespaceRouting:
         """``vaultspec subagent -V`` exits 0."""
         result = run_vaultspec("subagent", "-V")
         assert result.returncode == 0
-
-
-# ===================================================================
-# Spec CLI fallthrough
-# ===================================================================
 
 
 class TestSpecCliFallthrough:

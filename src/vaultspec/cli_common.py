@@ -13,6 +13,7 @@ Utilities:
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import contextlib
 import logging
@@ -22,7 +23,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
-    import argparse
     from collections.abc import Coroutine, Generator
 
     from .config import WorkspaceLayout
@@ -81,6 +81,42 @@ def get_version(root_dir: Path | None = None) -> str:
             if line.strip().startswith("version"):
                 return line.split("=", 1)[1].strip().strip('"').strip("'")
     return "unknown"
+
+
+def add_verbosity_args(parser: argparse.ArgumentParser) -> None:
+    """Add verbosity flags to a subcommand parser.
+
+    Adds ``--verbose``/``-v``, ``--debug``, and ``--quiet``/``-q`` as a
+    mutually-exclusive group.  Call this on each subparser so that flags
+    placed *after* the subcommand name are recognised.
+
+    Uses ``default=argparse.SUPPRESS`` so that unspecified flags do not
+    override values already set by the top-level parser.
+
+    Args:
+        parser: The argument parser to add verbosity arguments to.
+    """
+    verbosity = parser.add_mutually_exclusive_group()
+    verbosity.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="Enable verbose output (INFO level)",
+    )
+    verbosity.add_argument(
+        "--debug",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="Enable debug logging (DEBUG level)",
+    )
+    verbosity.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="Suppress informational output (WARNING level only)",
+    )
 
 
 def add_common_args(parser: argparse.ArgumentParser) -> None:

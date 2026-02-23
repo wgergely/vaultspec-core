@@ -14,6 +14,7 @@ from datetime import datetime
 
 from .cli_common import (
     add_common_args,
+    add_verbosity_args,
     get_default_layout,
     resolve_args_workspace,
     setup_logging,
@@ -47,6 +48,7 @@ def _make_parser() -> argparse.ArgumentParser:
 
     # Audit command
     audit_parser = subparsers.add_parser("audit", help="Audit the vault.")
+    add_verbosity_args(audit_parser)
     audit_parser.add_argument(
         "--summary", action="store_true", help="Show summary stats."
     )
@@ -77,6 +79,7 @@ def _make_parser() -> argparse.ArgumentParser:
     create_parser = subparsers.add_parser(
         "create", help="Create a new doc from template."
     )
+    add_verbosity_args(create_parser)
     create_parser.add_argument(
         "--type",
         type=str,
@@ -97,6 +100,7 @@ def _make_parser() -> argparse.ArgumentParser:
             "NOTE: Requires NVIDIA GPU with CUDA. CPU-only systems are not supported."
         ),
     )
+    add_verbosity_args(index_parser)
     index_parser.add_argument(
         "--full",
         action="store_true",
@@ -114,6 +118,7 @@ def _make_parser() -> argparse.ArgumentParser:
             "NOTE: Requires NVIDIA GPU with CUDA. CPU-only systems are not supported."
         ),
     )
+    add_verbosity_args(search_parser)
     search_parser.add_argument("query", type=str, help="Search query.")
     search_parser.add_argument(
         "--limit", type=int, default=5, help="Number of results."

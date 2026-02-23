@@ -23,6 +23,7 @@ import sys
 
 from .cli_common import (
     add_common_args,
+    add_verbosity_args,
     get_default_layout,
     resolve_args_workspace,
     setup_logging,
@@ -90,6 +91,7 @@ def _make_parser() -> argparse.ArgumentParser:
 
     # --- rules ---
     rules_parser = resource_parsers.add_parser("rules", help="Manage rules")
+    add_verbosity_args(rules_parser)
     rules_sub = rules_parser.add_subparsers(dest="command")
 
     rules_sub.add_parser("list", help="List all rules")
@@ -120,6 +122,7 @@ def _make_parser() -> argparse.ArgumentParser:
 
     # --- agents ---
     agents_parser = resource_parsers.add_parser("agents", help="Manage agents")
+    add_verbosity_args(agents_parser)
     agents_sub = agents_parser.add_subparsers(dest="command")
 
     agents_sub.add_parser("list", help="List all agents")
@@ -168,6 +171,7 @@ def _make_parser() -> argparse.ArgumentParser:
 
     # --- skills ---
     skills_parser = resource_parsers.add_parser("skills", help="Manage skills")
+    add_verbosity_args(skills_parser)
     skills_sub = skills_parser.add_subparsers(dest="command")
 
     skills_sub.add_parser("list", help="List all managed skills")
@@ -206,6 +210,7 @@ def _make_parser() -> argparse.ArgumentParser:
     config_parser = resource_parsers.add_parser(
         "config", help="Manage tool configs (CLAUDE.md, GEMINI.md)"
     )
+    add_verbosity_args(config_parser)
     config_sub = config_parser.add_subparsers(dest="command")
 
     config_sub.add_parser("show", help="Display internal/custom content")
@@ -218,6 +223,7 @@ def _make_parser() -> argparse.ArgumentParser:
 
     # --- system ---
     system_parser = resource_parsers.add_parser("system", help="Manage system prompts")
+    add_verbosity_args(system_parser)
     system_sub = system_parser.add_subparsers(dest="command")
 
     system_sub.add_parser("show", help="Display system parts and targets")
@@ -230,11 +236,13 @@ def _make_parser() -> argparse.ArgumentParser:
 
     # --- sync-all ---
     sync_all_parser = resource_parsers.add_parser("sync-all", help="Sync all")
+    add_verbosity_args(sync_all_parser)
     add_sync_flags(sync_all_parser)
     sync_all_parser.add_argument("--force", action="store_true", help="Force overwrite")
 
     # --- test ---
     test_parser = resource_parsers.add_parser("test", help="Run tests")
+    add_verbosity_args(test_parser)
     test_parser.add_argument(
         "category",
         nargs="?",
@@ -260,12 +268,16 @@ def _make_parser() -> argparse.ArgumentParser:
     test_parser.add_argument("extra_args", nargs="*", help="Extra pytest arguments")
 
     # --- doctor ---
-    resource_parsers.add_parser("doctor", help="Check prerequisites and system health")
+    doctor_parser = resource_parsers.add_parser(
+        "doctor", help="Check prerequisites and system health"
+    )
+    add_verbosity_args(doctor_parser)
 
     # --- init ---
     init_parser = resource_parsers.add_parser(
         "init", help="Initialize vaultspec in a project"
     )
+    add_verbosity_args(init_parser)
     init_parser.add_argument(
         "--force", action="store_true", help="Overwrite existing structure"
     )
@@ -274,12 +286,14 @@ def _make_parser() -> argparse.ArgumentParser:
     readiness_parser = resource_parsers.add_parser(
         "readiness", help="Assess codebase governance readiness"
     )
+    add_verbosity_args(readiness_parser)
     readiness_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # --- hooks ---
     hooks_parser = resource_parsers.add_parser(
         "hooks", help="Manage event-driven hooks"
     )
+    add_verbosity_args(hooks_parser)
     hooks_sub = hooks_parser.add_subparsers(dest="command")
     hooks_sub.add_parser("list", help="List all hooks")
     hooks_run_parser = hooks_sub.add_parser("run", help="Trigger hooks for an event")

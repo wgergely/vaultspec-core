@@ -75,11 +75,6 @@ __all__ = ["_ACP_HANDSHAKE_TIMEOUT", "GeminiACPBridge", "main"]
 _ACP_HANDSHAKE_TIMEOUT: float = 30.0
 
 
-# ---------------------------------------------------------------------------
-# Helper functions
-# ---------------------------------------------------------------------------
-
-
 def _map_tool_kind(tool_name: str) -> str:
     """Map a Gemini tool name to an ACP tool kind via substring matching.
 
@@ -166,11 +161,6 @@ def _get_tool_call_content(
     return []
 
 
-# ---------------------------------------------------------------------------
-# Per-session state
-# ---------------------------------------------------------------------------
-
-
 @dataclasses.dataclass
 class _SessionState:
     """Per-session state tracked by the Gemini ACP bridge.
@@ -216,11 +206,6 @@ class _SessionState:
     cancel_event: asyncio.Event = dataclasses.field(default_factory=asyncio.Event)
     tool_call_contents: dict[str, list[Any]] = dataclasses.field(default_factory=dict)
     todo_write_tool_call_ids: set[str] = dataclasses.field(default_factory=set)
-
-
-# ---------------------------------------------------------------------------
-# Proxy client — forwards child ACP updates to the parent bridge
-# ---------------------------------------------------------------------------
 
 
 class GeminiProxyClient(Client):
@@ -403,11 +388,6 @@ class GeminiProxyClient(Client):
         )
 
 
-# ---------------------------------------------------------------------------
-# Main bridge — all 15 Agent protocol methods
-# ---------------------------------------------------------------------------
-
-
 class GeminiACPBridge(Agent):
     """ACP ``Agent`` implementation that wraps the Gemini CLI.
 
@@ -525,8 +505,6 @@ class GeminiACPBridge(Agent):
             env_dirs = os.environ.get("VAULTSPEC_INCLUDE_DIRS", "")
             self._include_dirs = [d.strip() for d in env_dirs.split(",") if d.strip()]
 
-    # -- Protocol: on_connect -----------------------------------------------
-
     def on_connect(self, conn: Any) -> None:
         """Store the client-side connection for sending notifications.
 
@@ -535,8 +513,6 @@ class GeminiACPBridge(Agent):
                 the agent handshake completes.
         """
         self._conn = conn
-
-    # -- Protocol: initialize -----------------------------------------------
 
     async def initialize(
         self,
@@ -574,8 +550,6 @@ class GeminiACPBridge(Agent):
                 ),
             ),
         )
-
-    # -- Internal: spawn + cleanup helpers ----------------------------------
 
     async def _spawn_child_session(
         self,
@@ -764,8 +738,6 @@ class GeminiACPBridge(Agent):
         with contextlib.suppress(Exception):
             await state.exit_stack.aclose()
 
-    # -- Protocol: new_session ----------------------------------------------
-
     async def new_session(
         self,
         cwd: str,
@@ -798,8 +770,6 @@ class GeminiACPBridge(Agent):
         self._sessions[session_id] = state
 
         return NewSessionResponse(session_id=session_id)
-
-    # -- Protocol: prompt ---------------------------------------------------
 
     async def prompt(
         self,
@@ -884,8 +854,6 @@ class GeminiACPBridge(Agent):
             return PromptResponse(stop_reason="end_turn")
 
         return prompt_task.result()
-
-    # -- Forwarding: child → parent -----------------------------------------
 
     async def forward_update(self, session_id: str, update: Any) -> None:
         """Forward a session update from the child to the parent connection.
@@ -1015,8 +983,6 @@ class GeminiACPBridge(Agent):
                 session_id=state.child_session_id,
             )
 
-    # -- Protocol: authenticate ---------------------------------------------
-
     async def authenticate(
         self,
         method_id: str,
@@ -1038,8 +1004,6 @@ class GeminiACPBridge(Agent):
                 method_id,
             )
         return AuthenticateResponse()
-
-    # -- Protocol: load_session ---------------------------------------------
 
     async def load_session(
         self,
@@ -1112,8 +1076,6 @@ class GeminiACPBridge(Agent):
 
         return LoadSessionResponse()
 
-    # -- Protocol: list_sessions --------------------------------------------
-
     async def list_sessions(
         self,
         cursor: str | None = None,
@@ -1145,8 +1107,6 @@ class GeminiACPBridge(Agent):
                 ),
             )
         return ListSessionsResponse(sessions=sessions)
-
-    # -- Protocol: fork_session ---------------------------------------------
 
     async def fork_session(
         self,
@@ -1193,8 +1153,6 @@ class GeminiACPBridge(Agent):
 
         return ForkSessionResponse(session_id=new_id)
 
-    # -- Protocol: set_session_mode -----------------------------------------
-
     async def set_session_mode(
         self,
         mode_id: str,
@@ -1214,8 +1172,6 @@ class GeminiACPBridge(Agent):
         if self._debug:
             logger.debug("Session mode changed to: %s", mode_id)
 
-    # -- Protocol: set_session_model ----------------------------------------
-
     async def set_session_model(
         self,
         model_id: str,
@@ -1234,8 +1190,6 @@ class GeminiACPBridge(Agent):
             state.model = model_id
         if self._debug:
             logger.debug("Session model changed to: %s", model_id)
-
-    # -- Protocol: set_config_option ----------------------------------------
 
     async def set_config_option(
         self,
@@ -1259,8 +1213,6 @@ class GeminiACPBridge(Agent):
                 config_id,
                 value,
             )
-
-    # -- Protocol: ext_method / ext_notification ----------------------------
 
     async def ext_method(
         self,
@@ -1294,18 +1246,11 @@ class GeminiACPBridge(Agent):
         if self._debug:
             logger.debug("ext_notification: %s", method)
 
-    # -- Protocol: close ----------------------------------------------------
-
     async def close(self) -> None:
         """Close all active sessions and release resources."""
         for state in list(self._sessions.values()):
             await self._cleanup_session(state)
         self._sessions.clear()
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
 
 
 async def main() -> None:

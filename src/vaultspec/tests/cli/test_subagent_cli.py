@@ -12,10 +12,6 @@ import pytest
 
 pytestmark = [pytest.mark.unit]
 
-# ---------------------------------------------------------------------------
-# Helper: run subagent_cli as subprocess
-# ---------------------------------------------------------------------------
-
 
 def run_subagent(*args: str, check: bool = False) -> subprocess.CompletedProcess[str]:
     """Run vaultspec.subagent_cli as subprocess and return the result."""
@@ -26,11 +22,6 @@ def run_subagent(*args: str, check: bool = False) -> subprocess.CompletedProcess
         check=check,
         timeout=30,
     )
-
-
-# ===================================================================
-# TestSubagentArgParsing — direct parser tests for `run` subcommand
-# ===================================================================
 
 
 class TestSubagentArgParsing:
@@ -265,11 +256,6 @@ class TestSubagentArgParsing:
         assert args.task_file == "task.md"
 
 
-# ===================================================================
-# TestSubagentA2aServeArgs — direct parser tests for `a2a-serve`
-# ===================================================================
-
-
 class TestSubagentA2aServeArgs:
     """Test argparse configuration for the `a2a-serve` subcommand."""
 
@@ -351,11 +337,6 @@ class TestSubagentA2aServeArgs:
         assert args.model == "fast"
 
 
-# ===================================================================
-# TestSubagentOtherSubcommands — serve and list
-# ===================================================================
-
-
 class TestSubagentOtherSubcommands:
     """Test argparse configuration for `serve` and `list` subcommands."""
 
@@ -376,11 +357,6 @@ class TestSubagentOtherSubcommands:
     def test_no_subcommand_raises(self, parser):
         with pytest.raises(SystemExit):
             parser.parse_args([])
-
-
-# ===================================================================
-# TestSubagentValidation — subprocess-based validation error paths
-# ===================================================================
 
 
 class TestSubagentValidation:
@@ -419,11 +395,6 @@ class TestSubagentValidation:
     def test_a2a_serve_invalid_executor_errors(self):
         result = run_subagent("a2a-serve", "--executor", "invalid")
         assert result.returncode != 0
-
-
-# ===================================================================
-# TestSubagentHelpText — subprocess-based help verification
-# ===================================================================
 
 
 class TestSubagentHelpText:

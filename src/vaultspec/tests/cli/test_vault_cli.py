@@ -20,10 +20,6 @@ from tests.constants import TEST_PROJECT
 
 pytestmark = [pytest.mark.unit]
 
-# ---------------------------------------------------------------------------
-# Helper: run vault_cli as subprocess
-# ---------------------------------------------------------------------------
-
 
 def run_vault(*args: str, check: bool = False) -> subprocess.CompletedProcess[str]:
     """Run vaultspec.vault_cli as subprocess and return the result."""
@@ -34,11 +30,6 @@ def run_vault(*args: str, check: bool = False) -> subprocess.CompletedProcess[st
         check=check,
         timeout=30,
     )
-
-
-# ===================================================================
-# _get_version()
-# ===================================================================
 
 
 class TestGetVersion:
@@ -71,11 +62,6 @@ class TestGetVersion:
 
         version = get_version(root_dir=tmp_path)
         assert version == "unknown"
-
-
-# ===================================================================
-# --help text
-# ===================================================================
 
 
 class TestHelpText:
@@ -124,11 +110,6 @@ class TestHelpText:
         result = run_vault("search", "--help")
         assert result.returncode == 0
         assert "query" in result.stdout
-
-
-# ===================================================================
-# Argument parsing via monkeypatch
-# ===================================================================
 
 
 class TestArgumentParsing:
@@ -261,11 +242,6 @@ class TestArgumentParsing:
         assert args.command is None
 
 
-# ===================================================================
-# Audit subcommand (functional, using test-project vault)
-# ===================================================================
-
-
 class TestAuditSummary:
     """Test audit --summary on the test-project vault."""
 
@@ -356,11 +332,6 @@ class TestAuditVerify:
         assert "features" in data
 
 
-# ===================================================================
-# Create subcommand (output path generation)
-# ===================================================================
-
-
 class TestCreateSubcommand:
     """Test create subcommand output path logic."""
 
@@ -427,11 +398,6 @@ class TestCreateSubcommand:
             assert result.returncode != 2, f"DocType {dt.value} rejected by argparse"
 
 
-# ===================================================================
-# No-command behavior
-# ===================================================================
-
-
 class TestNoCommand:
     """Test behavior when no subcommand is given."""
 
@@ -440,11 +406,6 @@ class TestNoCommand:
         result = run_vault()
         assert result.returncode == 0
         assert "usage:" in result.stdout.lower() or "audit" in result.stdout
-
-
-# ===================================================================
-# Logging configuration dispatch
-# ===================================================================
 
 
 class TestLoggingDispatch:

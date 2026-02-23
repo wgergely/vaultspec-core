@@ -39,11 +39,6 @@ from ..team import (
 pytestmark = [pytest.mark.integration]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _make_card(name: str, port: int) -> AgentCard:
     return AgentCard(
         name=name,
@@ -107,11 +102,6 @@ def mux_transport():
     return _MuxTransport(
         {"http://localhost:10300": app_a, "http://localhost:10301": app_b}
     )
-
-
-# ---------------------------------------------------------------------------
-# Test 1: Full lifecycle — form → persist → restore → dispatch → dissolve
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -183,11 +173,6 @@ async def test_full_lifecycle_with_session_persistence(workspace, mux_transport)
     assert restored2.session.status == TeamStatus.DISSOLVED
 
 
-# ---------------------------------------------------------------------------
-# Test 2: Unified server exposes team tools
-# ---------------------------------------------------------------------------
-
-
 def test_unified_server_registers_team_tools():
     """Verify create_server() registers team tools alongside subagent tools."""
     from ...mcp_server.app import create_server
@@ -220,11 +205,6 @@ def test_unified_server_registers_team_tools():
         assert tool in tool_names, f"Team tool {tool!r} missing from unified server"
     for tool in expected_subagent_tools:
         assert tool in tool_names, f"Subagent tool {tool!r} missing from unified server"
-
-
-# ---------------------------------------------------------------------------
-# Test 3: ClaudeA2AExecutor accepts mcp_servers config
-# ---------------------------------------------------------------------------
 
 
 def test_executor_accepts_mcp_servers_config():

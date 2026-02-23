@@ -50,10 +50,6 @@ from ...team_cli import (
 if TYPE_CHECKING:
     from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _build_app_transport(executor, name: str, port: int) -> httpx.ASGITransport:
     """Build an httpx.ASGITransport backed by an in-process A2A app."""
@@ -133,11 +129,6 @@ def _args(**kwargs) -> argparse.Namespace:
     return argparse.Namespace(**defaults)
 
 
-# ---------------------------------------------------------------------------
-# Unit tests — pure helpers
-# ---------------------------------------------------------------------------
-
-
 class TestParseAgents:
     def test_single_agent(self):
         urls = _parse_agents("localhost:10010")
@@ -195,11 +186,6 @@ class TestSessionPersistence:
         assert loaded.members["http://localhost:29901/"].status == MemberStatus.WORKING
 
 
-# ---------------------------------------------------------------------------
-# command_status tests
-# ---------------------------------------------------------------------------
-
-
 class TestCommandStatus:
     def test_status_prints_team_info(self, tmp_path, capsys):
         """command_status prints team name, ID, and members."""
@@ -217,11 +203,6 @@ class TestCommandStatus:
         args = _args(root=tmp_path, name="ghost-team")
         with pytest.raises(SystemExit):
             command_status(args)
-
-
-# ---------------------------------------------------------------------------
-# command_list tests
-# ---------------------------------------------------------------------------
 
 
 class TestCommandList:
@@ -242,11 +223,6 @@ class TestCommandList:
         command_list(args)
         out = capsys.readouterr().out
         assert "No active teams" in out
-
-
-# ---------------------------------------------------------------------------
-# command_create tests — real coordinator with in-process A2A agents
-# ---------------------------------------------------------------------------
 
 
 class TestCommandCreate:
@@ -290,11 +266,6 @@ class TestCommandCreate:
         assert "test-team-id-0001" in out
 
 
-# ---------------------------------------------------------------------------
-# command_dissolve tests — real coordinator dissolution
-# ---------------------------------------------------------------------------
-
-
 class TestCommandDissolve:
     @pytest.mark.asyncio
     async def test_dissolve_removes_json(self, tmp_path):
@@ -317,11 +288,6 @@ class TestCommandDissolve:
         args = _args(root=tmp_path, name="ghost", force=True)
         with pytest.raises(SystemExit):
             command_dissolve(args)
-
-
-# ---------------------------------------------------------------------------
-# command_assign / command_broadcast — real dispatch with in-process agents
-# ---------------------------------------------------------------------------
 
 
 class TestCommandAssign:
@@ -381,11 +347,6 @@ class TestCommandBroadcast:
             await coordinator.dissolve_team()
 
 
-# ---------------------------------------------------------------------------
-# --root propagation test
-# ---------------------------------------------------------------------------
-
-
 class TestRootPropagation:
     def test_root_determines_session_path(self, tmp_path):
         """Sessions are stored under root/.vault/logs/teams/, not a hardcoded path."""
@@ -405,11 +366,6 @@ class TestRootPropagation:
 
         with pytest.raises(ToolError):
             _load_session(root_b, "shared-name")
-
-
-# ---------------------------------------------------------------------------
-# command_message tests — real dispatch with in-process agents
-# ---------------------------------------------------------------------------
 
 
 class TestCommandMessage:
@@ -497,11 +453,6 @@ class TestCommandMessage:
         )
         with pytest.raises(SystemExit):
             command_message(args)
-
-
-# ---------------------------------------------------------------------------
-# command_spawn tests — arg parsing and error paths
-# ---------------------------------------------------------------------------
 
 
 class TestCommandSpawn:
@@ -626,11 +577,6 @@ class TestCommandSpawn:
         )
         with pytest.raises(SystemExit):
             command_spawn(args)
-
-
-# ---------------------------------------------------------------------------
-# message arg-parsing tests — direct parser verification
-# ---------------------------------------------------------------------------
 
 
 class TestMessageArgParsing:

@@ -177,3 +177,9 @@ vault_index.json
 test-project/*
 !test-project/.vault/
 !test-project/README.md
+
+# VaultSpec Logs
+.vault/logs/
+
+# Temporary reference files
+tmp-ref/

@@ -38,10 +38,6 @@ def _build_app_transport(name: str, port: int) -> httpx.ASGITransport:
     return httpx.ASGITransport(app=app)
 
 
-# ---------------------------------------------------------------------------
-# Helper: write a temporary A2A echo-server script
-# ---------------------------------------------------------------------------
-
 _ECHO_SERVER_SCRIPT = textwrap.dedent("""\
     \"\"\"Minimal A2A echo server for spawn_agent integration tests.\"\"\"
     import argparse
@@ -138,11 +134,6 @@ def _find_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
-
-
-# ===================================================================
-# Phase 3 — spawn_agent integration tests
-# ===================================================================
 
 
 @pytest.mark.integration

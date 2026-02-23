@@ -58,9 +58,9 @@ Teams MUST prioritize the same core repository tools as individual sub-agents:
 
 **Deploy a documentation audit team:**
 
-1. `create_team(name="audit-team", agent_urls="...")`
-2. `broadcast_message(team_name="audit-team", message="Scan .vault/ for broken links.")`
-3. `team_status(name="audit-team")`
+- `create_team(name="audit-team", agent_urls="...")`
+- `broadcast_message(team_name="audit-team", message="Scan .vault/ for broken links.")`
+- `team_status(name="audit-team")`
 
 ## Behavior
 
