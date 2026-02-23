@@ -1,5 +1,15 @@
 """Shared CLI infrastructure (argument parsing, logging, async runner) for all vaultspec
-entry points."""
+entry points.
+
+Utilities:
+    get_default_layout:    Resolve and cache the default WorkspaceLayout.
+    get_version:           Read the package version from pyproject.toml.
+    add_common_args:       Register standard flags on an ArgumentParser.
+    setup_logging:         Configure logging from parsed args.
+    resolve_args_workspace: Re-resolve the workspace when --root/--content-dir is set.
+    run_async:             Run an async coroutine on a fresh event loop.
+    cli_error_handler:     Context manager for clean unhandled-exception exit.
+"""
 
 from __future__ import annotations
 
@@ -25,6 +35,17 @@ _default_layout: WorkspaceLayout | None = None
 
 
 def get_default_layout() -> WorkspaceLayout:
+    """Return the cached default WorkspaceLayout, resolving it on first call.
+
+    Resolves the workspace rooted at ``.vaultspec/`` relative to the current
+    working directory and caches the result for subsequent calls.
+
+    Returns:
+        The resolved ``WorkspaceLayout`` for the current project.
+
+    Raises:
+        WorkspaceError: If no valid workspace can be resolved.
+    """
     global _default_layout
     if _default_layout is None:
         from .config import resolve_workspace
@@ -34,16 +55,25 @@ def get_default_layout() -> WorkspaceLayout:
 
 
 def get_version(root_dir: Path | None = None) -> str:
-    """Read version from pyproject.toml via line-scanning.
+    """Read the package version, preferring importlib.metadata for pip-installed usage.
+
+    Tries ``importlib.metadata.version("vaultspec")`` first (correct when
+    pip-installed), then falls back to pyproject.toml line-scanning for
+    development mode (running from source without install).
 
     Args:
-        root_dir: Directory containing ``pyproject.toml``. Falls back to
-            ``Path.cwd()`` if ``None`` and ``pyproject.toml`` is not found
-            at that location.
+        root_dir: Directory containing ``pyproject.toml`` for the fallback path.
+            Falls back to ``Path.cwd()`` if ``None``.
 
     Returns:
         The version string, or ``"unknown"`` if it cannot be determined.
     """
+    try:
+        from importlib.metadata import version
+
+        return version("vaultspec")
+    except Exception:
+        pass
     search_root = root_dir if root_dir is not None else Path.cwd()
     toml_path = search_root / "pyproject.toml"
     if toml_path.exists():
@@ -114,7 +144,7 @@ def setup_logging(args: Any, default_format: str | None = None) -> None:
 
     if debug:
         reset_logging()
-        configure_logging(level="DEBUG")
+        configure_logging(debug=True)
     elif quiet:
         reset_logging()
         configure_logging(quiet=True)
@@ -123,6 +153,10 @@ def setup_logging(args: Any, default_format: str | None = None) -> None:
         configure_logging(level="INFO")
     else:
         configure_logging(log_format=default_format)
+
+    from .printer import Printer
+
+    args.printer = Printer(quiet=getattr(args, "quiet", False))
 
 
 def resolve_args_workspace(
@@ -190,11 +224,7 @@ def run_async[T](coro: Coroutine[Any, Any, T], *, debug: bool = False) -> T:
     except (KeyboardInterrupt, SystemExit):
         raise
     except Exception as exc:
-        logger.error("Error: %s", exc)
-        if debug:
-            import traceback
-
-            traceback.print_exc()
+        logger.error("Error: %s", exc, exc_info=debug)
         sys.exit(1)
     finally:
         if sys.platform == "win32":
@@ -219,9 +249,5 @@ def cli_error_handler(debug: bool) -> Generator[None]:
     except (KeyboardInterrupt, SystemExit):
         raise
     except Exception as exc:
-        logger.error("Error: %s", exc)
-        if debug:
-            import traceback
-
-            traceback.print_exc()
+        logger.error("Error: %s", exc, exc_info=debug)
         sys.exit(1)
