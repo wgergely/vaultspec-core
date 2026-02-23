@@ -22,7 +22,6 @@ from ...mcp_server.team_tools import (
     _delete_session,
     _load_session,
     _save_session,
-    _session_path,
 )
 from ...orchestration import (
     MemberStatus,
@@ -33,6 +32,7 @@ from ...orchestration import (
     extract_artifact_text,
 )
 from ...orchestration import parse_agents as _parse_agents
+from ...orchestration.team_session import session_path as _session_path
 from ...protocol.a2a import create_app
 from ...protocol.a2a.tests.conftest import (
     EchoExecutor,
@@ -119,11 +119,14 @@ def _make_session(root: Path, name: str = "my-team") -> TeamSession:
 
 def _args(**kwargs) -> argparse.Namespace:
     """Build a Namespace with defaults for team CLI tests."""
+    from ...printer import Printer
+
     defaults = {
         "api_key": None,
         "verbose": False,
         "debug": False,
         "force": False,
+        "printer": Printer(),
     }
     defaults.update(kwargs)
     return argparse.Namespace(**defaults)

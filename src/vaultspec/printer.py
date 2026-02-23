@@ -50,8 +50,16 @@ class Printer:
         self._out.print(*args, **kwargs)
 
     def out_json(self, data: Any, *, indent: int = 2) -> None:
-        """Serialize ``data`` as JSON and print to stdout; never suppressed."""
-        self.out(json.dumps(data, indent=indent))
+        """Serialize ``data`` as JSON and print to stdout; never suppressed.
+
+        Writes directly to the Console's underlying file to bypass Rich's
+        word-wrap, which would insert literal newlines into long JSON string
+        values and break parsers.
+        """
+        f = self._out.file
+        f.write(json.dumps(data, indent=indent))
+        f.write("\n")
+        f.flush()
 
     def status(self, msg: Any, *args: Any, **kwargs: Any) -> None:
         """Print a status message to stderr; suppressed when ``quiet=True``."""

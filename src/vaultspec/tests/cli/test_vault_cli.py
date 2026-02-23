@@ -57,11 +57,27 @@ class TestGetVersion:
         assert version == "0.1.0"
 
     def test_get_version_missing_pyproject(self, tmp_path):
-        """get_version returns 'unknown' when pyproject.toml is missing."""
+        """get_version returns a non-empty string even when pyproject.toml is missing.
+
+        When the package is installed, importlib.metadata supplies the version
+        regardless of root_dir, so the result is the installed version string.
+        When running uninstalled from source with no pyproject.toml at root_dir,
+        the result falls back to 'unknown'.  Either way it must be a non-empty string.
+        """
+        from importlib.metadata import PackageNotFoundError
+        from importlib.metadata import version as pkg_version
+
         from ...cli_common import get_version
 
-        version = get_version(root_dir=tmp_path)
-        assert version == "unknown"
+        result = get_version(root_dir=tmp_path)
+        assert isinstance(result, str)
+        assert result  # non-empty
+        # Installed package → real version; otherwise 'unknown'.
+        try:
+            installed = pkg_version("vaultspec")
+            assert result == installed
+        except PackageNotFoundError:
+            assert result == "unknown"
 
 
 class TestHelpText:
