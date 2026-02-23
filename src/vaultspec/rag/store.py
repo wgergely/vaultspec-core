@@ -31,7 +31,7 @@ def _check_rag_deps() -> None:
         _ = lancedb
     except ImportError:
         raise ImportError(
-            "RAG dependencies not installed. Run: pip install -e '.[rag]'"
+            "RAG dependencies not installed. Run: uv sync --extra rag"
         ) from None
 
 
@@ -198,6 +198,11 @@ class VaultStore:
         self.db = None
 
     def __enter__(self) -> VaultStore:
+        """Return *self* to support use as a context manager.
+
+        Returns:
+            This :class:`VaultStore` instance.
+        """
         return self
 
     def __exit__(

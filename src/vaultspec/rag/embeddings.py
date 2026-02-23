@@ -43,7 +43,7 @@ def _check_rag_deps() -> None:
         _ = torch
     except ImportError:
         raise ImportError(
-            "RAG dependencies not installed. Run: pip install -e '.[rag]'"
+            "RAG dependencies not installed. Run: uv sync --extra rag"
         ) from None
 
 
@@ -64,7 +64,7 @@ def _require_cuda() -> None:
             f"Torch version: {torch_version}, CUDA compiled: {cuda_version}. "
             f"vaultspec requires CUDA 13.0+ with compute capability >= 7.5. "
             f"Install CUDA-enabled PyTorch: "
-            f"pip install torch --extra-index-url {CUDA_INDEX_URL}"
+            f"uv pip install torch --extra-index-url {CUDA_INDEX_URL}"
         )
 
 
@@ -173,7 +173,7 @@ class EmbeddingModel:
 
         Raises:
             ImportError: If ``sentence-transformers`` or ``torch`` are not
-                installed (hint: ``pip install -e '.[rag]'``).
+                installed (hint: ``uv sync --extra rag``).
             GPUNotAvailableError: If no CUDA device is detected.
         """
         _check_rag_deps()
