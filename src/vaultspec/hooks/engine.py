@@ -12,7 +12,6 @@ Hooks are YAML files in ``.vaultspec/hooks/`` with the structure::
 
 Supported events:
     vault.document.created   — after vault.py create
-    vault.document.modified  — after vault doc edits
     vault.index.updated      — after vault.py index
     config.synced            — after cli.py sync-all
     audit.completed          — after vault.py audit
@@ -21,12 +20,15 @@ Supported events:
 from __future__ import annotations
 
 import logging
+import os
 import shlex
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,7 @@ __all__ = [
     "Hook",
     "HookAction",
     "HookResult",
+    "fire_hooks",
     "load_hooks",
     "trigger",
 ]
@@ -42,7 +45,6 @@ __all__ = [
 SUPPORTED_EVENTS = frozenset(
     {
         "vault.document.created",
-        "vault.document.modified",
         "vault.index.updated",
         "config.synced",
         "audit.completed",
@@ -111,27 +113,17 @@ class HookResult:
 
 
 def _parse_yaml(text: str) -> dict[str, Any]:
-    """Parse YAML with fallback to basic key-value parsing.
+    """Parse YAML text into a dict.
 
     Args:
         text: Raw YAML text to parse.
 
     Returns:
-        Parsed key-value mapping; empty dict if the text is empty or blank.
+        Parsed mapping; empty dict if the text is empty or blank.
     """
-    try:
-        import yaml
+    import yaml
 
-        return yaml.safe_load(text) or {}
-    except ImportError:
-        # Minimal fallback for simple YAML
-        result: dict[str, Any] = {}
-        for line in text.splitlines():
-            line = line.strip()
-            if ":" in line and not line.startswith("#"):
-                key, _, val = line.partition(":")
-                result[key.strip()] = val.strip()
-        return result
+    return yaml.safe_load(text) or {}
 
 
 def load_hooks(hooks_dir: Path) -> list[Hook]:
@@ -152,16 +144,20 @@ def load_hooks(hooks_dir: Path) -> list[Hook]:
     if not hooks_dir.exists():
         return hooks
 
-    for path in sorted(hooks_dir.glob("*.yaml")):
-        try:
-            data = _parse_yaml(path.read_text(encoding="utf-8"))
-            hook = _parse_hook(path, data)
-            if hook is not None:
-                hooks.append(hook)
-        except Exception:
-            logger.warning("Failed to parse hook: %s", path.name, exc_info=True)
+    seen: dict[str, Path] = {}
+    for ext in ("*.yaml", "*.yml"):
+        for path in sorted(hooks_dir.glob(ext)):
+            if path.stem in seen:
+                logger.warning(
+                    "Duplicate hook '%s': using %s, ignoring %s",
+                    path.stem,
+                    seen[path.stem].name,
+                    path.name,
+                )
+                continue
+            seen[path.stem] = path
 
-    for path in sorted(hooks_dir.glob("*.yml")):
+    for path in seen.values():
         try:
             data = _parse_yaml(path.read_text(encoding="utf-8"))
             hook = _parse_hook(path, data)
@@ -228,19 +224,30 @@ def _parse_action(raw: dict[str, Any]) -> HookAction | None:
     if action_type == "shell":
         cmd = raw.get("command", "")
         if not cmd:
+            logger.warning(
+                "Skipping action: shell action missing 'command' field (raw=%r)", raw
+            )
             return None
         return HookAction(action_type="shell", command=cmd)
     elif action_type == "agent":
         name = raw.get("name", "")
         task = raw.get("task", "")
         if not name or not task:
+            logger.warning(
+                "Skipping action: agent action missing 'name' or 'task' field (raw=%r)",
+                raw,
+            )
             return None
         return HookAction(
             action_type="agent",
             agent_name=name,
             task=task,
         )
+    logger.warning("Skipping action: unknown action type %r (raw=%r)", action_type, raw)
     return None
+
+
+_triggering: set[str] = set()
 
 
 def trigger(
@@ -251,7 +258,8 @@ def trigger(
     """Trigger all hooks matching the given event.
 
     Iterates over ``hooks``, filters to those whose ``event`` matches and
-    ``enabled`` is ``True``, and executes each action in order.
+    ``enabled`` is ``True``, and executes each action in order.  Guards
+    against re-entrant triggers for the same event.
 
     Args:
         hooks: List of loaded hooks to evaluate.
@@ -263,6 +271,10 @@ def trigger(
         List of :class:`HookResult` objects, one per executed action.
         Empty if no hooks matched the event.
     """
+    if event in _triggering:
+        logger.warning("Re-entrant hook trigger blocked: %s", event)
+        return []
+
     ctx = context or {}
     results: list[HookResult] = []
 
@@ -270,10 +282,15 @@ def trigger(
     if not matching:
         return results
 
-    for hook in matching:
-        for action in hook.actions:
-            result = _execute_action(hook.name, action, ctx)
-            results.append(result)
+    _triggering.add(event)
+    try:
+        logger.info("Triggering %d hook(s) for event '%s'", len(matching), event)
+        for hook in matching:
+            for action in hook.actions:
+                result = _execute_action(hook.name, action, ctx)
+                results.append(result)
+    finally:
+        _triggering.discard(event)
 
     return results
 
@@ -344,28 +361,31 @@ def _execute_shell(
     """
     cmd = _interpolate(action.command, ctx)
     try:
-        result = subprocess.run(
-            shlex.split(cmd),
-            shell=False,
-            capture_output=True,
-            text=True,
-            timeout=60,
+        cmd_args = shlex.split(cmd, posix=(os.name != "nt"))
+        process = subprocess.Popen(
+            cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         )
+        try:
+            stdout, stderr = process.communicate(timeout=60)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+            logger.warning("Shell hook '%s' timed out (60s)", hook_name)
+            return HookResult(
+                hook_name=hook_name,
+                action_type="shell",
+                success=False,
+                error="Hook timed out (60s)",
+            )
         return HookResult(
             hook_name=hook_name,
             action_type="shell",
-            success=result.returncode == 0,
-            output=result.stdout.strip(),
-            error=result.stderr.strip(),
-        )
-    except subprocess.TimeoutExpired:
-        return HookResult(
-            hook_name=hook_name,
-            action_type="shell",
-            success=False,
-            error="Hook timed out (60s)",
+            success=process.returncode == 0,
+            output=stdout.strip(),
+            error=stderr.strip(),
         )
     except Exception as e:
+        logger.error("Shell hook '%s' failed: %s", hook_name, e, exc_info=True)
         return HookResult(
             hook_name=hook_name,
             action_type="shell",
@@ -381,9 +401,8 @@ def _execute_agent(
 ) -> HookResult:
     """Execute an agent dispatch action by invoking the subagent CLI.
 
-    Interpolates ``{key}`` placeholders in the task string, resolves the
-    subagent script path from the framework config, and runs it as a
-    subprocess with a 300-second timeout.
+    Interpolates ``{key}`` placeholders in the task string and invokes
+    ``vaultspec subagent run`` as a subprocess with a 300-second timeout.
 
     Args:
         hook_name: Name of the parent hook (for result attribution).
@@ -396,43 +415,60 @@ def _execute_agent(
     """
     task_text = _interpolate(action.task, ctx)
     try:
-        from ..config import get_config
-
-        fw = Path(get_config().framework_dir)
-        subagent_script = fw / "lib" / "scripts" / "subagent.py"
-
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(subagent_script),
-                "run",
-                "--agent",
-                action.agent_name,
-                "--task",
-                task_text,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=300,
+        cmd = [
+            sys.executable,
+            "-m",
+            "vaultspec",
+            "subagent",
+            "run",
+            "--agent",
+            action.agent_name,
+            "--goal",
+            task_text,
+        ]
+        process = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         )
+        try:
+            stdout, stderr = process.communicate(timeout=300)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+            logger.warning("Agent hook '%s' timed out (300s)", hook_name)
+            return HookResult(
+                hook_name=hook_name,
+                action_type="agent",
+                success=False,
+                error="Agent dispatch timed out (300s)",
+            )
         return HookResult(
             hook_name=hook_name,
             action_type="agent",
-            success=result.returncode == 0,
-            output=result.stdout.strip(),
-            error=result.stderr.strip(),
-        )
-    except subprocess.TimeoutExpired:
-        return HookResult(
-            hook_name=hook_name,
-            action_type="agent",
-            success=False,
-            error="Agent dispatch timed out (300s)",
+            success=process.returncode == 0,
+            output=stdout.strip(),
+            error=stderr.strip(),
         )
     except Exception as e:
+        logger.error("Agent hook '%s' dispatch failed: %s", hook_name, e, exc_info=True)
         return HookResult(
             hook_name=hook_name,
             action_type="agent",
             success=False,
             error=str(e),
         )
+
+
+def fire_hooks(event: str, context: dict[str, str] | None = None) -> None:
+    """Fire hooks for a lifecycle event, silently catching all errors.
+
+    Args:
+        event: Event name to trigger.
+        context: Optional context dict passed through to hook actions.
+    """
+    try:
+        from ..core import types as _t
+
+        hooks = load_hooks(_t.HOOKS_DIR)
+        trigger(hooks, event, context)
+    except Exception:
+        logger.debug("Hook trigger failed for %s", event, exc_info=True)

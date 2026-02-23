@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 from ...hooks import (
@@ -15,6 +17,7 @@ from ...hooks.engine import (
     _interpolate,
     _parse_action,
     _parse_hook,
+    _triggering,
 )
 
 pytestmark = [pytest.mark.unit]
@@ -29,7 +32,6 @@ class TestSupportedEvents:
     def test_expected_events(self):
         expected = {
             "vault.document.created",
-            "vault.document.modified",
             "vault.index.updated",
             "config.synced",
             "audit.completed",
@@ -258,17 +260,134 @@ class TestTrigger:
         assert len(results) == 1
         assert results[0].success is True
 
-    def test_failing_command(self):
+    def test_failing_command(self, tmp_path):
+        # Write the script to a file to avoid shell quoting issues on Windows.
+        script = tmp_path / "fail.py"
+        script.write_text("import sys; sys.exit(1)", encoding="utf-8")
         hook = Hook(
             name="test",
             event="config.synced",
             actions=[
                 HookAction(
                     action_type="shell",
-                    command="exit 1",
+                    command=f"{sys.executable} {script}",
                 ),
             ],
         )
         results = trigger([hook], "config.synced")
         assert len(results) == 1
         assert results[0].success is False
+
+
+class TestDeduplication:
+    """Test that duplicate yaml/yml stems load only one hook."""
+
+    def test_yaml_takes_precedence_over_yml(self, tmp_path):
+        yaml_content = (
+            "event: config.synced\nactions:\n  - type: shell\n    command: echo yaml\n"
+        )
+        yml_content = (
+            "event: config.synced\nactions:\n  - type: shell\n    command: echo yml\n"
+        )
+        (tmp_path / "hook.yaml").write_text(yaml_content, encoding="utf-8")
+        (tmp_path / "hook.yml").write_text(yml_content, encoding="utf-8")
+        hooks = load_hooks(tmp_path)
+        assert len(hooks) == 1
+        assert hooks[0].source_path is not None
+        assert hooks[0].source_path.suffix == ".yaml"
+
+    def test_unique_stems_load_all(self, tmp_path):
+        (tmp_path / "hook-a.yaml").write_text(
+            "event: config.synced\nactions:\n  - type: shell\n    command: echo a\n",
+            encoding="utf-8",
+        )
+        (tmp_path / "hook-b.yml").write_text(
+            "event: audit.completed\nactions:\n  - type: shell\n    command: echo b\n",
+            encoding="utf-8",
+        )
+        hooks = load_hooks(tmp_path)
+        assert len(hooks) == 2
+
+
+class TestReentrantGuard:
+    """Test that recursive trigger of the same event is blocked."""
+
+    def test_reentrant_trigger_returns_empty(self):
+        # Directly mutate the module-level _triggering set to simulate a
+        # re-entrant call (as if trigger() is already running for this event).
+        # This avoids mocking — we exercise the real guard path in trigger().
+        hook = Hook(
+            name="test",
+            event="config.synced",
+            actions=[HookAction(action_type="shell", command="echo ok")],
+        )
+        _triggering.add("config.synced")
+        try:
+            results = trigger([hook], "config.synced")
+            assert results == []
+        finally:
+            _triggering.discard("config.synced")
+
+    def test_non_reentrant_trigger_works(self):
+        # Ensure the guard does not affect a different event or a clean state.
+        _triggering.discard("config.synced")
+        hook = Hook(
+            name="test",
+            event="config.synced",
+            actions=[HookAction(action_type="shell", command="echo ok")],
+        )
+        results = trigger([hook], "config.synced")
+        assert len(results) == 1
+        assert results[0].success is True
+
+    def test_triggering_set_cleaned_up_after_execution(self):
+        hook = Hook(
+            name="test",
+            event="audit.completed",
+            actions=[HookAction(action_type="shell", command="echo ok")],
+        )
+        trigger([hook], "audit.completed")
+        assert "audit.completed" not in _triggering
+
+
+class TestFireHooksIntegration:
+    """Integration tests for the load_hooks + trigger combination.
+
+    fire_hooks() internally uses _t.HOOKS_DIR which requires workspace
+    initialisation. These tests exercise the same real code path by calling
+    load_hooks(tmp_path) + trigger() directly.
+    """
+
+    def test_shell_hook_side_effect(self, tmp_path):
+        marker = tmp_path / "hook-fired.txt"
+        # Write a helper script to a file to avoid backslash escaping issues
+        # with Windows paths embedded inside YAML command strings.
+        script = tmp_path / "create_marker.py"
+        script.write_text(
+            f"import pathlib; pathlib.Path({str(marker)!r}).touch()",
+            encoding="utf-8",
+        )
+        hook_content = (
+            "event: vault.document.created\n"
+            "actions:\n"
+            f"  - type: shell\n"
+            f"    command: {sys.executable} {script}\n"
+        )
+        (tmp_path / "marker-hook.yaml").write_text(hook_content, encoding="utf-8")
+
+        hooks = load_hooks(tmp_path)
+        assert len(hooks) == 1
+
+        results = trigger(
+            hooks,
+            "vault.document.created",
+            {"root": str(tmp_path), "event": "vault.document.created"},
+        )
+        assert len(results) == 1
+        assert results[0].success is True
+        assert marker.exists(), "Shell hook should have created the marker file"
+
+    def test_no_hooks_returns_empty(self, tmp_path):
+        hooks = load_hooks(tmp_path)
+        results = trigger(hooks, "vault.document.created")
+        assert results == []
