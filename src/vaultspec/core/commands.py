@@ -10,6 +10,7 @@ import argparse
 import logging
 import subprocess
 import sys
+from pathlib import Path
 
 from . import types as _t
 from .helpers import ensure_dir
@@ -18,20 +19,31 @@ logger = logging.getLogger(__name__)
 
 VALID_CATEGORIES = {"all", "unit", "api", "search", "index", "quality"}
 
+# Paths relative to vaultspec package dir (dev src-layout + installed)
 MODULE_PATHS = {
-    "cli": ["src/vaultspec/tests/cli"],
-    "rag": ["src/vaultspec/rag/tests"],
-    "vault": ["src/vaultspec/vaultcore/tests"],
+    "cli": ["tests/cli"],
+    "rag": ["rag/tests"],
+    "vault": ["vaultcore/tests"],
     "protocol": [
-        "src/vaultspec/protocol/tests",
-        "src/vaultspec/protocol/a2a/tests",
-        "src/vaultspec/protocol/acp/tests",
+        "protocol/tests",
+        "protocol/a2a/tests",
+        "protocol/acp/tests",
     ],
-    "orchestration": ["src/vaultspec/orchestration/tests"],
-    "subagent": ["src/vaultspec/subagent_server/tests"],
-    "core": ["src/vaultspec/core/tests"],
-    "mcp_tools": ["src/vaultspec/mcp_tools/tests"],
+    "orchestration": ["orchestration/tests"],
+    "subagent": ["subagent_server/tests"],
+    "core": ["core/tests"],
+    "mcp_tools": ["mcp_tools/tests"],
 }
+
+
+def _get_package_dir() -> Path:
+    """Return the vaultspec package directory, whether src-layout or installed."""
+    src_dir = _t.ROOT_DIR / "src" / "vaultspec"
+    if src_dir.is_dir():
+        return src_dir
+    import vaultspec
+
+    return Path(vaultspec.__file__).parent
 
 
 def test_run(args: argparse.Namespace) -> None:
@@ -52,16 +64,20 @@ def test_run(args: argparse.Namespace) -> None:
     if category != "all":
         cmd.extend(["-m", category])
 
+    pkg_dir = _get_package_dir()
+
     if module:
         if module not in MODULE_PATHS:
             valid = ", ".join(sorted(MODULE_PATHS))
             logger.error("Error: Unknown module '%s'. Valid: %s", module, valid)
             return
         for p in MODULE_PATHS[module]:
-            cmd.append(str(_t.ROOT_DIR / p))
+            cmd.append(str(pkg_dir / p))
     else:
-        cmd.append(str(_t.ROOT_DIR / "src" / "vaultspec"))
-        cmd.append(str(_t.ROOT_DIR / "tests"))
+        cmd.append(str(pkg_dir))
+        tests_dir = _t.ROOT_DIR / "tests"
+        if tests_dir.is_dir():
+            cmd.append(str(tests_dir))
 
     cmd.extend(extra)
 
@@ -87,6 +103,7 @@ def doctor_run(_args: argparse.Namespace) -> None:
         print(" [OK]")
     else:
         print(" [WARN] Python 3.13+ recommended")
+        logger.warning("Python 3.13+ recommended")
         issues.append("Python 3.13+ recommended")
 
     # CUDA/GPU
@@ -101,9 +118,11 @@ def doctor_run(_args: argparse.Namespace) -> None:
             print(f"GPU: {props.name} ({mem_gb:.1f} GB) [OK]")
         else:
             print("CUDA: Not available [FAIL]")
+            logger.warning("CUDA not available - GPU required")
             issues.append("CUDA not available - GPU required")
     except ImportError:
         print("PyTorch: Not installed [FAIL]")
+        logger.warning("PyTorch not installed")
         issues.append("PyTorch not installed")
 
     # Optional deps
@@ -117,10 +136,8 @@ def doctor_run(_args: argparse.Namespace) -> None:
             importlib.import_module(pkg)
             print(f"{pkg}: installed [OK]")
         except ImportError:
-            print(
-                f"{pkg}: not installed [WARN]"
-                f" (install with pip install -e '.[{group}]')"
-            )
+            print(f"{pkg}: not installed [WARN] (install with uv sync --extra {group})")
+            logger.warning("%s not installed", pkg)
             issues.append(f"{pkg} not installed")
 
     # .lance directory
@@ -130,7 +147,7 @@ def doctor_run(_args: argparse.Namespace) -> None:
         size_mb = size / (1024 * 1024)
         print(f".lance index: {size_mb:.1f} MB [OK]")
     else:
-        print(".lance index: not built [INFO] (run 'vault.py index' to build)")
+        print(".lance index: not built [INFO] (run 'vaultspec vault index' to build)")
 
     # Summary
     if issues:
@@ -195,11 +212,28 @@ def init_run(args: argparse.Namespace) -> None:
         )
         created.append(str(proj_md.relative_to(_t.ROOT_DIR)))
 
+    # Scaffold .mcp.json for MCP server integration
+    import json
+
+    mcp_json = _t.ROOT_DIR / ".mcp.json"
+    if not mcp_json.exists():
+        mcp_config = {
+            "mcpServers": {
+                "vaultspec-mcp": {
+                    "command": "vaultspec-mcp",
+                    "env": {"VAULTSPEC_MCP_ROOT_DIR": str(_t.ROOT_DIR.resolve())},
+                }
+            }
+        }
+        mcp_json.write_text(json.dumps(mcp_config, indent=2) + "\n", encoding="utf-8")
+        created.append(str(mcp_json.relative_to(_t.ROOT_DIR)))
+
     print("Initialized vaultspec structure:")
     for path in created:
         print(f"  {path}")
+        logger.info("  %s", path)
     logger.info(
-        "Created %d directories/files. Run 'cli.py sync-all' to sync.", len(created)
+        "Created %d directories/files. Run 'vaultspec sync-all' to sync.", len(created)
     )
 
 
@@ -462,6 +496,7 @@ def readiness_run(args: argparse.Namespace) -> None:
         except ImportError:
             pass
     except Exception:
+        logger.debug("Environment check error", exc_info=True)
         env_score = 1
         env_detail = "Environment check failed"
 
@@ -501,17 +536,17 @@ def readiness_run(args: argparse.Namespace) -> None:
     if rules_score < 4:
         recommendations.append("Create custom rules for project conventions")
     if rules_score == 4:
-        recommendations.append("Run 'cli.py sync-all' to sync rules to all tools")
+        recommendations.append("Run 'vaultspec sync-all' to sync rules to all tools")
     if agent_score < 4:
         recommendations.append("Add more agents with tier assignments")
     if agent_score == 4:
-        recommendations.append("Run 'cli.py agents sync' to sync agents")
+        recommendations.append("Run 'vaultspec agents sync' to sync agents")
     if test_score < 5:
         recommendations.append("Add CI pipeline for automated testing")
     if env_score < 4:
         recommendations.append("Install optional dependencies (lancedb, etc.)")
     if env_score == 4:
-        recommendations.append("Run 'vault.py index' to build .lance index")
+        recommendations.append("Run 'vaultspec vault index' to build .lance index")
 
     if getattr(args, "json", False):
         result = {
