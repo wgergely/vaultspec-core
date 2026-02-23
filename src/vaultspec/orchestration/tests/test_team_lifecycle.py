@@ -81,11 +81,6 @@ class _MuxTransport(httpx.AsyncBaseTransport):
         return await transport.handle_async_request(request)
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture
 def workspace(tmp_path):
     """Clean workspace root with team_tools configured."""

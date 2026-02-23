@@ -262,10 +262,6 @@ def _merge_artifacts(text_artifacts: list[str], written_files: list[str]) -> lis
     return sorted(merged)
 
 
-# ---------------------------------------------------------------------------
-# Agent file polling and resource management
-# ---------------------------------------------------------------------------
-
 _agent_mtimes: dict[str, float] = {}
 
 
@@ -802,11 +798,6 @@ async def get_locks() -> str:
             }
         )
     return json.dumps({"locks": res, "count": len(res)}, indent=2)
-
-
-# ---------------------------------------------------------------------------
-# Registration API -- used by the unified server (vaultspec.mcp_server.app)
-# ---------------------------------------------------------------------------
 
 
 @asynccontextmanager

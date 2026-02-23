@@ -216,11 +216,6 @@ class TestRegisterTools:
         assert annotations.destructiveHint is True
 
 
-# ---------------------------------------------------------------------------
-# Session persistence tests
-# ---------------------------------------------------------------------------
-
-
 class TestSessionPersistence:
     """Verify session save/load round-trip."""
 
