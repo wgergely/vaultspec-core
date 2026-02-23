@@ -170,7 +170,7 @@ def list_features(root_dir: pathlib.Path) -> set[str]:
                     features.add(tag.lstrip("#"))
         except (OSError, UnicodeDecodeError):
             skip_count += 1
-            logger.debug("Failed to read feature tags from %s", path.name)
+            logger.warning("Failed to read feature tags from %s", path.name)
             continue
     logger.info(
         "Feature extraction complete: found %d features, skipped %d files",
@@ -209,7 +209,7 @@ def verify_vertical_integrity(root_dir: pathlib.Path) -> list[VerificationError]
             if doc_type == DocType.PLAN:
                 planned_features.update(doc_features)
         except (OSError, UnicodeDecodeError):
-            logger.debug("Failed to parse vertical integrity from %s", path.name)
+            logger.warning("Failed to parse vertical integrity from %s", path.name)
             continue
 
     from ..config import get_config

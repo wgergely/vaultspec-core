@@ -33,9 +33,13 @@ def collect_rules() -> dict[str, tuple[Path, dict[str, Any], str]]:
     if not _t.RULES_SRC_DIR.exists():
         return sources
     for f in sorted(_t.RULES_SRC_DIR.glob("*.md")):
-        content = f.read_text(encoding="utf-8")
-        meta, body = parse_frontmatter(content)
-        sources[f.name] = (f, meta, body)
+        try:
+            content = f.read_text(encoding="utf-8")
+            meta, body = parse_frontmatter(content)
+            sources[f.name] = (f, meta, body)
+        except (OSError, Exception) as e:
+            logger.error("Failed to read/parse %s: %s", f, e)
+            continue
 
     return sources
 
@@ -111,7 +115,7 @@ def rules_add(args: argparse.Namespace) -> None:
                 _launch_editor(editor, str(file_path))
                 logger.info("Rule saved to %s", file_path)
             except Exception as e:
-                logger.error("Error opening editor: %s", e)
+                logger.error("Error opening editor: %s", e, exc_info=True)
             return
         else:
             content = sys.stdin.read()

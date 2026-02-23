@@ -33,9 +33,13 @@ def collect_skills() -> dict[str, tuple[Path, dict[str, Any], str]]:
         if path.is_dir() and path.name.startswith("vaultspec-"):
             skill_md = path / "SKILL.md"
             if skill_md.exists():
-                content = skill_md.read_text(encoding="utf-8")
-                meta, body = parse_frontmatter(content)
-                sources[path.name] = (skill_md, meta, body)
+                try:
+                    content = skill_md.read_text(encoding="utf-8")
+                    meta, body = parse_frontmatter(content)
+                    sources[path.name] = (skill_md, meta, body)
+                except (OSError, Exception) as e:
+                    logger.error("Failed to read/parse %s: %s", skill_md, e)
+                    continue
     return sources
 
 
@@ -146,7 +150,7 @@ def skills_add(args: argparse.Namespace) -> None:
             _launch_editor(editor, str(file_path))
             logger.info("Skill saved to %s", file_path)
         except Exception as e:
-            logger.error("Error opening editor: %s", e)
+            logger.error("Error opening editor: %s", e, exc_info=True)
     else:
         file_path.write_text(scaffold, encoding="utf-8")
         logger.info("Created skill: %s", file_path)

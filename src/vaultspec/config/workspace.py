@@ -114,7 +114,8 @@ def _parse_git_pointer(git_path: Path) -> Path | None:
     """
     try:
         content = git_path.read_text(encoding="utf-8").strip()
-    except (OSError, UnicodeDecodeError):
+    except (OSError, UnicodeDecodeError) as e:
+        logger.debug("Failed to read git pointer %s: %s", git_path, e)
         return None
 
     if not content.startswith("gitdir:"):

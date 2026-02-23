@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import shutil
 import subprocess
 import sys
@@ -9,6 +10,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 
 def _yaml_load(text: str) -> dict[str, Any]:
@@ -44,9 +47,7 @@ yaml.add_representer(_LiteralStr, _literal_representer)
 
 
 def _yaml_dump(data: dict[str, Any]) -> str:
-    """Serialize a dict to a YAML string, using literal block style for multi-line
-    values.
-
+    """Serialize a dict to YAML, using literal block style for multi-line values.
 
     Args:
         data: Key-value mapping to serialize.
@@ -97,8 +98,12 @@ def atomic_write(path: Path, content: str) -> None:
         content: Text content to write, encoded as UTF-8.
     """
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(content, encoding="utf-8")
-    tmp.replace(path)
+    try:
+        tmp.write_text(content, encoding="utf-8")
+        tmp.replace(path)
+    except Exception as exc:
+        logger.error("atomic_write failed for %s: %s", path, exc)
+        raise
 
 
 def resolve_model(tool: str, tier: str) -> str | None:
@@ -120,7 +125,10 @@ def resolve_model(tool: str, tier: str) -> str | None:
         from ..protocol.providers import CapabilityLevel
 
         level = CapabilityLevel[tier.upper()]
-    except (ImportError, KeyError, AttributeError):
+    except (ImportError, KeyError, AttributeError) as exc:
+        logger.warning(
+            "Could not resolve model for tool=%r tier=%r: %s", tool, tier, exc
+        )
         return None
     return PROVIDERS[tool].get_best_model_for_capability(level)
 

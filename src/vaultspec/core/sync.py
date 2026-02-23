@@ -75,7 +75,7 @@ def sync_files(
 
         except Exception as e:
             result.errors.append(f"{name}: {e}")
-            logger.error("    [ERROR] %s: %s", name, e)
+            logger.error("    [ERROR] %s: %s", name, e, exc_info=True)
 
     # Prune
     if prune:
@@ -170,7 +170,7 @@ def sync_skills(
 
         except Exception as e:
             result.errors.append(f"{name}: {e}")
-            logger.error("    [ERROR] %s: %s", name, e)
+            logger.error("    [ERROR] %s: %s", name, e, exc_info=True)
 
     # Prune: only prune vaultspec-* prefixed skill dirs and legacy flat files
     if prune:

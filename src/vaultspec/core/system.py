@@ -37,9 +37,13 @@ def collect_system_parts() -> dict[str, tuple[Path, dict[str, Any], str]]:
     if not _t.SYSTEM_SRC_DIR.exists():
         return sources
     for f in sorted(_t.SYSTEM_SRC_DIR.glob("*.md")):
-        content = f.read_text(encoding="utf-8")
-        meta, body = parse_frontmatter(content)
-        sources[f.stem] = (f, meta, body)
+        try:
+            content = f.read_text(encoding="utf-8")
+            meta, body = parse_frontmatter(content)
+            sources[f.stem] = (f, meta, body)
+        except (OSError, Exception) as e:
+            logger.error("Failed to read/parse %s: %s", f, e)
+            continue
     return sources
 
 
@@ -100,8 +104,10 @@ def _collect_skill_listing() -> str:
         skill_dirs = [path.parent for path, _, _ in skills.values()]
         try:
             return to_prompt(skill_dirs)
-        except Exception:
-            pass  # Fall through to Markdown fallback
+        except Exception as exc:
+            logger.warning(
+                "skills_ref.to_prompt failed, using Markdown fallback: %s", exc
+            )
 
     # Fallback to Markdown list
     lines = [
@@ -179,9 +185,7 @@ def _generate_system_prompt(cfg: ToolConfig) -> str | None:
 
 
 def _generate_system_rules(cfg: ToolConfig) -> str | None:
-    """Assemble shared behavioral content as a rule file for tools without a
-    system_file.
-
+    """Assemble shared behavioral content as a rule file for tools without system_file.
 
     Combines the ``base.md`` body and all shared system parts into a single
     ``vaultspec-system.builtin.md`` rule file, formatted with YAML frontmatter

@@ -74,6 +74,7 @@ class VaultGraph:
 
         # First pass: Create nodes with metadata
         for path in scan_vault(self.root_dir):
+            logger.debug("Graph pass 1: reading %s", path)
             name = path.stem
             doc_type = get_doc_type(path, self.root_dir)
 

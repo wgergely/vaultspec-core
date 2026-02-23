@@ -223,14 +223,13 @@ def _is_cli_managed(path: Path) -> bool:
     try:
         content = path.read_text(encoding="utf-8")
         return content.startswith(_t.CONFIG_HEADER)
-    except Exception:
+    except Exception as exc:
+        logger.warning("Failed to check CLI management for %s: %s", path, exc)
         return False
 
 
 def config_show(_args: argparse.Namespace) -> None:
-    """Print the framework config, project config, and per-tool rule references to
-    stdout.
-
+    """Print framework config, project config, and per-tool rule references.
 
     Args:
         _args: Parsed CLI arguments (unused).

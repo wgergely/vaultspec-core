@@ -6,12 +6,12 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 from .models import DocumentMetadata
 
 __all__ = ["parse_frontmatter", "parse_vault_metadata"]
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +52,11 @@ try:
         """
         try:
             return yaml.safe_load(text) or {}
-        except yaml.YAMLError:
+        except yaml.YAMLError as e:
             # PyYAML chokes on unquoted colons in values (e.g.
             # ``description: A test: with colons``).  Fall back to
             # the simple key-value splitter which handles them fine.
+            logger.warning("PyYAML parse error, falling back to simple parser: %s", e)
             return _simple_yaml_load(text)
 
     _yaml_load = _yaml_load_impl
@@ -91,7 +92,7 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
     try:
         frontmatter = _yaml_load(match.group(1))
     except Exception as e:
-        logger.warning("Failed to parse frontmatter: %s", e)
+        logger.warning("Failed to parse frontmatter: %s", e, exc_info=True)
         frontmatter = {}
     body = match.group(2)
     return frontmatter, body

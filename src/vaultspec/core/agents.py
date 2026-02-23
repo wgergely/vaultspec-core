@@ -18,6 +18,34 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Bidirectional tool-name mapping: canonical (Claude) ↔ Gemini CLI.
+_CLAUDE_TO_GEMINI: dict[str, str] = {
+    "Glob": "glob",
+    "Grep": "grep_search",
+    "Read": "read_file",
+    "Write": "write_file",
+    "Edit": "replace",
+    "Bash": "run_shell_command",
+    "WebFetch": "web_fetch",
+    "WebSearch": "google_web_search",
+}
+_GEMINI_TO_CLAUDE: dict[str, str] = {v: k for k, v in _CLAUDE_TO_GEMINI.items()}
+
+_TOOL_MAPS: dict[str, dict[str, str]] = {
+    "gemini": _CLAUDE_TO_GEMINI,
+    "claude": _GEMINI_TO_CLAUDE,
+}
+
+
+def _translate_tools(tools_value: str, target: str) -> str:
+    """Translate a comma-separated tools string for *target* tool destination."""
+    mapping = _TOOL_MAPS.get(target)
+    if not mapping:
+        return tools_value
+    parts = [t.strip() for t in tools_value.split(",")]
+    translated = [mapping.get(p, p) for p in parts]
+    return ", ".join(translated)
+
 
 def collect_agents() -> dict[str, tuple[Path, dict[str, Any], str]]:
     """Collect agent definitions from .vaultspec/rules/agents/.
@@ -32,9 +60,13 @@ def collect_agents() -> dict[str, tuple[Path, dict[str, Any], str]]:
     if not _t.AGENTS_SRC_DIR.exists():
         return sources
     for f in sorted(_t.AGENTS_SRC_DIR.glob("*.md")):
-        content = f.read_text(encoding="utf-8")
-        meta, body = parse_frontmatter(content)
-        sources[f.name] = (f, meta, body)
+        try:
+            content = f.read_text(encoding="utf-8")
+            meta, body = parse_frontmatter(content)
+            sources[f.name] = (f, meta, body)
+        except (OSError, Exception) as e:
+            logger.error("Failed to read/parse %s: %s", f, e)
+            continue
     return sources
 
 
@@ -79,12 +111,16 @@ def transform_agent(
         logger.warning(msg)
         return None
 
-    fm = {
+    fm: dict[str, Any] = {
         "name": agent_name,
         "description": description,
         "kind": "local",
         "model": model,
     }
+
+    # Pass through tool-supported fields, translating names per target.
+    if "tools" in meta:
+        fm["tools"] = _translate_tools(meta["tools"], tool)
     return build_file(fm, body)
 
 
@@ -157,7 +193,7 @@ def agents_add(args: argparse.Namespace) -> None:
             _launch_editor(editor, str(file_path))
             logger.info("Agent saved to %s", file_path)
         except Exception as e:
-            logger.error("Error opening editor: %s", e)
+            logger.error("Error opening editor: %s", e, exc_info=True)
     else:
         file_path.write_text(scaffold, encoding="utf-8")
         logger.info("Created agent: %s", file_path)

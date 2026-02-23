@@ -79,7 +79,7 @@ def resource_edit(args: argparse.Namespace, src_dir: Path, label: str) -> None:
     try:
         _launch_editor(editor, str(file_path))
     except Exception as e:
-        logger.error("Error opening editor: %s", e)
+        logger.error("Error opening editor: %s", e, exc_info=True)
 
 
 def resource_remove(args: argparse.Namespace, src_dir: Path, label: str) -> None:
@@ -115,10 +115,14 @@ def resource_remove(args: argparse.Namespace, src_dir: Path, label: str) -> None
             logger.info("Cancelled.")
             return
 
-    if label == "Skill":
-        shutil.rmtree(target_to_remove)
-    else:
-        target_to_remove.unlink()
+    try:
+        if label == "Skill":
+            shutil.rmtree(target_to_remove)
+        else:
+            target_to_remove.unlink()
+    except OSError as e:
+        logger.error("Failed to remove %s: %s", target_to_remove, e)
+        return
     logger.info("Removed %s", target_to_remove)
 
     # Prune synced copies
@@ -183,7 +187,11 @@ def resource_rename(args: argparse.Namespace, src_dir: Path, label: str) -> None
         logger.error("Error: %s '%s' already exists at %s", label, new_name, new_path)
         return
 
-    old_path.rename(new_path)
+    try:
+        old_path.rename(new_path)
+    except OSError as e:
+        logger.error("Failed to rename %s -> %s: %s", old_path, new_path, e)
+        return
     logger.info("Renamed %s -> %s", old_path.name, new_path.name)
 
     # Update synced copies

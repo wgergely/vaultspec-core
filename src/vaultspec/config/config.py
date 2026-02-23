@@ -357,6 +357,7 @@ def _parse_raw(var: ConfigVariable, raw: str, source: str | None) -> Any:
             raw,
             source,
             exc,
+            exc_info=True,
         )
         return _SENTINEL
 
