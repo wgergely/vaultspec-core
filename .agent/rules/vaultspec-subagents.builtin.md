@@ -25,10 +25,10 @@ agentic workflows.
 
 ## Internal Dispatch Protocol
 
-Internally, the skill uses `subagent.py`:
+Internally, the skill uses `vaultspec subagent`:
 
 ```bash
-python .vaultspec/lib/scripts/subagent.py run \
+vaultspec subagent run \
   --agent <agent_name> \
   --goal "<task_description|plan_document>"
 ```

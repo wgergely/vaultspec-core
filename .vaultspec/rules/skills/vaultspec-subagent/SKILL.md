@@ -19,7 +19,7 @@ task that requires more than a few lines of code.
 ## Usage
 
 ```bash
-python .vaultspec/lib/scripts/subagent.py run \
+vaultspec subagent run \
   --agent {agent_name} \
   --goal "{task_description|plan_document}"
 ```
@@ -46,7 +46,7 @@ repository operations:
 **Dispatch a research task:**
 
 ```bash
-python .vaultspec/lib/scripts/subagent.py run \
+vaultspec subagent run \
   --agent vaultspec-adr-researcher \
   --goal "Analyze trade-offs of Pattern A vs Pattern B for library crates."
 ```
@@ -54,7 +54,7 @@ python .vaultspec/lib/scripts/subagent.py run \
 **Dispatch a code review:**
 
 ```bash
-python .vaultspec/lib/scripts/subagent.py run \
+vaultspec subagent run \
   --agent vaultspec-code-reviewer \
   --goal "Review the unsafe block in src/utils.rs."
 ```

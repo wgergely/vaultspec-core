@@ -5,7 +5,7 @@ description: Form and manage a multi-agent team to perform complex, parallelizab
   from specialized agents working in coordination.
 ---
 
-# Dispatch Team Skill
+# Team Coordination Skill (vaultspec-team)
 
 This skill enables the deployment of multiple specialized agents working
 together as a team. Use it for massive refactors, multi-module auditing, or

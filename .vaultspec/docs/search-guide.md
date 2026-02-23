@@ -6,19 +6,19 @@ powered by GPU-accelerated embeddings and hybrid retrieval.
 ## Basic Search
 
 ```bash
-python .vaultspec/lib/scripts/vault.py search "protocol integration patterns"
+vaultspec vault search "protocol integration patterns"
 ```
 
 Returns the top 5 most relevant documents by default. Use `--limit` to change:
 
 ```bash
-python .vaultspec/lib/scripts/vault.py search "agent dispatch" --limit 10
+vaultspec vault search "agent dispatch" --limit 10
 ```
 
 Use `--json` for machine-readable output:
 
 ```bash
-python .vaultspec/lib/scripts/vault.py search "embedding model" --json
+vaultspec vault search "embedding model" --json
 ```
 
 ## Filter Tokens
@@ -37,16 +37,16 @@ and applied as SQL WHERE clauses on document metadata.
 
 ```bash
 # Find ADRs about search
-python .vaultspec/lib/scripts/vault.py search "type:adr search implementation"
+vaultspec vault search "type:adr search implementation"
 
 # Find all RAG-related research
-python .vaultspec/lib/scripts/vault.py search "type:research feature:rag embeddings"
+vaultspec vault search "type:research feature:rag embeddings"
 
 # Find recent execution records
-python .vaultspec/lib/scripts/vault.py search "type:exec date:2026-02 results"
+vaultspec vault search "type:exec date:2026-02 results"
 
 # Combine multiple filters
-python .vaultspec/lib/scripts/vault.py search "type:plan feature:protocol integration steps"
+vaultspec vault search "type:plan feature:protocol integration steps"
 ```
 
 Filter tokens are removed from the query text before semantic matching, so the
@@ -95,10 +95,10 @@ Before searching, you must build the vector index:
 
 ```bash
 # Incremental index (default) — only processes new/changed files
-python .vaultspec/lib/scripts/vault.py index
+vaultspec vault index
 
 # Full re-index — reprocesses all documents
-python .vaultspec/lib/scripts/vault.py index --full
+vaultspec vault index --full
 ```
 
 ### How Incremental Indexing Works

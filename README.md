@@ -66,15 +66,26 @@ Plan → Execute → Verify) work without a GPU.
 - [Framework Manual](.vaultspec/README.md) -- detailed workflow, agent
   reference, and diagrams
 
+## Hooks
+
+vaultspec supports event-driven hooks that fire automatically at key lifecycle
+points in the workflow. Hooks are YAML files stored in `.vaultspec/rules/hooks/`
+and execute whenever a lifecycle event fires — such as after creating a vault
+document, updating the index, completing an audit, or running `sync-all`. Both
+shell commands and agent dispatches are supported as hook actions, letting you
+automate post-phase tasks like running linters, notifying agents, or triggering
+follow-up reviews. See [`.vaultspec/docs/hooks-guide.md`](.vaultspec/docs/hooks-guide.md)
+for the complete guide.
+
 ## CUDA Requirements
 
 ```bash
-pip install -e ".[rag,dev]" --extra-index-url https://download.pytorch.org/whl/cu130
+uv pip install -e ".[rag,dev]" --extra-index-url https://download.pytorch.org/whl/cu130
 ```
 
 The `[rag]` optional dependency group powers the semantic vault search index
 _(torch >= 2.9.0, CUDA 13.0+, compute capability >= 7.5)_.
 
  Always use `--extra-index-url`(not `--index-url`) when installing `[rag]` dependencies.
- Without it, pip installs CPU-only PyTorch from PyPI, which fails at runtime
+ Without it, the installer pulls CPU-only PyTorch from PyPI, which fails at runtime
  with `GPUNotAvailableError`.

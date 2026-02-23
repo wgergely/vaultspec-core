@@ -1,27 +1,35 @@
 # Example hook: auto-verify vault after document creation.
 #
-# This hook runs `vault.py audit --verify` whenever a new document
-# is created via `vault.py create`. Remove the `.example` suffix
-# (or copy this file) to activate it.
+# This hook runs `vaultspec vault audit --verify` whenever a new document
+# is created via `vaultspec vault create`.
 #
-# Available events:
-#   vault.document.created   — after vault.py create
-#   vault.document.modified  — after vault doc edits
-#   vault.index.updated      — after vault.py index
-#   config.synced            — after cli.py sync-all
-#   audit.completed          — after vault.py audit
+# To activate: set `enabled: true` below.
 #
-# Available action types:
-#   shell  — run a shell command
-#   agent  — dispatch a sub-agent via ACP
+# Supported events (exactly 4):
+#   vault.document.created   — after vaultspec vault create
+#   vault.index.updated      — after vaultspec vault index
+#   config.synced            — after vaultspec sync-all
+#   audit.completed          — after vaultspec vault audit
 #
-# Context variables (available in {placeholders}):
-#   {path}     — path to the affected document
-#   {root}     — workspace root directory
-#   {event}    — the event name
+# Action types:
+#   shell  — run a shell command (60s timeout, no shell=True)
+#   agent  — dispatch a vaultspec sub-agent (300s timeout)
+#
+# Context variables (usable as {placeholders} in command/task strings):
+#   {path}   — path to the affected document (set by --path on manual runs,
+#               or by the lifecycle trigger for vault.document.created)
+#   {root}   — workspace root directory
+#   {event}  — the event name that fired this hook
 
 event: vault.document.created
 enabled: false  # set to true to activate
 actions:
   - type: shell
-    command: "python .vaultspec/lib/scripts/vault.py audit --verify"
+    command: "vaultspec vault audit --verify"
+
+  # Uncomment the block below to also dispatch a curation agent after creation.
+  # The agent receives the document path and event name for context.
+  #
+  # - type: agent
+  #   name: vaultspec-docs-curator
+  #   task: "A new vault document was created at {path} (event: {event}). Review the document for tag compliance and broken wiki-links, and fix any issues found."

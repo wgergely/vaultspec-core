@@ -20,7 +20,7 @@ documentation that ensures quality and context preservation.
 - **Plan (`vaultspec-write`)** defines the steps.
 - **Execute (`vaultspec-execute`)** builds it.
 - **Verify (`vaultspec-review`)** validates it.
-- **Curate (`vaultspec-docs-curator`)** cleans up.
+- **Curate (`vaultspec-curate`)** cleans up.
 
 #### Detailed Steps
 
@@ -56,10 +56,10 @@ documentation that ensures quality and context preservation.
   - **Agent:** `vaultspec-code-reviewer` (High Tier).
   - *Usage:* "Activate `vaultspec-review` to audit the implementation."
 
-- **Curate (`vaultspec-docs-curator`)**:
+- **Curate (`vaultspec-curate`)**:
   - **Goal:** Maintain the hygiene of the `.vault/` vault.
   - **Agent:** `vaultspec-docs-curator` (Medium Tier).
-  - *Usage:* "Run the `vaultspec-docs-curator` agent to audit the vault."
+  - *Usage:* "Activate `vaultspec-curate` to audit the vault."
 
 ### Agent Reference
 
@@ -88,12 +88,12 @@ in `.vaultspec/`:
 - **`system/project.md` (User-Editable):** A placeholder for
   project-specific instructions, extra context, or user preferences. This
   content is appended verbatim to the generated config files.
-- **`cli.py config sync`:** This command synchronizes `system/framework.md`
+- **`vaultspec config sync`:** This command synchronizes `system/framework.md`
   and `system/project.md` into the root `AGENTS.md` and tool-specific files
   (`CLAUDE.md`, `GEMINI.md`).
-- **`cli.py system show`:** Displays the composable system prompt parts and
+- **`vaultspec system show`:** Displays the composable system prompt parts and
   their generation targets.
-- **`cli.py system sync`:** Assembles parts from `system/` into `SYSTEM.md`
+- **`vaultspec system sync`:** Assembles parts from `system/` into `SYSTEM.md`
   and syncs it to tool destinations (e.g., `.gemini/SYSTEM.md`).
 
 **Syntactic Stability:**
@@ -107,11 +107,11 @@ syntactically stable and separated from user-provided content.
 | :--- | :--- | :--- |
 | `system/framework.md` | Bootstrap prompt | `config sync` |
 | `system/project.md` | Project context | User |
-| `AGENTS.md` | Root AI entry point | `cli.py` |
-| `CLAUDE.md` | Claude Code config | `cli.py` |
-| `GEMINI.md` | Gemini CLI config | `cli.py` |
+| `AGENTS.md` | Root AI entry point | `vaultspec` |
+| `CLAUDE.md` | Claude Code config | `vaultspec` |
+| `GEMINI.md` | Gemini CLI config | `vaultspec` |
 | `system/` | Composable prompts | Developer |
-| `SYSTEM.md` | Gemini system prompt | `cli.py` |
+| `SYSTEM.md` | Gemini system prompt | `vaultspec` |
 
 ## Overview Diagram
 
@@ -165,7 +165,7 @@ flowchart TD
 
     %% Phase 1: Research
     SK_RES["Skill: vaultspec-research<br/>Announce"]
-    SK_SUB_RES["Skill: vaultspec-subagent<br/>Run Command: subagent.py"]
+    SK_SUB_RES["Skill: vaultspec-subagent<br/>Run Command: vaultspec subagent"]
     SA_RES["Agent: vaultspec-adr-researcher<br/>Search<br/>Write Artifact"]
     PH1_END["Phase 1 Complete"]
 
@@ -175,22 +175,22 @@ flowchart TD
 
     %% Phase 3: Plan
     SK_REF["Skill: vaultspec-reference<br/>Announce"]
-    SK_SUB_REF["Skill: vaultspec-subagent<br/>Run Command: subagent.py"]
+    SK_SUB_REF["Skill: vaultspec-subagent<br/>Run Command: vaultspec subagent"]
     SA_REF["Agent: vaultspec-reference-auditor<br/>Audit Ref<br/>Write Artifact"]
 
     SK_WRITE["Skill: vaultspec-write<br/>Announce"]
-    SK_SUB_WRITE["Skill: vaultspec-subagent<br/>Run Command: subagent.py"]
+    SK_SUB_WRITE["Skill: vaultspec-subagent<br/>Run Command: vaultspec subagent"]
     SA_WRITER["Agent: vaultspec-writer<br/>Plan Codebase<br/>Write Artifact"]
     PH3_END["Phase 3 Complete"]
 
     %% Phase 4: Execute
     SK_EXEC["Skill: vaultspec-execute<br/>Announce"]
-    SK_SUB_EXEC["Skill: vaultspec-subagent<br/>Run Command: subagent.py"]
+    SK_SUB_EXEC["Skill: vaultspec-subagent<br/>Run Command: vaultspec subagent"]
     SA_EXEC["Agent: vaultspec-complex-executor<br/>Edit Code<br/>Validate"]
 
     %% Phase 5: Verify
     SK_REV["Skill: vaultspec-review<br/>Announce"]
-    SK_SUB_REV["Skill: vaultspec-subagent<br/>Run Command: subagent.py"]
+    SK_SUB_REV["Skill: vaultspec-subagent<br/>Run Command: vaultspec subagent"]
     SA_REV["Agent: vaultspec-code-reviewer<br/>Audit Safety/Intent<br/>Report"]
 
     EXEC_RET["Execution Return"]
@@ -198,7 +198,7 @@ flowchart TD
 
     %% Revision (if needed)
     SK_FIX["Skill: vaultspec-execute (Fixes)<br/>Announce"]
-    SK_SUB_FIX["Skill: vaultspec-subagent<br/>Run Command: subagent.py"]
+    SK_SUB_FIX["Skill: vaultspec-subagent<br/>Run Command: vaultspec subagent"]
     SA_FIX["Agent: vaultspec-standard-executor<br/>Fix Code<br/>Verify"]
     PH5_END["Phase 5 Complete"]
 

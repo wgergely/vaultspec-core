@@ -30,15 +30,13 @@ Clone the repository and install dependencies:
 ```bash
 git clone https://github.com/wgergely/vaultspec
 cd vaultspec
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
+uv sync --extra dev
 ```
 
 Verify the CLI is available:
 
 ```bash
-python .vaultspec/lib/scripts/cli.py --help
+vaultspec --help
 ```
 
 The `.vault/` directory is created automatically the first time you invoke a
@@ -364,6 +362,18 @@ Every document has exactly two tags:
 1. **Directory tag** — matches the subdirectory (`#adr`, `#research`, etc.)
 2. **Feature tag** — groups related documents (`#rag`, `#protocol`)
 
+### Hooks
+
+Hooks let you automate post-phase actions without modifying the core pipeline.
+They are YAML files in `.vaultspec/rules/hooks/` that attach shell commands or
+agent dispatches to lifecycle events such as `vault.document.created`,
+`vault.index.updated`, `config.synced`, and `audit.completed`. A hook fires
+automatically after its lifecycle event completes — for example, you can trigger
+a curate agent every time a new vault document is created, or run a linter after
+`sync-all`. Hook failures are always logged at debug level and never block the
+parent command. See [hooks-guide.md](hooks-guide.md) for the full schema,
+event list, and examples.
+
 ### Agents, Skills, and Rules
 
 **Agents** are AI personas with defined roles and capability tiers:
@@ -379,7 +389,7 @@ Every document has exactly two tags:
 `vaultspec-curate`.
 
 **Rules** are behavioral constraints synced to `.claude/rules/`,
-`.gemini/rules/`, etc. by `cli.py rules sync`.
+`.gemini/rules/`, etc. by `vaultspec rules sync`.
 
 ### The Protocol Stack
 
@@ -417,7 +427,7 @@ flowchart LR
         SK["skills/*.md"]
     end
 
-    subgraph Transform["cli.py sync"]
+    subgraph Transform["vaultspec sync"]
         CS["config sync"]
         RS["rules sync"]
         AS["agents sync"]
