@@ -47,7 +47,7 @@ repos:
         name: Check documentation links (Lychee)
         entry: lychee
         language: system
-        args: ["--no-progress", "--exclude-path", "README.md", "--exclude", "\\[\\[.*\\]\\]"]
+        args: ["--no-progress", "--exclude-path", "README.md"]
         types: [markdown]
 
       - id: markdownlint

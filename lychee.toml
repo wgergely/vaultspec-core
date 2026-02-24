@@ -1,16 +1,19 @@
 # Lychee configuration
-accept = [200, 403, 410, 429, 502]
+accept = [200, 403, 410, 429, 502, 503]
 exclude = [
   '\[\[.*\]\]',
   "https://www.npmjs.com/.*",
   "https://github.com/.*",
   "https://www.linuxfoundation.org/.*",
   "https://gpui.rs/.*",
+  "https://www.gpui.rs/.*",
   "https://medium.com/.*",
   "https://skillsmp.com/.*",
   "https://www.iclr.cc/.*",
   "https://deepwiki.com/.*",
   "https://javascript.info/.*",
+  "https://blog.jetbrains.com/.*",
+  "http://blog.modelcontextprotocol.io/.*",
 ]
 exclude_path = ["README.md"]
 no_progress = true

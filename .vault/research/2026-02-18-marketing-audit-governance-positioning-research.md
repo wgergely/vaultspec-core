@@ -161,7 +161,7 @@ Context loss between AI sessions is a critical pain point across the industry.
 - [Martin Fowler: SDD Tools Analysis](https://martinfowler.com/articles/exploring-gen-ai/sdd-3-tools.html)
 - [InfoQ: AWS Kiro Spec-Driven Agent IDE](https://www.infoq.com/news/2025/08/aws-kiro-spec-driven-agent/)
 - [Kiro.dev](https://kiro.dev/)
-- [AWS: Kiro Project Init](https://aws.startups/prompt-library/kiro-project-init)
+- [AWS: Kiro Project Init](https://aws.amazon.com/startups/prompt-library/kiro-project-init)
 - [IMDA: Model AI Governance Framework for Agentic AI](https://www.imda.gov.sg/-/media/imda/files/about/emerging-tech-and-research/artificial-intelligence/mgf-for-agentic-ai.pdf)
 - [WitnessAI: Agentic AI Governance Framework](https://witness.ai/blog/agentic-ai-governance-framework/)
 - [Microsoft: AI Agent Governance](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ai-agents/governance-security-across-organization)
