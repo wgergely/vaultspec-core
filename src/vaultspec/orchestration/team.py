@@ -10,6 +10,7 @@ ADR: .vault/adr/2026-02-20-a2a-team-adr.md
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 import signal
@@ -582,6 +583,7 @@ class TeamCoordinator:
                 logger.debug("Spawned process for %s already exited", agent_name)
             finally:
                 from .utils import cleanup_subprocess_transports
+
                 await cleanup_subprocess_transports(proc)
         self._spawned.clear()
 
@@ -906,6 +908,7 @@ class TeamCoordinator:
                 with contextlib.suppress(Exception):
                     await process.wait()
                 from .utils import cleanup_subprocess_transports
+
                 await cleanup_subprocess_transports(process)
                 raise RuntimeError(
                     f"Agent {name!r} on port {port} did not become reachable "

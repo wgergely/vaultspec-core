@@ -11,7 +11,11 @@ related:
 
 ## Status
 
-**Research Complete** — Feasibility confirmed (8/10). Implementation decision pending.
+**SUPERSEDED** — This ADR is fully superseded by
+`[[2026-02-24-subagent-protocol-adr]]` (Unified A2A Protocol Stack — Full
+Rewrite). The 3-protocol stack (ACP + A2A + MCP coexisting) recommended here
+is replaced by a unified A2A-only agent communication stack. Do not implement
+any decisions from this document.
 
 ## Question
 

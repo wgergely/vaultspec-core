@@ -325,9 +325,9 @@ class GeminiProvider(AgentProvider):
         root_dir: pathlib.Path,
         model_override: str | None = None,
         mode: str = "read-write",
+        mcp_servers: dict[str, Any] | None = None,
         *,
         creds_path: pathlib.Path | None = None,
-        mcp_servers: dict[str, Any] | None = None,
     ) -> ProcessSpec:
         """Build a ProcessSpec for launching the Gemini CLI ACP bridge subprocess.
 

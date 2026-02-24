@@ -1,0 +1,5 @@
+# Lychee configuration
+exclude = ['\[\[.*\]\]']
+exclude_path = ["README.md"]
+verbose = true
+no_progress = true

@@ -10,7 +10,13 @@ related:
   - "[[2026-02-21-acp-ref-impl-research]]"
 ---
 
-# `claude-acp-bidirectional` adr: `Multi-Turn Bidirectional Communication in Claude ACP Bridge` | (**status:** `accepted`)
+# `claude-acp-bidirectional` adr: Multi-Turn Bidirectional Communication in Claude ACP Bridge | (**status:** `superseded`)
+
+**SUPERSEDED** — This ADR is fully superseded by
+`[[2026-02-24-subagent-protocol-adr]]` (Unified A2A Protocol Stack — Full
+Rewrite). ACP bridges are being deleted entirely. Per-session state,
+cancel semantics, and session resume patterns described here are no longer
+applicable. Do not implement any decisions from this document.
 
 ## Problem Statement
 

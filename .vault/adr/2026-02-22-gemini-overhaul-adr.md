@@ -16,7 +16,13 @@ related:
   - "[[2026-02-22-gemini-a2a-review]]"
 ---
 
-# `gemini-overhaul` adr: Gemini ACP Bridge Rewrite and A2A Executor Hardening | (**status:** `proposed`)
+# `gemini-overhaul` adr: Gemini ACP Bridge Rewrite and A2A Executor Hardening | (**status:** `superseded`)
+
+**SUPERSEDED** — This ADR is fully superseded by
+`[[2026-02-24-subagent-protocol-adr]]` (Unified A2A Protocol Stack — Full
+Rewrite). The Gemini ACP bridge rewrite decided here is moot — all ACP bridges
+are being deleted. A2A executor hardening patterns remain valid as
+implementation guidance. Do not treat this document as authoritative.
 
 **Supersedes:** `[[2026-02-22-gemini-acp-bridge-adr]]`
 
@@ -96,12 +102,14 @@ Seven decisions addressing the bridge rewrite, executor hardening, and integrati
 **Rationale**: The current scaffold has 4 CRITICAL issues (runtime crash, protocol violation, test failure, missing 9/15 methods) and 6 HIGH issues. Every public method has defects. Patching would require rewriting every method anyway while carrying the risk of inheriting structural problems (wrong `_SessionState` fields, missing DI, leaked tasks). A clean rewrite using the Claude bridge as a template is faster, safer, and produces a more maintainable result.
 
 **What the rewrite preserves from the scaffold**:
+
 - `_map_tool_kind()` function (lines 71-85) -- correct and matches Claude bridge.
 - `_get_tool_call_content()` function (lines 88-108) -- correct for structured diffs.
 - `GeminiProxyClient` pattern (lines 127-166) -- structurally correct, needs cleanup path added.
 - `_SessionState` dataclass concept (lines 111-124) -- needs additional fields.
 
 **What the rewrite replaces**:
+
 - Constructor: add `spawn_fn` DI parameter, remove `get_config()` coupling.
 - `initialize()`: fix `McpCapabilities` import, set correct session capabilities.
 - `new_session()`: remove synchronous version check, remove Windows `cmd.exe` workaround (use `shutil.which` + SDK `spawn_agent_process`), remove `os.environ.copy()` (let SDK handle env trimming), add task tracking for background tasks.
@@ -169,6 +177,7 @@ Note: `McpCapabilities` is removed entirely. It was incorrectly used in the scaf
 5. Track background tasks (`_read_stderr`, `_monitor_exit`) in `_SessionState.background_tasks: list[asyncio.Task]` for cleanup.
 
 **What is removed**:
+
 - Synchronous `subprocess.run(["gemini", "--version"], ...)` (lines 215-221). Blocks the event loop and provides no value -- if Gemini is missing, the spawn will fail with a clear error.
 - Windows `cmd.exe /c` workaround (lines 223-238). `shutil.which("gemini")` resolves to `gemini.cmd` on Windows. `spawn_agent_process` handles it.
 - `env=os.environ.copy()` (line 259). The SDK's `spawn_stdio_transport` uses `default_environment()` which only inherits platform-safe variables. Passing the full env defeats this security measure.
@@ -215,6 +224,7 @@ class _SessionState:
 ```
 
 **`load_session` flow** (mirroring Claude bridge):
+
 1. Look up `session_id` in `self._sessions`.
 2. If found and child process is alive, return the existing session.
 3. If found but child process has exited, reconstruct: spawn a new child using stored config (`cwd`, `model`, `mode`, `mcp_servers`), perform ACP handshake, create new child session, update `_SessionState` with new `child_conn` and `child_proc`.
@@ -258,11 +268,13 @@ async def _heartbeat(self, updater: TaskUpdater, cancel_event: asyncio.Event) ->
 Add `_running_tasks: dict[str, asyncio.Task]` and `_cancel_events: dict[str, asyncio.Event]` instance variables protected by `asyncio.Lock`.
 
 In `execute()`:
+
 - Wrap the `run_subagent()` call in `asyncio.create_task()` and store in `_running_tasks[task_id]`.
 - Register a per-task `asyncio.Event` in `_cancel_events[task_id]`.
 - Handle `asyncio.CancelledError` in the try/except to mark the task as cancelled.
 
 In `cancel()`:
+
 - Set `_cancel_events[task_id]` to signal the heartbeat to stop.
 - Call `_running_tasks[task_id].cancel()` to cancel the in-flight asyncio task.
 - Emit `updater.cancel()` after the task is cancelled.
@@ -283,6 +295,7 @@ async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None
 **5d. Concurrency protection**:
 
 Add `asyncio.Lock` instances for all shared mutable state:
+
 - `_tasks_lock` protects `_running_tasks` and `_cancel_events`.
 - `_session_ids_lock` protects `_session_ids` (once session resume is added).
 
@@ -311,6 +324,7 @@ if debug:
 ```
 
 Environment variables for the bridge to read:
+
 - `VAULTSPEC_AGENT_MODE`: sandbox mode (`"read-only"` or `"read-write"`)
 - `VAULTSPEC_ROOT_DIR`: workspace root
 - `VAULTSPEC_ALLOWED_TOOLS`: comma-separated tool names

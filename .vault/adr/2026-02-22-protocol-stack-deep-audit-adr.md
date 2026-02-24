@@ -15,7 +15,14 @@ related:
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 
-# `protocol-stack` ADR: Protocol Stack Deep Audit Remediation | (**status:** `accepted`)
+# `protocol-stack` ADR: Protocol Stack Deep Audit Remediation | (**status:** `superseded`)
+
+**SUPERSEDED** — This ADR is fully superseded by
+`[[2026-02-24-subagent-protocol-adr]]` (Unified A2A Protocol Stack — Full
+Rewrite). Session resume fixes, CLI parity, and team tools patterns described
+here assumed ACP bridges remain. That assumption is eliminated. Specific
+decisions (e.g. `__init__.py` fix, monkeypatch policy) may still be
+independently valid but are not binding from this document.
 
 ## Problem Statement
 
@@ -84,6 +91,7 @@ Fix the root cause and propagate session resume capability through all layers.
 
 **Step 1a.** Modify `run_subagent()` in `src/vaultspec/orchestration/subagent.py`
 to branch on `resume_session_id`:
+
 - When `resume_session_id` is set, call `conn.resume_session(resume_session_id)`
   instead of `conn.new_session()`
 - When unset, preserve the current `conn.new_session()` behavior
@@ -118,6 +126,7 @@ session. This validates the entire chain from Step 1a through 1e.
 Eliminate the 6-parameter gap between CLI and `run_subagent()`.
 
 **Step 2a.** Add the following flags to `subagent_cli.py` `command_run`:
+
 - `--max-turns` (int) mapped to `max_turns`
 - `--budget` (float) mapped to `budget`
 - `--effort` (str, choices: low/medium/high) mapped to `effort`
@@ -182,6 +191,7 @@ recorded here for traceability and will require its own dedicated ADR.
 
 The current `interactive=True` mode works via a stdin loop, making it unusable
 from MCP or programmatic callers. A non-blocking multi-turn API is needed that:
+
 - Accepts a sequence of turns as input (or provides a turn-by-turn callback
   interface)
 - Returns results per turn without requiring stdin
@@ -222,6 +232,7 @@ a dedicated research and ADR cycle would risk an under-specified implementation.
 ## Consequences
 
 **Positive:**
+
 - Multi-turn agent workflows will actually persist state across turns, enabling
   the State Agent pattern from [[2026-02-22-protocol-test-architecture-adr]]
 - CLI and MCP interfaces will expose identical capabilities, eliminating a class
@@ -234,6 +245,7 @@ a dedicated research and ADR cycle would risk an under-specified implementation.
   first, then multi-turn API, preventing premature implementation
 
 **Negative:**
+
 - Decision 1 touches the critical path of every agent invocation; regressions
   must be caught by the protocol matrix tests from
   [[2026-02-22-protocol-test-architecture-adr]]

@@ -487,7 +487,7 @@ class ClaudeACPBridge(Agent):
         # avoiding the generator-death bug from upstream MessageParseError.
 
     async def _disconnect_sdk_client(self, sdk_client: Any) -> None:
-        """Disconnect the SDK client and explicitly clean up its subprocess transports."""
+        """Disconnect the SDK client and clean up its subprocess transports."""
         if sdk_client is None:
             return
         proc = getattr(sdk_client, "_process", None)
@@ -499,6 +499,7 @@ class ClaudeACPBridge(Agent):
             logger.exception("Error disconnecting SDK client")
         if proc is not None:
             from ...orchestration.utils import cleanup_subprocess_transports
+
             await cleanup_subprocess_transports(proc)
 
     def on_connect(self, conn: Any) -> None:
@@ -552,8 +553,8 @@ class ClaudeACPBridge(Agent):
                     image=True,
                     embedded_context=True,
                 ),
-                call_tool=True,
             ),
+            field_meta={"call_tool": True},
         )
 
     def _build_options(

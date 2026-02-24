@@ -6,7 +6,13 @@ import logging
 import pathlib
 from typing import Any
 
-__all__ = ["SecurityError", "cleanup_subprocess_transports", "find_project_root", "kill_process_tree", "safe_read_text"]
+__all__ = [
+    "SecurityError",
+    "cleanup_subprocess_transports",
+    "find_project_root",
+    "kill_process_tree",
+    "safe_read_text",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +49,7 @@ async def cleanup_subprocess_transports(proc: Any) -> None:
     if getattr(proc, "stderr", None):
         _cleanup_transport(getattr(proc.stderr, "_transport", None))
     _cleanup_transport(getattr(proc, "_transport", None))
-            
+
     # Yield control to allow transport close callbacks to execute
     await asyncio.sleep(0)
 

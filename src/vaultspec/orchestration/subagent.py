@@ -580,6 +580,7 @@ async def run_subagent(
 
                 # Clean up asyncio subprocess transport to avoid ResourceWarning
                 from .utils import cleanup_subprocess_transports
+
                 await cleanup_subprocess_transports(_proc)
 
                 t.cancel()

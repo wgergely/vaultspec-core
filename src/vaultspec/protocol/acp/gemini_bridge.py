@@ -33,7 +33,6 @@ from acp.schema import (
     AgentCapabilities,
     AgentMessageChunk,
     AgentPlanUpdate,
-    AgentThoughtChunk,
     AuthenticateResponse,
     FileEditToolCallContent,
     ForkSessionResponse,
@@ -208,10 +207,6 @@ class _SessionState:
     cancel_event: asyncio.Event = dataclasses.field(default_factory=asyncio.Event)
     tool_call_contents: dict[str, list[Any]] = dataclasses.field(default_factory=dict)
     todo_write_tool_call_ids: set[str] = dataclasses.field(default_factory=set)
-    # History of all ACP content blocks (User/Assistant) for multi-turn persistence
-    history: list[Any] = dataclasses.field(default_factory=list)
-    # Temporary buffer for the current turn's response text
-    current_response_text: str = ""
 
 
 class GeminiProxyClient(Client):
@@ -251,7 +246,9 @@ class GeminiProxyClient(Client):
             try:
                 update = await self._queue.get()
                 if self.bridge._debug:
-                    logger.debug("Proxy client worker: forwarding %s", type(update).__name__)
+                    logger.debug(
+                        "Proxy client worker: forwarding %s", type(update).__name__
+                    )
                 await self.bridge.forward_update(self.session_id, update)
                 self._queue.task_done()
             except asyncio.CancelledError:
@@ -393,31 +390,6 @@ class GeminiProxyClient(Client):
             await self.bridge._conn.release_terminal(**kwargs)
             if self.bridge._conn
             else None
-        )
-
-    async def call_tool(
-        self,
-        tool_name: str,
-        tool_input: dict[str, Any],
-        session_id: str,
-        **kwargs: Any,
-    ) -> Any:
-        """Proxy a call-tool request to the parent bridge.
-
-        Args:
-            tool_name: The name of the tool to execute.
-            tool_input: Input parameters for the tool.
-            session_id: The session ID (unused for routing).
-            **kwargs: Additional fields forwarded verbatim.
-
-        Returns:
-            The tool result from the parent.
-        """
-        return await self.bridge.call_tool(
-            tool_name=tool_name,
-            tool_input=tool_input,
-            session_id=session_id,
-            **kwargs,
         )
 
 
@@ -581,18 +553,20 @@ class GeminiACPBridge(Agent):
                     audio=True,
                     embedded_context=True,
                 ),
-                # Explicitly advertise tool-calling support
-                call_tool=True,
             ),
+            # Advertise tool-calling support in _meta since AgentCapabilities
+            # doesn't have a standard field for it yet.
+            field_meta={"call_tool": True},
         )
 
     async def _spawn_child_session(
         self,
-        session_id: str,
+        session_id: str | None,
         cwd: str,
         model: str,
         mode: str,
         mcp_servers: list[Any] | None = None,
+        resume_native_id: str | None = None,
     ) -> _SessionState:
         """Spawn a Gemini child process and create an ACP session.
 
@@ -602,11 +576,13 @@ class GeminiACPBridge(Agent):
 
         Args:
             session_id: Bridge-level session ID to assign to the new state.
+                If None, a fresh one is generated.
             cwd: Working directory passed to the Gemini CLI subprocess.
             model: Gemini model identifier (e.g. ``GeminiModels.LOW``).
             mode: Sandboxing mode — ``"read-only"`` or ``"read-write"``.
             mcp_servers: Optional ACP MCP server configurations forwarded to
                 the child process.
+            resume_native_id: Native Gemini session ID to resume.
 
         Returns:
             A fully initialised ``_SessionState`` with a live child connection.
@@ -614,6 +590,7 @@ class GeminiACPBridge(Agent):
         Raises:
             FileNotFoundError: If the ``gemini`` CLI binary cannot be located.
         """
+        session_id = session_id or str(uuid.uuid4())
         gemini_path = self._gemini_path or shutil.which("gemini")
         if gemini_path is None:
             raise FileNotFoundError(
@@ -623,6 +600,8 @@ class GeminiACPBridge(Agent):
         args: list[str] = ["--experimental-acp", "--model", model]
         if mode == "read-only":
             args.append("--sandbox")
+        if resume_native_id:
+            args.extend(["--resume", resume_native_id])
         for tool in self._allowed_tools:
             args.extend(["--allowed-tools", tool])
         if self._approval_mode:
@@ -744,11 +723,11 @@ class GeminiACPBridge(Agent):
             logger.debug(
                 "Child session created: %s (bridge session: %s)",
                 child_session.session_id,
-                session_id,
+                session_id or "(none)",
             )
 
         return _SessionState(
-            session_id=session_id,
+            session_id=session_id or str(uuid.uuid4()),
             cwd=cwd,
             model=model,
             mode=mode,
@@ -781,6 +760,7 @@ class GeminiACPBridge(Agent):
             with contextlib.suppress(Exception):
                 await state.child_proc.wait()
             from ...orchestration.utils import cleanup_subprocess_transports
+
             await cleanup_subprocess_transports(state.child_proc)
 
         with contextlib.suppress(Exception):
@@ -819,7 +799,7 @@ class GeminiACPBridge(Agent):
             )
             self._sessions[session_id] = state
             return NewSessionResponse(session_id=session_id)
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to create new session %s", session_id)
             raise
 
@@ -855,17 +835,12 @@ class GeminiACPBridge(Agent):
         state.cancel_event.clear()
         state.todo_write_tool_call_ids.clear()
         state.tool_call_contents.clear()
-        state.current_response_text = ""
-
-        # Append new prompt to history
-        state.history.extend(prompt)
 
         # Race the child prompt against the cancel event so that
         # cancel() can interrupt a long-running prompt.
-        # NOTE: For Gemini CLI, we send the FULL history on every turn to emulate persistence
         prompt_task = asyncio.create_task(
             state.child_conn.prompt(
-                prompt=state.history,
+                prompt=prompt,
                 session_id=state.child_session_id,
             ),
         )
@@ -910,12 +885,7 @@ class GeminiACPBridge(Agent):
                     logger.debug("Failed to emit error as AgentMessageChunk")
             return PromptResponse(stop_reason="end_turn")
 
-        # Capture response and add to history
-        response = prompt_task.result()
-        if state.current_response_text:
-            state.history.append(TextContentBlock(type="text", text=state.current_response_text))
-        
-        return response
+        return prompt_task.result()
 
     async def forward_update(self, session_id: str, update: Any) -> None:
         """Forward a session update from the child to the parent connection.
@@ -934,18 +904,8 @@ class GeminiACPBridge(Agent):
             )
             return
 
-        # Multi-turn history capture: accumulate response text
-        if isinstance(update, AgentMessageChunk) and isinstance(update.content, TextContentBlock):
-            state.current_response_text += update.content.text
-        elif isinstance(update, AgentThoughtChunk) and isinstance(update.content, TextContentBlock):
-            # Include thoughts in history to maintain model reasoning context
-            state.current_response_text += f"\n<thought>\n{update.content.text}\n</thought>\n"
-        elif isinstance(update, UserMessageChunk) and isinstance(update.content, TextContentBlock):
-            # Capture user messages (e.g. from tool results) into history
-            state.history.append(update.content)
-
         if isinstance(update, ToolCallStart):
-            # Track tool call for multi-turn history if needed
+            # Track tool call for consistency
             if update.tool_call_id not in state.tool_call_contents:
                 state.tool_call_contents[update.tool_call_id] = []
             await self._emit_tool_call(state, session_id, update)
@@ -1078,8 +1038,8 @@ class GeminiACPBridge(Agent):
             The tool result returned by the parent client.
         """
         if self._conn:
-            # self._conn is the parent bridge's connection to the ACP client (SubagentClient)
-            # which we've updated to implement call_tool.
+            # self._conn is the parent bridge's connection to the ACP client
+            # (SubagentClient) which we've updated to implement call_tool.
             return await self._conn.call_tool(
                 tool_name=tool_name,
                 tool_input=tool_input,
@@ -1148,6 +1108,7 @@ class GeminiACPBridge(Agent):
                     self._model,
                     self._mode,
                     mcp_servers,
+                    resume_native_id=session_id,
                 )
                 self._sessions[session_id] = state
                 return LoadSessionResponse()
@@ -1170,19 +1131,22 @@ class GeminiACPBridge(Agent):
 
             await self._cleanup_session(state)
 
-            effective_mcp = mcp_servers if mcp_servers is not None else state.mcp_servers
+            effective_mcp = (
+                mcp_servers if mcp_servers is not None else state.mcp_servers
+            )
             new_state = await self._spawn_child_session(
                 session_id,
                 cwd,
                 state.model,
                 state.mode,
                 effective_mcp,
+                resume_native_id=session_id,
             )
-            
+
             self._sessions[session_id] = new_state
 
             return LoadSessionResponse()
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to load session %s", session_id)
             raise
 
@@ -1209,7 +1173,7 @@ class GeminiACPBridge(Agent):
         try:
             await self.load_session(cwd, session_id, mcp_servers, **kwargs)
             return ResumeSessionResponse()
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to resume session %s", session_id)
             raise
 

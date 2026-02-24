@@ -8,7 +8,10 @@ related: []
 
 ## Status
 
-**Proposed** — User constraints confirmed: Python-only (hard), Gemini must-have, claude-agent-sdk acceptable.
+**SUPERSEDED** — This ADR is fully superseded by
+`[[2026-02-24-subagent-protocol-adr]]` (Unified A2A Protocol Stack — Full
+Rewrite). Option E (Python ACP bridge) chosen here is eliminated by the full
+rewrite decision. Do not implement any decisions from this document.
 
 ## Context
 

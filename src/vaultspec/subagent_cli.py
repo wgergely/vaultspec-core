@@ -21,7 +21,6 @@ from .cli_common import (
     run_async,
     setup_logging,
 )
-from .mcp_server.app import main as server_main
 from .orchestration.subagent import (
     AgentNotFoundError,
     list_available_agents,
@@ -128,13 +127,32 @@ def command_run(args):
         args.printer.out(result.response_text)
 
 
-def command_serve(_args):
+def command_serve(args):
     """Start the subagent MCP server.
 
     Args:
-        _args: Parsed argument namespace from the ``serve`` subparser.
+        args: Parsed argument namespace from the ``serve`` subparser.
     """
-    server_main()
+    import asyncio
+
+    from .config import get_config
+    from .mcp_server.app import create_server, initialize_server
+
+    cfg = get_config()
+    root_dir = Path(args.root).resolve()
+    logger.info("Starting subagent MCP server root=%s", root_dir)
+
+    initialize_server(
+        root_dir=root_dir,
+        ttl_seconds=cfg.mcp_ttl_seconds,
+    )
+
+    mcp = create_server()
+
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
+    mcp.run()
 
 
 def command_a2a_serve(args):

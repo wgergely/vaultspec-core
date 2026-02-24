@@ -188,7 +188,8 @@ class EmbeddingModel:
             model_name, device="cuda", trust_remote_code=True
         )
         # Query actual dimension from the loaded model
-        self.dimension: int = self.model.get_sentence_embedding_dimension()
+        dim = self.model.get_sentence_embedding_dimension()
+        self.dimension: int = dim or self.DEFAULT_DIMENSION
         logger.info("Embedding model loaded on cuda (dimension=%d)", self.dimension)
 
     @property

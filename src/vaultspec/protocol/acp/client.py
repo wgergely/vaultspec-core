@@ -563,11 +563,13 @@ class SubagentClient(Client):
         if terminal is not None:
             with contextlib.suppress(ProcessLookupError):
                 from ...orchestration.utils import kill_process_tree
+
                 kill_process_tree(terminal.proc.pid)
                 terminal.proc.kill()
-            
+
             # Clean up asyncio subprocess transport to avoid ResourceWarning
             from ...orchestration.utils import cleanup_subprocess_transports
+
             await cleanup_subprocess_transports(terminal.proc)
         return KillTerminalCommandResponse()
 
@@ -599,12 +601,14 @@ class SubagentClient(Client):
             if terminal.proc.returncode is None:
                 with contextlib.suppress(ProcessLookupError):
                     from ...orchestration.utils import kill_process_tree
+
                     kill_process_tree(terminal.proc.pid)
                     terminal.proc.kill()
                 await terminal.proc.wait()
 
             # Clean up asyncio subprocess transport to avoid ResourceWarning
             from ...orchestration.utils import cleanup_subprocess_transports
+
             await cleanup_subprocess_transports(terminal.proc)
 
         return ReleaseTerminalResponse()
@@ -658,6 +662,7 @@ class SubagentClient(Client):
             if terminal.proc.returncode is None:
                 with contextlib.suppress(ProcessLookupError):
                     from ...orchestration.utils import kill_process_tree
+
                     kill_process_tree(terminal.proc.pid)
                     terminal.proc.kill()
                 try:
@@ -668,9 +673,10 @@ class SubagentClient(Client):
                         terminal_id,
                         exc,
                     )
-            
+
             # Clean up asyncio subprocess transport to avoid ResourceWarning
             from ...orchestration.utils import cleanup_subprocess_transports
+
             await cleanup_subprocess_transports(terminal.proc)
 
     async def graceful_cancel(self) -> None:
@@ -680,100 +686,3 @@ class SubagentClient(Client):
                 await self._conn.cancel(session_id=self._session_id)
             except Exception:
                 logger.warning("Failed to send cancel notification", exc_info=True)
-
-    async def call_tool(
-        self,
-        tool_name: str,
-        tool_input: dict[str, Any],
-        session_id: str,
-        **kwargs: Any,
-    ) -> Any:
-        """Execute a tool call and return the result.
-
-        Args:
-            tool_name: The name of the tool to execute (e.g. ``"dispatch_agent"``).
-            tool_input: Input parameters for the tool.
-            session_id: The active ACP session identifier.
-            **kwargs: Additional fields forwarded by the ACP library.
-
-        Returns:
-            The tool result dictionary.
-        """
-        _ = session_id
-        _ = kwargs
-        
-        if tool_name == "dispatch_agent":
-            # Simplified direct call to the tool implementation
-            from ...mcp_server.subagent_tools import dispatch_agent as _dispatch_impl
-            try:
-                res_json = await _dispatch_impl(
-                    agent=tool_input.get("agent", ""),
-                    task=tool_input.get("task", ""),
-                    model=tool_input.get("model"),
-                    mode=tool_input.get("mode"),
-                )
-                return json.loads(res_json)
-            except Exception as e:
-                logger.exception("dispatch_agent tool call failed")
-                return {"error": str(e)}
-        
-        return {"error": f"Tool '{tool_name}' not implemented in SubagentClient"}
-
-    async def call_tool(
-        self,
-        tool_name: str,
-        tool_input: dict[str, Any],
-        session_id: str,
-        **kwargs: Any,
-    ) -> Any:
-        """Execute a tool call and return the result.
-
-        Supports both the explicit 'dispatch_agent' tool and direct sub-agent
-        calls by name (where the sub-agent name is used as the tool title).
-
-        Args:
-            tool_name: The name of the tool to execute.
-            tool_input: Input parameters for the tool.
-            session_id: The active ACP session identifier.
-            **kwargs: Additional fields forwarded by the ACP library.
-
-        Returns:
-            The tool result dictionary.
-        """
-        _ = session_id
-        _ = kwargs
-        
-        from ...mcp_server.subagent_tools import dispatch_agent as _dispatch_impl
-        
-        # 1. Handle explicit dispatch_agent tool
-        if tool_name == "dispatch_agent":
-            try:
-                res_json = await _dispatch_impl(
-                    agent=tool_input.get("agent", ""),
-                    task=tool_input.get("task", ""),
-                    model=tool_input.get("model"),
-                    mode=tool_input.get("mode"),
-                )
-                return json.loads(res_json)
-            except Exception as e:
-                logger.exception("dispatch_agent tool call failed")
-                return {"error": str(e)}
-        
-        # 2. Handle sub-agents exposed as tools named after themselves
-        # SubagentClient allows any tool call to be interpreted as a dispatch
-        # if the tool_name matches an available agent.
-        try:
-            # We use the same dispatch implementation but map tool_name to agent
-            res_json = await _dispatch_impl(
-                agent=tool_name,
-                task=tool_input.get("task", tool_input.get("initial_task", "")),
-                model=tool_input.get("model"),
-                mode=tool_input.get("mode"),
-            )
-            return json.loads(res_json)
-        except Exception as e:
-            # If it's not an agent, fall back to error
-            if "not found" in str(e):
-                return {"error": f"Tool '{tool_name}' not implemented in SubagentClient"}
-            logger.exception("Implicit sub-agent dispatch failed for '%s'", tool_name)
-            return {"error": str(e)}

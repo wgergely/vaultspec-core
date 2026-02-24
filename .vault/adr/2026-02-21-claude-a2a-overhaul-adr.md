@@ -14,7 +14,13 @@ related:
   - "[[2026-02-20-a2a-team-adr]]"
 ---
 
-# `claude-a2a-overhaul` adr: `Claude A2A Executor, Team Tools, and Process Lifecycle` | (**status:** `proposed`)
+# `claude-a2a-overhaul` adr: Claude A2A Executor, Team Tools, and Process Lifecycle | (**status:** `superseded`)
+
+**SUPERSEDED** — This ADR is fully superseded by
+`[[2026-02-24-subagent-protocol-adr]]` (Unified A2A Protocol Stack — Full
+Rewrite). Executor hardening patterns described here remain valid as
+implementation guidance but are no longer binding decisions. Do not treat this
+document as authoritative.
 
 ## Problem Statement
 
@@ -60,6 +66,7 @@ capabilities. The raw `anthropic` SDK has no equivalent — it's a stateless API
 with no MCP support.
 
 Additionally, `claude-agent-sdk` provides:
+
 - Full Claude Code tool suite (Bash, Read, Write, Edit, Glob, Grep, etc.)
 - `can_use_tool` sandbox callbacks (read-only / read-write mode)
 - `permission_mode` for auto-approval
@@ -158,6 +165,7 @@ registration pattern. Seven tools wrapping `TeamCoordinator` + new spawn capabil
 | `dissolve_team` | `dissolve_team()` | Dissolve a running team |
 
 Each tool follows the imperative registration pattern:
+
 ```python
 mcp.tool(
     title="Create Team",

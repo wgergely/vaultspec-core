@@ -31,14 +31,14 @@ repos:
 
       - id: ty
         name: ty
-        entry: python -m ty check src/vaultspec
+        entry: uv run python -m ty check src/vaultspec
         language: system
         types: [python]
         pass_filenames: false
 
       - id: check-naming
         name: check docs naming
-        entry: python -m vaultspec.vault_cli audit --verify
+        entry: uv run python -m vaultspec.vault_cli audit --verify
         language: system
         types: [markdown]
         pass_filenames: false
@@ -50,9 +50,3 @@ repos:
         name: markdownlint
         args: ["--config", ".markdownlint.yaml", "--fix", ".vaultspec/", ".vault/", "README.md"]
 
-  - repo: https://github.com/lycheeverse/lychee.git
-    rev: v0.15.1
-    hooks:
-      - id: lychee
-        name: lychee link check
-        args: ["--no-progress", "--exclude-path", "README.md"]

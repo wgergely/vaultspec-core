@@ -20,11 +20,12 @@ pytestmark = [pytest.mark.integration, pytest.mark.gemini, pytest.mark.claude]
 _LEAD_AGENT_TEMPLATE = (
     "---\n"
     "tier: MEDIUM\n"
-    "tools: {echo_agent}\n"
+    "tools: dispatch_agent\n"
     "---\n"
     "# Persona\n"
     "You are a Lead Agent.  Your ONLY job is:\n"
-    "1. Call the '{echo_agent}' tool with task='Echo: {payload}'.\n"
+    "1. Call the 'dispatch_agent' tool with agent='{echo_agent}' and "
+    "task='Echo: {payload}'.\n"
     "2. Return ONLY the raw tool result text.  Do NOT explain, wrap, "
     "summarise, or add any other text.\n"
 )

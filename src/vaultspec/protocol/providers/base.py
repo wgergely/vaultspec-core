@@ -107,7 +107,7 @@ class ProcessSpec:
     cleanup_paths: list[pathlib.Path]
     session_meta: dict[str, Any] = field(default_factory=dict)
     initial_prompt_override: str | None = None
-    mcp_servers: list[dict[str, Any]] = field(default_factory=list)
+    mcp_servers: dict[str, Any] | None = None
 
 
 def resolve_includes(
@@ -347,6 +347,7 @@ class AgentProvider(abc.ABC):
         root_dir: pathlib.Path,
         model_override: str | None = None,
         mode: str = "read-write",
+        mcp_servers: dict[str, Any] | None = None,
     ) -> ProcessSpec:
         """Prepares the process specification for spawning the agent.
 

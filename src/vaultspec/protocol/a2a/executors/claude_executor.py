@@ -151,7 +151,7 @@ class ClaudeA2AExecutor(AgentExecutor):
         self._cancel_events: dict[str, asyncio.Event] = {}
 
     async def _disconnect_sdk_client(self, sdk_client: Any) -> None:
-        """Disconnect the SDK client and explicitly clean up its subprocess transports."""
+        """Disconnect the SDK client and clean up its subprocess transports."""
         if sdk_client is None:
             return
         proc = getattr(sdk_client, "_process", None)
@@ -163,6 +163,7 @@ class ClaudeA2AExecutor(AgentExecutor):
             logger.exception("Error disconnecting SDK client")
         if proc is not None:
             from ....orchestration.utils import cleanup_subprocess_transports
+
             await cleanup_subprocess_transports(proc)
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
@@ -378,19 +379,11 @@ class ClaudeA2AExecutor(AgentExecutor):
         Args:
             sdk_client: Connected Claude SDK client used to send the prompt
                 and stream the response.
-            prompt: The user-facing prompt text to send.
-            updater: Task updater used to emit status and artifact events.
-            context_id: A2A context identifier for the current task.
-            cancel_event: Asyncio event; when set the stream loop exits early.
-
-        Returns:
-            True if the caller should retry (rate-limit hit), False
-            otherwise (task completed, failed, or cancelled).
         """
         await sdk_client.query(prompt)
         # Fixed artifact_id for this stream: all append=True chunks and the
-        # final last_chunk=True emit share the same ID so the client assembles
-        # them into one artifact object.
+        # final last_chunk=True emit share the same ID so the client
+        # assembles them into one artifact object.
         artifact_id = str(uuid.uuid4())
         collected: list[str] = []
         chunk_emitted = False

@@ -242,6 +242,7 @@ class TestBridgeSpawn:
                 proc.kill()
             await proc.wait()
             from ...orchestration.utils import cleanup_subprocess_transports
+
             await cleanup_subprocess_transports(proc)
 
     @pytest.mark.asyncio
@@ -284,6 +285,7 @@ class TestBridgeSpawn:
                 proc.kill()
             await proc.wait()
             from ...orchestration.utils import cleanup_subprocess_transports
+
             await cleanup_subprocess_transports(proc)
 
 
@@ -383,6 +385,7 @@ class TestMultiTurnContext:
                 proc.kill()
             await proc.wait()
             from ...orchestration.utils import cleanup_subprocess_transports
+
             await cleanup_subprocess_transports(proc)
 
 

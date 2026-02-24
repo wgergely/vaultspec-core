@@ -24,8 +24,7 @@ from claude_agent_sdk import (
 
 from tests.constants import TEST_PROJECT
 
-from ..claude_bridge import ClaudeACPBridge
-from ..claude_bridge import _map_tool_kind
+from ..claude_bridge import ClaudeACPBridge, _map_tool_kind
 
 if TYPE_CHECKING:
     from acp.schema import FileEditToolCallContent
