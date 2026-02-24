@@ -1,25 +1,25 @@
 [extension]
+description = "A governed development framework for AI agents"
 name = "vaultspec"
 version = "0.1.0"
-description = "A governed development framework for AI agents"
 
 [requires.python]
 version = ">=3.13"
 
 [runtime]
-type = "python"
 install = "uv sync --extra rag"
+type = "python"
 
 [entry_points]
 cli = ".vaultspec/lib/scripts/cli.py"
 mcp = "vaultspec.server:main"
 
 [provides]
-mcp = ["vaultspec-mcp"]
 content_types = ["rules", "agents", "skills", "system", "templates"]
+mcp = ["vaultspec-mcp"]
 
 [outputs]
-claude_dir = ".claude"
-gemini_dir = ".gemini"
 agent_dir = ".agent"
 agents_md = "AGENTS.md"
+claude_dir = ".claude"
+gemini_dir = ".gemini"

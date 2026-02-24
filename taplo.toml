@@ -1,8 +1,8 @@
 [formatting]
-trailing_newline = true
+align_entries = false
 compact_arrays = true
 compact_inline_tables = false
 indent_string = "  "
 indent_tables = true
-align_entries = false
 reorder_keys = true
+trailing_newline = true

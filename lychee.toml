@@ -1,4 +1,5 @@
 # Lychee configuration
+accept = [200, 403, 410, 429, 502]
 exclude = [
   '\[\[.*\]\]',
   "https://www.npmjs.com/.*",
@@ -9,9 +10,8 @@ exclude = [
   "https://skillsmp.com/.*",
   "https://www.iclr.cc/.*",
   "https://deepwiki.com/.*",
-  "https://javascript.info/.*"
+  "https://javascript.info/.*",
 ]
 exclude_path = ["README.md"]
-verbose = "info"
 no_progress = true
-accept = [200, 403, 410, 429, 502]
+verbose = "info"
