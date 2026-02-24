@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from . import types as _t
+from .enums import Resource, Tool
 from .helpers import _launch_editor, build_file, ensure_dir
 from .sync import print_summary, sync_files
 from .types import SyncResult
@@ -44,14 +45,14 @@ def collect_rules() -> dict[str, tuple[Path, dict[str, Any], str]]:
     return sources
 
 
-def transform_rule(tool: str, name: str, _meta: dict[str, Any], body: str) -> str:
+def transform_rule(tool: Tool, name: str, _meta: dict[str, Any], body: str) -> str:
     """Transform a rule definition for a specific tool destination.
 
     Adds a YAML frontmatter block with ``trigger: always_on`` and, for
-    non-agent tools, a ``name`` key derived from the filename stem.
+    non-antigravity tools, a ``name`` key derived from the filename stem.
 
     Args:
-        tool: Target tool name (e.g. ``"claude"``). When ``"agent"``, the
+        tool: Target tool enum. When ``ToolType.ANTIGRAVITY``, the
             ``name`` key is omitted from the frontmatter.
         name: Source filename (e.g. ``"my-rule.md"``).
         _meta: Parsed source frontmatter (currently unused).
@@ -61,7 +62,7 @@ def transform_rule(tool: str, name: str, _meta: dict[str, Any], body: str) -> st
         Assembled file content string with the appropriate frontmatter.
     """
     fm: dict[str, Any] = {}
-    if tool != "agent":
+    if tool != Tool.ANTIGRAVITY:
         fm["name"] = Path(name).stem
     fm["trigger"] = "always_on"
     return build_file(fm, body)
@@ -137,19 +138,19 @@ def rules_sync(args: argparse.Namespace) -> None:
     prune = getattr(args, "prune", False)
 
     total = SyncResult()
-    for tool_name, cfg in _t.TOOL_CONFIGS.items():
+    for tool_type, cfg in _t.TOOL_CONFIGS.items():
         if cfg.rules_dir is None:
             continue
         result = sync_files(
             sources=sources,
             dest_dir=cfg.rules_dir,
-            transform_fn=lambda _tool, n, m, b, _tn=tool_name: transform_rule(
-                _tn, n, m, b
+            transform_fn=lambda _tool, n, m, b, _tt=tool_type: transform_rule(
+                _tt, n, m, b
             ),
             dest_path_fn=lambda dest_dir, name: dest_dir / name,
             prune=prune,
             dry_run=dry_run,
-            label=f"rules -> {tool_name}",
+            label=f"rules -> {tool_type.value}",
         )
         total.added += result.added
         total.updated += result.updated

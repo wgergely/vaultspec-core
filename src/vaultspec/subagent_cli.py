@@ -27,6 +27,7 @@ from .orchestration.subagent import (
     load_agent,
     run_subagent,
 )
+from .core.enums import Tool
 from .protocol.acp import SubagentClient
 from .protocol.providers import ClaudeModels, GeminiModels
 
@@ -188,8 +189,8 @@ def command_a2a_serve(args):
         agent_persona = None
 
     # Create executor based on --executor flag
-    executor_type = args.executor or "claude"
-    if executor_type == "claude":
+    executor_type = args.executor or Tool.CLAUDE.value
+    if executor_type == Tool.CLAUDE.value:
         from .protocol.a2a.executors import ClaudeA2AExecutor
 
         executor = ClaudeA2AExecutor(
@@ -198,7 +199,7 @@ def command_a2a_serve(args):
             mode=args.mode or "read-only",
             system_prompt=agent_persona,
         )
-    elif executor_type == "gemini":
+    elif executor_type == Tool.GEMINI.value:
         from .protocol.a2a.executors import GeminiA2AExecutor
 
         executor = GeminiA2AExecutor(
@@ -264,11 +265,10 @@ def _make_parser() -> argparse.ArgumentParser:
         "--task-file", "-f", help="Path to markdown file describing the task (Legacy)"
     )
 
-    run_parser.add_argument("--model", "-m", help="Override default model")
     run_parser.add_argument(
         "--provider",
         "-p",
-        choices=["gemini", "claude"],
+        choices=[Tool.GEMINI.value, Tool.CLAUDE.value],
         help="Explicitly force a provider",
     )
     run_parser.add_argument(
@@ -338,9 +338,9 @@ def _make_parser() -> argparse.ArgumentParser:
     a2a_serve_parser.add_argument(
         "--executor",
         "-e",
-        choices=["claude", "gemini"],
-        default="claude",
-        help="Executor type (default: claude)",
+        choices=[Tool.CLAUDE.value, Tool.GEMINI.value],
+        default=Tool.CLAUDE.value,
+        help=f"Executor type (default: {Tool.CLAUDE.value})",
     )
     a2a_serve_parser.add_argument(
         "--port",

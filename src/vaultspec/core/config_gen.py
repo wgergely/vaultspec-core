@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 
 from . import types as _t
+from .enums import FileName, Tool
 from .helpers import atomic_write, ensure_dir
 from .rules import collect_rules
 from .sync import print_summary
@@ -31,7 +32,7 @@ def _collect_rule_refs(cfg: ToolConfig) -> list[str]:
         ``@rule/path`` references in a config file.
     """
     if cfg.rules_dir is None or cfg.config_file is None:
-        if cfg.name == "agents" and cfg.config_file:
+        if cfg.name == Tool.AGENTS.value and cfg.config_file:
             config_dir = cfg.config_file.parent
             sources = collect_rules()
             # Also include the generated system rule (vaultspec-system.builtin.md),
@@ -259,13 +260,13 @@ def config_show(_args: argparse.Namespace) -> None:
         print("-" * 60)
 
     print("Generated references per tool:")
-    for tool_name, cfg in _t.TOOL_CONFIGS.items():
+    for tool_type, cfg in _t.TOOL_CONFIGS.items():
         if cfg.config_file is None:
             continue
         refs = _collect_rule_refs(cfg)
         dest_rel = cfg.config_file.relative_to(_t.ROOT_DIR)
         managed = "CLI-managed" if _is_cli_managed(cfg.config_file) else "custom"
-        print(f"\n  {tool_name} ({dest_rel}) [{managed}]:")
+        print(f"\n  {tool_type.value} ({dest_rel}) [{managed}]:")
         if refs:
             for ref in refs:
                 print(f"    @{ref}")
@@ -292,12 +293,12 @@ def config_sync(args: argparse.Namespace) -> None:
 
     result = SyncResult()
 
-    for _tool_name, cfg in _t.TOOL_CONFIGS.items():
+    for _tool_type, cfg in _t.TOOL_CONFIGS.items():
         if cfg.config_file is None:
             continue
 
         # Use agents.md standard format for AGENTS.md
-        if cfg.name == "agents":
+        if cfg.name == Tool.AGENTS.value:
             content = _generate_agents_md(cfg)
         else:
             content = _generate_config(cfg)

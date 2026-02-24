@@ -25,7 +25,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
+from ..core.enums import Tool
 
 __all__ = [
     "FileLock",

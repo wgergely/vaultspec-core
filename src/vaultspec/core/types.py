@@ -72,14 +72,41 @@ TEMPLATES_DIR: Path = Path()
 FRAMEWORK_CONFIG_SRC: Path = Path()
 PROJECT_CONFIG_SRC: Path = Path()
 HOOKS_DIR: Path = Path()
-TOOL_CONFIGS: dict[str, ToolConfig] = {}
+TOOL_CONFIGS: dict[Tool, ToolConfig] = {}
 
 from ..protocol.providers import ClaudeProvider, GeminiProvider  # noqa: E402
+from .enums import DirName, FileName, Resource, Tool
 
 PROVIDERS: dict[str, Any] = {
-    "claude": ClaudeProvider(),
-    "gemini": GeminiProvider(),
+    Tool.CLAUDE.value: ClaudeProvider(),
+    Tool.GEMINI.value: GeminiProvider(),
 }
+
+
+def _create_tool_cfg(
+    tool: Tool,
+    root: Path,
+    tool_dir: str | None = None,
+    rules: bool = True,
+    agents: bool = True,
+    skills: bool = True,
+    config: FileName | None = None,
+    system: FileName | str | None = None,
+) -> ToolConfig:
+    """Helper to create a ToolConfig with standard directory patterns."""
+    t_dir = root / tool_dir if tool_dir else None
+    return ToolConfig(
+        name=tool.value,
+        rules_dir=t_dir / Resource.RULES.value if t_dir and rules else None,
+        agents_dir=t_dir / Resource.AGENTS.value if t_dir and agents else None,
+        skills_dir=t_dir / Resource.SKILLS.value if t_dir and skills else None,
+        config_file=(t_dir / config.value) if t_dir and config else None,
+        system_file=(
+            (t_dir / (system.value if isinstance(system, FileName) else system))
+            if t_dir and system
+            else None
+        ),
+    )
 
 
 def init_paths(layout: Any) -> None:
@@ -88,10 +115,6 @@ def init_paths(layout: Any) -> None:
     Accepts either a ``WorkspaceLayout`` (preferred) or a plain ``Path`` for
     backwards compatibility (treated as the output root with content located at
     ``root / framework_dir``).
-
-    Also emits deprecation warnings for legacy config filenames
-    (``INTERNAL.md``, ``FRAMEWORK.md``, ``CUSTOM.md``, ``PROJECT.md``) if they
-    exist and the new canonical paths do not.
 
     Args:
         layout: A ``WorkspaceLayout`` instance providing ``output_root`` and
@@ -115,66 +138,35 @@ def init_paths(layout: Any) -> None:
         content = layout.content_root
 
     ROOT_DIR = root
-    RULES_SRC_DIR = content / "rules" / "rules"
-    AGENTS_SRC_DIR = content / "rules" / "agents"
-    SKILLS_SRC_DIR = content / "rules" / "skills"
-    SYSTEM_SRC_DIR = content / "rules" / "system"
-    TEMPLATES_DIR = content / "rules" / "templates"
-    FRAMEWORK_CONFIG_SRC = SYSTEM_SRC_DIR / "framework.md"
-    PROJECT_CONFIG_SRC = SYSTEM_SRC_DIR / "project.md"
-    HOOKS_DIR = content / "rules" / "hooks"
+    RULES_SRC_DIR = content / Resource.RULES.value / Resource.RULES.value
+    AGENTS_SRC_DIR = content / Resource.RULES.value / Resource.AGENTS.value
+    SKILLS_SRC_DIR = content / Resource.RULES.value / Resource.SKILLS.value
+    SYSTEM_SRC_DIR = content / Resource.RULES.value / Resource.SYSTEM.value
+    TEMPLATES_DIR = content / Resource.RULES.value / Resource.TEMPLATES.value
+    FRAMEWORK_CONFIG_SRC = SYSTEM_SRC_DIR / FileName.FRAMEWORK.value
+    PROJECT_CONFIG_SRC = SYSTEM_SRC_DIR / FileName.PROJECT.value
+    HOOKS_DIR = content / Resource.RULES.value / Resource.HOOKS.value
 
-    fw_dir = cfg.framework_dir
-
-    # Backward compatibility: warn if old filenames still exist
-    for old_name, new_path in [
-        ("INTERNAL.md", FRAMEWORK_CONFIG_SRC),
-        ("FRAMEWORK.md", FRAMEWORK_CONFIG_SRC),
-        ("CUSTOM.md", PROJECT_CONFIG_SRC),
-        ("PROJECT.md", PROJECT_CONFIG_SRC),
-    ]:
-        old = content / old_name
-        if old.exists() and not new_path.exists():
-            logger.warning(
-                "Warning: %s/%s is deprecated. Migrate to %s",
-                fw_dir,
-                old_name,
-                new_path.relative_to(root),
-            )
-
-    claude_dir = cfg.claude_dir
-    gemini_dir = cfg.gemini_dir
-
+    # Build Tool Configurations
     TOOL_CONFIGS = {
-        "claude": ToolConfig(
-            name="claude",
-            rules_dir=root / claude_dir / "rules",
-            agents_dir=root / claude_dir / "agents",
-            skills_dir=root / claude_dir / "skills",
-            config_file=root / claude_dir / "CLAUDE.md",
-            system_file=None,
+        Tool.CLAUDE: _create_tool_cfg(
+            Tool.CLAUDE, root, cfg.claude_dir, config=FileName.CLAUDE
         ),
-        "gemini": ToolConfig(
-            name="gemini",
-            rules_dir=root / gemini_dir / "rules",
-            agents_dir=root / gemini_dir / "agents",
-            skills_dir=root / gemini_dir / "skills",
-            config_file=root / gemini_dir / "GEMINI.md",
-            system_file=root / gemini_dir / "SYSTEM.md",
+        Tool.GEMINI: _create_tool_cfg(
+            Tool.GEMINI, root, cfg.gemini_dir, config=FileName.GEMINI, system="SYSTEM.md"
         ),
-        "agents": ToolConfig(
-            name="agents",
+        Tool.AGENTS: ToolConfig(
+            name=Tool.AGENTS.value,
             rules_dir=None,
             agents_dir=None,
             skills_dir=None,
-            config_file=root / "AGENTS.md",
+            config_file=root / FileName.AGENTS.value,
             system_file=None,
         ),
-        "agent": ToolConfig(
-            name="agent",
-            rules_dir=root / ".agent" / "rules",
-            agents_dir=None,
-            skills_dir=root / ".agent" / "skills",
-            system_file=None,
+        Tool.ANTIGRAVITY: _create_tool_cfg(
+            Tool.ANTIGRAVITY,
+            root,
+            cfg.agent_dir,
+            agents=False,
         ),
     }

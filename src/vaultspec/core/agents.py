@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from . import types as _t
-from .helpers import _launch_editor, build_file, ensure_dir, resolve_model
+from .enums import ClaudeModels, GeminiModels, Resource, Tool
+from .helpers import _launch_editor, atomic_write, build_file, ensure_dir, resolve_model
 from .sync import print_summary, sync_files
 from .types import SyncResult
 
@@ -18,28 +19,37 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Bidirectional tool-name mapping: canonical (Claude) ↔ Gemini CLI.
-_CLAUDE_TO_GEMINI: dict[str, str] = {
-    "Glob": "glob",
-    "Grep": "grep_search",
-    "Read": "read_file",
-    "Write": "write_file",
-    "Edit": "replace",
-    "Bash": "run_shell_command",
-    "WebFetch": "web_fetch",
-    "WebSearch": "google_web_search",
+# Maps internal tool names (for agents) to external names in tool-specific formats.
+_TOOL_MAPS: dict[Tool, dict[str, str]] = {
+    Tool.CLAUDE: {
+        "Glob": "Glob",
+        "Grep": "Grep",
+        "Read": "Read",
+        "Write": "Write",
+        "Edit": "Edit",
+        "Bash": "Bash",
+        "WebFetch": "WebFetch",
+        "WebSearch": "WebSearch",
+        "vaultspec-execute": "execute-plan",
+    },
+    Tool.GEMINI: {
+        "Glob": "glob",
+        "Grep": "grep_search",
+        "Read": "read_file",
+        "Write": "write_file",
+        "Edit": "replace",
+        "Bash": "run_shell_command",
+        "WebFetch": "web_fetch",
+        "WebSearch": "google_web_search",
+        "vaultspec-execute": "execute_plan",
+    },
 }
-_GEMINI_TO_CLAUDE: dict[str, str] = {v: k for k, v in _CLAUDE_TO_GEMINI.items()}
-
-_TOOL_MAPS: dict[str, dict[str, str]] = {
-    "gemini": _CLAUDE_TO_GEMINI,
-    "claude": _GEMINI_TO_CLAUDE,
-}
 
 
-def _translate_tools(tools_value: str | list[str], target: str) -> list[str]:
+def _translate_tools(tools_value: str | list[str], target: Tool | str) -> list[str]:
     """Translate a tools string or list for *target* tool destination."""
-    mapping = _TOOL_MAPS.get(target)
+    target_enum = target if isinstance(target, Tool) else Tool(target)
+    mapping = _TOOL_MAPS.get(target_enum)
 
     if isinstance(tools_value, str):
         parts = [t.strip() for t in tools_value.split(",")]
@@ -76,49 +86,42 @@ def collect_agents() -> dict[str, tuple[Path, dict[str, Any], str]]:
 
 
 def transform_agent(
-    tool: str,
+    tool: Tool,
     name: str,
     meta: dict[str, Any],
     body: str,
-    *,
-    resolve_fn: Callable[..., str | None] | None = None,
-) -> str | None:
+) -> str:
     """Transform an agent definition for a specific tool destination.
 
-    Resolves the agent's capability tier to a model string and assembles the
-    final file content with YAML frontmatter.
+    Resolves the execution model, translates tool names to the tool's native
+    format, and injects tool-agnostic system prompts into a final Markdown
+    persona.
 
     Args:
-        tool: Target tool name (e.g. ``"claude"`` or ``"gemini"``).
-        name: Source filename (e.g. ``"my-agent.md"``).
-        meta: Parsed frontmatter dict; must contain ``"tier"`` and optionally
-            ``"description"``.
-        body: Markdown body text of the agent definition.
-        resolve_fn: Optional override for the model-resolution callable. If
-            ``None``, the default ``resolve_model`` function is used.
+        tool: Target tool enum (e.g. Tool.CLAUDE).
+        name: Logical name of the agent.
+        meta: Agent frontmatter metadata.
+        body: Raw persona Markdown content.
 
     Returns:
-        Assembled file content string, or ``None`` if the agent should be
-        skipped (missing tier or no model found for the given tool/tier pair).
+        The transformed persona content string.
     """
-    agent_name = Path(name).stem
-    description = meta.get("description", "")
-    tier = meta.get("tier", "")
-
-    if not tier:
-        logger.warning("  Warning: Agent '%s' missing tier.", agent_name)
-        return None
-
-    _resolve = resolve_fn or resolve_model
-    model = _resolve(tool, tier)
+    # 1. Resolve model
+    model = meta.get("model")
     if model is None:
-        msg = f"  Warning: No model for {tool}/{tier}. Skipping {agent_name}."
-        logger.warning(msg)
-        return None
+        # Default models per tool
+        if tool == Tool.GEMINI:
+            model = GeminiModels.LOW
+        else:
+            # Claude and others
+            model = ClaudeModels.MEDIUM
+
+    # 2. Tool translations
+    tool_map = _TOOL_MAPS.get(tool, {})
 
     fm: dict[str, Any] = {
-        "name": agent_name,
-        "description": description,
+        "name": Path(name).stem,
+        "description": meta.get("description", ""),
         "kind": "local",
         "model": model,
     }
@@ -140,15 +143,13 @@ def agents_list(_args: argparse.Namespace) -> None:
         print("No agents found.")
         return
 
-    print(f"{'Name':<25} {'Tier':<8} {'Claude':<25} {'Gemini':<25}")
-    print("-" * 83)
+    print(f"{'Name':<25} {'Description':<50}")
+    print("-" * 75)
     for name, meta_tuple in sources.items():
         _path, meta, _body = meta_tuple
         agent_name = Path(name).stem
-        tier = meta.get("tier", "?")
-        claude_model = resolve_model("claude", tier) or "?"
-        gemini_model = resolve_model("gemini", tier) or "?"
-        print(f"{agent_name:<25} {tier:<8} {claude_model:<25} {gemini_model:<25}")
+        description = meta.get("description", "")
+        print(f"{agent_name:<25} {description:<50}")
 
 
 def agents_add(args: argparse.Namespace) -> None:
@@ -227,8 +228,6 @@ def agents_set_tier(args: argparse.Namespace) -> None:
         logger.error("Error: Agent '%s' not found at %s", agent_name, file_path)
         return
 
-    from .helpers import atomic_write
-
     content = file_path.read_text(encoding="utf-8")
     meta, body = parse_frontmatter(content)
     old_tier = meta.get("tier", "?")
@@ -237,45 +236,36 @@ def agents_set_tier(args: argparse.Namespace) -> None:
     atomic_write(file_path, build_file(meta, body))
     logger.info("Updated %s: tier %s -> %s", agent_name, old_tier, new_tier)
 
-    # Show resolved models
-    for tool_name in ["claude", "gemini"]:
-        model = resolve_model(tool_name, new_tier)
-        if model:
-            logger.info("  %s: %s", tool_name, model)
-
     logger.info("Run 'agents sync' to propagate changes.")
 
 
 def agents_sync(
     args: argparse.Namespace,
-    *,
-    resolve_fn: Callable[..., str | None] | None = None,
 ) -> None:
     """Sync all agent definitions to every configured tool destination.
 
     Args:
         args: Parsed CLI arguments. Expected attributes: ``dry_run`` and ``prune``.
-        resolve_fn: Optional override for model resolution, replacing the default
-            ``resolve_model`` function. Useful in tests.
     """
     sources = collect_agents()
     dry_run = getattr(args, "dry_run", False)
     prune = getattr(args, "prune", False)
 
     total = SyncResult()
-    for tool_name, cfg in _t.TOOL_CONFIGS.items():
+    for tool_type, cfg in _t.TOOL_CONFIGS.items():
         if cfg.agents_dir is None:
             continue
+        print(f"  {tool_type.value}: {cfg.agents_dir.relative_to(_t.ROOT_DIR)}")
         result = sync_files(
             sources=sources,
             dest_dir=cfg.agents_dir,
-            transform_fn=lambda _tool, n, m, b, _tn=tool_name: transform_agent(
-                _tn, n, m, b, resolve_fn=resolve_fn
+            transform_fn=lambda _tool, n, m, b, _tt=tool_type: transform_agent(
+                _tt, n, m, b
             ),
             dest_path_fn=lambda dest_dir, name: dest_dir / name,
             prune=prune,
             dry_run=dry_run,
-            label=f"agents -> {tool_name}",
+            label=f"agents -> {tool_type.value}",
         )
         total.added += result.added
         total.updated += result.updated

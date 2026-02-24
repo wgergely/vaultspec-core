@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..core.enums import DirName
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -153,16 +155,16 @@ class VaultSpecConfig:
     a2a_host: str = "localhost"
 
     # -- Storage ---------------------------------------------------------------
-    docs_dir: str = ".vault"
-    framework_dir: str = ".vaultspec"
+    docs_dir: str = DirName.VAULT.value
+    framework_dir: str = DirName.VAULTSPEC.value
     lance_dir: str = ".lance"
     index_metadata_file: str = "index_meta.json"
     logs_dir: str = "logs"
 
     # -- Tool directories ------------------------------------------------------
-    claude_dir: str = ".claude"
-    gemini_dir: str = ".gemini"
-    agent_dir: str = ".agent"
+    claude_dir: str = DirName.CLAUDE.value
+    gemini_dir: str = DirName.GEMINI.value
+    agent_dir: str = DirName.AGENTS.value
 
     # -- Orchestration ---------------------------------------------------------
     task_engine_ttl_seconds: float = 3600.0
@@ -540,14 +542,14 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
         env_name="VAULTSPEC_DOCS_DIR",
         attr_name="docs_dir",
         var_type=str,
-        default=".vault",
+        default=DirName.VAULT.value,
         description="Documentation vault directory name.",
     ),
     ConfigVariable(
         env_name="VAULTSPEC_FRAMEWORK_DIR",
         attr_name="framework_dir",
         var_type=str,
-        default=".vaultspec",
+        default=DirName.VAULTSPEC.value,
         description="Framework directory name.",
     ),
     ConfigVariable(
@@ -576,21 +578,21 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
         env_name="VAULTSPEC_CLAUDE_DIR",
         attr_name="claude_dir",
         var_type=str,
-        default=".claude",
+        default=DirName.CLAUDE.value,
         description="Claude tool directory name.",
     ),
     ConfigVariable(
         env_name="VAULTSPEC_GEMINI_DIR",
         attr_name="gemini_dir",
         var_type=str,
-        default=".gemini",
+        default=DirName.GEMINI.value,
         description="Gemini tool directory name.",
     ),
     ConfigVariable(
         env_name="VAULTSPEC_AGENT_DIR",
         attr_name="agent_dir",
         var_type=str,
-        default=".agent",
+        default=DirName.AGENTS.value,
         description="Agent tool directory name.",
     ),
     # -- Orchestration ---------------------------------------------------------

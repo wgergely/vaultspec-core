@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from . import types as _t
-from .helpers import _launch_editor, build_file, ensure_dir
+from .enums import FileName, Tool
+from .helpers import atomic_write, build_file, ensure_dir
 from .sync import print_summary
 from .sync import sync_skills as _sync_skills
 from .types import SyncResult
@@ -43,7 +44,7 @@ def collect_skills() -> dict[str, tuple[Path, dict[str, Any], str]]:
     return sources
 
 
-def transform_skill(_tool: str, name: str, meta: dict[str, Any], body: str) -> str:
+def transform_skill(tool: Tool, name: str, _meta: dict[str, Any], body: str) -> str:
     """Transform a skill definition for a specific tool destination.
 
     Assembles a YAML-frontmattered file containing the skill's name and
@@ -58,7 +59,7 @@ def transform_skill(_tool: str, name: str, meta: dict[str, Any], body: str) -> s
     Returns:
         Assembled file content string with YAML frontmatter.
     """
-    description = meta.get("description", "")
+    description = _meta.get("description", "")
     fm = {"name": name, "description": description}
     return build_file(fm, body)
 
@@ -73,7 +74,7 @@ def skill_dest_path(dest_dir: Path, name: str) -> Path:
     Returns:
         The full path ``dest_dir / name / SKILL.md``.
     """
-    return dest_dir / name / "SKILL.md"
+    return dest_dir / name / FileName.SKILL.value
 
 
 def skills_list(_args: argparse.Namespace) -> None:
@@ -167,18 +168,18 @@ def skills_sync(args: argparse.Namespace) -> None:
     prune = getattr(args, "prune", False)
 
     total = SyncResult()
-    for tool_name, cfg in _t.TOOL_CONFIGS.items():
+    for tool_type, cfg in _t.TOOL_CONFIGS.items():
         if cfg.skills_dir is None:
             continue
         result = _sync_skills(
             sources=sources,
             skills_dir=cfg.skills_dir,
-            transform_fn=lambda _tool, n, m, b, _tn=tool_name: transform_skill(
-                _tn, n, m, b
+            transform_fn=lambda _tool, n, m, b, _tt=tool_type: transform_skill(
+                _tt, n, m, b
             ),
             prune=prune,
             dry_run=dry_run,
-            label=f"skills -> {tool_name}",
+            label=f"skills -> {tool_type.value}",
         )
         total.added += result.added
         total.updated += result.updated

@@ -11,6 +11,7 @@ from typing import Any
 from . import types as _t
 from .agents import collect_agents
 from .config_gen import _is_cli_managed
+from .enums import DirName, FileName, Resource, Tool
 from .helpers import atomic_write, build_file, ensure_dir
 from .skills import collect_skills
 from .sync import print_summary
@@ -252,12 +253,12 @@ def system_show(_args: argparse.Namespace) -> None:
         print(f"{name:<25} {tool_filter:<15} {line_count:<8}")
 
     print("\nGeneration targets:")
-    for tool_name, cfg in _t.TOOL_CONFIGS.items():
+    for tool_type, cfg in _t.TOOL_CONFIGS.items():
         if cfg.system_file is None:
             continue
         rel = cfg.system_file.relative_to(_t.ROOT_DIR)
         managed = "CLI-managed" if _is_cli_managed(cfg.system_file) else "custom"
-        print(f"  {tool_name}: {rel} [{managed}]")
+        print(f"  {tool_type.value}: {rel} [{managed}]")
 
 
 def system_sync(args: argparse.Namespace) -> None:
@@ -272,7 +273,7 @@ def system_sync(args: argparse.Namespace) -> None:
 
     result = SyncResult()
 
-    for _tool_name, cfg in _t.TOOL_CONFIGS.items():
+    for _tool_type, cfg in _t.TOOL_CONFIGS.items():
         # Path A: Tool has a system_file -> generate assembled SYSTEM.md
         if cfg.system_file is not None:
             content = _generate_system_prompt(cfg)
