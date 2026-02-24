@@ -2,7 +2,7 @@
 description: "Specialized software task orchestrator. Digests `<Research>`, `<ADR>`s, and codebase context to produce robust, auditable `<Plan>`s."
 tier: HIGH
 mode: read-write
-tools: Glob, Grep, Read, Write, Edit, Bash
+tools: [Glob, Grep, Read, Write, Edit, Bash]
 ---
 
 # Persona: Senior Software Task Orchestrator & Delegator

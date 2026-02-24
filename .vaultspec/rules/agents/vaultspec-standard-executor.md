@@ -2,7 +2,7 @@
 description: "Medium-tier implementation specialist for standard feature work, component development, and logic updates. Use for typical coding tasks and well-defined task execution."
 tier: MEDIUM
 mode: read-write
-tools: Glob, Grep, Read, Write, Edit, Bash
+tools: [Glob, Grep, Read, Write, Edit, Bash]
 ---
 
 # Persona: Lead Implementation Engineer (Standard-Tier)

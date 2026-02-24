@@ -241,6 +241,8 @@ class TestBridgeSpawn:
             if proc.returncode is None:
                 proc.kill()
             await proc.wait()
+            from ...orchestration.utils import cleanup_subprocess_transports
+            await cleanup_subprocess_transports(proc)
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(15)
@@ -281,6 +283,8 @@ class TestBridgeSpawn:
             if proc.returncode is None:
                 proc.kill()
             await proc.wait()
+            from ...orchestration.utils import cleanup_subprocess_transports
+            await cleanup_subprocess_transports(proc)
 
 
 class TestMultiTurnContext:
@@ -378,6 +382,8 @@ class TestMultiTurnContext:
             if proc.returncode is None:
                 proc.kill()
             await proc.wait()
+            from ...orchestration.utils import cleanup_subprocess_transports
+            await cleanup_subprocess_transports(proc)
 
 
 class TestSandboxEnforcement:

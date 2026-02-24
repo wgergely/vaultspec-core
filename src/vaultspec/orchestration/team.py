@@ -38,6 +38,8 @@ from a2a.types import (
     TextPart,
 )
 
+from .utils import kill_process_tree
+
 __all__ = [
     "MemberStatus",
     "TeamCoordinator",
@@ -567,19 +569,27 @@ class TeamCoordinator:
                 await asyncio.wait_for(proc.wait(), timeout=5.0)
                 logger.debug("Spawned process for %s terminated cleanly", agent_name)
             except TimeoutError:
-                proc.kill()
+                with contextlib.suppress(ProcessLookupError):
+                    kill_process_tree(proc.pid)
+                    proc.kill()
+                with contextlib.suppress(Exception):
+                    await proc.wait()
                 logger.warning(
                     "Spawned process for %s did not terminate in time; killed",
                     agent_name,
                 )
             except ProcessLookupError:
                 logger.debug("Spawned process for %s already exited", agent_name)
+            finally:
+                from .utils import cleanup_subprocess_transports
+                await cleanup_subprocess_transports(proc)
         self._spawned.clear()
 
         # Terminate processes restored from disk (PIDs only, no Process handle).
         for agent_name, pid in list(self._spawned_pids.items()):
             try:
                 os.kill(pid, signal.SIGTERM)
+                kill_process_tree(pid)
                 logger.debug("Terminated restored process %s (pid=%d)", agent_name, pid)
             except ProcessLookupError:
                 logger.debug(
@@ -890,7 +900,13 @@ class TeamCoordinator:
                 pass
 
             if asyncio.get_running_loop().time() >= deadline:
-                process.terminate()
+                with contextlib.suppress(ProcessLookupError):
+                    kill_process_tree(process.pid)
+                    process.kill()
+                with contextlib.suppress(Exception):
+                    await process.wait()
+                from .utils import cleanup_subprocess_transports
+                await cleanup_subprocess_transports(process)
                 raise RuntimeError(
                     f"Agent {name!r} on port {port} did not become reachable "
                     "within 10 seconds"

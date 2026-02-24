@@ -2,7 +2,7 @@
 description: "Hard-tier implementation specialist for complex architectural changes, core logic refactors, and advanced feature implementation. Use for tasks requiring high reasoning depth and sophisticated design decisions."
 tier: HIGH
 mode: read-write
-tools: Glob, Grep, Read, Write, Edit, Bash
+tools: [Glob, Grep, Read, Write, Edit, Bash]
 ---
 
 # Persona: Lead Implementation Engineer (Hard-Tier)

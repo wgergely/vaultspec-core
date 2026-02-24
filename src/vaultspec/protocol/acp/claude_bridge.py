@@ -486,6 +486,21 @@ class ClaudeACPBridge(Agent):
         # receive_response() which creates a fresh generator per turn,
         # avoiding the generator-death bug from upstream MessageParseError.
 
+    async def _disconnect_sdk_client(self, sdk_client: Any) -> None:
+        """Disconnect the SDK client and explicitly clean up its subprocess transports."""
+        if sdk_client is None:
+            return
+        proc = getattr(sdk_client, "_process", None)
+        try:
+            res = sdk_client.disconnect()
+            if asyncio.iscoroutine(res) or hasattr(res, "__await__"):
+                await res
+        except Exception:
+            logger.exception("Error disconnecting SDK client")
+        if proc is not None:
+            from ...orchestration.utils import cleanup_subprocess_transports
+            await cleanup_subprocess_transports(proc)
+
     def on_connect(self, conn: Any) -> None:
         """Called by ``AgentSideConnection`` with the client-facing connection.
 
@@ -537,6 +552,7 @@ class ClaudeACPBridge(Agent):
                     image=True,
                     embedded_context=True,
                 ),
+                call_tool=True,
             ),
         )
 
@@ -748,12 +764,7 @@ class ClaudeACPBridge(Agent):
 
             # Recreate SDK client with new permission mode
             if state.sdk_client:
-                try:
-                    state.sdk_client.disconnect()
-                except Exception:
-                    logger.exception(
-                        "Error disconnecting SDK client during mode switch"
-                    )
+                await self._disconnect_sdk_client(state.sdk_client)
 
             effective_mcp = state.mcp_servers
             sdk_mcp = _convert_mcp_servers(effective_mcp)
@@ -988,10 +999,7 @@ class ClaudeACPBridge(Agent):
 
         # Disconnect current session if active
         if self._sdk_client is not None:
-            try:
-                self._sdk_client.disconnect()
-            except Exception:
-                logger.exception("Error disconnecting previous SDK client")
+            await self._disconnect_sdk_client(self._sdk_client)
 
         # Rebuild SDK client from stored config
         effective_mcp = mcp_servers if mcp_servers is not None else state.mcp_servers
@@ -1061,10 +1069,7 @@ class ClaudeACPBridge(Agent):
 
         # Disconnect current session if active
         if self._sdk_client is not None:
-            try:
-                self._sdk_client.disconnect()
-            except Exception:
-                logger.exception("Error disconnecting previous SDK client")
+            await self._disconnect_sdk_client(self._sdk_client)
 
         # Rebuild SDK client from stored config
         effective_mcp = mcp_servers if mcp_servers is not None else state.mcp_servers
@@ -1128,10 +1133,7 @@ class ClaudeACPBridge(Agent):
 
         # Disconnect current session if active
         if self._sdk_client is not None:
-            try:
-                self._sdk_client.disconnect()
-            except Exception:
-                logger.exception("Error disconnecting previous SDK client")
+            await self._disconnect_sdk_client(self._sdk_client)
 
         # Create new session with cloned config
         new_id = str(uuid.uuid4())
@@ -1283,10 +1285,7 @@ class ClaudeACPBridge(Agent):
         """Close all active sessions and disconnect SDK clients."""
         for state in list(self._sessions.values()):
             if state.sdk_client:
-                try:
-                    await state.sdk_client.disconnect()
-                except Exception as exc:
-                    logger.debug("SDK client disconnect failed: %s", exc)
+                await self._disconnect_sdk_client(state.sdk_client)
         self._sessions.clear()
 
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:

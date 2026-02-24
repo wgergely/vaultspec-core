@@ -27,6 +27,8 @@ import sys
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from ..orchestration.utils import kill_process_tree
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -368,6 +370,7 @@ def _execute_shell(
         try:
             stdout, stderr = process.communicate(timeout=60)
         except subprocess.TimeoutExpired:
+            kill_process_tree(process.pid)
             process.kill()
             process.communicate()
             logger.warning("Shell hook '%s' timed out (60s)", hook_name)
@@ -432,6 +435,7 @@ def _execute_agent(
         try:
             stdout, stderr = process.communicate(timeout=300)
         except subprocess.TimeoutExpired:
+            kill_process_tree(process.pid)
             process.kill()
             process.communicate()
             logger.warning("Agent hook '%s' timed out (300s)", hook_name)

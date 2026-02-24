@@ -22,7 +22,7 @@ from claude_agent_sdk import ResultMessage
 from tests.constants import TEST_PROJECT
 
 from ...providers import ClaudeModels
-from .. import ClaudeACPBridge
+from ..claude_bridge import ClaudeACPBridge
 from ..claude_bridge import (
     _build_sdk_message_payload,
     _convert_mcp_servers,

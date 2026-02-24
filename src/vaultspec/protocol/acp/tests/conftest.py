@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 from ...providers import ClaudeModels
-from .. import ClaudeACPBridge
+from ..claude_bridge import ClaudeACPBridge
 
 
 class AsyncItemIterator:

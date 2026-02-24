@@ -66,6 +66,7 @@ class FakeChildProc:
 
     def __init__(self, *, returncode: int | None = None) -> None:
         self.returncode = returncode
+        self.pid = 12345
         self.terminate_count = 0
         self.stderr = None
 

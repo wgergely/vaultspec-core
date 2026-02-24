@@ -37,14 +37,19 @@ _TOOL_MAPS: dict[str, dict[str, str]] = {
 }
 
 
-def _translate_tools(tools_value: str, target: str) -> str:
-    """Translate a comma-separated tools string for *target* tool destination."""
+def _translate_tools(tools_value: str | list[str], target: str) -> list[str]:
+    """Translate a tools string or list for *target* tool destination."""
     mapping = _TOOL_MAPS.get(target)
+
+    if isinstance(tools_value, str):
+        parts = [t.strip() for t in tools_value.split(",")]
+    else:
+        parts = tools_value
+
     if not mapping:
-        return tools_value
-    parts = [t.strip() for t in tools_value.split(",")]
-    translated = [mapping.get(p, p) for p in parts]
-    return ", ".join(translated)
+        return parts
+
+    return [mapping.get(p, p) for p in parts]
 
 
 def collect_agents() -> dict[str, tuple[Path, dict[str, Any], str]]:

@@ -9,6 +9,24 @@ from vaultspec.protocol.providers import GeminiProvider
 pytestmark = [pytest.mark.integration, pytest.mark.gemini]
 
 
+@pytest.fixture
+def state_agent_def() -> str:
+    """Returns the definition for a robust State Agent."""
+    return (
+        "---\n"
+        "tier: LOW\n"
+        "mode: read-write\n"
+        "---\n\n"
+        "# Persona\n"
+        "You are a State Agent. Your only goal is to store and retrieve values.\n"
+        "Rules:\n"
+        "1. If the user says 'Set <key>=<value>', store it and reply 'OK'.\n"
+        "2. If the user says 'Get <key>', reply with the stored value only.\n"
+        "3. Do not add any explanation, thoughts, or markdown.\n"
+        "4. If no value is stored, reply 'EMPTY'.\n"
+    )
+
+
 @pytest.mark.asyncio
 async def test_gemini_echo_single_turn(workspace, echo_agent_def):
     """Verify Gemini ACP handles single-turn deterministic echo."""

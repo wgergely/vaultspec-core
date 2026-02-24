@@ -1,7 +1,5 @@
 """Protocol layer exposing providers, ACP bridge, and A2A agent support."""
 
-from .acp import ClaudeACPBridge as ClaudeACPBridge
-from .acp import GeminiACPBridge as GeminiACPBridge
 from .acp import SessionLogger as SessionLogger
 from .acp import SubagentClient as SubagentClient
 from .acp import SubagentError as SubagentError

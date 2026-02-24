@@ -18,7 +18,7 @@ from claude_agent_sdk import (
 
 from tests.constants import TEST_PROJECT
 
-from .. import ClaudeACPBridge
+from ..claude_bridge import ClaudeACPBridge
 from .conftest import (
     make_di_bridge,
     make_test_client,

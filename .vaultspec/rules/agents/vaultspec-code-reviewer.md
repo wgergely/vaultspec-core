@@ -2,7 +2,7 @@
 description: "High-tier code reviewer that enforces safety, architectural intent, and code quality. Use for final verification before 'done'."
 tier: HIGH
 mode: read-only
-tools: Glob, Grep, Read, Bash
+tools: [Glob, Grep, Read, Bash]
 ---
 
 # Persona: Lead Code Reviewer & Safety Officer

@@ -241,6 +241,7 @@ class ClaudeProvider(AgentProvider):
         root_dir: pathlib.Path,
         model_override: str | None = None,
         mode: str = "read-write",
+        mcp_servers: dict[str, Any] | None = None,
     ) -> ProcessSpec:
         """Build a ProcessSpec for launching the Claude ACP bridge subprocess.
 
@@ -259,6 +260,7 @@ class ClaudeProvider(AgentProvider):
                 default derived from ``agent_meta``.
             mode: Sandbox mode forwarded to the bridge (``"read-only"`` or
                 ``"read-write"``).
+            mcp_servers: Optional MCP server configurations forwarded to the bridge.
 
         Returns:
             ProcessSpec ready for the orchestration layer to spawn.
@@ -352,4 +354,5 @@ class ClaudeProvider(AgentProvider):
             cleanup_paths=[],
             initial_prompt_override=task_context,
             session_meta={"model": model},
+            mcp_servers=mcp_servers,
         )

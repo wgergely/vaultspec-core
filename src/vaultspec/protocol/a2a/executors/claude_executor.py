@@ -150,6 +150,21 @@ class ClaudeA2AExecutor(AgentExecutor):
         self._session_ids_lock = asyncio.Lock()
         self._cancel_events: dict[str, asyncio.Event] = {}
 
+    async def _disconnect_sdk_client(self, sdk_client: Any) -> None:
+        """Disconnect the SDK client and explicitly clean up its subprocess transports."""
+        if sdk_client is None:
+            return
+        proc = getattr(sdk_client, "_process", None)
+        try:
+            res = sdk_client.disconnect()
+            if asyncio.iscoroutine(res) or hasattr(res, "__await__"):
+                await res
+        except Exception:
+            logger.exception("Error disconnecting SDK client")
+        if proc is not None:
+            from ....orchestration.utils import cleanup_subprocess_transports
+            await cleanup_subprocess_transports(proc)
+
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         """Execute an A2A task by streaming a Claude SDK conversation.
 
@@ -335,7 +350,7 @@ class ClaudeA2AExecutor(AgentExecutor):
                 logger.debug(
                     "Disconnecting SDK client for task %s after error", task_id
                 )
-                await sdk_client.disconnect()
+                await self._disconnect_sdk_client(sdk_client)
             else:
                 # Successful completion: persist the live client under context_id
                 # so the next turn can reuse it without reconnecting.
@@ -533,6 +548,6 @@ class ClaudeA2AExecutor(AgentExecutor):
             self._active_clients.clear()
         for client in clients:
             try:
-                await client.disconnect()
+                await self._disconnect_sdk_client(client)
             except Exception:
                 logger.exception("Error disconnecting SDK client during cleanup")

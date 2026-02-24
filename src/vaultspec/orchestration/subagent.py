@@ -6,7 +6,6 @@ import asyncio
 import contextlib
 import gc
 import logging
-import sys
 import uuid
 from typing import TYPE_CHECKING, Any
 
@@ -26,7 +25,7 @@ from acp.schema import (
 )
 
 from ..vaultcore import parse_frontmatter
-from .utils import safe_read_text
+from .utils import kill_process_tree, safe_read_text
 
 __all__ = [
     "AgentNotFoundError",
@@ -69,33 +68,6 @@ def list_available_agents(content_root: pathlib.Path) -> None:
 
 
 _GEMINI_PATTERNS = ("gemini-",)
-
-
-def _kill_process_tree(pid: int) -> None:
-    """Kill a process and all its descendants.
-
-    On Windows, asyncio's proc.terminate() kills only the bridge process;
-    node.exe children spawned by claude-agent-sdk become orphaned and
-    persist indefinitely.  taskkill /F /T kills the entire tree recursively.
-
-    On Unix, orphaned children are reparented to PID 1 and eventually reaped
-    by init/systemd, so no intervention is needed.
-
-    Args:
-        pid: Process ID of the root process to terminate.
-    """
-    if sys.platform != "win32":
-        return
-    import subprocess
-
-    try:
-        subprocess.run(
-            ["taskkill", "/F", "/T", "/PID", str(pid)],
-            capture_output=True,
-            timeout=5,
-        )
-    except Exception as exc:
-        logger.debug("Process tree kill for PID %s failed: %s", pid, exc)
 
 
 class AgentNotFoundError(Exception):
@@ -425,6 +397,7 @@ async def run_subagent(
         root_dir,
         model_override=current_model,
         mode=mode,
+        mcp_servers=effective_mcp_servers,
     )
     # 4. Spawn and Connect
     correlation_id = str(uuid.uuid4())
@@ -597,22 +570,31 @@ async def run_subagent(
 
                 # Windows: kill the entire bridge process tree so node.exe
                 # children (spawned by claude-agent-sdk) don't become orphans.
-                _kill_process_tree(_proc.pid)
+                kill_process_tree(_proc.pid)
                 try:
                     await asyncio.wait_for(_proc.wait(), timeout=5.0)
                 except TimeoutError:
-                    _proc.kill()
+                    with contextlib.suppress(ProcessLookupError):
+                        _proc.kill()
                     await _proc.wait()
+
+                # Clean up asyncio subprocess transport to avoid ResourceWarning
+                from .utils import cleanup_subprocess_transports
+                await cleanup_subprocess_transports(_proc)
 
                 t.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await t
 
-                return SubagentResult(
+                result = SubagentResult(
                     session_id=session.session_id,
                     response_text=client.response_text,
                     written_files=client.written_files,
                 )
+
+            # Outside async with block (acp cleanup has run)
+            await asyncio.sleep(0.05)
+            return result
 
     except Exception as exc:
         logger.exception("Subagent execution failed")

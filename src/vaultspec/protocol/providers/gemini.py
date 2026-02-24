@@ -327,6 +327,7 @@ class GeminiProvider(AgentProvider):
         mode: str = "read-write",
         *,
         creds_path: pathlib.Path | None = None,
+        mcp_servers: dict[str, Any] | None = None,
     ) -> ProcessSpec:
         """Build a ProcessSpec for launching the Gemini CLI ACP bridge subprocess.
 
@@ -348,6 +349,7 @@ class GeminiProvider(AgentProvider):
                 ``"read-write"``).
             creds_path: Override path for the Gemini OAuth credentials file.
                 Defaults to ``~/.gemini/oauth_creds.json``. Injectable for testing.
+            mcp_servers: Optional MCP server configurations forwarded to the bridge.
 
         Returns:
             ProcessSpec ready for the orchestration layer to spawn.
@@ -462,4 +464,5 @@ class GeminiProvider(AgentProvider):
             cleanup_paths=cleanup_paths,
             initial_prompt_override=task_context,
             session_meta={"model": model},
+            mcp_servers=mcp_servers,
         )

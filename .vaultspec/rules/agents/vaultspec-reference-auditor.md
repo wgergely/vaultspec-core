@@ -2,7 +2,7 @@
 description: "Specialized agent used for auditing codebases to produce a `<Reference>`. Discovers features, concrete code patterns, and best practices."
 tier: MEDIUM
 mode: read-only
-tools: Glob, Grep, Read, Bash
+tools: [Glob, Grep, Read, Bash]
 ---
 
 # Persona: Reference Codebase Specialist
