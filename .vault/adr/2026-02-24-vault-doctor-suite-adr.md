@@ -11,12 +11,12 @@ related:
 
 ## Problem Statement
 
-The vault verification system has grown organically around a single `vault audit --verify` command.
-Several check domains exist in isolation (graph invalid-links, orphan detection) and are not wired
-into the verification pipeline. Critical check gaps exist around chain integrity, frontmatter format
-drift, and fix safety. The existing `fix_violations()` function modifies files without a dry-run
-mode, creating risk. A coherent architecture is needed that can host new check domains, expose them
-composably, and maintain commit-hook compatibility.
+The vault verification system grew organically around `vault audit`. That command is now
+feature-saturated and is removed. Several check domains (graph invalid-links, orphan detection)
+exist in isolation and are not wired into any user-facing command. Critical gaps remain around
+chain integrity, frontmatter format drift, and fix safety. The existing `fix_violations()` function
+modifies files without a dry-run mode. A coherent replacement architecture is needed that can host
+new check domains, expose them composably, and work cleanly with pre-commit hooks.
 
 ## Considerations
 
@@ -25,38 +25,37 @@ composably, and maintain commit-hook compatibility.
 Add more flags to the existing `vault audit` command (`--chain-check`, `--link-check`, etc.) and
 expand `fix_violations()` with a `dry_run` parameter.
 
-**Pro:** Minimal surface area change, backward compatible.
-**Con:** `audit` is already overloaded (summary, features, verify, fix, graph). Adding more flags
-makes the interface unwieldy. The audit command is not structured to register checks dynamically.
-Each new domain requires another flag combination.
+**Pro:** Minimal surface area change.
+**Con:** `audit` is already overloaded and is being removed. Adding more flags to a command slated
+for removal is counter-productive. The audit command is not structured to register checks dynamically.
 
 ### Option 2 — New `vault doctor` Subcommand with Registered Checks
 
-Introduce `vaultspec vault doctor` as a dedicated command. Doctor checks are individually
-registered and addressable by name or category. The command supports `--dry-run`, `--fix`,
-`--check <name>`, `--severity <level>`, and `--json`.
+Introduce `vaultspec vault doctor` as the sole dedicated command for vault content health. Doctor
+checks are individually registered and addressable by name or category. The command supports
+`--dry-run`, `--fix`, `--input`, `--check`, `--severity`, and `--json`.
 
-**Pro:** Clean separation of concerns, composable, extensible. Pre-commit hook can target specific
-check categories. Severity model is native to the command design.
+**Pro:** Clean separation of concerns, composable, extensible. Pre-commit hooks pass staged files
+via `--input` or positional args. Severity model is native to the command design. No legacy surface
+to maintain.
 **Con:** New CLI surface to document and maintain.
 
 ### Option 3 — Standalone Doctor Module Called by Both CLI Paths
 
-A `doctor/` module that is invoked by both `vault audit --verify` (for backward compat) and by a
-new `vault doctor` command. The module owns check registration and result formatting.
+A `doctor/` module invoked by both `vault audit --verify` (backward compat) and a new
+`vault doctor` command.
 
-**Pro:** Reuses existing `--verify` integration point while enabling a richer dedicated interface.
-**Con:** Two CLI paths to the same logic create documentation confusion about which to use when.
+**Pro:** Reuses existing integration point while enabling a richer interface.
+**Con:** `vault audit` is removed — there is no dual-path to support. This option is moot.
 
 ## Implementation
 
-**Adopt Option 2** with a compatibility shim.
+**Adopt Option 2.**
 
-`vaultspec vault doctor` is the primary interface for the suite. `vault audit --verify` continues
-to call the existing fast path (`get_malformed` + `verify_vertical_integrity`) unchanged — it is
-the pre-commit hook target and must remain stable and fast.
+`vaultspec vault doctor` is the primary and sole interface for vault content health checks.
+`vault audit` is removed entirely — no shim, no deprecation notice, no sunsetting period.
 
-The doctor suite introduces a `src/vaultspec/doctor/` module with the following structure:
+The doctor suite introduces a `src/vaultspec/doctor/` module:
 
 ```
 src/vaultspec/doctor/
@@ -76,9 +75,18 @@ src/vaultspec/doctor/
     └── frontmatter.py    — frontmatter normalization fixes (dry-run aware)
 ```
 
-### Check Registry Design
+### Three-Mode Contract
 
-Checks are registered with a category, name, severity, and whether they are fixable:
+| Mode | Invocation | Reads | Writes | Output |
+|---|---|---|---|---|
+| **report** (default) | `vault doctor` | yes | no | issue list |
+| **preview** | `vault doctor --fix --dry-run` | yes | no | what *would* change |
+| **modify** | `vault doctor --fix` | yes | yes | issue list + applied changes |
+
+`--dry-run` is only meaningful with `--fix`. Without `--fix`, `--dry-run` is rejected with an
+error. The default mode is always safe — no writes without `--fix`.
+
+### Check Registry Design
 
 ```python
 @dataclass
@@ -87,16 +95,15 @@ class DoctorCheck:
     category: CheckCategory    # LINKS | CHAIN | DRIFT | COVERAGE | STRUCTURE
     severity: Severity         # ERROR | WARNING | INFO
     fixable: bool
-    run: Callable[[Path], list[DoctorResult]]
+    run: Callable[[Path, list[Path] | None], list[DoctorResult]]
     fix: Callable[[Path, bool], list[DoctorResult]] | None  # dry_run param
 ```
 
-The suite runner calls all registered checks (or a filtered subset), collects `DoctorResult`
-objects, and formats output.
+The `run` callable accepts an optional `input_paths` argument. When provided, checks scope their
+results to those paths only. Aggregate checks (chain, coverage) that require a full vault graph
+still build the full graph but filter results to input paths.
 
 ### DoctorResult Model
-
-Extends `VerificationError` to add severity and fix metadata:
 
 ```python
 @dataclass
@@ -110,9 +117,6 @@ class DoctorResult:
     fix_detail: str = ""
 ```
 
-This is backward-compatible with `VerificationError` (path + message) while adding structured
-metadata for filtering and reporting.
-
 ### Dry-Run Contract
 
 Every fix function accepts `dry_run: bool`. When `dry_run=True`:
@@ -121,8 +125,7 @@ Every fix function accepts `dry_run: bool`. When `dry_run=True`:
 - Returned `DoctorResult` has `fix_applied=False`, `fix_detail` describes the planned action
 - Log lines are prefixed `[DRY-RUN]`
 
-The `safe_writer.py` helper encapsulates this pattern for atomic frontmatter rewrites and file
-renames, preventing duplication across fix functions.
+`safe_writer.py` centralises this pattern for atomic frontmatter rewrites and file renames.
 
 ### Severity Model
 
@@ -132,15 +135,18 @@ renames, preventing duplication across fix functions.
 | `WARNING` | Advisory drift — valid but inconsistent | Pass by default, configurable |
 | `INFO` | Informational — coverage gaps, style suggestions | Pass always |
 
-Pre-commit integration uses `--severity error` by default. Users can opt into `--severity warning`
-for stricter hooks.
+Pre-commit integration uses `--severity error` by default.
 
 ### CLI Interface
 
 ```
-vaultspec vault doctor [options]
+vaultspec vault doctor [FILES...] [options]
+
+Arguments:
+  FILES                Specific files to check. If omitted, the full vault is scanned.
 
 Options:
+  -i, --input <file>   Additional file to include (repeatable; merged with positional FILES)
   --check <name>       Run only the named check (repeatable)
   --category <cat>     Run only checks in a category: links|chain|drift|coverage|structure
   --severity <level>   Minimum severity to report: error|warning|info  (default: info)
@@ -150,6 +156,9 @@ Options:
   --limit <n>          Limit items per check in output (default: 20)
   --feature <name>     Scope checks to a specific feature
 ```
+
+`FILES` and `--input` are equivalent and merged. Positional args are the natural form for
+pre-commit hooks (`pass_filenames: true`). `--input` / `-i` is useful for scripting.
 
 ### Check Domains and Categories
 
@@ -196,34 +205,62 @@ Options:
 |---|---|---|---|
 | `feature-coverage-matrix` | INFO | No | Per-feature doc-type presence/absence report |
 
-### Integration with Existing Pre-commit Hook
+### Pre-commit Hook Integration
 
-The `check-naming` pre-commit hook stays unchanged — it calls `vault audit --verify` which runs
-the fast existing pipeline. A new optional pre-commit hook `vault-doctor` can be added to call
-`vaultspec vault doctor --category chain --category links --severity error` for teams that want
-deeper checks on commit. This hook is not mandatory and is opt-in via `.pre-commit-config.yaml`.
+`vault doctor` is the pre-commit hook entry point. With `pass_filenames: true`, pre-commit appends
+staged filenames as positional args and doctor scopes all checks to those files only:
+
+```yaml
+- id: vault-doctor
+  name: Vault Doctor
+  entry: uv run python -m vaultspec vault doctor --severity error
+  language: system
+  types: [markdown]
+  pass_filenames: true
+```
+
+For the heavier chain and link checks (opt-in):
+
+```yaml
+- id: vault-doctor-deep
+  name: Vault Doctor (chain + links)
+  entry: uv run python -m vaultspec vault doctor --category chain --category links --severity error
+  language: system
+  types: [markdown]
+  pass_filenames: true
+```
+
+Both hooks are opt-in via the consuming project's `.pre-commit-config.yaml`.
+
+### Why No Special Category Flags (e.g. `--filenames`)
+
+A `--filenames` shortcut flag was considered for the hook use case. It is not added because:
+
+1. `--category drift` already covers all filename-related checks (date drift, feature drift).
+2. The hook scoping problem is solved by `--input` / positional file args — the hook passes exactly
+   the changed files and doctor restricts results to those files regardless of check category.
+3. Adding check-type aliases (`--filenames`, `--links`) would duplicate `--category` with worse
+   naming and fragment the interface.
 
 ### Relationship to `vaultspec doctor`
 
 The existing `vaultspec doctor` (system health check) is in `core/commands.py` and covers Python
 version, CUDA, and optional deps. The new `vaultspec vault doctor` is in `vault_cli.py` and covers
-vault content health. The namespace distinction (`doctor` vs `vault doctor`) keeps them separate
-with no overlap.
+vault content health. The namespace distinction (`doctor` vs `vault doctor`) keeps them separate.
 
 ## Rationale
 
 Option 2 (dedicated `vault doctor` command) is chosen because:
 
-1. The audit command is already feature-saturated. Adding chain and drift checks behind more flags
-   would make the interface unmaintainable.
+1. `vault audit` is removed — there is no legacy interface to preserve or be compatible with.
 2. A registered-check architecture allows the suite to grow without modifying the CLI surface.
    New check domains are Python files in `doctor/checks/`, not new flags.
-3. The severity model is essential for pre-commit integration. Without it, any WARNING-level check
-   would either block all commits or be invisible. A threshold parameter solves this cleanly.
-4. Dry-run must be a first-class contract, not an afterthought. Centralizing it in `safe_writer.py`
-   ensures every current and future fix respects the pattern.
-5. The `vault audit --verify` fast path is preserved unchanged. Teams relying on it for pre-commit
-   are not disrupted.
+3. The severity model is essential for pre-commit integration. A threshold parameter solves the
+   WARNING-blocks-all-commits vs WARNING-is-invisible problem cleanly.
+4. Dry-run must be a first-class contract. Centralising it in `safe_writer.py` ensures every
+   current and future fix respects the pattern.
+5. `--input` / positional file args replace the need for a separate fast hook command or special
+   category shortcut flags. One command, scoped by the caller.
 
 ## Consequences
 
@@ -231,16 +268,17 @@ Option 2 (dedicated `vault doctor` command) is chosen because:
 
 - Chain integrity gaps (exec→plan, plan→ADR, ADR→research) become detectable and reportable
 - Frontmatter drift classes that previously passed validation are now caught
-- Broken wikilinks and orphaned documents are surfaced in the verify pipeline
-- Fix operations are safe (dry-run always available)
+- Broken wikilinks and orphaned documents are surfaced in a unified command
+- Fix operations are safe (dry-run always available, always a modifier on `--fix`)
 - Feature coverage gaps are visible as a matrix
-- The check registry allows community or project-specific checks to be added
+- Pre-commit hooks receive only changed files and run only relevant checks
+- The check registry allows project-specific checks to be added as Python files
 
 ### Negative / Trade-offs
 
 - New `doctor/` module and `vault doctor` CLI add surface area to document and test
 - Graph construction is required for LINKS and CHAIN categories — adds ~50–200ms for large vaults
-- CHAIN checks produce warnings (not errors) for plan→ADR and ADR→research gaps, which may feel
-  lenient. Teams can override to ERROR via `--severity` if desired
-- Advisory-only checks (chain breaks without auto-fix) require human action to resolve; the suite
-  reports but cannot repair missing documents
+- Advisory-only checks (chain breaks without auto-fix) require human action; the suite reports
+  but cannot repair missing documents
+- `--input` scoping for aggregate checks (chain, coverage) still builds the full graph — file
+  scoping filters results, not graph construction
