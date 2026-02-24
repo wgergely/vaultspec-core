@@ -7,6 +7,7 @@ resource commands.
 Commands:
     vault:    Vault document management (audit, create, index, search).
     team:     Multi-agent team lifecycle (create, assign, dissolve).
+    server:   Manage backend A2A daemonized servers (start, stop, list, logs).
     subagent: Sub-agent dispatch and serving (run, serve, a2a-serve).
     mcp:      MCP tool server.
     rules:    Manage rules (spec_cli passthrough).
@@ -27,6 +28,7 @@ import sys
 NAMESPACES = {
     "vault": "Vault document management (audit, create, index, search)",
     "team": "Multi-agent team lifecycle (create, assign, dissolve)",
+    "server": "Manage backend A2A daemonized servers (start, stop, list, logs)",
     "subagent": "Sub-agent dispatch and serving (run, serve, a2a-serve)",
     "mcp": "MCP tool server",
 }
@@ -105,6 +107,8 @@ def main() -> None:
             from .vault_cli import main as run
         elif first_arg == "team":
             from .team_cli import main as run
+        elif first_arg == "server":
+            from .server_cli import main as run
         elif first_arg == "subagent":
             from .subagent_cli import main as run
         elif first_arg == "mcp":

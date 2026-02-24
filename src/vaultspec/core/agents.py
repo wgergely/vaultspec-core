@@ -6,16 +6,13 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from . import types as _t
-from .enums import ClaudeModels, GeminiModels, Resource, Tool
-from .helpers import _launch_editor, atomic_write, build_file, ensure_dir, resolve_model
+from .enums import ClaudeModels, GeminiModels, Tool
+from .helpers import _launch_editor, atomic_write, build_file, ensure_dir
 from .sync import print_summary, sync_files
 from .types import SyncResult
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -110,14 +107,9 @@ def transform_agent(
     model = meta.get("model")
     if model is None:
         # Default models per tool
-        if tool == Tool.GEMINI:
-            model = GeminiModels.LOW
-        else:
-            # Claude and others
-            model = ClaudeModels.MEDIUM
+        model = GeminiModels.LOW if tool == Tool.GEMINI else ClaudeModels.MEDIUM
 
     # 2. Tool translations
-    tool_map = _TOOL_MAPS.get(tool, {})
 
     fm: dict[str, Any] = {
         "name": Path(name).stem,

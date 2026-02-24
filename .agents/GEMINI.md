@@ -10,7 +10,6 @@ dispatching sub-agents to produce artifacts that capture decisions, plans, and
 execution records in `.vault/`. This documentation trail preserves context so
 that decisions and their rationale remain accessible across sessions.
 
-
 ## Pipeline
 
 All significant work follows this pipeline. Each phase produces artifacts that
@@ -34,7 +33,6 @@ Supporting phases, invoked when appropriate:
 Trivial fixes and direct edits do not require the full pipeline. Use judgment
 based on scope and risk.
 
-
 ## Dispatch
 
 Interpret user intent and invoke the appropriate skill:
@@ -57,7 +55,6 @@ and with what goal.
 Before starting a new pipeline phase, check `.vault/` for existing artifacts
 related to the user's request. Resume work in progress rather than starting
 fresh.
-
 
 ## Conventions
 

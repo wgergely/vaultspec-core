@@ -31,7 +31,7 @@ from ..orchestration import (
     run_subagent,
     safe_read_text,
 )
-from ..protocol.acp import SubagentError
+from ..protocol.types import SubagentError
 from ..vaultcore import parse_frontmatter
 
 __all__ = [

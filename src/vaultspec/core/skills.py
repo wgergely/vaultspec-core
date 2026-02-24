@@ -10,7 +10,7 @@ from typing import Any
 
 from . import types as _t
 from .enums import FileName, Tool
-from .helpers import atomic_write, build_file, ensure_dir
+from .helpers import _launch_editor, build_file, ensure_dir
 from .sync import print_summary
 from .sync import sync_skills as _sync_skills
 from .types import SyncResult
@@ -44,7 +44,7 @@ def collect_skills() -> dict[str, tuple[Path, dict[str, Any], str]]:
     return sources
 
 
-def transform_skill(tool: Tool, name: str, _meta: dict[str, Any], body: str) -> str:
+def transform_skill(_tool: Tool, name: str, _meta: dict[str, Any], body: str) -> str:
     """Transform a skill definition for a specific tool destination.
 
     Assembles a YAML-frontmattered file containing the skill's name and

@@ -39,7 +39,6 @@ from .types import FRAMEWORK_CONFIG_SRC as FRAMEWORK_CONFIG_SRC
 from .types import HOOKS_DIR as HOOKS_DIR
 from .types import PROJECT_CONFIG_SRC as PROJECT_CONFIG_SRC
 from .types import PROTECTED_SKILLS as PROTECTED_SKILLS
-from .types import PROVIDERS as PROVIDERS
 from .types import ROOT_DIR as ROOT_DIR
 from .types import RULES_SRC_DIR as RULES_SRC_DIR
 from .types import SKILLS_SRC_DIR as SKILLS_SRC_DIR
@@ -48,4 +47,5 @@ from .types import TEMPLATES_DIR as TEMPLATES_DIR
 from .types import TOOL_CONFIGS as TOOL_CONFIGS
 from .types import SyncResult as SyncResult
 from .types import ToolConfig as ToolConfig
+from .types import get_providers as get_providers
 from .types import init_paths as init_paths

@@ -193,7 +193,7 @@ class TestDispatchAgent:
     async def test_successful_dispatch(self, baker_cache, fresh_task_engine):
         """Successful dispatch returns taskId 'working', then completes with result."""
 
-        from ...protocol.acp import SubagentResult
+        from ...protocol.types import SubagentResult
 
         recorded_calls: list[dict] = []
 
@@ -265,7 +265,7 @@ class TestDispatchAgent:
     @pytest.mark.integration
     async def test_model_override_passthrough(self, baker_cache, fresh_task_engine):
         """Model override is forwarded to the subagent and included in response."""
-        from ...protocol.acp import SubagentResult
+        from ...protocol.types import SubagentResult
 
         recorded_calls: list[dict] = []
 
@@ -306,7 +306,7 @@ class TestDispatchAgent:
     @pytest.mark.integration
     async def test_task_engine_creates_task(self, baker_cache, fresh_task_engine):
         """dispatch_agent creates a task, transitions through working to completed."""
-        from ...protocol.acp import SubagentResult
+        from ...protocol.types import SubagentResult
 
         async def _recording_subagent(**_kw):
             return SubagentResult(
@@ -347,7 +347,7 @@ class TestDispatchAgent:
     @pytest.mark.integration
     async def test_default_mode_from_agent_cache(self, baker_cache, fresh_task_engine):
         """No mode passed: uses agent's default_mode from cache, forwarded."""
-        from ...protocol.acp import SubagentResult
+        from ...protocol.types import SubagentResult
 
         recorded_calls: list[dict] = []
 
@@ -496,7 +496,7 @@ class TestCancelTask:
         """Cancellation stops the background asyncio.Task from a running dispatch."""
         import asyncio
 
-        from ...protocol.acp import SubagentResult
+        from ...protocol.types import SubagentResult
 
         # Slow subagent that blocks long enough for cancellation to hit
         async def _slow_subagent(**_kw):

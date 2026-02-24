@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 
 from . import types as _t
-from .enums import FileName, Tool
+from .enums import Tool
 from .helpers import atomic_write, ensure_dir
 from .rules import collect_rules
 from .sync import print_summary

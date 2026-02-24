@@ -11,7 +11,6 @@ from typing import Any
 from . import types as _t
 from .agents import collect_agents
 from .config_gen import _is_cli_managed
-from .enums import DirName, FileName, Resource, Tool
 from .helpers import atomic_write, build_file, ensure_dir
 from .skills import collect_skills
 from .sync import print_summary

@@ -21,15 +21,13 @@ from .cli_common import (
     run_async,
     setup_logging,
 )
+from .core.enums import Tool
 from .orchestration.subagent import (
     AgentNotFoundError,
     list_available_agents,
     load_agent,
     run_subagent,
 )
-from .core.enums import Tool
-from .protocol.acp import SubagentClient
-from .protocol.providers import ClaudeModels, GeminiModels
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +111,6 @@ def command_run(args):
             debug=args.debug,
             mode=args.mode,
             quiet=False,  # CLI should be noisy
-            client_class=SubagentClient,
             resume_session_id=args.resume_session,
             max_turns=args.max_turns,
             budget=args.budget,
@@ -172,7 +169,7 @@ def command_a2a_serve(args):
     root = args.root
     content_root = args.content_root
     agent_name = args.agent or "vaultspec-researcher"
-    port = args.port or 10010
+    port = args.port if args.port is not None else 10010
 
     try:
         agent_meta, agent_persona = load_agent(
@@ -186,42 +183,67 @@ def command_a2a_serve(args):
             "name": agent_name,
             "description": f"Vaultspec agent: {agent_name}",
         }
-        agent_persona = None
 
-    # Create executor based on --executor flag
-    executor_type = args.executor or Tool.CLAUDE.value
-    if executor_type == Tool.CLAUDE.value:
-        from .protocol.a2a.executors import ClaudeA2AExecutor
-
-        executor = ClaudeA2AExecutor(
-            model=args.model or ClaudeModels.MEDIUM,
-            root_dir=str(root),
-            mode=args.mode or "read-only",
-            system_prompt=agent_persona,
-        )
-    elif executor_type == Tool.GEMINI.value:
-        from .protocol.a2a.executors import GeminiA2AExecutor
-
-        executor = GeminiA2AExecutor(
-            root_dir=root,
-            model=args.model or GeminiModels.LOW,
-            agent_name=agent_name,
-        )
-    else:
-        logger.error("Unknown executor: %s", executor_type)
-        sys.exit(1)
+    executor_type = args.executor
+    executor = None
+    if executor_type in ("claude", "gemini"):
+        pass
 
     card = agent_card_from_definition(agent_name, agent_meta, port=port)
     app = create_app(executor, card)
 
-    from .config import get_config
-
-    cfg = get_config()
-
     logger.info(
         "Starting A2A server: %s (%s) on port %d", agent_name, executor_type, port
     )
-    uvicorn.run(app, host=cfg.mcp_host, port=port)
+
+    # Bind ephemeral port and announce it for ServerProcessManager
+    import socket
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(("127.0.0.1", port))
+    actual_port = sock.getsockname()[1]
+    args.printer.out(f"PORT={actual_port}")
+
+    # Orphan prevention: monitor parent PID if provided
+    parent_pid_str = os.environ.get("VAULTSPEC_PARENT_PID")
+    if parent_pid_str:
+        try:
+            parent_pid = int(parent_pid_str)
+            logger.debug("Monitoring parent PID %d for orphan prevention", parent_pid)
+            
+            def _monitor_parent():
+                import time
+                import signal
+                
+                while True:
+                    try:
+                        if sys.platform == "win32":
+                            # Windows: Check if process handle is still valid/running
+                            # This is a basic check; strictly speaking OpenProcess would be better
+                            # but os.kill(pid, 0) works on Python 3.10+ on Windows to check existence
+                            os.kill(parent_pid, 0)
+                        else:
+                            # Unix: signal 0 checks for existence
+                            os.kill(parent_pid, 0)
+                    except OSError:
+                        # Process dead or permission denied (likely dead if it was our parent)
+                        logger.warning("Parent process %d gone. Shutting down.", parent_pid)
+                        os.kill(os.getpid(), signal.SIGTERM)
+                        return
+                    time.sleep(1.0)
+
+            import threading
+            t = threading.Thread(target=_monitor_parent, daemon=True)
+            t.start()
+        except (ValueError, ImportError):
+            logger.warning("Invalid VAULTSPEC_PARENT_PID: %s", parent_pid_str)
+
+    config = uvicorn.Config(app, host="127.0.0.1", port=actual_port, log_level="info")
+    server = uvicorn.Server(config)
+
+    import asyncio
+
+    asyncio.run(server.serve(sockets=[sock]))
 
 
 def command_list(args):

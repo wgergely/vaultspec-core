@@ -74,13 +74,16 @@ PROJECT_CONFIG_SRC: Path = Path()
 HOOKS_DIR: Path = Path()
 TOOL_CONFIGS: dict[Tool, ToolConfig] = {}
 
-from ..protocol.providers import ClaudeProvider, GeminiProvider  # noqa: E402
-from .enums import DirName, FileName, Resource, Tool
+from .enums import FileName, Resource, Tool  # noqa: E402
 
-PROVIDERS: dict[str, Any] = {
-    Tool.CLAUDE.value: ClaudeProvider(),
-    Tool.GEMINI.value: GeminiProvider(),
-}
+
+def get_providers():
+    from ..protocol.providers import ClaudeProvider, GeminiProvider
+
+    return {
+        Tool.CLAUDE.value: ClaudeProvider(),
+        Tool.GEMINI.value: GeminiProvider(),
+    }
 
 
 def _create_tool_cfg(
@@ -153,7 +156,11 @@ def init_paths(layout: Any) -> None:
             Tool.CLAUDE, root, cfg.claude_dir, config=FileName.CLAUDE
         ),
         Tool.GEMINI: _create_tool_cfg(
-            Tool.GEMINI, root, cfg.gemini_dir, config=FileName.GEMINI, system="SYSTEM.md"
+            Tool.GEMINI,
+            root,
+            cfg.gemini_dir,
+            config=FileName.GEMINI,
+            system="SYSTEM.md",
         ),
         Tool.AGENTS: ToolConfig(
             name=Tool.AGENTS.value,

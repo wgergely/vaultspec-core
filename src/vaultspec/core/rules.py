@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from . import types as _t
-from .enums import Resource, Tool
+from .enums import Tool
 from .helpers import _launch_editor, build_file, ensure_dir
 from .sync import print_summary, sync_files
 from .types import SyncResult

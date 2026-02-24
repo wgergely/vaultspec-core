@@ -110,7 +110,11 @@ class TestGeminiProvider:
         )
         assert isinstance(spec, ProcessSpec)
         assert "-m" in spec.args
-        assert "vaultspec.protocol.acp.gemini_bridge" in spec.args
+        assert "vaultspec" in spec.args
+        assert "subagent" in spec.args
+        assert "a2a-serve" in spec.args
+        assert "--executor" in spec.args
+        assert "gemini" in spec.args
         assert spec.initial_prompt_override == "Do something."
         # System prompt delivered via GEMINI_SYSTEM_MD temp file
         assert len(spec.cleanup_paths) == 1
@@ -262,7 +266,11 @@ class TestClaudeProvider:
         )
         assert isinstance(spec, ProcessSpec)
         assert "-m" in spec.args
-        assert "vaultspec.protocol.acp.claude_bridge" in spec.args
+        assert "vaultspec" in spec.args
+        assert "subagent" in spec.args
+        assert "a2a-serve" in spec.args
+        assert "--executor" in spec.args
+        assert "claude" in spec.args
 
 
 class TestGetProviderForModel:

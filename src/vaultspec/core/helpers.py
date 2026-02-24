@@ -117,9 +117,10 @@ def resolve_model(tool: str, tier: str) -> str | None:
         The best model identifier for the given provider and capability level,
         or ``None`` if the provider is unknown or the tier cannot be resolved.
     """
-    from .types import PROVIDERS
+    from .types import get_providers
 
-    if not PROVIDERS or tool not in PROVIDERS:
+    providers = get_providers()
+    if not providers or tool not in providers:
         return None
     try:
         from ..protocol.providers import CapabilityLevel
@@ -130,7 +131,7 @@ def resolve_model(tool: str, tier: str) -> str | None:
             "Could not resolve model for tool=%r tier=%r: %s", tool, tier, exc
         )
         return None
-    return PROVIDERS[tool].get_best_model_for_capability(level)
+    return providers[tool].get_best_model_for_capability(level)
 
 
 def _launch_editor(editor: str, file_path: str) -> None:

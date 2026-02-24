@@ -27,7 +27,6 @@ MODULE_PATHS = {
     "protocol": [
         "protocol/tests",
         "protocol/a2a/tests",
-        "protocol/acp/tests",
     ],
     "orchestration": ["orchestration/tests"],
     "subagent": ["subagent_server/tests"],

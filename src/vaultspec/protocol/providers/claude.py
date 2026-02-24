@@ -14,11 +14,9 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
+from ...core.enums import CapabilityLevel, ClaudeModels, ModelRegistry
 from .base import (
     AgentProvider,
-    CapabilityLevel,
-    ClaudeModels,
-    ModelRegistry,
     ProcessSpec,
     resolve_includes,
 )
@@ -347,13 +345,24 @@ class ClaudeProvider(AgentProvider):
             executable=sys.executable,
             args=[
                 "-m",
-                "vaultspec.protocol.acp.claude_bridge",
+                "vaultspec",
+                "subagent",
+                "--root",
+                str(root_dir),  # Ensure proper workspace context
+                "a2a-serve",
+                "--executor",
+                self.name,
                 "--model",
                 model,
+                "--agent",
+                agent_name,
+                "--port",
+                "0",
             ],
             env=env,
             cleanup_paths=[],
             initial_prompt_override=task_context,
             session_meta={"model": model},
             mcp_servers=mcp_servers,
+            protocol="a2a",
         )

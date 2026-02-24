@@ -20,11 +20,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+from ...core.enums import CapabilityLevel, GeminiModels, ModelRegistry
 from .base import (
     AgentProvider,
-    CapabilityLevel,
-    GeminiModels,
-    ModelRegistry,
     ProcessSpec,
     resolve_executable,
     resolve_includes,
@@ -459,10 +457,26 @@ class GeminiProvider(AgentProvider):
 
         return ProcessSpec(
             executable=sys.executable,
-            args=["-m", "vaultspec.protocol.acp.gemini_bridge", "--model", model],
+            args=[
+                "-m",
+                "vaultspec",
+                "subagent",
+                "--root",
+                str(root_dir),  # Ensure proper workspace context
+                "a2a-serve",
+                "--executor",
+                self.name,
+                "--model",
+                model,
+                "--agent",
+                agent_name,
+                "--port",
+                "0",
+            ],
             env=env,
             cleanup_paths=cleanup_paths,
             initial_prompt_override=task_context,
             session_meta={"model": model},
             mcp_servers=mcp_servers,
+            protocol="a2a",
         )

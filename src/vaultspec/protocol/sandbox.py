@@ -1,7 +1,6 @@
 """Shared sandboxing utilities for agent executors.
 
-Provides file-write restriction callbacks used by both the ACP bridge
-(``protocol.acp.claude_bridge``) and the A2A executors
+Provides file-write restriction callbacks used by the A2A executors
 (``protocol.a2a.executors``).
 """
 

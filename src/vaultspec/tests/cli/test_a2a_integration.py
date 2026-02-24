@@ -33,8 +33,8 @@ from ...protocol.a2a.executors import ClaudeA2AExecutor, GeminiA2AExecutor
 from ...protocol.a2a.tests.conftest import (
     _make_card,
 )
-from ...protocol.acp import SubagentResult
 from ...protocol.providers import ClaudeModels, GeminiModels
+from ...protocol.types import SubagentResult
 
 
 class _AwaitableNone:

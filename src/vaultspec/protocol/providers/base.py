@@ -5,8 +5,7 @@ from __future__ import annotations
 import abc
 import logging
 from dataclasses import dataclass, field
-from enum import IntEnum
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     import pathlib
@@ -15,74 +14,14 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "AgentProvider",
-    "CapabilityLevel",
-    "ClaudeModels",
-    "GeminiModels",
-    "ModelRegistry",
     "ProcessSpec",
     "resolve_executable",
     "resolve_includes",
 ]
 
 
-class CapabilityLevel(IntEnum):
-    """Tiered capability levels used to select an appropriate model."""
-
-    LOW = 1
-    MEDIUM = 2
-    HIGH = 3
-
-
-class ClaudeModels:
-    """Single source of truth for Claude model identifiers.
-
-    Attributes:
-        HIGH: Model ID for the highest capability tier (Opus).
-        MEDIUM: Model ID for the medium capability tier (Sonnet).
-        LOW: Model ID for the low capability tier (Haiku).
-        ALL: All model IDs ordered from highest to lowest capability.
-        BY_LEVEL: Mapping from CapabilityLevel to model ID.
-    """
-
-    HIGH = "claude-opus-4-6"
-    MEDIUM = "claude-sonnet-4-6"
-    LOW = "claude-haiku-4-5"
-
-    ALL: ClassVar[list[str]] = [HIGH, MEDIUM, LOW]
-
-    BY_LEVEL: ClassVar[dict[CapabilityLevel, str]] = {
-        CapabilityLevel.HIGH: HIGH,
-        CapabilityLevel.MEDIUM: MEDIUM,
-        CapabilityLevel.LOW: LOW,
-    }
-
-
-class GeminiModels:
-    """Single source of truth for Gemini model identifiers.
-
-    Attributes:
-        HIGH: Model ID for the highest capability tier (Pro).
-        MEDIUM: Model ID for the medium capability tier (Flash).
-        LOW: Model ID for the low capability tier (Flash 2.5).
-        ALL: All model IDs ordered from highest to lowest capability.
-        BY_LEVEL: Mapping from CapabilityLevel to model ID.
-    """
-
-    HIGH = "gemini-3-pro-preview"
-    MEDIUM = "gemini-3-flash-preview"
-    LOW = "gemini-2.5-flash"
-
-    ALL: ClassVar[list[str]] = [HIGH, MEDIUM, LOW]
-
-    BY_LEVEL: ClassVar[dict[CapabilityLevel, str]] = {
-        CapabilityLevel.HIGH: HIGH,
-        CapabilityLevel.MEDIUM: MEDIUM,
-        CapabilityLevel.LOW: LOW,
-    }
-
-
-# Type alias for model registry classes
-ModelRegistry = type[ClaudeModels] | type[GeminiModels]
+if TYPE_CHECKING:
+    from ...core.enums import CapabilityLevel, ModelRegistry
 
 
 @dataclass
@@ -108,6 +47,7 @@ class ProcessSpec:
     session_meta: dict[str, Any] = field(default_factory=dict)
     initial_prompt_override: str | None = None
     mcp_servers: dict[str, Any] | None = None
+    protocol: Literal["acp", "a2a"] = "a2a"
 
 
 def resolve_includes(
@@ -250,7 +190,7 @@ class AgentProvider(abc.ABC):
             Model ID string; falls back to the MEDIUM model when the level
             is not found in the registry.
         """
-        return self.models.BY_LEVEL.get(level, self.models.MEDIUM)
+        return self.models.from_level(level)
 
     @abc.abstractmethod
     def load_system_prompt(self, root_dir: pathlib.Path) -> str:

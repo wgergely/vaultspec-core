@@ -7,7 +7,6 @@ Reuses sandboxing logic from protocol.a2a.executors.base.
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import logging
 import os
 import shutil
@@ -18,9 +17,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-from a2a.server.agent_execution import AgentExecutor, RequestContext
+from a2a.server.agent_execution import RequestContext  # noqa
 from a2a.server.tasks import TaskUpdater
-from a2a.types import Part, TaskState, TextPart
+from a2a.types import Part, TextPart
 from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
@@ -30,7 +29,8 @@ from claude_agent_sdk import (
 )
 from claude_agent_sdk._errors import MessageParseError
 
-from .base import _make_sandbox_callback
+from ...sandbox import _make_sandbox_callback
+from .base import BaseA2AExecutor
 
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
@@ -79,7 +79,7 @@ def _is_rate_limit_parse_error(exc: MessageParseError) -> bool:
     return "rate_limit" in str(exc).lower()
 
 
-class ClaudeA2AExecutor(AgentExecutor):
+class ClaudeA2AExecutor(BaseA2AExecutor):
     """Execute A2A tasks by delegating to Claude via ``claude-agent-sdk``.
 
     Parameters
@@ -134,6 +134,8 @@ class ClaudeA2AExecutor(AgentExecutor):
             max_retries: Maximum retries on rate-limit errors before failing.
             retry_base_delay: Base delay in seconds for exponential back-off.
         """
+        super().__init__(max_retries=max_retries, retry_base_delay=retry_base_delay)
+
         self._model = model
         self._root_dir = root_dir
         self._mode = mode
@@ -141,14 +143,11 @@ class ClaudeA2AExecutor(AgentExecutor):
         self._system_prompt = system_prompt
         self._client_factory = client_factory or _default_client_factory
         self._options_factory = options_factory or _default_options_factory
-        self._max_retries = max_retries
-        self._retry_base_delay = retry_base_delay
         self._active_clients: dict[str, Any] = {}
         self._clients_lock = asyncio.Lock()
         self._cli_path: str | None = shutil.which("claude")
         self._session_ids: dict[str, str] = {}
         self._session_ids_lock = asyncio.Lock()
-        self._cancel_events: dict[str, asyncio.Event] = {}
 
     async def _disconnect_sdk_client(self, sdk_client: Any) -> None:
         """Disconnect the SDK client and clean up its subprocess transports."""
@@ -166,36 +165,10 @@ class ClaudeA2AExecutor(AgentExecutor):
 
             await cleanup_subprocess_transports(proc)
 
-    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        """Execute an A2A task by streaming a Claude SDK conversation.
-
-        Connects to the Claude SDK, sends the user prompt, and streams
-        assistant content back as A2A task lifecycle events.  Implements
-        exponential back-off retry on rate-limit errors.
-
-        Args:
-            context: The A2A request context carrying the task ID, context ID,
-                and user input prompt.
-            event_queue: The A2A event queue used to emit status updates,
-                artifacts, and terminal events.
-        """
-        task_id = context.task_id or ""
-        context_id = context.context_id or ""
-        updater = TaskUpdater(event_queue, task_id, context_id)
-        prompt = context.get_user_input()
-
-        logger.info(
-            "ClaudeA2AExecutor executing task %s (context=%s, model=%s, prompt_len=%d)",
-            task_id,
-            context_id,
-            self._model,
-            len(prompt),
-        )
-
-        cancel_event = asyncio.Event()
-        self._cancel_events[task_id] = cancel_event
-
-        # Check for a live persistent client from a previous turn on this context.
+    async def _on_task_start(
+        self, task_id: str, context_id: str, cancel_event: asyncio.Event
+    ) -> None:
+        """Connect the SDK client if needed."""
         async with self._clients_lock:
             existing_client = self._active_clients.get(context_id)
 
@@ -206,19 +179,12 @@ class ClaudeA2AExecutor(AgentExecutor):
                 context_id,
                 task_id,
             )
-            # Register under task_id so cancel() can interrupt it.
             async with self._clients_lock:
                 self._active_clients[task_id] = sdk_client
         else:
             sandbox_cb = _make_sandbox_callback(self._mode, self._root_dir)
-            # The SDK merges options.env ON TOP of os.environ:
-            #   process_env = {**os.environ, **options.env, "CLAUDE_...": ..}
-            # Simply omitting CLAUDECODE from options.env is not enough — the parent
-            # value from os.environ would survive the merge.  Setting it to "" (empty
-            # string) overrides the parent value; the Claude CLI treats an empty
-            # CLAUDECODE as falsy and allows the subprocess to start normally.
             sdk_env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-            sdk_env["CLAUDECODE"] = ""  # empty string overrides parent "1" in SDK merge
+            sdk_env["CLAUDECODE"] = ""
             kwargs: dict[str, Any] = {
                 "model": self._model,
                 "cwd": self._root_dir,
@@ -231,8 +197,6 @@ class ClaudeA2AExecutor(AgentExecutor):
             if self._cli_path:
                 kwargs["cli_path"] = self._cli_path
 
-            # Session resume: reuse session_id from a previous execution on the
-            # same context_id so the SDK can restore conversation state.
             async with self._session_ids_lock:
                 prev_session = self._session_ids.get(context_id)
             if prev_session:
@@ -246,144 +210,86 @@ class ClaudeA2AExecutor(AgentExecutor):
             async with self._clients_lock:
                 self._active_clients[task_id] = sdk_client
 
-        cancelled = False
-        errored = False
-        try:
-            if existing_client is None:
-                logger.debug("Connecting SDK client for task %s", task_id)
-                await sdk_client.connect()
-                logger.debug("SDK client connected for task %s", task_id)
+            logger.debug("Connecting SDK client for task %s", task_id)
+            await sdk_client.connect()
+            logger.debug("SDK client connected for task %s", task_id)
 
-            # Only signal working after the subprocess is confirmed started —
-            # avoids a window where the task appears working but connect failed.
-            await updater.start_work()
+    async def _on_task_end(
+        self, task_id: str, context_id: str, cancelled: bool, errored: bool
+    ) -> None:
+        """Clean up or persist the SDK client after a task run."""
+        async with self._clients_lock:
+            sdk_client = self._active_clients.get(task_id)
 
-            attempt = 0
-            while True:
-                should_retry = await self._run_stream(
-                    sdk_client=sdk_client,
-                    prompt=prompt,
-                    updater=updater,
-                    context_id=context_id,
-                    cancel_event=cancel_event,
-                )
-                if cancel_event.is_set():
-                    cancelled = True
-                    # The stream may have already completed before the
-                    # cancel event was observed — guard against duplicate
-                    # terminal state.
-                    with contextlib.suppress(RuntimeError):
-                        await updater.cancel()
-                    break
-                if not should_retry:
-                    break
+        if sdk_client is None:
+            return
 
-                # Rate-limit retry with exponential back-off.
-                attempt += 1
-                if attempt > self._max_retries:
-                    await updater.failed(
-                        message=updater.new_agent_message(
-                            parts=[
-                                Part(
-                                    root=TextPart(
-                                        text=(
-                                            "Rate limited: exhausted "
-                                            f"{self._max_retries} retries"
-                                        )
-                                    )
-                                )
-                            ]
-                        )
-                    )
-                    break
-                delay = self._retry_base_delay * (2**attempt)
-                await updater.update_status(
-                    TaskState.working,
-                    message=updater.new_agent_message(
-                        parts=[
-                            Part(
-                                root=TextPart(
-                                    text=(
-                                        f"Rate limited, retrying "
-                                        f"(attempt {attempt}"
-                                        f"/{self._max_retries})"
-                                    )
-                                )
-                            )
-                        ]
-                    ),
-                )
-                logger.info(
-                    "Rate limited on task %s, retrying in %.1fs (attempt %d/%d)",
-                    task_id,
-                    delay,
-                    attempt,
-                    self._max_retries,
-                )
-                await asyncio.sleep(delay)
-
-        except Exception as e:
-            errored = True
-            logger.exception("ClaudeA2AExecutor error for task %s", task_id)
-            await updater.failed(
-                message=updater.new_agent_message(
-                    parts=[Part(root=TextPart(text=str(e)))]
-                )
+        if cancelled:
+            async with self._clients_lock:
+                self._active_clients.pop(task_id, None)
+                self._active_clients[context_id] = sdk_client
+            logger.debug(
+                "Task %s cancelled: keeping SDK client alive for context %s",
+                task_id,
+                context_id,
             )
-        finally:
-            if cancelled:
-                # Cancelled: keep the client alive under context_id for future resume.
-                # Remove the task_id entry but store the client under context_id.
-                async with self._clients_lock:
-                    self._active_clients.pop(task_id, None)
-                    self._active_clients[context_id] = sdk_client
+        elif errored:
+            async with self._clients_lock:
+                self._active_clients.pop(task_id, None)
+                if self._active_clients.get(context_id) is sdk_client:
+                    self._active_clients.pop(context_id, None)
+            logger.debug("Disconnecting SDK client for task %s after error", task_id)
+            await self._disconnect_sdk_client(sdk_client)
+        else:
+            async with self._clients_lock:
+                self._active_clients.pop(task_id, None)
+                self._active_clients[context_id] = sdk_client
                 logger.debug(
-                    "Task %s cancelled: keeping SDK client alive for context %s",
-                    task_id,
+                    "Persisting SDK client for context %s after task %s completion",
                     context_id,
+                    task_id,
                 )
-            elif errored:
-                # Error path: disconnect and evict so the next attempt starts fresh.
-                async with self._clients_lock:
-                    self._active_clients.pop(task_id, None)
-                    if self._active_clients.get(context_id) is sdk_client:
-                        self._active_clients.pop(context_id, None)
-                logger.debug(
-                    "Disconnecting SDK client for task %s after error", task_id
-                )
-                await self._disconnect_sdk_client(sdk_client)
-            else:
-                # Successful completion: persist the live client under context_id
-                # so the next turn can reuse it without reconnecting.
-                async with self._clients_lock:
-                    self._active_clients.pop(task_id, None)
-                    self._active_clients[context_id] = sdk_client
-                    logger.debug(
-                        "Persisting SDK client for context %s after task %s completion",
-                        context_id,
-                        task_id,
-                    )
-            self._cancel_events.pop(task_id, None)
+
+    async def _on_task_cancel(self, task_id: str, context_id: str) -> None:
+        """Interrupt the SDK without closing it."""
+        async with self._clients_lock:
+            client = self._active_clients.get(task_id)
+        if client is not None:
+            try:
+                await client.interrupt()
+            except Exception:
+                logger.exception("Error interrupting SDK client for task %s", task_id)
+
+    async def _on_cleanup(self) -> None:
+        """Disconnect all SDK processes on server shutdown."""
+        async with self._clients_lock:
+            clients = list(self._active_clients.values())
+            self._active_clients.clear()
+        for client in clients:
+            try:
+                await self._disconnect_sdk_client(client)
+            except Exception:
+                logger.exception("Error disconnecting SDK client during cleanup")
 
     async def _run_stream(
         self,
         *,
-        sdk_client: Any,
         prompt: str,
         updater: TaskUpdater,
         context_id: str,
+        task_id: str,
         cancel_event: asyncio.Event,
     ) -> bool:
-        """Execute one query+stream cycle.
-
-        Args:
-            sdk_client: Connected Claude SDK client used to send the prompt
-                and stream the response.
+        """Stream a turn of conversation from Claude to the A2A event queue.
+        Returns True if a rate limit was hit.
         """
+        async with self._clients_lock:
+            sdk_client = self._active_clients.get(task_id)
+
+        if sdk_client is None:
+            raise RuntimeError("SDK client missing in _run_stream")
+
         await sdk_client.query(prompt)
-        # Fixed artifact_id for this stream: all append=True chunks and the
-        # final last_chunk=True emit share the same ID so the client
-        # assembles them into one artifact object.
         artifact_id = str(uuid.uuid4())
         collected: list[str] = []
         chunk_emitted = False
@@ -404,7 +310,6 @@ class ClaudeA2AExecutor(AgentExecutor):
                             collected.append(block.text)
                             new_text += block.text
 
-                    # Throttled incremental artifact chunks (append=True).
                     now = time.monotonic()
                     if now - last_chunk_time >= _STATUS_THROTTLE_SECS and new_text:
                         await updater.add_artifact(
@@ -424,7 +329,6 @@ class ClaudeA2AExecutor(AgentExecutor):
                         msg.is_error,
                         msg.session_id,
                     )
-                    # Persist session_id for future resume.
                     if msg.session_id:
                         async with self._session_ids_lock:
                             self._session_ids[context_id] = msg.session_id
@@ -458,14 +362,10 @@ class ClaudeA2AExecutor(AgentExecutor):
                     return False
 
         except MessageParseError as exc:
-            # Belt-and-suspenders: the SDK now handles rate_limit_event
-            # natively, but if an unparseable message still slips through
-            # we check whether it looks rate-limit-related.
             logger.debug("Skipping unparseable SDK message: %s", exc)
             if _is_rate_limit_parse_error(exc):
                 return True
 
-        # Stream ended without a ResultMessage — fall back to collected text.
         logger.warning("Task %s: stream ended without ResultMessage", context_id)
         text = "".join(collected)
         if text:
