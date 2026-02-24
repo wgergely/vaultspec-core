@@ -1,9 +1,11 @@
 ---
-tags: ["#plan", "#audit-fixes"]
-related: ["[[2026-02-22-audit-fixes-adr.md]]"]
-date: 2026-02-22
+tags:
+  - "#plan"
+  - "#audit-fixes"
+date: "2026-02-22"
+related:
+  - "[[2026-02-22-audit-fixes-adr.md]]"
 ---
-
 # Plan: Audit Remediations (Logging & Robustness)
 
 This plan executes the fixes mandated by `[[2026-02-22-audit-fixes-adr.md]]` to improve logging and robustness across the codebase.

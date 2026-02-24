@@ -1,9 +1,9 @@
 ---
-tags: ["#research", "#protocol"]
-date: 2026-02-07
-related: []
+tags:
+  - "#research"
+  - "#protocol"
+date: "2026-02-07"
 ---
-
 # Protocol Review: ACP vs A2A
 
 **Date:** 2026-02-07

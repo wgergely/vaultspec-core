@@ -15,7 +15,6 @@ related:
   - "[[2026-02-22-gemini-acp-bridge-review]]"
   - "[[2026-02-22-gemini-a2a-review]]"
 ---
-
 # `gemini-overhaul` adr: Gemini ACP Bridge Rewrite and A2A Executor Hardening | (**status:** `superseded`)
 
 **SUPERSEDED** — This ADR is fully superseded by

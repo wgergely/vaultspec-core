@@ -8,7 +8,6 @@ related:
   - "[[2026-02-12-rag-vectordb-adr]]"
   - "[[2026-02-12-rag-retrieval-adr]]"
 ---
-
 # `cuda-dependencies` research: RAG CUDA Environment Audit
 
 Full audit of the CUDA dependency stack powering the RAG subsystem. The project mandates **Python 3.13+** and **CUDA 13.0+** as a deliberate frontier stance. This audit identifies where dependency floors, documentation, and in-code messages fail to align with that mandate.

@@ -1,12 +1,13 @@
 ---
-tags: ["#adr", "#protocol-tests"]
+tags:
+  - "#adr"
+  - "#protocol-tests"
 date: "2026-02-22"
 related:
   - "[[2026-02-22-protocol-test-architecture-research]]"
   - "[[2026-02-21-protocol-gap-analysis-research]]"
   - "[[2026-02-21-provider-auth-billing-research]]"
 ---
-
 # ADR: Rust-Style Unit Testing & Deterministic Protocol Matrix
 
 ## Status

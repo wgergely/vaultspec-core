@@ -1,11 +1,12 @@
 ---
-tags: ["#adr", "#gemini-acp-bridge"]
+tags:
+  - "#adr"
+  - "#gemini-acp-bridge"
 date: "2026-02-22"
 related:
   - "[[2026-02-22-gemini-acp-audit-expanded]]"
   - "[[2026-02-21-claude-acp-bidirectional-adr]]"
 ---
-
 # ADR: `gemini-acp-bridge` — Gemini ACP Protocol Normalization & Session Parity
 
 ## Status

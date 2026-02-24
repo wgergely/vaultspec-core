@@ -2,13 +2,12 @@
 tags:
   - "#research"
   - "#marketing-and-documentation"
-date: 2026-02-20
+date: "2026-02-20"
 related:
   - "[[2026-02-17-marketing-ux-audit]]"
   - "[[2026-02-17-roadmap-plan]]"
   - "[[2026-02-18-marketing-audit-documentation-quality]]"
 ---
-
 # `marketing-and-documentation` research: Gap analysis after Wave 2
 
 Audit of all documentation produced in Wave 2 (onboarding pass) against prior

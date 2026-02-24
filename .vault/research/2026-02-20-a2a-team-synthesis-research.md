@@ -10,7 +10,6 @@ related:
   - "[[2026-02-15-a2a-adr]]"
   - "[[2026-02-07-a2a-research]]"
 ---
-
 # `a2a-team` Feasibility Synthesis
 
 **Verdict: Technically feasible. Foundation is largely in place.**

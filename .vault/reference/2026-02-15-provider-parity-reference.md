@@ -1,9 +1,9 @@
 ---
-tags: ["#reference", "#protocol"]
-date: 2026-02-15
-related: []
+tags:
+  - "#reference"
+  - "#protocol"
+date: "2026-02-15"
 ---
-
 # Provider Parity Gap Report: Claude vs Gemini ACP Subagent Providers
 
 **Date:** 2026-02-15

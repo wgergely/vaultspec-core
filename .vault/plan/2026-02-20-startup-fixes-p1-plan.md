@@ -8,7 +8,6 @@ related:
   - "[[2026-02-12-rag-mcp-api-adr]]"
   - "[[2026-02-12-rag-embeddings-adr]]"
 ---
-
 # `startup-fixes` `p1` plan
 
 Address four identified startup and deployment bottlenecks discovered during

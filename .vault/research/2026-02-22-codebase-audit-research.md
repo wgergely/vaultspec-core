@@ -1,9 +1,9 @@
 ---
-tags: ["#research", "#codebase-audit"]
-related: []
-date: 2026-02-22
+tags:
+  - "#research"
+  - "#codebase-audit"
+date: "2026-02-22"
 ---
-
 # Research: Codebase Security & Robustness Audit
 
 ## Goal

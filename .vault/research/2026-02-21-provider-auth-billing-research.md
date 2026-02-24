@@ -7,7 +7,6 @@ related:
   - "[[2026-02-21-acp-bridge-auth-research]]"
   - "[[2026-02-21-gemini-bridge-auth-research]]"
 ---
-
 # `acp-bridge-auth` research: Subscription billing vs. API key costs
 
 Billing research to determine whether API keys can be used with existing monthly

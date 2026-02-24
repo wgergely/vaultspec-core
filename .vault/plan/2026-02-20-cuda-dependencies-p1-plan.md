@@ -7,7 +7,6 @@ related:
   - "[[2026-02-20-cuda-dependencies-adr]]"
   - "[[2026-02-20-cuda-dependencies-audit-research]]"
 ---
-
 # `cuda-dependencies` `p1` plan
 
 Align the RAG dependency stack with the project's CUDA 13.0+ / Python 3.13+ frontier

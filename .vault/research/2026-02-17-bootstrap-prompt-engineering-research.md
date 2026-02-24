@@ -1,10 +1,11 @@
 ---
-tags: ["#research", "#framework"]
-date: 2026-02-17
+tags:
+  - "#research"
+  - "#framework"
+date: "2026-02-17"
 related:
   - "[[2026-02-17-bootstrap-prompt-adr]]"
 ---
-
 # Bootstrap Prompt Engineering Research
 
 **Date**: 2026-02-17

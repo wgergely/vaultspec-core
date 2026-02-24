@@ -6,7 +6,6 @@ date: "2026-02-21"
 related:
   - "[[2026-02-21-packaging-restructure-adr]]"
 ---
-
 # `module-exports` research: protocol, rag, hooks
 
 Exhaustive audit of the import/export structure of three packages under `src/vaultspec/`: `protocol`, `rag`, and `hooks`. This research catalogs every public symbol, every cross-package import, every intra-package import, and proposes `__all__` and `__init__.py` re-exports for each module.

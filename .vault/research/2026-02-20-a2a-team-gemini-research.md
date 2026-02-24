@@ -6,7 +6,6 @@ date: "2026-02-20"
 related:
   - "[[2026-02-07-a2a-research]]"
 ---
-
 # A2A Team research: Gemini CLI Native A2A and ACP Team Support
 
 Investigation of Gemini CLI's native capabilities for participation in multi-agent

@@ -1,12 +1,9 @@
 ---
-title: "ACP Layer Audit: Our Implementation"
-date: 2026-02-21
-tags: [acp, audit]
-status: complete
-source: "src/vaultspec/protocol/acp/"
-agent: acp-auditor
+tags:
+  - "#research"
+  - "#acp"
+date: "2026-02-21"
 ---
-
 # ACP Layer Audit
 
 ## File Map

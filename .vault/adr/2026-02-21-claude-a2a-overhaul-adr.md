@@ -13,7 +13,6 @@ related:
   - "[[2026-02-22-claude-team-management-plan]]"
   - "[[2026-02-20-a2a-team-adr]]"
 ---
-
 # `claude-a2a-overhaul` adr: Claude A2A Executor, Team Tools, and Process Lifecycle | (**status:** `superseded`)
 
 **SUPERSEDED** — This ADR is fully superseded by

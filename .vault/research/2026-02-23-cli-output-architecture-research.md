@@ -1,6 +1,4 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#research"
   - "#cli-output"
@@ -9,7 +7,6 @@ related:
   - "[[2026-02-22-cli-logging-research]]"
   - "[[2026-02-22-cli-logging-adr]]"
 ---
-
 # `cli-output` research: dual-console Printer abstraction for stdout/stderr separation
 
 Follow-up to the Phase 1 RichHandler work. Phase 1 introduced Rich-based

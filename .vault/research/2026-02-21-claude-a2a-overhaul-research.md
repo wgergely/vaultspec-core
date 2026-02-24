@@ -10,7 +10,6 @@ related:
   - "[[2026-02-20-a2a-team-adr]]"
   - "[[2026-02-21-claude-acp-bidirectional-adr]]"
 ---
-
 # `claude-a2a-overhaul` research: Claude A2A Executor & Team Coordination
 
 Synthesis of protocol audit, rate limit research, reference implementations

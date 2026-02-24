@@ -227,6 +227,11 @@ def resolve_args_workspace(
 
     args.root = layout.output_root.resolve()
     args.content_root = layout.content_root.resolve()
+
+    from .core import init_paths
+
+    init_paths(layout)
+
     return layout
 
 

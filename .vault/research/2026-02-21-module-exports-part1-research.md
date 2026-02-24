@@ -6,7 +6,6 @@ date: "2026-02-21"
 related:
   - "[[2026-02-21-packaging-restructure-adr]]"
 ---
-
 # `module-exports` research: core, vaultcore, orchestration
 
 Audit of the import/export structure for three packages under `src/vaultspec/`: `core`, `vaultcore`, and `orchestration`. The goal is to catalog every public symbol, every cross-package import, every intra-package import, and propose explicit `__all__` and `__init__.py` re-exports for each package.

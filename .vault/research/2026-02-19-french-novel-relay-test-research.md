@@ -1,12 +1,13 @@
 ---
-tags: ["#research", "#french-novel-relay"]
-date: 2026-02-19
+tags:
+  - "#research"
+  - "#french-novel-relay"
+date: "2026-02-19"
 related:
   - "[[2026-02-15-cross-agent-adr]]"
   - "[[2026-02-15-a2a-adr]]"
   - "[[2026-02-07-a2a-research]]"
 ---
-
 # `french-novel-relay` research: 3-Turn Collaborative French Story Test via A2A
 
 Research into implementing a multi-agent collaborative French novel relay test

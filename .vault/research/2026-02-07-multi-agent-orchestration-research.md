@@ -1,9 +1,9 @@
 ---
-tags: ["#research", "#framework"]
-date: 2026-02-07
-related: []
+tags:
+  - "#research"
+  - "#framework"
+date: "2026-02-07"
 ---
-
 # Multi-Agent Orchestration Patterns -- Survey
 
 **Date:** 2026-02-07

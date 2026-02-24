@@ -1,9 +1,9 @@
 ---
-tags: ["#research", "#acp-claude-audit"]
-related: []
-date: 2026-02-21
+tags:
+  - "#research"
+  - "#acp-claude-audit"
+date: "2026-02-21"
 ---
-
 # ACP Claude Implementation Audit
 
 ## 1. Executive Summary

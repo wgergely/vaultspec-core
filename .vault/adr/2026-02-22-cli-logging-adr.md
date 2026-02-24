@@ -1,6 +1,4 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#adr"
   - "#cli-logging"
@@ -8,7 +6,6 @@ date: "2026-02-22"
 related:
   - "[[2026-02-22-cli-logging-research]]"
 ---
-
 # `cli-logging` adr: unified Rich-based CLI and agent feed logging | (**status:** `accepted`)
 
 ## Problem Statement

@@ -6,7 +6,6 @@ date: "2026-02-21"
 related:
   - "[[2026-02-21-pytest-e2e-observability-research]]"
 ---
-
 # `pytest-e2e` adr: E2E test observability and reliability stack | (**status:** `accepted`)
 
 ## Problem Statement

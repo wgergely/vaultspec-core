@@ -7,7 +7,6 @@ related:
   - "[[2026-02-21-packaging-restructure-adr]]"
   - "[[2026-02-21-packaging-restructure-research]]"
 ---
-
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 

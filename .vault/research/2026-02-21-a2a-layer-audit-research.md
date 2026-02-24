@@ -1,12 +1,9 @@
 ---
-title: "A2A Layer Audit: Our Implementation"
-date: 2026-02-21
-tags: [a2a, audit]
-status: complete
-source: "src/vaultspec/protocol/a2a/"
-agent: a2a-auditor
+tags:
+  - "#research"
+  - "#a2a"
+date: "2026-02-21"
 ---
-
 # A2A Layer Audit
 
 ## File Map

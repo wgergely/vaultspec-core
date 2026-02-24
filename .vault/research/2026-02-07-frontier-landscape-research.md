@@ -1,9 +1,9 @@
 ---
-tags: ["#research", "#framework"]
-date: 2026-02-07
-related: []
+tags:
+  - "#research"
+  - "#framework"
+date: "2026-02-07"
 ---
-
 # Frontier Landscape: Agent Protocols and Interoperability
 
 **Date:** 2026-02-07

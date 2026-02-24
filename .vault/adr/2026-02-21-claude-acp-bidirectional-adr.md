@@ -9,7 +9,6 @@ related:
   - "[[2026-02-21-acp-layer-audit-research]]"
   - "[[2026-02-21-acp-ref-impl-research]]"
 ---
-
 # `claude-acp-bidirectional` adr: Multi-Turn Bidirectional Communication in Claude ACP Bridge | (**status:** `superseded`)
 
 **SUPERSEDED** — This ADR is fully superseded by

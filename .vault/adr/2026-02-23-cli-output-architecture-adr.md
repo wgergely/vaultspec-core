@@ -1,20 +1,13 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
-# Directory tag (hardcoded - DO NOT CHANGE - based on .vault/adr/ location)
-# Feature tag (replace {feature} with your feature name, e.g., #editor-demo)
 tags:
   - "#adr"
   - "#cli-output"
-# ISO date format (e.g., 2026-02-06)
 date: "2026-02-23"
-# Related documents as quoted wiki-links
 related:
   - "[[2026-02-23-cli-output-architecture-research]]"
   - "[[2026-02-22-cli-logging-research]]"
   - "[[2026-02-22-cli-logging-adr]]"
 ---
-
 # `cli-output` adr: dual-console Printer abstraction | (**status:** `accepted`)
 
 ## Problem Statement

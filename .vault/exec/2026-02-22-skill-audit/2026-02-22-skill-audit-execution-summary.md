@@ -1,9 +1,11 @@
 ---
-tags: ["#exec", "#skill-audit"]
-related: ["[[2026-02-22-skill-audit-plan.md]]"]
-date: 2026-02-22
+tags:
+  - "#exec"
+  - "#skill-audit"
+date: "2026-02-22"
+related:
+  - "[[2026-02-22-skill-audit-plan.md]]"
 ---
-
 # Execution Summary: Skill Audit Refactor
 
 ## Overview

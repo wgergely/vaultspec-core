@@ -7,7 +7,6 @@ related:
   - "[[2026-02-21-acp-bridge-auth-research]]"
   - "[[2026-02-20-a2a-team-gemini-research]]"
 ---
-
 # `acp-bridge-auth` research: Gemini CLI child-process authentication
 
 Parallel investigation to `"[[2026-02-21-acp-bridge-auth-research]]"` (Claude). Maps Gemini

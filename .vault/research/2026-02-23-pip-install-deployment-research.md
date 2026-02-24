@@ -1,6 +1,4 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#research"
   - "#pip-install-deployment"
@@ -9,7 +7,6 @@ related:
   - "[[2026-02-21-packaging-restructure-research]]"
   - "[[2026-02-19-workspace-path-decoupling-research]]"
 ---
-
 # `pip-install-deployment` research: `pip-install-vs-source-deployment`
 
 Audit of vaultspec's behavior when installed as a pip package into a target

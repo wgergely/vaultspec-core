@@ -1,9 +1,11 @@
 ---
-tags: ["#plan", "#skill-audit"]
-related: ["[[2026-02-22-skill-audit-adr.md]]"]
-date: 2026-02-22
+tags:
+  - "#plan"
+  - "#skill-audit"
+date: "2026-02-22"
+related:
+  - "[[2026-02-22-skill-audit-adr.md]]"
 ---
-
 # Plan: Refactor Skills to Spec
 
 This plan executes the restructuring of `.vaultspec/rules/skills` to comply with the Agent Skills specification.

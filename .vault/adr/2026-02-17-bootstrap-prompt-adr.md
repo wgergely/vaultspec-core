@@ -1,10 +1,11 @@
 ---
-tags: ["#adr", "#framework"]
-date: 2026-02-17
+tags:
+  - "#adr"
+  - "#framework"
+date: "2026-02-17"
 related:
   - "[[2026-02-17-bootstrap-prompt-engineering-research]]"
 ---
-
 # bootstrap-prompt adr: framework bootstrap prompt redesign | (**status:** accepted)
 
 ## Problem Statement

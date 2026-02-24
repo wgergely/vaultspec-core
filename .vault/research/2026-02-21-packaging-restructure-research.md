@@ -6,7 +6,6 @@ date: "2026-02-21"
 related:
   - "[[2026-02-21-packaging-restructure-adr]]"
 ---
-
 # `packaging-restructure` research: `uv + unified MCP server`
 
 Exhaustive audit of the Python codebase under `.vaultspec/lib/` to inform

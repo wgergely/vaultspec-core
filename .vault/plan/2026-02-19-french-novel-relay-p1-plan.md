@@ -1,12 +1,13 @@
 ---
-tags: ["#plan", "#french-novel-relay"]
-date: 2026-02-19
+tags:
+  - "#plan"
+  - "#french-novel-relay"
+date: "2026-02-19"
 related:
   - "[[2026-02-19-french-novel-relay-adr]]"
   - "[[2026-02-19-french-novel-relay-test-research]]"
   - "[[2026-02-15-cross-agent-adr]]"
 ---
-
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 

@@ -1,12 +1,9 @@
 ---
-title: "ACP Reference Implementation Analysis: acp-claude-code"
-date: 2026-02-21
-tags: [acp, reference]
-status: complete
-source: "tmp-ref/acp-claude-code (github.com/Xuanwo/acp-claude-code, 235 stars)"
-agent: acp-ref-researcher
+tags:
+  - "#research"
+  - "#acp"
+date: "2026-02-21"
 ---
-
 # ACP Reference Implementation: acp-claude-code
 
 ## Overview

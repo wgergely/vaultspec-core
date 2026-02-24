@@ -7,7 +7,6 @@ related:
   - "[[2026-02-21-acp-bridge-auth-research]]"
   - "[[2026-02-21-provider-auth-billing-research]]"
 ---
-
 # `acp-bridge-auth` adr: OAuth token injection with API key override in `ClaudeProvider.prepare_process()` | (**status:** `accepted`)
 
 ## Problem Statement

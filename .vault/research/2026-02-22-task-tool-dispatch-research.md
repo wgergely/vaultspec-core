@@ -1,6 +1,4 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#research"
   - "#task-tool-dispatch"
@@ -9,7 +7,6 @@ related:
   - "[[2026-02-22-cli-ecosystem-factoring-research]]"
   - "[[2026-02-22-mcp-consolidation-research]]"
 ---
-
 # task-tool-dispatch research: unifying subagent dispatch via claude code task tool
 
 The project currently has two parallel subagent dispatch systems that serve

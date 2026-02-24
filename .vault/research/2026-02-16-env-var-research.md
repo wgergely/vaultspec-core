@@ -1,11 +1,12 @@
 ---
-tags: ["#research", "#framework"]
-date: 2026-02-16
+tags:
+  - "#research"
+  - "#framework"
+date: "2026-02-16"
 related:
   - "[[2026-02-16-environment-variable-research]]"
   - "[[2026-02-16-environment-variable-adr]]"
 ---
-
 # Environment Variable Usage Audit Report
 
 **Date**: 2026-02-16

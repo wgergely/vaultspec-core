@@ -1,9 +1,11 @@
 ---
-tags: ["#adr", "#audit-fixes"]
-related: ["[[2026-02-22-codebase-audit.md]]"]
-date: 2026-02-22
+tags:
+  - "#adr"
+  - "#audit-fixes"
+date: "2026-02-22"
+related:
+  - "[[2026-02-22-codebase-audit.md]]"
 ---
-
 # ADR: Audit Remediations (Logging & Robustness)
 
 ## Context

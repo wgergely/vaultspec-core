@@ -1,14 +1,12 @@
 ---
-title: "Gemini ACP Bridge & A2A Executor Overhaul Reference"
-date: 2026-02-22
-tags: [gemini, reference]
-status: complete
-source: "tmp-ref/acp-python-sdk, tmp-ref/a2a-python-sdk, tmp-ref/acp-claude-code, tmp-ref/python-a2a, tmp-ref/a2a-educational"
+tags:
+  - "#reference"
+  - "#gemini"
+date: "2026-02-22"
 related:
   - "[[2026-02-21-claude-acp-bidirectional-reference]]"
   - "[[2026-02-15-provider-parity-reference]]"
 ---
-
 # Gemini ACP Bridge & A2A Executor Overhaul Reference
 
 ## Crates / Packages

@@ -1,10 +1,11 @@
 ---
-tags: ["#research", "#protocol-tests"]
+tags:
+  - "#research"
+  - "#protocol-tests"
 date: "2026-02-22"
 related:
   - "[[2026-02-21-protocol-gap-analysis-research]]"
 ---
-
 # Research: Protocol Test Architecture Overhaul
 
 ## Context

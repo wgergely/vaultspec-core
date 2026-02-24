@@ -1,6 +1,4 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#plan"
   - "#team-mcp-integration"
@@ -10,7 +8,6 @@ related:
   - "[[2026-02-20-team-mcp-integration-research]]"
   - "[[2026-02-20-team-mcp-surface-design-reference]]"
 ---
-
 # `team-mcp-integration` Phase 1 Plan — Unified `vs-agents-mcp` Server
 
 Create the unified `vs-agents-mcp` MCP server that merges subagent dispatch and team

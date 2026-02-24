@@ -2,10 +2,8 @@
 tags:
   - "#reference"
   - "#repo-manager-extensions"
-date: 2026-02-23
-related: []
+date: "2026-02-23"
 ---
-
 # repo-manager extensions system reference
 
 ```

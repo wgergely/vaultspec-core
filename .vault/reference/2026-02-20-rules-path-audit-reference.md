@@ -1,11 +1,11 @@
 ---
-title: "Rules Directory Path Audit"
-date: 2026-02-20
-tags: ["#reference", "#rules-path-audit"]
+tags:
+  - "#reference"
+  - "#rules-path-audit"
+date: "2026-02-20"
 related:
   - "[[2026-02-15-provider-parity-reference]]"
 ---
-
 # Reference: `.vaultspec/rules/` Path Audit
 
 Crate(s): N/A (documentation audit)

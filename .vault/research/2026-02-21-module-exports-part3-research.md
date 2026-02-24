@@ -6,7 +6,6 @@ date: "2026-02-21"
 related:
   - "[[2026-02-21-packaging-restructure-adr]]"
 ---
-
 # `module-exports` research: graph, metrics, verification, subagent_server, mcp_tools, top-level
 
 Part 3 of the import/export audit covers the remaining packages

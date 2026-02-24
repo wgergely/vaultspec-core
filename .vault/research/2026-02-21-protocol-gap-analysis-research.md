@@ -1,17 +1,14 @@
 ---
-title: "Protocol Layer Gap Analysis: A2A and ACP vs Reference Implementations"
-date: 2026-02-21
-tags: [a2a, acp]
-status: complete
-source: "Synthesis of 4 agent research reports"
-agent: orchestrator
+tags:
+  - "#research"
+  - "#a2a"
+date: "2026-02-21"
 related:
   - "[[2026-02-21-acp-ref-impl-research]]"
   - "[[2026-02-21-a2a-ref-impl-research]]"
   - "[[2026-02-21-a2a-layer-audit-research]]"
   - "[[2026-02-21-acp-layer-audit-research]]"
 ---
-
 # Protocol Layer Gap Analysis
 
 ## Executive Summary

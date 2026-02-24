@@ -1,13 +1,9 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#research"
   - "#hooks-maturity"
 date: "2026-02-23"
-related: []
 ---
-
 # hooks-maturity research: production-readiness audit
 
 Comprehensive audit of the vaultspec hooks system conducted by a 4-agent team

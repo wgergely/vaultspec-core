@@ -1,10 +1,11 @@
 ---
-tags: ["#audit", "#roadmap"]
-date: 2026-02-17
+tags:
+  - "#audit"
+  - "#roadmap"
+date: "2026-02-17"
 related:
   - "[[2026-02-17-audit-summary-audit]]"
 ---
-
 # Test Verification Report
 
 **Date**: 2026-02-17

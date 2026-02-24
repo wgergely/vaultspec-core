@@ -2,14 +2,12 @@
 tags:
   - "#research"
   - "#cli"
-  - "#protocol"
 date: "2026-02-24"
 related:
   - "[[2026-02-24-subagent-protocol-adr]]"
   - "[[2026-02-24-unified-a2a-rewrite-plan]]"
   - "[[2026-02-20-a2a-team-gemini-research]]"
 ---
-
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 

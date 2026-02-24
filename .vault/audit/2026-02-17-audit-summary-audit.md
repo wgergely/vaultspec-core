@@ -1,6 +1,8 @@
 ---
-tags: ["#audit", "#roadmap"]
-date: 2026-02-17
+tags:
+  - "#audit"
+  - "#roadmap"
+date: "2026-02-17"
 related:
   - "[[2026-02-17-ux-simulation-audit]]"
   - "[[2026-02-17-tech-audit-audit]]"
@@ -9,7 +11,6 @@ related:
   - "[[2026-02-17-protocol-ecosystem-audit]]"
   - "[[2026-02-17-marketing-ux-audit]]"
 ---
-
 # vaultspec Comprehensive Audit: Executive Summary
 
 **Date**: 2026-02-17

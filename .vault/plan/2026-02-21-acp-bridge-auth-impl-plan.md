@@ -1,5 +1,7 @@
 ---
-tags: ["#plan", "#acp-bridge-auth"]
+tags:
+  - "#plan"
+  - "#acp-bridge-auth"
 date: "2026-02-21"
 related:
   - "[[2026-02-21-claude-provider-auth-strategy-adr]]"
@@ -8,7 +10,6 @@ related:
   - "[[2026-02-21-gemini-bridge-auth-research]]"
   - "[[2026-02-21-provider-auth-billing-research]]"
 ---
-
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 

@@ -1,13 +1,9 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#reference"
   - "#repo-manager-extension"
-date: 2026-02-23
-related: []
+date: "2026-02-23"
 ---
-
 # repo-manager manifest and configuration format reference
 
 ## crate(s)

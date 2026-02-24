@@ -1,9 +1,11 @@
 ---
-tags: ["#adr", "#system-prompt-injection"]
-related: ["[[2026-02-22-system-prompt-injection-research.md]]"]
-date: 2026-02-22
+tags:
+  - "#adr"
+  - "#system-prompt-injection"
+date: "2026-02-22"
+related:
+  - "[[2026-02-22-system-prompt-injection-research.md]]"
 ---
-
 # ADR: XML-Based System Prompt Injection
 
 ## Context

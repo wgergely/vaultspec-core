@@ -1,10 +1,11 @@
 ---
-tags: ["#plan", "#roadmap"]
-date: 2026-02-17
+tags:
+  - "#plan"
+  - "#roadmap"
+date: "2026-02-17"
 related:
   - "[[2026-02-17-audit-summary-audit]]"
 ---
-
 # vaultspec Roadmap: Wave-Based Rollout Plan
 
 ## Context

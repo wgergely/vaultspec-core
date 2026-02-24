@@ -9,7 +9,6 @@ related:
   - "[[2026-02-12-rag-vectordb-adr]]"
   - "[[2026-02-12-rag-retrieval-adr]]"
 ---
-
 # `cuda-dependencies` adr: Elevate RAG Dependency Floors to Frontier Versions | (**status:** `accepted`)
 
 ## Problem Statement

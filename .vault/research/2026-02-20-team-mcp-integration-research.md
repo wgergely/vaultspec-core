@@ -1,14 +1,11 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#research"
   - "#team-mcp-integration"
-date: 2026-02-20
+date: "2026-02-20"
 related:
   - "[[2026-02-20-team-mcp-surface-design-reference]]"
 ---
-
 <!-- Migrated from frontmatter — do not promote back -->
 **Title:** Team MCP Integration: Audit Findings
 **Status:** complete

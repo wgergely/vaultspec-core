@@ -1,9 +1,9 @@
 ---
-tags: ["#research", "#protocol"]
-date: 2026-02-07
-related: []
+tags:
+  - "#research"
+  - "#protocol"
+date: "2026-02-07"
 ---
-
 # ACP (Agent Client Protocol) -- Technical Reference
 
 **Date:** 2026-02-07

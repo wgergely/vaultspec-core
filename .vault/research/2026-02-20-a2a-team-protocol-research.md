@@ -2,13 +2,12 @@
 tags:
   - "#research"
   - "#protocol"
-date: 2026-02-20
+date: "2026-02-20"
 related:
   - "[[2026-02-07-a2a-research]]"
   - "[[2026-02-15-a2a-adr]]"
   - "[[2026-02-15-cross-agent-bidirectional-communication]]"
 ---
-
 # A2A Team Protocol Research: Multi-Agent Team Coordination Patterns
 
 Research into how the A2A protocol (v0.3.x, a2a-sdk v0.3.22) supports multi-agent

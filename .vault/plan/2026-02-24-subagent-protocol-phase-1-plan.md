@@ -7,7 +7,6 @@ related:
   - "[[2026-02-24-subagent-protocol-research]]"
   - "[[2026-02-24-subagent-protocol-adr]]"
 ---
-
 # `subagent-protocol` `phase-1` plan
 
 Rewrite the vaultspec subagent spawning layer to use A2A over localhost HTTP,

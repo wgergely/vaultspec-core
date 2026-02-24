@@ -1,6 +1,4 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#research"
   - "#cli-ecosystem-factoring"
@@ -8,7 +6,6 @@ date: "2026-02-22"
 related:
   - "[[2026-02-22-codebase-audit-research]]"
 ---
-
 # cli-ecosystem-factoring research: CLI module decomposition and shared infrastructure
 
 The goal of this research is to prepare for a refactoring of all four CLI

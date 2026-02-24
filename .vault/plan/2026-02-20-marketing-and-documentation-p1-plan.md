@@ -2,11 +2,10 @@
 tags:
   - "#plan"
   - "#marketing-and-documentation"
-date: 2026-02-20
+date: "2026-02-20"
 related:
   - "[[2026-02-20-marketing-and-documentation-research]]"
 ---
-
 # `marketing-and-documentation` `phase1` plan
 
 Restructure and simplify the documentation corpus. The root `docs/` folder is eliminated.

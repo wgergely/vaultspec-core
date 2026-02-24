@@ -6,7 +6,6 @@ date: "2026-02-21"
 related:
   - "[[2026-02-21-acp-claude-prompt-audit-research.md]]"
 ---
-
 # ACP Claude Multi-Modal Prompt Support | (**status:** `proposed`)
 
 ## Context

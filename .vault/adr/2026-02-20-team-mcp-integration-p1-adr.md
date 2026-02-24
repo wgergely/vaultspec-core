@@ -1,14 +1,11 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#adr"
   - "#team-mcp-integration"
-date: 2026-02-20
+date: "2026-02-20"
 related:
   - "[[2026-02-20-team-mcp-integration-research]]"
 ---
-
 # `team-mcp-integration` adr: Unified `vs-agents-mcp` server | (**status:** `accepted`)
 
 ## Problem Statement

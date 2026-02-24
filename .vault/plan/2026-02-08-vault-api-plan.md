@@ -1,13 +1,8 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE - REFERENCE: #adr #exec #plan #reference #research #vault-api
-# Directory tag (hardcoded - DO NOT CHANGE - based on .vault/adr/ location)
-# Feature tag (replace vault-api with your feature name, e.g., #editor-demo)
 tags:
   - "#plan"
   - "#vault-api"
-# ISO date format (e.g., 2026-02-06)
-date: 2026-02-08
-# Related documents as quoted wiki-links (e.g., "[[2026-02-04-feature-research]]")
+date: "2026-02-08"
 related:
   - "[[2026-02-08-vault-api-adr]]"
 ---

@@ -7,7 +7,6 @@ related:
   - "[[2026-02-21-claude-acp-bidirectional-adr]]"
   - "[[2026-02-21-claude-acp-bidirectional-reference]]"
 ---
-
 # Research: Gemini ACP Audit & Gap Analysis
 
 ## Context

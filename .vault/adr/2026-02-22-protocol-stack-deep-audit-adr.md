@@ -11,7 +11,6 @@ related:
   - "[[2026-02-22-gemini-acp-audit-research]]"
   - "[[2026-02-22-gemini-overhaul-reference]]"
 ---
-
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 

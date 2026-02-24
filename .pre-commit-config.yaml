@@ -2,51 +2,58 @@ repos:
   - repo: local
     hooks:
       - id: ruff-check
-        name: ruff check fix
+        name: Lint and fix Python code (Ruff)
         entry: ruff check --fix
         language: system
         types: [python]
         pass_filenames: true
 
       - id: ruff-format
-        name: ruff format
+        name: Format Python code (Ruff)
         entry: ruff format
         language: system
         types: [python]
         pass_filenames: true
 
       - id: taplo-format
-        name: taplo format
+        name: Format TOML files (Taplo)
         entry: npx @taplo/cli fmt
         language: system
         types: [toml]
         pass_filenames: true
 
       - id: taplo-lint
-        name: taplo lint
+        name: Lint TOML files (Taplo)
         entry: npx @taplo/cli lint
         language: system
         types: [toml]
         pass_filenames: true
 
       - id: ty
-        name: ty
+        name: Type-check Python codebase (Ty)
         entry: uv run python -m ty check src/vaultspec
         language: system
         types: [python]
         pass_filenames: false
 
       - id: check-naming
-        name: check docs naming
-        entry: uv run python -m vaultspec.vault_cli audit --verify
+        name: Verify vault document naming and integrity
+        entry: uv run python -m vaultspec vault audit --verify
         language: system
         types: [markdown]
         pass_filenames: false
 
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.44.0
-    hooks:
+      - id: lychee
+        name: Check documentation links (Lychee)
+        entry: lychee
+        language: system
+        args: ["--no-progress", "--exclude-path", "README.md", "--exclude", "\\[\\[.*\\]\\]"]
+        types: [markdown]
+
       - id: markdownlint
-        name: markdownlint
-        args: ["--config", ".markdownlint.yaml", "--fix", ".vaultspec/", ".vault/", "README.md"]
+        name: Lint Markdown style (markdownlint)
+        entry: npx --yes markdownlint-cli
+        language: system
+        args: ["--config", ".markdownlint.json", "--fix", ".vaultspec/", ".vault/", "README.md"]
+        types: [markdown]
 

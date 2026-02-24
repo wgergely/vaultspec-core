@@ -1,12 +1,13 @@
 ---
-tags: ["#adr", "#protocol"]
-date: 2026-02-15
+tags:
+  - "#adr"
+  - "#protocol"
+date: "2026-02-15"
 related:
   - "[[2026-02-15-subagent-adr]]"
   - "[[2026-02-07-a2a-research]]"
   - "[[2026-02-07-protocol-architecture-research]]"
 ---
-
 ## ADR: Cross-Agent Bidirectional Communication — Gemini and Claude via A2A
 
 ## Status

@@ -1,19 +1,14 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
-# Directory tag (hardcoded - DO NOT CHANGE - based on .vault/plan/ location)
-# Feature tag (replace {feature} with your feature name, e.g., #editor-demo)
 tags:
   - "#plan"
   - "#team-hardening"
-date: 2026-02-23
+date: "2026-02-23"
 related:
   - "[[2026-02-23-task-tool-dispatch-research]]"
   - "[[2026-02-22-protocol-stack-deep-audit-research]]"
   - "[[2026-02-21-a2a-layer-audit-research]]"
   - "[[2026-02-20-a2a-team-p1-plan]]"
 ---
-
 # team-hardening phase-1 plan
 
 Fix the three remaining bugs that block real team functionality in the A2A multi-agent system. Each bug is independently scoped and can be fixed in parallel. All three must pass before the team feature is considered production-ready.

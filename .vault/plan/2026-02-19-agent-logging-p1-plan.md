@@ -6,7 +6,6 @@ date: "2026-02-19"
 related:
   - "[[2026-02-15-cross-agent-bidirectional-communication]]"
 ---
-
 # Agent Logging P1 Plan
 
 Centralize agent session log management, fix naming conventions, bridge the

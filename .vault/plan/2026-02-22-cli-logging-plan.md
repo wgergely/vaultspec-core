@@ -1,6 +1,4 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#plan"
   - "#cli-logging"
@@ -9,7 +7,6 @@ related:
   - "[[2026-02-22-cli-logging-adr]]"
   - "[[2026-02-22-cli-logging-research]]"
 ---
-
 # `cli-logging` plan
 
 Standardize all CLI logging with Rich and overhaul agent feed formatting for

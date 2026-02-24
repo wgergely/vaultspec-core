@@ -1,13 +1,8 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE - REFERENCE: #adr #audit #exec #plan #reference #research #<feature>
-# Directory tag (hardcoded - DO NOT CHANGE - based on .vault/adr/ location)
-# Feature tag (replace <feature> with your feature name, e.g., #editor-demo)
 tags:
   - "#adr"
   - "#system-prompt"
-# ISO date format (e.g., 2026-02-06)
-date: 2026-02-18
-# Related documents as quoted wiki-links (e.g., "[[2026-02-04-feature-research]]")
+date: "2026-02-18"
 related:
   - "[[2026-02-18-system-prompt-architecture-research]]"
   - "[[2026-02-18-system-prompt-restructure-adr]]"

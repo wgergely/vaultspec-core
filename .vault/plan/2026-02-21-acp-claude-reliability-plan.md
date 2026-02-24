@@ -7,7 +7,6 @@ related:
   - "[[2026-02-21-acp-claude-reliability-adr.md]]"
   - "[[2026-02-21-acp-claude-final-audit-research.md]]"
 ---
-
 # Implementation Plan: ACP Claude Reliability & Permissions
 
 Enhance the Claude ACP bridge with dynamic permission modes, session recovery, and explicit tool error handling.

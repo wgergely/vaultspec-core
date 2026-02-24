@@ -1,10 +1,11 @@
 ---
-tags: ["#audit", "#protocol"]
-date: 2026-02-17
+tags:
+  - "#audit"
+  - "#protocol"
+date: "2026-02-17"
 related:
   - "[[2026-02-17-audit-summary-audit]]"
 ---
-
 # Protocol Ecosystem & Feature Gap Analysis
 
 **Date**: 2026-02-17

@@ -1,12 +1,13 @@
 ---
-tags: ["#adr", "#framework"]
-date: 2026-02-16
+tags:
+  - "#adr"
+  - "#framework"
+date: "2026-02-16"
 related:
   - "[[2026-02-16-env-var-research]]"
   - "[[2026-02-16-hardcoded-constants-research]]"
   - "[[2026-02-16-environment-variable-research]]"
 ---
-
 ## Environment Variable Standardization Blueprint
 
 ## Executive Summary

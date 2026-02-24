@@ -1,6 +1,4 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#adr"
   - "#hooks-maturity"
@@ -8,7 +6,6 @@ date: "2026-02-23"
 related:
   - "[[2026-02-23-hooks-maturity-research]]"
 ---
-
 # hooks-maturity adr: production-readiness hardening | (**status:** `accepted`)
 
 ## Problem Statement

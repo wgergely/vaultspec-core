@@ -1,9 +1,9 @@
 ---
-tags: ["#research", "#skill-audit"]
-related: []
-date: 2026-02-22
+tags:
+  - "#research"
+  - "#skill-audit"
+date: "2026-02-22"
 ---
-
 # Skill Audit and Compliance Research
 
 ## Context

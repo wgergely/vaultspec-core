@@ -7,7 +7,6 @@ related:
   - "[[2026-02-21-acp-claude-multimodal-adr.md]]"
   - "[[2026-02-21-acp-claude-prompt-audit-research.md]]"
 ---
-
 # Implementation Plan: ACP Claude Multi-Modal Prompt Support
 
 Enable multi-modal support (images and embedded resources) in the Claude ACP bridge, aligning with the ACP protocol and reference implementation.

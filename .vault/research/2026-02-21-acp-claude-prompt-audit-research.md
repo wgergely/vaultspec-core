@@ -1,9 +1,11 @@
 ---
-tags: ["#research", "#acp-claude-audit"]
-related: ["[[2026-02-21-acp-claude-audit-research.md]]"]
-date: 2026-02-21
+tags:
+  - "#research"
+  - "#acp-claude-audit"
+date: "2026-02-21"
+related:
+  - "[[2026-02-21-acp-claude-audit-research.md]]"
 ---
-
 # ACP Claude Prompt Handling Audit
 
 ## 1. Executive Summary

@@ -9,7 +9,6 @@ related:
   - "[[2026-02-21-protocol-gap-analysis-research]]"
   - "[[2026-02-21-acp-layer-audit-research]]"
 ---
-
 # `claude-acp-bidirectional` implementation plan
 
 Enable multi-turn bidirectional communication in the Claude ACP bridge by implementing

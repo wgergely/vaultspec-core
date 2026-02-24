@@ -9,7 +9,6 @@ related:
   - "[[2026-02-11-rag-embeddings-adr]]"
   - "[[2026-02-11-rag-plan]]"
 ---
-
 # RAG MCP API Design
 
 ## Problem

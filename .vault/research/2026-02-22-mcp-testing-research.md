@@ -1,6 +1,4 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#research"
   - "#mcp-testing"
@@ -9,7 +7,6 @@ related:
   - "[[2026-02-22-mcp-consolidation-research]]"
   - "[[2026-02-22-mcp-consolidation-adr]]"
 ---
-
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 

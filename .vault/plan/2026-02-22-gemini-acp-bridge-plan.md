@@ -1,11 +1,12 @@
 ---
-tags: ["#plan", "#gemini-acp-bridge"]
+tags:
+  - "#plan"
+  - "#gemini-acp-bridge"
 date: "2026-02-22"
 related:
   - "[[2026-02-22-gemini-acp-bridge-adr]]"
   - "[[2026-02-21-claude-acp-bidirectional-adr]]"
 ---
-
 # Plan: Gemini ACP Bridge Implementation
 
 ## Overview

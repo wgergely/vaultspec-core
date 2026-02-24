@@ -1,12 +1,9 @@
 ---
-title: "A2A Reference Implementation Analysis: python-a2a"
-date: 2026-02-21
-tags: [a2a, reference]
-status: complete
-source: "tmp-ref/python-a2a (github.com/themanojdesai/python-a2a, 980 stars)"
-agent: a2a-ref-researcher
+tags:
+  - "#research"
+  - "#a2a"
+date: "2026-02-21"
 ---
-
 # A2A Reference Implementation: python-a2a
 
 ## Overview

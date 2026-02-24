@@ -1,14 +1,11 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#reference"
   - "#team-mcp-integration"
-date: 2026-02-20
+date: "2026-02-20"
 related:
   - "[[2026-02-20-a2a-team-adr]]"
 ---
-
 <!-- Migrated from frontmatter — do not promote back -->
 **Title:** vs-team-mcp Tool Surface Design
 **Subtitle:** MCP server surface for TeamCoordinator orchestration

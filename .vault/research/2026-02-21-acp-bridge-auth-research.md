@@ -7,7 +7,6 @@ related:
   - "[[2026-02-20-team-mcp-integration-research]]"
   - "[[2026-02-07-acp-research]]"
 ---
-
 # `acp-bridge-auth` research: Claude SDK child-process authentication failure
 
 Investigation into `acp.exceptions.RequestError: Verify your account to continue` raised

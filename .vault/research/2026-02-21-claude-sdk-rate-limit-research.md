@@ -1,10 +1,9 @@
 ---
-title: "claude-agent-sdk rate_limit_event Handling Gap"
-tags: [sdk, streaming]
-status: complete
-date: 2026-02-21
+tags:
+  - "#research"
+  - "#sdk"
+date: "2026-02-21"
 ---
-
 # claude-agent-sdk `rate_limit_event` Handling Gap
 
 ## Summary

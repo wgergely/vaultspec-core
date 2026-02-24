@@ -6,7 +6,6 @@ date: "2026-02-24"
 related:
   - "[[2026-02-24-subagent-protocol-adr]]"
 ---
-
 # `subagent-protocol` research: Subagent Spawning and Debugging Protocol Stack
 
 Research into the optimal protocol stack for spawning, managing, and debugging

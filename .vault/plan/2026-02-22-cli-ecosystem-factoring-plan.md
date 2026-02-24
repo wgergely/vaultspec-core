@@ -1,6 +1,4 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#plan"
   - "#cli-ecosystem-factoring"
@@ -9,7 +7,6 @@ related:
   - "[[2026-02-22-cli-ecosystem-factoring-adr]]"
   - "[[2026-02-22-cli-ecosystem-factoring-research]]"
 ---
-
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 

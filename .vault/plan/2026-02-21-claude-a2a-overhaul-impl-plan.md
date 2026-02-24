@@ -11,7 +11,6 @@ related:
   - "[[2026-02-22-claude-team-management-plan]]"
   - "[[2026-02-20-a2a-team-adr]]"
 ---
-
 # `claude-a2a-overhaul` implementation plan
 
 > **Parallel plan**: [[2026-02-22-claude-team-management-plan]] covers the same

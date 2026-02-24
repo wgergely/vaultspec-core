@@ -6,7 +6,6 @@ date: "2026-02-21"
 related:
   - "[[2026-02-21-acp-claude-final-audit-research.md]]"
 ---
-
 # ACP Claude Permission & Reliability Fixes | (**status:** `superseded`)
 
 **SUPERSEDED** — This ADR is fully superseded by

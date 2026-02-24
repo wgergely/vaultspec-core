@@ -7,7 +7,6 @@ related:
   - "[[2026-02-21-pytest-e2e-observability-adr]]"
   - "[[2026-02-21-pytest-e2e-observability-research]]"
 ---
-
 # `pytest-e2e` `impl` plan
 
 Add an observability and reliability stack for long-running A2A/E2E tests per

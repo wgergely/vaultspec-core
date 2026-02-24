@@ -7,7 +7,6 @@ related:
   - "[[2026-02-15-cross-agent-bidirectional-communication]]"
   - "[[2026-02-07-a2a-protocol-reference]]"
 ---
-
 # `a2a-team` research: Claude Code Team API & Two-Way Agent Communication
 
 Investigation of the Claude Code team infrastructure tools (TaskCreate, TaskUpdate,

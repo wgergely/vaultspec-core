@@ -1,9 +1,9 @@
 ---
-tags: ["#adr", "#protocol"]
-date: 2026-02-15
-related: []
+tags:
+  - "#adr"
+  - "#protocol"
+date: "2026-02-15"
 ---
-
 ## ADR: Subagent Architecture Refactor — Protocol Convergence
 
 ## Status

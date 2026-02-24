@@ -10,7 +10,6 @@ related:
   - "[[2026-02-22-gemini-acp-audit-research]]"
   - "[[2026-02-22-gemini-overhaul-reference]]"
 ---
-
 # Protocol Stack Deep Audit: MCP, CLI, and Test Suite
 
 Cross-domain audit of the vaultspec protocol stack (ACP/A2A/MCP/CLI) conducted

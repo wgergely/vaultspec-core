@@ -7,7 +7,6 @@ related:
   - "[[2026-02-20-a2a-team-adr]]"
   - "[[2026-02-20-a2a-team-synthesis-research]]"
 ---
-
 # `a2a-team` Phase 1 Plan — Multi-Agent Team Coordination Layer
 
 Build the N-agent team coordination layer on top of the existing A2A bilateral

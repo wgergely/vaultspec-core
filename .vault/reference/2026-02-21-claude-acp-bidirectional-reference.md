@@ -1,15 +1,13 @@
 ---
-title: "Claude ACP Bidirectional Communication Reference"
-date: 2026-02-21
-tags: [acp, reference]
-status: complete
-source: "tmp-ref/acp-claude-code (github.com/Xuanwo/acp-claude-code, v0.8.0)"
+tags:
+  - "#reference"
+  - "#acp"
+date: "2026-02-21"
 related:
   - "[[2026-02-21-protocol-gap-analysis-research]]"
   - "[[2026-02-21-acp-ref-impl-research]]"
   - "[[2026-02-21-acp-layer-audit-research]]"
 ---
-
 # Claude ACP Bidirectional Communication Reference
 
 ## Crates / Packages

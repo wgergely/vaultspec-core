@@ -1,13 +1,14 @@
 ---
-tags: ["#plan", "#framework"]
-date: 2026-02-17
+tags:
+  - "#plan"
+  - "#framework"
+date: "2026-02-17"
 related:
   - "[[2026-02-17-bootstrap-prompt-adr]]"
   - "[[2026-02-16-environment-variable-adr]]"
   - "[[2026-02-07-multi-agent-orchestration-research]]"
   - "[[2026-02-07-frontier-landscape-research]]"
 ---
-
 # Framework Infrastructure Plan
 
 Consolidation plan for vaultspec internal framework concerns: configuration management, bootstrap prompt engineering, and multi-agent orchestration infrastructure.

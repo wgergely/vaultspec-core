@@ -6,7 +6,6 @@ date: "2026-02-21"
 related:
   - "[[2026-02-21-pytest-e2e-observability-adr]]"
 ---
-
 # `pytest-e2e` research: observability for long-running A2A/E2E tests
 
 The protocol test suite (`src/vaultspec/protocol/`) contains 403 tests. 381 are

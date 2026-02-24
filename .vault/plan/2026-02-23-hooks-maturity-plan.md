@@ -1,6 +1,4 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#plan"
   - "#hooks-maturity"
@@ -9,7 +7,6 @@ related:
   - "[[2026-02-23-hooks-maturity-adr]]"
   - "[[2026-02-23-hooks-maturity-research]]"
 ---
-
 # hooks-maturity implementation plan
 
 Harden the hooks system from prototype (2/5) to production-ready (4/5). Fix

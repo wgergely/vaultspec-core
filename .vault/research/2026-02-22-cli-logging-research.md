@@ -1,13 +1,9 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
   - "#research"
   - "#cli-logging"
 date: "2026-02-22"
-related: []
 ---
-
 # `cli-logging` research: standardize CLI logging with Rich
 
 Research into current logging patterns across all vaultspec CLI entry points and

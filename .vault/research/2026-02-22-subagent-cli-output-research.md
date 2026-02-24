@@ -1,9 +1,9 @@
 ---
-tags: ["#research", "#subagent-cli"]
-related: []
-date: 2026-02-22
+tags:
+  - "#research"
+  - "#subagent-cli"
+date: "2026-02-22"
 ---
-
 # Subagent CLI Output & Stability Research
 
 ## Objective

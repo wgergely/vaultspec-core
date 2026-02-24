@@ -7,7 +7,6 @@ related:
   - "[[2026-02-12-rag-mcp-api-adr]]"
   - "[[2026-02-12-rag-embeddings-adr]]"
 ---
-
 # `containerization` research: `deployment isolation and startup overhead`
 
 Investigation into whether containerizing vaultspec's PyTorch/RAG stack into a

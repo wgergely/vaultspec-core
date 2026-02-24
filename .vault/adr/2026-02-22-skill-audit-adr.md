@@ -1,9 +1,11 @@
 ---
-tags: ["#adr", "#skill-audit"]
-related: ["[[2026-02-22-skill-audit-research.md]]"]
-date: 2026-02-22
+tags:
+  - "#adr"
+  - "#skill-audit"
+date: "2026-02-22"
+related:
+  - "[[2026-02-22-skill-audit-research.md]]"
 ---
-
 # ADR: Standardize Skill Structure
 
 ## Context

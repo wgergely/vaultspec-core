@@ -1,10 +1,9 @@
 ---
-title: "Stale Path Audit: Old Hierarchy References in .vaultspec/lib/"
-date: 2026-02-20
-tags: [#reference, #audit]
-status: complete
+tags:
+  - "#reference"
+  - "#uncategorized"
+date: "2026-02-20"
 ---
-
 ```
 Crate(s): N/A (Python project)
 File(s): See findings below

@@ -1,6 +1,8 @@
 ---
-tags: ["#research", "#protocol"]
-date: 2026-02-07
+tags:
+  - "#research"
+  - "#protocol"
+date: "2026-02-07"
 related:
   - "[[2026-02-07-acp-research]]"
   - "[[2026-02-07-a2a-research]]"
@@ -8,7 +10,6 @@ related:
   - "[[2026-02-07-frontier-landscape-research]]"
   - "[[2026-02-07-protocol-review-research]]"
 ---
-
 # Protocol Architecture for Sub-Agent Driven Development
 
 **Date:** 2026-02-07

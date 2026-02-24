@@ -63,7 +63,6 @@ dev = [
   "ruff>=0.15.2",
   "ty>=0.0.15",
   "prek>=0.3.2",
-  "lychee>=0.0.1",
   "identify>=2.0.0",
   "nodeenv>=1.0.0",
 ]
@@ -80,7 +79,6 @@ rag = [
 [dependency-groups]
 dev = [
   "identify>=2.0.0",
-  "lychee>=0.0.1",
   "nodeenv>=1.0.0",
   "prek>=0.3.2",
   "pytest>=9.0.2",
