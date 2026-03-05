@@ -207,6 +207,11 @@ class TestClaudeA2AExecutor:
         # Verify SDK lifecycle
         assert len(test_client.connect_calls) == 1
         assert test_client.query_calls == ["Say hello"]
+        # Success should NOT disconnect immediately (it persists the client)
+        assert test_client.disconnect_calls == 0
+
+        # Disconnect should happen on cleanup
+        await executor.cleanup()
         assert test_client.disconnect_calls == 1
 
     @pytest.mark.asyncio
@@ -504,6 +509,11 @@ class TestClaudeA2AExecutor:
         assert "resume" not in first_opts, "First call should not have resume"
 
         # Second execution — same context_id, should resume
+        # But we must simulate a case where the client was cleared from active clients
+        # so that it actually attempts to create a new one with 'resume'
+        async with executor._clients_lock:
+            executor._active_clients.pop("ctx-shared", None)
+
         queue2 = EventQueue()
         ctx2 = make_request_context(
             "second call", task_id="task-B", context_id="ctx-shared"

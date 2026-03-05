@@ -115,7 +115,7 @@ def transform_agent(
         "name": Path(name).stem,
         "description": meta.get("description", ""),
         "kind": "local",
-        "model": model,
+        "model": str(model) if model else None,
     }
 
     # Pass through tool-supported fields, translating names per target.

@@ -21,6 +21,7 @@ from vaultspec.core import (
     transform_skill,
 )
 from vaultspec.core.config_gen import _generate_config
+from vaultspec.core.enums import Tool
 from vaultspec.core.system import (
     _collect_agent_listing,
     _collect_skill_listing,
@@ -133,57 +134,49 @@ class TestCollectSystemParts:
 
 class TestTransformRule:
     def test_claude_includes_name(self):
-        out = transform_rule("claude", "my-rule.md", {}, "Body text")
+        out = transform_rule(Tool.CLAUDE, "my-rule.md", {}, "Body text")
         meta, body = parse_frontmatter(out)
         assert meta["name"] == "my-rule"
         assert meta["trigger"] == "always_on"
         assert "Body text" in body
 
     def test_agent_no_name(self):
-        out = transform_rule("agent", "my-rule.md", {}, "Body")
+        out = transform_rule(Tool.AGENTS, "my-rule.md", {}, "Body")
         meta, _body = parse_frontmatter(out)
         assert "name" not in meta
         assert meta["trigger"] == "always_on"
 
     def test_gemini_includes_name(self):
-        out = transform_rule("gemini", "rule.md", {}, "Content")
+        out = transform_rule(Tool.GEMINI, "rule.md", {}, "Content")
         meta, _body = parse_frontmatter(out)
         assert meta["name"] == "rule"
 
 
 class TestTransformAgent:
-    def test_valid_tier(self):
+    def test_valid_model(self):
         result = transform_agent(
-            "claude",
+            Tool.CLAUDE,
             "coder.md",
-            {"description": "A coder", "tier": "HIGH"},
+            {"description": "A coder", "model": ClaudeModels.HIGH},
             "Body",
         )
         assert result is not None
         meta, body = parse_frontmatter(result)
-        assert meta["model"] == ClaudeModels.HIGH
+        assert meta["model"] == str(ClaudeModels.HIGH)
         assert meta["name"] == "coder"
         assert "Body" in body
 
-    def test_missing_model_returns_none(self):
-        result = transform_agent(
-            "claude",
-            "agent.md",
-            {"description": "x", "tier": "HIGH"},
-            "Body",
-            resolve_fn=lambda *_args, **_kw: None,
-        )
-        assert result is None
-
-    def test_missing_tier_returns_none(self):
-        result = transform_agent("claude", "agent.md", {"description": "x"}, "Body")
-        assert result is None
+    def test_missing_model_uses_default(self):
+        result = transform_agent(Tool.CLAUDE, "agent.md", {"description": "x"}, "Body")
+        assert result is not None
+        meta, body = parse_frontmatter(result)
+        assert meta["model"] == str(ClaudeModels.MEDIUM)
 
 
 class TestTransformSkill:
     def test_extracts_description(self):
         out = transform_skill(
-            "claude", "vaultspec-deploy", {"description": "Deploy things"}, "# Deploy"
+            Tool.CLAUDE, "vaultspec-deploy", {"description": "Deploy things"}, "# Deploy"
         )
         meta, body = parse_frontmatter(out)
         assert meta["description"] == "Deploy things"

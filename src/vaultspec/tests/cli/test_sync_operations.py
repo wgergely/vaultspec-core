@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
 import pytest
 
+from vaultspec.core.enums import Tool
 from ...core import (
     agents_sync,
     config_sync,
@@ -50,9 +51,10 @@ class TestSyncFiles:
         result = sync_files(
             sources=sources,
             dest_dir=dest,
-            transform_fn=lambda _t, n, m, b: transform_rule("claude", n, m, b),
+            transform_fn=lambda _t, n, m, b: transform_rule(Tool.CLAUDE, n, m, b),
             dest_path_fn=lambda d, n: d / n,
             prune=False,
+
             dry_run=False,
             label="test",
         )
@@ -68,9 +70,10 @@ class TestSyncFiles:
         result = sync_files(
             sources=sources,
             dest_dir=dest,
-            transform_fn=lambda _t, n, m, b: transform_rule("claude", n, m, b),
+            transform_fn=lambda _t, n, m, b: transform_rule(Tool.CLAUDE, n, m, b),
             dest_path_fn=lambda d, n: d / n,
             prune=False,
+
             dry_run=False,
             label="test",
         )
@@ -85,9 +88,10 @@ class TestSyncFiles:
         result = sync_files(
             sources=sources,
             dest_dir=dest,
-            transform_fn=lambda _t, n, m, b: transform_rule("claude", n, m, b),
+            transform_fn=lambda _t, n, m, b: transform_rule(Tool.CLAUDE, n, m, b),
             dest_path_fn=lambda d, n: d / n,
-            prune=True,
+            prune=False,
+
             dry_run=False,
             label="test",
         )
@@ -102,9 +106,10 @@ class TestSyncFiles:
         result = sync_files(
             sources=sources,
             dest_dir=dest,
-            transform_fn=lambda _t, n, m, b: transform_rule("claude", n, m, b),
+            transform_fn=lambda _t, n, m, b: transform_rule(Tool.CLAUDE, n, m, b),
             dest_path_fn=lambda d, n: d / n,
             prune=False,
+
             dry_run=False,
             label="test",
         )
@@ -118,9 +123,10 @@ class TestSyncFiles:
         result = sync_files(
             sources=sources,
             dest_dir=dest,
-            transform_fn=lambda _t, n, m, b: transform_rule("claude", n, m, b),
+            transform_fn=lambda _t, n, m, b: transform_rule(Tool.CLAUDE, n, m, b),
             dest_path_fn=lambda d, n: d / n,
             prune=False,
+
             dry_run=True,
             label="test",
         )
@@ -165,7 +171,7 @@ class TestSyncSkills:
         result = sync_skills(
             sources=sources,
             skills_dir=skills_dir,
-            transform_fn=lambda _t, n, m, b: transform_skill("claude", n, m, b),
+            transform_fn=lambda _t, n, m, b: transform_skill(Tool.CLAUDE, n, m, b),
             prune=False,
             dry_run=False,
             label="test",
@@ -188,7 +194,7 @@ class TestSyncSkills:
         result = sync_skills(
             sources=sources,
             skills_dir=skills_dir,
-            transform_fn=lambda _t, n, m, b: transform_skill("claude", n, m, b),
+            transform_fn=lambda _t, n, m, b: transform_skill(Tool.CLAUDE, n, m, b),
             prune=True,
             dry_run=False,
             label="test",
@@ -209,7 +215,7 @@ class TestSyncSkills:
         result = sync_skills(
             sources={},
             skills_dir=skills_dir,
-            transform_fn=lambda _t, n, m, b: transform_skill("claude", n, m, b),
+            transform_fn=lambda _t, n, m, b: transform_skill(Tool.CLAUDE, n, m, b),
             prune=True,
             dry_run=False,
             label="test",

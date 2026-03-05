@@ -232,23 +232,25 @@ class TestTrigger:
             actions=[
                 HookAction(
                     action_type="shell",
-                    command="echo hello",
+                    command=f"{sys.executable.replace('\\', '/')} -V",
                 ),
             ],
         )
         results = trigger([hook], "config.synced")
         assert len(results) == 1
         assert results[0].success is True
-        assert "hello" in results[0].output
+        assert "Python" in results[0].output
 
-    def test_context_interpolation(self):
+    def test_context_interpolation(self, tmp_path):
+        script = tmp_path / "print_arg.py"
+        script.write_text("import sys\nprint(sys.argv[1])", encoding="utf-8")
         hook = Hook(
             name="test",
             event="config.synced",
             actions=[
                 HookAction(
                     action_type="shell",
-                    command="echo {root}",
+                    command=f"{sys.executable.replace('\\', '/')} {str(script).replace('\\', '/')} {{root}}",
                 ),
             ],
         )
@@ -270,7 +272,7 @@ class TestTrigger:
             actions=[
                 HookAction(
                     action_type="shell",
-                    command=f"{sys.executable} {script}",
+                    command=f"{sys.executable.replace('\\', '/')} {str(script).replace('\\', '/')}",
                 ),
             ],
         )
@@ -319,7 +321,7 @@ class TestReentrantGuard:
         hook = Hook(
             name="test",
             event="config.synced",
-            actions=[HookAction(action_type="shell", command="echo ok")],
+            actions=[HookAction(action_type="shell", command=f"{sys.executable.replace('\\', '/')} -V")],
         )
         _triggering.add("config.synced")
         try:
@@ -334,7 +336,7 @@ class TestReentrantGuard:
         hook = Hook(
             name="test",
             event="config.synced",
-            actions=[HookAction(action_type="shell", command="echo ok")],
+            actions=[HookAction(action_type="shell", command=f"{sys.executable.replace('\\', '/')} -V")],
         )
         results = trigger([hook], "config.synced")
         assert len(results) == 1
@@ -344,7 +346,7 @@ class TestReentrantGuard:
         hook = Hook(
             name="test",
             event="audit.completed",
-            actions=[HookAction(action_type="shell", command="echo ok")],
+            actions=[HookAction(action_type="shell", command=f"{sys.executable.replace('\\', '/')} -V")],
         )
         trigger([hook], "audit.completed")
         assert "audit.completed" not in _triggering

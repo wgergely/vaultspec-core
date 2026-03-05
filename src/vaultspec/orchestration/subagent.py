@@ -1,4 +1,4 @@
-"""Subagent dispatch: spawn ACP agent processes and collect their output."""
+"""Subagent dispatch: spawn A2A agent processes and collect their output."""
 
 from __future__ import annotations
 
@@ -23,11 +23,9 @@ from ..protocol.providers import AgentProvider, ClaudeProvider, GeminiProvider
 from ..protocol.types import (
     SubagentResult,
 )
+from ..printer import Printer
 
 logger = logging.getLogger(__name__)
-
-# Timeout (seconds) for the ACP handshake sequence (initialize + session setup).
-_ACP_HANDSHAKE_TIMEOUT: float = 30.0
 
 _CLAUDE_PATTERNS = ("claude-",)
 
@@ -201,6 +199,7 @@ async def run_subagent(
     output_format: str | None = None,
     content_root: pathlib.Path | None = None,
     mcp_servers: dict[str, Any] | None = None,
+    printer: Printer | None = None,
 ) -> SubagentResult:
     """Orchestrate the full agent lifecycle natively over the A2A protocol."""
 
@@ -209,6 +208,9 @@ async def run_subagent(
     _ = client_class
     _ = effort
     _ = output_format
+
+    if printer is None:
+        printer = Printer(quiet=quiet)
 
     if max_turns is not None and max_turns <= 0:
         raise ValueError(f"max_turns must be positive, got {max_turns}")
@@ -266,51 +268,106 @@ async def run_subagent(
 
     # 5. Spawn and Connect
     from ..protocol.a2a.server_manager import ServerProcessManager
+    from a2a.client.client_factory import ClientFactory
+    from a2a.types import (
+        Message,
+        Part,
+        Role,
+        TextPart,
+        TaskStatusUpdateEvent,
+        TaskArtifactUpdateEvent,
+        TaskState,
+    )
 
     manager = ServerProcessManager(root_dir=root_dir)
     server = await manager.spawn(spec, cwd=str(root_dir), debug=debug)
 
+    full_response = []
+    
+    # We maintain a task_id if one is returned, to link subsequent messages
+    current_task_id: str | None = None
+
     try:
         await manager.wait_ready(server)
 
-        # Connect to A2A server
-        from a2a.client.client_factory import ClientFactory
-        from a2a.types import Message, Part, TextPart
-
-        a2a_client = await ClientFactory.connect(f"http://127.0.0.1:{server.port}")
-
-        req = Message(
-            message_id="init-1",
-            role="user",
-            parts=[Part(root=TextPart(text=full_prompt))],
-        )
+        # Connect to A2A server using the raw factory to get full event access
+        client = await ClientFactory.connect(f"http://127.0.0.1:{server.port}")
 
         if not quiet:
-            print(f"\\n[{agent_name} is thinking...]")
+            printer.status(f"[{agent_name} is thinking...]")
 
-        full_response = []
+        try:
+            # Interaction Loop
+            next_message_text = full_prompt
+            
+            while True:
+                req = Message(
+                    message_id=f"msg-{len(full_response)}",  # Simple incremental ID
+                    role=Role.user,
+                    parts=[Part(root=TextPart(text=next_message_text))],
+                    task_id=current_task_id,
+                )
+                
+                task_done = False
+                
+                async for event in client.send_message(req):
+                    if isinstance(event, tuple):
+                        _task, update = event
+                        
+                        # Update task ID if established
+                        if _task and _task.id:
+                            current_task_id = _task.id
 
-        # 6. Stream events
-        from a2a.types import TaskArtifactUpdateEvent
-
-        async for event in a2a_client.send_message(req):
-            if isinstance(event, tuple):
-                _task, update = event
-                if isinstance(update, TaskArtifactUpdateEvent):
-                    for part in update.artifact.parts:
-                        if isinstance(part.root, TextPart):
-                            if not quiet and not update.append:
-                                print(part.root.text, end="", flush=True)
-                            if update.last_chunk:
-                                full_response.append(part.root.text)
+                        if isinstance(update, TaskArtifactUpdateEvent):
+                            for part in update.artifact.parts:
+                                if isinstance(part.root, TextPart):
+                                    text = part.root.text
+                                    if not quiet and not update.append:
+                                        printer.out(text, end="")
+                                    full_response.append(text)
+                                    
+                        elif isinstance(update, TaskStatusUpdateEvent):
+                            state = update.status.state
+                            if state == TaskState.input_required:
                                 if not quiet:
-                                    print()
-            elif isinstance(event, Message):
-                # Final message
-                pass
+                                    printer.status("\n[Input Required]")
+                                
+                                if interactive:
+                                    try:
+                                        # TODO: Use a robust prompt toolkit if available, fallback to input()
+                                        user_input = input("> ")
+                                        next_message_text = user_input
+                                        # Break the stream loop to send the next message
+                                        break 
+                                    except EOFError:
+                                        # Treat EOF as cancel? Or just stop.
+                                        task_done = True
+                                        break
+                                else:
+                                    logger.warning("Agent requested input but not interactive mode.")
+                                    # We can't provide input, so we likely have to abort or send empty?
+                                    # For now, break loop, effective abort.
+                                    task_done = True
+                                    break
+                                    
+                            elif state in (TaskState.completed, TaskState.failed, TaskState.canceled):
+                                task_done = True
+                    
+                    elif isinstance(event, Message):
+                        # Final message response (non-streaming or end of stream)
+                        pass
+                
+                if task_done:
+                    if not quiet:
+                        printer.out() # Newline
+                    break
+                    
+        finally:
+            if hasattr(client, "close"):
+                await Any(client).close()
 
         if interactive:
-            print("\\n[Interactive session not supported natively in a2a-serve yet]")
+            printer.status("\n[Interactive session ended]")
 
     finally:
         await manager.shutdown(server)

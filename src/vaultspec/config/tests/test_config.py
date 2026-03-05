@@ -73,7 +73,7 @@ class TestDefaults:
         cfg = VaultSpecConfig()
         assert cfg.claude_dir == ".claude"
         assert cfg.gemini_dir == ".gemini"
-        assert cfg.agent_dir == ".agent"
+        assert cfg.agent_dir == ".agents"
 
     def test_orchestration_defaults(self):
         cfg = VaultSpecConfig()

@@ -11,6 +11,7 @@ from __future__ import annotations
 import abc
 import asyncio
 import contextlib
+import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -19,6 +20,8 @@ if TYPE_CHECKING:
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.tasks import TaskUpdater
 from a2a.types import Part, TaskState, TextPart
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "BaseA2AExecutor",
@@ -42,7 +45,13 @@ class BaseA2AExecutor(AgentExecutor, abc.ABC):
         max_retries: int = 3,
         retry_base_delay: float = 1.0,
     ) -> None:
-        """Initialize the base executor with retry and task tracking constraints."""
+        """Initialize the base executor with retry and task tracking constraints.
+
+        Args:
+            max_retries: Maximum number of retries on retryable errors before failing.
+            retry_base_delay: Base delay in seconds for exponential back-off
+                between retries.
+        """
         self._max_retries = max_retries
         self._retry_base_delay = retry_base_delay
 
@@ -78,13 +87,18 @@ class BaseA2AExecutor(AgentExecutor, abc.ABC):
         errored = False
         try:
             # Subclass hook for any per-task initialization (e.g. SDK connection)
+            logger.debug("Calling _on_task_start for task %s", task_id)
             await self._on_task_start(task_id, context_id, cancel_event)
 
             # Signal working after subclass init ensures we are truly running
+            logger.debug("Signaling start_work for task %s", task_id)
             await updater.start_work()
 
             attempt = 0
             while True:
+                logger.debug(
+                    "Calling _run_stream for task %s (attempt %d)", task_id, attempt
+                )
                 should_retry = await self._run_stream(
                     prompt=prompt,
                     updater=updater,
@@ -92,23 +106,37 @@ class BaseA2AExecutor(AgentExecutor, abc.ABC):
                     task_id=task_id,
                     cancel_event=cancel_event,
                 )
+                logger.debug(
+                    "_run_stream returned for task %s: retry=%s", task_id, should_retry
+                )
+
                 if cancel_event.is_set():
+                    logger.info("Task %s cancelled during execution", task_id)
                     cancelled = True
                     with contextlib.suppress(RuntimeError):
                         await updater.cancel()
                     break
                 if not should_retry:
+                    logger.debug(
+                        "Task %s completed successfully (no retry requested)", task_id
+                    )
                     break
 
                 # Rate-limit retry with exponential back-off.
                 attempt += 1
                 if attempt > self._max_retries:
+                    logger.warning(
+                        "Task %s exhausted max retries (%d)", task_id, self._max_retries
+                    )
                     await updater.failed(
                         message=updater.new_agent_message(
                             parts=[
                                 Part(
                                     root=TextPart(
-                                        text=f"Rate limited: exhausted {self._max_retries} retries"
+                                        text=(
+                                            f"Rate limited: exhausted "
+                                            f"{self._max_retries} retries"
+                                        )
                                     )
                                 )
                             ]
@@ -123,9 +151,12 @@ class BaseA2AExecutor(AgentExecutor, abc.ABC):
                         parts=[
                             Part(
                                 root=TextPart(
-                                    text=f"Rate limited, retrying (attempt {attempt}/{self._max_retries})"
+                                    text=(
+                                        f"Rate limited, retrying (attempt "
+                                        f"{attempt}/{self._max_retries})"
+                                    )
                                 )
-                            )
+                            ),
                         ]
                     ),
                 )
@@ -147,6 +178,12 @@ class BaseA2AExecutor(AgentExecutor, abc.ABC):
                 )
             )
         finally:
+            logger.debug(
+                "BaseA2AExecutor cleanup for task %s (cancelled=%s, errored=%s)",
+                task_id,
+                cancelled,
+                errored,
+            )
             self._cancel_events.pop(task_id, None)
             await self._on_task_end(
                 task_id, context_id, cancelled=cancelled, errored=errored

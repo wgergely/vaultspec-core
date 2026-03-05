@@ -182,7 +182,7 @@ class TestDefaults:
 
     def test_agent_dir(self):
         cfg = VaultSpecConfig()
-        assert cfg.agent_dir == ".agent"
+        assert cfg.agent_dir == ".agents"
 
     def test_task_engine_ttl_seconds(self):
         cfg = VaultSpecConfig()

@@ -49,11 +49,11 @@ def transform_rule(tool: Tool, name: str, _meta: dict[str, Any], body: str) -> s
     """Transform a rule definition for a specific tool destination.
 
     Adds a YAML frontmatter block with ``trigger: always_on`` and, for
-    non-antigravity tools, a ``name`` key derived from the filename stem.
+    non-antigravity/agents tools, a ``name`` key derived from the filename stem.
 
     Args:
-        tool: Target tool enum. When ``ToolType.ANTIGRAVITY``, the
-            ``name`` key is omitted from the frontmatter.
+        tool: Target tool enum or string. When ``Tool.ANTIGRAVITY`` or
+            ``Tool.AGENTS``, the ``name`` key is omitted from the frontmatter.
         name: Source filename (e.g. ``"my-rule.md"``).
         _meta: Parsed source frontmatter (currently unused).
         body: Markdown body text of the rule.
@@ -61,8 +61,11 @@ def transform_rule(tool: Tool, name: str, _meta: dict[str, Any], body: str) -> s
     Returns:
         Assembled file content string with the appropriate frontmatter.
     """
+    if isinstance(tool, str):
+        tool = Tool(tool)
+
     fm: dict[str, Any] = {}
-    if tool != Tool.ANTIGRAVITY:
+    if tool != Tool.ANTIGRAVITY and tool != Tool.AGENTS:
         fm["name"] = Path(name).stem
     fm["trigger"] = "always_on"
     return build_file(fm, body)

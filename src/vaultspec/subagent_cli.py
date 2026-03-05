@@ -10,7 +10,10 @@ Commands:
 import argparse
 import json
 import logging
+import os
+import signal
 import sys
+import time
 from pathlib import Path
 
 from .cli_common import (
@@ -185,9 +188,22 @@ def command_a2a_serve(args):
         }
 
     executor_type = args.executor
-    executor = None
-    if executor_type in ("claude", "gemini"):
-        pass
+    executor: Any = None
+    
+    if executor_type == Tool.CLAUDE.value:
+        from .protocol.a2a.executors.claude_executor import ClaudeA2AExecutor
+        executor = ClaudeA2AExecutor(
+            model=args.model or "claude-3-5-sonnet-20240620", # Default model if not provided
+            root_dir=str(root),
+            mode=args.mode
+        )
+    elif executor_type == Tool.GEMINI.value:
+        from .protocol.a2a.executors.gemini_executor import GeminiA2AExecutor
+        executor = GeminiA2AExecutor(
+            model=args.model or "gemini-2.5-flash", # Default model if not provided
+            root_dir=str(root),
+            mode=args.mode
+        )
 
     card = agent_card_from_definition(agent_name, agent_meta, port=port)
     app = create_app(executor, card)
@@ -204,6 +220,7 @@ def command_a2a_serve(args):
     actual_port = sock.getsockname()[1]
     args.printer.out(f"PORT={actual_port}")
 
+    import os
     # Orphan prevention: monitor parent PID if provided
     parent_pid_str = os.environ.get("VAULTSPEC_PARENT_PID")
     if parent_pid_str:
@@ -214,17 +231,12 @@ def command_a2a_serve(args):
             def _monitor_parent():
                 import time
                 import signal
+                import os
                 
                 while True:
                     try:
-                        if sys.platform == "win32":
-                            # Windows: Check if process handle is still valid/running
-                            # This is a basic check; strictly speaking OpenProcess would be better
-                            # but os.kill(pid, 0) works on Python 3.10+ on Windows to check existence
-                            os.kill(parent_pid, 0)
-                        else:
-                            # Unix: signal 0 checks for existence
-                            os.kill(parent_pid, 0)
+                        # Check for parent process existence (works on both Unix and Windows)
+                        os.kill(parent_pid, 0)
                     except OSError:
                         # Process dead or permission denied (likely dead if it was our parent)
                         logger.warning("Parent process %d gone. Shutting down.", parent_pid)
@@ -285,6 +297,9 @@ def _make_parser() -> argparse.ArgumentParser:
     )
     run_parser.add_argument(
         "--task-file", "-f", help="Path to markdown file describing the task (Legacy)"
+    )
+    run_parser.add_argument(
+        "--model", "-m", help="Override the model for this run"
     )
 
     run_parser.add_argument(

@@ -14,7 +14,7 @@ import logging
 import os
 import threading
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import pathlib
@@ -58,7 +58,7 @@ def _start_server(
             self.end_headers()
             self.wfile.write(response_body)
 
-        def log_message(self, *_args):  # silence access logs in test output
+        def log_message(self, format: str, *args: Any) -> None:  # silence access logs in test output
             pass
 
     server = http.server.HTTPServer(("127.0.0.1", 0), _Handler)

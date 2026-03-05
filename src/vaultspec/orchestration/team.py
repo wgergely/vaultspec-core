@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 import httpx
-from a2a.client import A2ACardResolver, A2AClient
+from a2a.client import A2ACardResolver, ClientFactory
 from a2a.types import (
     AgentCard,
     CancelTaskRequest,
@@ -40,6 +40,8 @@ from a2a.types import (
 )
 
 from .utils import kill_process_tree
+from ..protocol.a2a.server_manager import ServerProcessManager
+from ..protocol.providers import ProcessSpec
 
 __all__ = [
     "MemberStatus",
@@ -212,14 +214,16 @@ class TeamCoordinator:
         # Map agent-name -> in-flight task ID (for collect_results / dissolve cleanup)
         self._in_flight: dict[str, str] = {}
         # Per-member A2AClient instances, keyed by agent name
-        self._clients: dict[str, A2AClient] = {}
+        self._clients: dict[str, Any] = {}
         # Single underlying httpx.AsyncClient shared across all A2A connections
         self._http_client: httpx.AsyncClient | None = None
         # Map agent-name -> spawned subprocess (managed by spawn_agent / dissolve_team)
         self._spawned: dict[str, asyncio.subprocess.Process] = {}
         # Map agent-name -> PID for processes restored from disk (no Process handle)
         self._spawned_pids: dict[str, int] = {}
-
+        
+        # Lifecycle manager for spawned agents
+        self._server_manager = ServerProcessManager()
     async def __aenter__(self) -> TeamCoordinator:
         """Open the shared HTTP client for use in an async context manager."""
         headers: dict[str, str] = {}
@@ -231,6 +235,8 @@ class TeamCoordinator:
     async def __aexit__(self, *_: object) -> None:
         """Close the shared HTTP client on context manager exit."""
         await self._close_http()
+        # Ensure all spawned servers are shut down
+        await self._server_manager.shutdown_all()
 
     def _ensure_http_client(self) -> httpx.AsyncClient:
         """Return the shared HTTP client, creating it lazily if necessary.
@@ -251,7 +257,7 @@ class TeamCoordinator:
             await self._http_client.aclose()
             self._http_client = None
 
-    def _get_client(self, ref: str) -> A2AClient:
+    async def _get_client(self, ref: str) -> Any:
         """Return (or lazily create) the A2AClient for the given agent.
 
         Accepts either the exact dict key (URL or logical name) or the
@@ -268,10 +274,9 @@ class TeamCoordinator:
         key = resolve_member_key(self._session.members, ref)
         if key not in self._clients:
             member = self._session.members[key]
-            self._clients[key] = A2AClient(
-                httpx_client=self._ensure_http_client(),
-                agent_card=member.card,
-            )
+            # Use SDK factory to connect. Ideally we'd reuse self._http_client but
+            # Factory handles transport details.
+            self._clients[key] = await ClientFactory.connect(member.url)
         return self._clients[key]
 
     def _session_member(self, ref: str) -> TeamMember:
@@ -370,7 +375,7 @@ class TeamCoordinator:
         Returns:
             The ``Task`` once it has reached a terminal state.
         """
-        client = self._get_client(agent_name)
+        client = await self._get_client(agent_name)
         wait = 0.1
         async with asyncio.timeout(self._collect_timeout):
             while True:
@@ -405,7 +410,7 @@ class TeamCoordinator:
         Returns:
             The terminal ``Task`` produced by the agent.
         """
-        client = self._get_client(agent_name)
+        client = await self._get_client(agent_name)
         logger.debug("Sending A2A message to %r", agent_name)
         response = await client.send_message(request)
         result = response.root
@@ -544,7 +549,7 @@ class TeamCoordinator:
         # Best-effort cancel of any in-flight tasks.
         for agent_name, task_id in list(self._in_flight.items()):
             try:
-                client = self._get_client(agent_name)
+                client = await self._get_client(agent_name)
                 await client.cancel_task(
                     CancelTaskRequest(
                         id=str(uuid.uuid4()),
@@ -563,29 +568,8 @@ class TeamCoordinator:
         self._in_flight.clear()
         self._clients.clear()
 
-        # Terminate all spawned subprocesses (live handles from spawn_agent).
-        for agent_name, proc in list(self._spawned.items()):
-            try:
-                proc.terminate()
-                await asyncio.wait_for(proc.wait(), timeout=5.0)
-                logger.debug("Spawned process for %s terminated cleanly", agent_name)
-            except TimeoutError:
-                with contextlib.suppress(ProcessLookupError):
-                    kill_process_tree(proc.pid)
-                    proc.kill()
-                with contextlib.suppress(Exception):
-                    await proc.wait()
-                logger.warning(
-                    "Spawned process for %s did not terminate in time; killed",
-                    agent_name,
-                )
-            except ProcessLookupError:
-                logger.debug("Spawned process for %s already exited", agent_name)
-            finally:
-                from .utils import cleanup_subprocess_transports
-
-                await cleanup_subprocess_transports(proc)
-        self._spawned.clear()
+        # Shutdown all active servers managed by the coordinator
+        await self._server_manager.shutdown_all()
 
         # Terminate processes restored from disk (PIDs only, no Process handle).
         for agent_name, pid in list(self._spawned_pids.items()):
@@ -706,7 +690,7 @@ class TeamCoordinator:
             Returns:
                 A ``(agent_name, artifact_text)`` tuple.
             """
-            client = self._get_client(agent_name)
+            client = await self._get_client(agent_name)
             wait = 0.1
             while True:
                 response = await client.get_task(
@@ -761,7 +745,7 @@ class TeamCoordinator:
             Returns:
                 A ``(agent_name, Task)`` tuple for the completed task.
             """
-            client = self._get_client(agent_name)
+            client = await self._get_client(agent_name)
             wait = 0.1
             while True:
                 response = await client.get_task(
@@ -842,14 +826,12 @@ class TeamCoordinator:
     ) -> TeamMember:
         """Spawn a subprocess running an A2A agent server and add it to the team.
 
-        Uses ``sys.executable`` to ensure the subprocess shares the active
-        Python environment (virtualenv). After launching, polls the agent's
-        well-known endpoint until it becomes reachable, then discovers its
-        ``AgentCard`` and adds it as a new ``TeamMember``.
+        Uses ``ServerProcessManager`` to spawn the agent process and wait for
+        readiness. Then discovers its ``AgentCard`` and adds it as a new
+        ``TeamMember``.
 
         Args:
-            script_path: Path to a Python script that starts an A2A server
-                on the given port.
+            script_path: Path to a Python script that starts an A2A server.
             port: TCP port the agent will listen on.
             name: Logical name for the new team member.
 
@@ -864,58 +846,25 @@ class TeamCoordinator:
         if self._session is None:
             raise RuntimeError("No active team session. Call form_team() first.")
 
-        process = await asyncio.create_subprocess_exec(
-            sys.executable,
-            script_path,
-            "--port",
-            str(port),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        # Construct a ProcessSpec for ServerProcessManager
+        spec = ProcessSpec(
+            executable=sys.executable,
+            args=[script_path, "--port", str(port)],
+            env=dict(os.environ),
+            cleanup_paths=[],
+            session_meta={"agent_name": name},
+            protocol="a2a",
         )
-        self._spawned[name] = process
-        logger.info("Spawned agent %r (pid=%s) on port %d", name, process.pid, port)
 
-        # Poll until the agent's well-known endpoint is reachable.
-        base_url = f"http://localhost:{port}"
-        card_url = f"{base_url}/.well-known/agent-card.json"
+        logger.info("Spawning agent %r on port %d", name, port)
+        server = await self._server_manager.spawn(spec, cwd=os.getcwd())
+        
+        # Wait for readiness (handled by manager)
+        await self._server_manager.wait_ready(server)
+        
+        base_url = f"http://localhost:{server.port}"
         http = self._ensure_http_client()
-
-        deadline = asyncio.get_running_loop().time() + 10.0
-        while True:
-            # Check that the subprocess has not exited prematurely.
-            if process.returncode is not None:
-                stderr_bytes = await process.stderr.read() if process.stderr else b""
-                logger.error(
-                    "Spawned process for %r exited prematurely with code %s",
-                    name,
-                    process.returncode,
-                )
-                raise RuntimeError(
-                    f"Spawned process for {name!r} exited with code "
-                    f"{process.returncode}: {stderr_bytes.decode(errors='replace')}"
-                )
-            try:
-                resp = await http.get(card_url, timeout=2.0)
-                if resp.status_code == 200:
-                    break
-            except (httpx.ConnectError, httpx.ReadError, httpx.TimeoutException):
-                pass
-
-            if asyncio.get_running_loop().time() >= deadline:
-                with contextlib.suppress(ProcessLookupError):
-                    kill_process_tree(process.pid)
-                    process.kill()
-                with contextlib.suppress(Exception):
-                    await process.wait()
-                from .utils import cleanup_subprocess_transports
-
-                await cleanup_subprocess_transports(process)
-                raise RuntimeError(
-                    f"Agent {name!r} on port {port} did not become reachable "
-                    "within 10 seconds"
-                )
-            await asyncio.sleep(0.5)
-
+        
         # Discover the agent card and register the member.
         resolver = A2ACardResolver(httpx_client=http, base_url=f"{base_url}/")
         card = await resolver.get_agent_card()

@@ -17,6 +17,7 @@ from ...core import (
 )
 from ...core import types as _types
 from ...core.config_gen import _is_cli_managed
+from ...core.enums import Tool
 from ...core.types import CONFIG_HEADER
 from ...vaultcore import parse_frontmatter
 from .conftest import TEST_PROJECT
@@ -144,12 +145,11 @@ class TestInitPaths:
 
     def test_tool_configs_populated(self):
         init_paths(TEST_PROJECT)
-        assert "claude" in _types.TOOL_CONFIGS
-        assert "gemini" in _types.TOOL_CONFIGS
-        assert "agent" in _types.TOOL_CONFIGS
-        assert "agents" in _types.TOOL_CONFIGS
+        assert Tool.CLAUDE in _types.TOOL_CONFIGS
+        assert Tool.GEMINI in _types.TOOL_CONFIGS
+        assert Tool.AGENTS in _types.TOOL_CONFIGS
         expected_rules = TEST_PROJECT / ".claude" / "rules"
-        assert _types.TOOL_CONFIGS["claude"].rules_dir == expected_rules
+        assert _types.TOOL_CONFIGS[Tool.CLAUDE].rules_dir == expected_rules
 
 
 class TestSyncResult:

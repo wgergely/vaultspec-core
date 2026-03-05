@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import datetime
 import json
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -20,22 +22,27 @@ def _fresh_config():
     yield
     reset_config()
 
+@pytest.fixture
+def env_setup():
+    """Set up environment variables for tests."""
+    original_environ = dict(os.environ)
+    os.environ["VAULTSPEC_DOCS_DIR"] = ".vault"
+    os.environ["VAULTSPEC_LOGS_DIR"] = "logs"
+    yield
+    os.environ.clear()
+    os.environ.update(original_environ)
 
 class TestSessionLogger:
     """Tests for orchestration.session_logger.SessionLogger."""
 
-    def test_creates_log_directory(self, tmp_path: Path, monkeypatch):
-        monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
-        monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
+    def test_creates_log_directory(self, tmp_path: Path, env_setup):
         from .. import SessionLogger
 
         logger = SessionLogger(tmp_path, "test-agent", task_id="abcd1234-0000")
         assert logger.log_dir.exists()
         assert logger.log_dir == tmp_path / ".vault" / "logs"
 
-    def test_filename_format(self, tmp_path: Path, monkeypatch):
-        monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
-        monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
+    def test_filename_format(self, tmp_path: Path, env_setup):
         from .. import SessionLogger
 
         logger = SessionLogger(tmp_path, "my-agent", task_id="deadbeef-1234-5678")
@@ -45,9 +52,7 @@ class TestSessionLogger:
         assert "_my-agent_" in name
         assert "_deadbeef." in name
 
-    def test_session_start_header(self, tmp_path: Path, monkeypatch):
-        monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
-        monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
+    def test_session_start_header(self, tmp_path: Path, env_setup):
         from .. import SessionLogger
 
         logger = SessionLogger(tmp_path, "test-agent", task_id="abcd1234-0000")
@@ -59,9 +64,7 @@ class TestSessionLogger:
         assert "start_time" in entry["data"]
         assert "root_dir" in entry["data"]
 
-    def test_log_appends_jsonl(self, tmp_path: Path, monkeypatch):
-        monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
-        monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
+    def test_log_appends_jsonl(self, tmp_path: Path, env_setup):
         from .. import SessionLogger
 
         logger = SessionLogger(tmp_path, "test-agent", task_id="abcd1234")
@@ -72,9 +75,7 @@ class TestSessionLogger:
         assert second["type"] == "session_update"
         assert second["data"]["key"] == "value"
 
-    def test_log_path_workspace_relative(self, tmp_path: Path, monkeypatch):
-        monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
-        monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
+    def test_log_path_workspace_relative(self, tmp_path: Path, env_setup):
         from .. import SessionLogger
 
         logger = SessionLogger(tmp_path, "test-agent", task_id="abcd1234")
@@ -84,9 +85,7 @@ class TestSessionLogger:
         assert "logs" in rel
         assert not Path(rel).is_absolute()
 
-    def test_auto_generates_task_id(self, tmp_path: Path, monkeypatch):
-        monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
-        monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
+    def test_auto_generates_task_id(self, tmp_path: Path, env_setup):
         from .. import SessionLogger
 
         logger = SessionLogger(tmp_path, "test-agent")
@@ -97,10 +96,8 @@ class TestSessionLogger:
 class TestCleanupOldLogs:
     """Tests for cleanup_old_logs."""
 
-    def test_deletes_old_files(self, tmp_path: Path, monkeypatch):
-        monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
-        monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
-        monkeypatch.setenv("VAULTSPEC_LOG_RETENTION_DAYS", "7")
+    def test_deletes_old_files(self, tmp_path: Path, env_setup):
+        os.environ["VAULTSPEC_LOG_RETENTION_DAYS"] = "7"
         from .. import cleanup_old_logs
 
         log_dir = tmp_path / ".vault" / "logs"
@@ -119,10 +116,8 @@ class TestCleanupOldLogs:
         assert not old.exists()
         assert recent.exists()
 
-    def test_ignores_non_jsonl(self, tmp_path: Path, monkeypatch):
-        monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
-        monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
-        monkeypatch.setenv("VAULTSPEC_LOG_RETENTION_DAYS", "1")
+    def test_ignores_non_jsonl(self, tmp_path: Path, env_setup):
+        os.environ["VAULTSPEC_LOG_RETENTION_DAYS"] = "1"
         from .. import cleanup_old_logs
 
         log_dir = tmp_path / ".vault" / "logs"
@@ -133,9 +128,7 @@ class TestCleanupOldLogs:
         assert deleted == 0
         assert txt.exists()
 
-    def test_returns_zero_when_no_dir(self, tmp_path: Path, monkeypatch):
-        monkeypatch.setenv("VAULTSPEC_DOCS_DIR", ".vault")
-        monkeypatch.setenv("VAULTSPEC_LOGS_DIR", "logs")
+    def test_returns_zero_when_no_dir(self, tmp_path: Path, env_setup):
         from .. import cleanup_old_logs
 
         assert cleanup_old_logs(tmp_path) == 0
