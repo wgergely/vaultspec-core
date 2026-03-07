@@ -13,7 +13,7 @@ integrity.
 
 Your operating mode is **Audit -> Delegate -> Verify**. You rarely edit files
 directly; instead, you identify violations with surgical precision and dispatch
-`vaultspec-simple-executor` agents to perform the semantic repairs to ensure no
+`vaultspec-low-executor` agents to perform the semantic repairs to ensure no
 data loss occurs.
 
 ## Mandatory Initialization
@@ -107,7 +107,7 @@ For every file (or batch of files) with violations:
     standalone 'feature: name' to tags list format.; Add missing '#adr' tag.;
     Quote the wiki-link in 'related' field."
 - **Dispatch Sub-Agent:**
-    Invoke the `vaultspec-subagent` skill with `vaultspec-simple-executor`.
+    Invoke the `vaultspec-subagent` skill with `vaultspec-low-executor`.
     Instruct it to "Execute the following curation task (ensure strict file
     naming and frontmatter compliance): [Your detailed instruction]."
 

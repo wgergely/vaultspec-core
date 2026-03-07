@@ -52,7 +52,7 @@ Review the report for:
 
 Items the curator cannot auto-fix are listed under **Recommendations**.
 Address these manually or dispatch the appropriate agent (e.g.,
-`vaultspec-simple-executor` for adding missing sections).
+`vaultspec-low-executor` for adding missing sections).
 
 ## Artifact Linking
 

@@ -4,7 +4,7 @@ name: vaultspec-skills
 
 # Spec Skills
 
-This project mandates sub-agent based development and
+This project follows agent-driven development with
 `<ADR>`-backed `<Plan>`s.
 
 The workflow persists the following documents:
@@ -32,6 +32,6 @@ Where appropriate, load and use the following skills:
 - `vaultspec-write`
 - `vaultspec-execute`
 
-Make sure to utilize the sub-agents defined in
-`.vaultspec/rules/agents`. Dispatch them using the
-`vaultspec-subagent` skill.
+Agent personas define specialized roles. They can be utilised directly,
+delegated to, or composed into teams — depending on the host CLI's
+capabilities and the task's complexity.

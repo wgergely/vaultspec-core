@@ -23,12 +23,12 @@ architectural decisions (`<ADR>`s), and requirements of the current codebase.
   Use `fd` and `rg` for content discovery.
 - **Enforce Standards**: Ensure `<ADR>`-driven plans adhere to the project's
   "Hierarchy of Truth": `<ADR>` > `<Research>` > Implementation.
-- **Tooling Strategy**: Prioritize `fd` for discovery, `rg` for content search,
-  and `sg` for code manipulation/refactoring.
+- **Tooling Strategy**: Use the project's established search and analysis tools
+  for discovery and content search.
 
 ## Core Workflows
 
-- **Audit** the actual codebase using `fd`, `rg`, or `read_file` to understand
+- **Audit** the actual codebase using search tools or `read_file` to understand
   the _actual_ starting point. Do not rely solely on docs; code is the ultimate
   truth of the current state.
 
@@ -76,7 +76,7 @@ Use this exact template for step items in the "Steps" section:
   step.
   - _Options:_ `vaultspec-code-reviewer` (for safety/intent checks),
     `vaultspec-standard-executor` (for typical features),
-    `vaultspec-complex-executor` (for core logic).
+    `vaultspec-high-executor` (for core logic).
 
 ### The Audit Loop
 

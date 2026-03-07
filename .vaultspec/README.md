@@ -1,7 +1,11 @@
 # Spec-Driven Development (SDD)
 
+vaultspec is a language-agnostic development framework. Rules, skills, and
+templates work with any language and toolchain. Agent personas reference the
+project's established conventions rather than prescribing specific tools.
+
 This folder contains the rule and template collection mandating the research,
-reference, ADR, and sub-agent based development process.
+reference, ADR, and agent-based development process.
 The rules are compatible with Google Antigravity, Gemini CLI and Claude Code.
 
 ## User Manual
@@ -45,8 +49,8 @@ documentation that ensures quality and context preservation.
 
 - **Execute (`vaultspec-execute`)**:
   - **Goal:** Implement the plan using specialized sub-agents.
-  - **Agent:** Orchestrator (You) + Executors (`vaultspec-simple-executor`,
-    `vaultspec-complex-executor`).
+  - **Agent:** Orchestrator (You) + Executors (`vaultspec-low-executor`,
+    `vaultspec-high-executor`).
   - **Output:** Code changes + `.vault/exec/...` logs.
   - *Usage:* "Activate `vaultspec-execute` to implement the plan."
 
@@ -69,9 +73,9 @@ documentation that ensures quality and context preservation.
 | `vaultspec-writer` | HIGH | Planner | After ADR approval |
 | `vaultspec-docs-curator` | MED | Librarian | Links, tags, schema |
 | `vaultspec-reference-auditor` | MED | Auditor | Codebase patterns |
-| `vaultspec-complex-executor` | HIGH | Sr. Engineer | Refactors, new logic |
+| `vaultspec-high-executor` | HIGH | Sr. Engineer | Refactors, new logic |
 | `vaultspec-standard-executor` | MED | Engineer | Feature work |
-| `vaultspec-simple-executor` | LOW | Jr. Engineer | Rote tasks, fixes |
+| `vaultspec-low-executor` | LOW | Jr. Engineer | Rote tasks, fixes |
 | `vaultspec-code-reviewer` | HIGH | Reviewer | Safety, quality |
 
 ## Context Management
@@ -186,7 +190,7 @@ flowchart TD
     %% Phase 4: Execute
     SK_EXEC["Skill: vaultspec-execute<br/>Announce"]
     SK_SUB_EXEC["Skill: vaultspec-subagent<br/>Run Command: vaultspec subagent"]
-    SA_EXEC["Agent: vaultspec-complex-executor<br/>Edit Code<br/>Validate"]
+    SA_EXEC["Agent: vaultspec-high-executor<br/>Edit Code<br/>Validate"]
 
     %% Phase 5: Verify
     SK_REV["Skill: vaultspec-review<br/>Announce"]

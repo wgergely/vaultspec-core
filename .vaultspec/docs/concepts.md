@@ -382,7 +382,7 @@ event list, and examples.
 | ------ | -------------- | ----------------------------- |
 | HIGH   | Most capable   | Researcher, planner, reviewer |
 | MEDIUM | Balanced       | Standard executor, curator    |
-| LOW    | Fastest        | Simple executor (rote tasks)  |
+| LOW    | Fastest        | Low executor (rote tasks)     |
 
 **Skills** are user-invocable workflows: `vaultspec-research`,
 `vaultspec-adr`, `vaultspec-write`, `vaultspec-execute`, `vaultspec-review`,

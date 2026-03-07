@@ -140,7 +140,7 @@ Name                      Tier   Claude
 --------------------------------------------
 vaultspec-adr-researcher  HIGH   claude-s-4-5
 vaultspec-researcher      MED    claude-s-4-5
-vaultspec-simple-executor LOW    claude-h-4-5
+vaultspec-low-executor LOW    claude-h-4-5
 ```
 
 #### `agents add`
@@ -846,11 +846,11 @@ vaultspec subagent list
 Agents in .vaultspec/rules/agents:
   vaultspec-adr-researcher
   vaultspec-code-reviewer
-  vaultspec-complex-executor
+  vaultspec-high-executor
   vaultspec-docs-curator
   vaultspec-reference-auditor
   vaultspec-researcher
-  vaultspec-simple-executor
+  vaultspec-low-executor
   vaultspec-standard-executor
   vaultspec-writer
 ```

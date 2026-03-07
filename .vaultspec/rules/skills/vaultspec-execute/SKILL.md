@@ -24,11 +24,11 @@ documented correctly.
 Invoke the `vaultspec-subagent` skill with the appropriate executor agent.
 Instruct it to "Execute the plan at `[[...-plan.md]]`. Start with Phase `{X}`."
 
-- **Complex Tasks:** `vaultspec-complex-executor` (High Tier). Use for
+- **Complex Tasks:** `vaultspec-high-executor` (High Tier). Use for
   architectural changes or core logic refactors.
 - **Standard Tasks:** `vaultspec-standard-executor` (Medium Tier). Use for
   typical features and components.
-- **Simple Tasks:** `vaultspec-simple-executor` (Low Tier). Use for
+- **Simple Tasks:** `vaultspec-low-executor` (Low Tier). Use for
   straightforward edits or documentation.
 
 ### Step Execution & Logging
