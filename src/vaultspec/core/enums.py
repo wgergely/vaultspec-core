@@ -89,4 +89,4 @@ class DirName(StrEnum):
     VAULTSPEC = ".vaultspec"
     CLAUDE = ".claude"
     GEMINI = ".gemini"
-    AGENTS = ".agents"
+    AGENTS = ".agent"
