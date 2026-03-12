@@ -1,5 +1,0 @@
-{"timestamp": "2026-02-19T22:28:36.225789+00:00", "type": "session_start", "data": {"agent_name": "vaultspec-researcher", "task_id": "5d85cbcc-0aae-44d3-8366-98c612efaf6a", "start_time": "2026-02-19T22:28:36.225604+00:00", "root_dir": "Y:\\code\\task-worktrees\\main"}}
-{"timestamp": "2026-02-19T22:28:36.229782+00:00", "type": "handshake_start", "data": {"agent": "vaultspec-researcher"}}
-{"timestamp": "2026-02-19T22:28:51.551974+00:00", "type": "handshake_complete", "data": {"agent": "vaultspec-researcher", "elapsed": 15.321764099993743}}
-{"timestamp": "2026-02-19T22:28:51.552507+00:00", "type": "session_create_start", "data": {"agent": "vaultspec-researcher"}}
-{"timestamp": "2026-02-19T22:28:55.801145+00:00", "type": "run_failed", "data": {"agent": "vaultspec-researcher", "error": "Internal error", "total_elapsed": 24.569315800094046}}

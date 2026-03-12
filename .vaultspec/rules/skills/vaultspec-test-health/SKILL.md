@@ -33,8 +33,8 @@ goals.
 
 - Tests that do not provide insight into the actual integration and production
   flow. This includes tests that are too narrowly focused, do not cover edge
-  cases, or are written in a way that they can pass without truly validating
-  the functionality of the code.
+  cases, are tautological, or are written in a way that they can pass without
+  truly validating the functionality of the code.
 - Mocks, patches, stubs, false positives. These are NOT acceptable and are
   indicative of bad programming. Tests must be written in a way that they
   reveal the true behavior of the codebase in a production environment.

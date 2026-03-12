@@ -14,8 +14,8 @@ and deep architectural integrity.
 Utilize:
 
 - Relevant tools (domain knowledge tools, language tools, search tools).
-- Delegate to the appropriate agent persona — either directly, via sub-agent
-  dispatch, or as part of a team workflow.
+- Load the appropriate agent persona for focused work, or coordinate multiple
+  personas through the host environment for multi-agent execution.
   - *Alternatives:* `vaultspec-adr-researcher`, `vaultspec-reference-auditor`.
 - If you have to compact your context, ensure any original document paths are
   preserved.
@@ -88,7 +88,7 @@ When you do write or update tests, the following are **STRICTLY FORBIDDEN**:
 
 Code review is mandatory before completion. Ensure the
 `vaultspec-code-reviewer` persona audits the changes for safety and intent
-violations — either by delegating to it or by having it loaded as part of the
+violations — either by delegating to it or by including it in the supervised
 team workflow.
 
 **DO NOT** mark the task as complete until the review passes.

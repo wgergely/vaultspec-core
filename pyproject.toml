@@ -16,42 +16,39 @@ classifiers = [
 ]
 dependencies = [
   "PyYAML>=6.0.3",
-  "a2a-sdk>=0.3.24",
-  "agent-client-protocol>=0.8.1",
-  "claude-agent-sdk @ git+https://github.com/anthropics/claude-agent-sdk-python.git@main",
   "httpx>=0.28.1",
   "mcp>=1.26.0",
   "pydantic>=2.12.5",
   "rich>=14.3.2",
   "sse-starlette>=3.2.0",
   "starlette>=0.52.1",
+  "typer>=0.12.0",
   "uvicorn>=0.41.0",
 ]
-description = "A governed development framework for AI agents"
+description = "A governed development framework for AI-assisted engineering"
 keywords = [
-  "a2a",
   "acp",
   "adr",
-  "ai-agents",
+  "ai-assisted",
   "governance",
   "mcp",
   "spec-driven-development",
 ]
 license = { file = "LICENSE" }
-name = "vaultspec"
+name = "vaultspec-core"
 readme = "README.md"
 requires-python = ">=3.13"
 version = "0.1.0"
 
   [project.urls]
-  "Bug Tracker" = "https://github.com/wgergely/vaultspec/issues"
-  Documentation = "https://github.com/wgergely/vaultspec/tree/main/docs"
-  Homepage = "https://github.com/wgergely/vaultspec"
-  Repository = "https://github.com/wgergely/vaultspec"
+  "Bug Tracker" = "https://github.com/wgergely/vaultspec-core/issues"
+  Documentation = "https://github.com/wgergely/vaultspec-core/tree/main/.vaultspec/docs"
+  Homepage = "https://github.com/wgergely/vaultspec-core"
+  Repository = "https://github.com/wgergely/vaultspec-core"
 
   [project.scripts]
-  vaultspec = "vaultspec.__main__:main"
-  vaultspec-mcp = "vaultspec.mcp_server.app:main"
+  "vaultspec-core" = "vaultspec_core.__main__:main"
+  "vaultspec-mcp" = "vaultspec_core.mcp_server.app:run"
 
   [project.optional-dependencies]
   dev = [
@@ -65,13 +62,6 @@ version = "0.1.0"
     "prek>=0.3.2",
     "identify>=2.0.0",
     "nodeenv>=1.0.0",
-  ]
-  dev-rag = ["vaultspec[dev,rag]"]
-  rag = [
-    "torch>=2.9.0",
-    "sentence-transformers>=5.0.0",
-    "lancedb>=0.27.0",
-    "einops>=0.8.0",                # transitive dep of nomic-embed-text-v1.5 (trust_remote_code)
   ]
 
 [dependency-groups]
@@ -92,7 +82,7 @@ dev = [
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/vaultspec"]
+packages = ["src/vaultspec_core"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -103,19 +93,13 @@ log_cli_level = "INFO"
 log_file = "test-debug.log"
 log_file_level = "DEBUG"
 markers = [
+  "api: API-level tests covering stable public analysis surfaces",
   "unit: fast tests with no external dependencies",
-  "api: MCP subagent and RAG API surface tests",
-  "search: RAG search, filtering, and ranking tests",
-  "index: embedding, indexing, and store operation tests",
-  "quality: precision, recall, and full-corpus benchmark tests",
   "integration: requires CLI tools and network",
   "gemini: requires Gemini CLI installed",
   "claude: requires Claude CLI installed",
   "timeout: timeout in seconds for individual tests",
-  "a2a: A2A protocol interoperability tests",
   "e2e: end-to-end tests requiring real LLM API keys",
-  "benchmark: performance and throughput benchmarks (GPU required)",
-  "team: multi-agent team coordination tests (TeamCoordinator)",
 ]
 testpaths = ["tests", "src"]
 timeout = 300
@@ -146,19 +130,11 @@ target-version = "py313"
     "**/test_*.py" = ["ARG"]
     "**/tests/**/*.py" = ["ARG"]
     # Core CLI modules use argparse/Path as runtime parameter types — no need to move to TYPE_CHECKING
-    "src/vaultspec/core/*.py" = ["TC003"]
-    "src/vaultspec/mcp_server/subagent_tools.py" = ["TC002"]
-    "src/vaultspec/orchestration/team_task_engine.py" = ["TC003"]
-    # Protocol proxy methods intentionally use **kwargs as passthrough — not unused
-    "src/vaultspec/protocol/acp/gemini_bridge.py" = ["ARG002"]
+    "src/vaultspec_core/core/*.py" = ["TC003"]
 
     [tool.ruff.lint.isort]
-    known-first-party = ["vaultspec"]
+    known-first-party = ["vaultspec_core"]
 
 [tool.ty.environment]
 python-version = "3.13"
 root = [".", "src"]
-
-[tool.ty.rules]
-# Optional RAG/ML/logging deps not installed in base venv — suppress
-unresolved-import = "ignore"

@@ -59,7 +59,7 @@ Every document MUST strictly adhere to the following schema:
 
 - **Research**: Ensure `vaultspec-adr-researcher` has answered questions.
 - **Linking**: Ensure the Plan uses `[[wiki-links]]`.
-- **Drafting**: Invoke the `vaultspec-subagent` skill with `vaultspec-writer`.
+- **Drafting**: Load the `vaultspec-writer` agent persona.
   Instruct it to "Create an implementation plan for `{feature}` based on
   `[[...-adr.md]]`. Use the template at `.vaultspec/rules/templates/plan.md`."
 - **Review**: Present the saved Plan to the user.
@@ -73,5 +73,5 @@ Every document MUST strictly adhere to the following schema:
   ```
 
 - **Approval Loop**: User must explicitly approve the Plan. If changes are
-  requested, invoke the `vaultspec-subagent` skill with `vaultspec-writer`.
+  requested, load the `vaultspec-writer` agent persona.
   Instruct it to "Revise the plan based on user feedback: `{feedback}`."

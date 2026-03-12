@@ -17,7 +17,7 @@ architectural decisions (`<ADR>`s), and requirements of the current codebase.
   `<Research>` documents. If `<Research>` and `<ADR>` are not available, or you
   identify gaps, conduct research to ensure implementation remains grounded.
 - **Orchestrate Execution:** Break down complex goals into logical, atomic
-  phases and steps executable by specialized sub-agents.
+  phases and steps executable by specialized agent personas.
 - **Audit Feasibility:** Do not "hallucinate" steps. Verify that files,
   functions, and modules you reference actually exist or are planned to exist.
   Use `fd` and `rg` for content discovery.
@@ -63,7 +63,7 @@ Use this exact template for step items in the "Steps" section:
 ```markdown
 - Name: <brief name of the step>
 - Step summary: <Step Record> (`.vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-<step>.md`)
-- Executing sub-agent: <name of the coding sub-agent
+- Executing agent: <name of the agent persona
   responsible for executing the step.>
 - References: <links to related tasks, <ADR>s, <Research> docs using [[wiki-links]]>
 ```
@@ -72,7 +72,7 @@ Use this exact template for step items in the "Steps" section:
 
 - **Phasing:** If a task involves more than 3 distinct logical contexts or
   exceeds ~200 lines of potential code change, break it into Phases.
-- **Assignment:** Autonomously assign the most appropriate sub-agent for each
+- **Assignment:** Autonomously assign the most appropriate agent persona for each
   step.
   - _Options:_ `vaultspec-code-reviewer` (for safety/intent checks),
     `vaultspec-standard-executor` (for typical features),
@@ -83,13 +83,13 @@ Use this exact template for step items in the "Steps" section:
 - Persist `<Plan>` to `.vault/plan/yyyy-mm-dd-<feature>-<phase>-plan.md`.
 - Run an audit on the saved raw `<Plan>` document:
   - "Can the plan be structured into logical execution blocks we can hand off to
-    parallel sub-agents?"
+    parallel agents?"
   - Make sure `<Phase Summary>`
     (`.vault/exec/yyyy-mm-dd-<feature>/yyyy-mm-dd-<feature>-<phase>-summary.md`)
     paths are updated and references are pointing to valid docs.
   - "Do steps contradict the `<ADR>` and user task?"
   - "Are the file paths correct?"
   - "Is the success criteria verifiable?"
-  - "Did I pick the right executing sub-agent?"
+  - "Did I pick the right executing agent persona?"
 
 You must autonomously make the most optimal decisions.

@@ -15,11 +15,11 @@ import pathlib
 #: Repository root (one directory above: tests/ -> repo)
 PROJECT_ROOT: pathlib.Path = pathlib.Path(__file__).resolve().parent.parent
 
-#: src/vaultspec/ — the library source root
-LIB_SRC: pathlib.Path = PROJECT_ROOT / "src" / "vaultspec"
+#: src/vaultspec_core/ — the library source root
+LIB_SRC: pathlib.Path = PROJECT_ROOT / "src" / "vaultspec_core"
 
-#: CLI entry points are now modules inside the vaultspec package
-SCRIPTS: pathlib.Path = PROJECT_ROOT / "src" / "vaultspec"
+#: CLI entry points are now modules inside the vaultspec_core package
+SCRIPTS: pathlib.Path = PROJECT_ROOT / "src" / "vaultspec_core"
 
 #: test-project/ fixture directory (git-tracked .vault/ seed corpus)
 TEST_PROJECT: pathlib.Path = PROJECT_ROOT / "test-project"
@@ -27,36 +27,8 @@ TEST_PROJECT: pathlib.Path = PROJECT_ROOT / "test-project"
 #: test-project/.vault/ documentation vault
 TEST_VAULT: pathlib.Path = TEST_PROJECT / ".vault"
 
-GPU_FAST_CORPUS_STEMS: frozenset[str] = frozenset(
-    [
-        # adr (4)
-        "2026-02-05-editor-demo-architecture",
-        "2026-02-06-displaymap-architecture-design",
-        "2026-02-06-main-window-architecture",
-        "2026-02-07-dispatch-architecture",
-        # plan (2)
-        "2026-02-05-editor-demo-phase1-plan",
-        "2026-02-06-main-window-master-plan",
-        # exec (2)
-        "2026-02-05-turn-completion-summary",
-        "2026-02-06-layout-alignment-summary",
-        # reference (3)
-        "2026-02-07-main-window-safety-audit",
-        "2026-02-05-editor-demo-core-reference",
-        "2026-02-04-displaymap-reference",
-        # research (2)
-        "2026-02-05-editor-demo-research",
-        "2026-02-07-dispatch-protocol-alignment-audit",
-    ]
-)
-
-LANCE_SUFFIX_FAST: str = "-fast"
-LANCE_SUFFIX_FULL: str = "-full"
-LANCE_SUFFIX_UNIT: str = "-fast-unit"
-
 TEST_PORT_BASE: int = 10001
-TEST_PORT_A2A_BASE: int = 10020
-TEST_PORT_SUBAGENT: int = 10010
+TEST_PORT_EXECUTION: int = 10010
 
 TIMEOUT_QUICK: int = 15
 TIMEOUT_INTEGRATION: int = 120

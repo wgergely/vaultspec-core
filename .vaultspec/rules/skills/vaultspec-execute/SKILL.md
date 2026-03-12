@@ -1,8 +1,10 @@
 ---
 name: vaultspec-execute
 description: >-
-  Skill to execute implementation plans. Delegates to specialized sub-agents
-  based on task complexity. Use when you have a plan document to execute.
+  Skill to execute implementation plans. Loads specialized agent personas for
+  focused work, or coordinates multiple personas through the host environment
+  for complex multi-agent execution. Use when you have a plan document to
+  execute.
 ---
 # Spec Execution Skill (vaultspec-execute)
 
@@ -21,8 +23,11 @@ documented correctly.
 
 ### Executor Delegation
 
-Invoke the `vaultspec-subagent` skill with the appropriate executor agent.
-Instruct it to "Execute the plan at `[[...-plan.md]]`. Start with Phase `{X}`."
+Load the appropriate executor agent persona for focused work. When the task
+needs multiple specialists, coordinate them through the host environment rather
+than assuming a shipped MCP team-thread runtime. Instruct the executor to
+"Execute the plan at
+`[[...-plan.md]]`. Start with Phase `{X}`."
 
 - **Complex Tasks:** `vaultspec-high-executor` (High Tier). Use for
   architectural changes or core logic refactors.
@@ -59,10 +64,10 @@ following schema:
 
 - After an executor completes a step (or the full plan), you MUST invoke the
   `vaultspec-review` skill.
-- This will dispatch the `vaultspec-code-reviewer` to audit for safety,
+- This will load the `vaultspec-code-reviewer` persona to audit for safety,
   intent, and quality.
 - If the reviewer identifies **CRITICAL** or **HIGH** issues, you MUST
-  resolve them by dispatching an executor again before proceeding.
+  resolve them by loading an executor again before proceeding.
 
 ### Finalization & Summary
 

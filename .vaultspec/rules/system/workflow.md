@@ -5,7 +5,7 @@ order: 20
 # Primary Workflow
 
 This project follows the vaultspec pipeline defined in `system/framework.md`.
-The pipeline maps user intent to skills and sub-agents that produce documented
+The pipeline maps user intent to skills and agent personas that produce documented
 artifacts.
 
 ## Software Engineering Tasks

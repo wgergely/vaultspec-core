@@ -1,3 +1,0 @@
-{"timestamp": "2026-02-20T11:43:59.391685+00:00", "type": "session_start", "data": {"agent_name": "vaultspec-researcher", "task_id": "c06dcc80-1f1b-4b09-b6c0-56d2c9dc572f", "start_time": "2026-02-20T11:43:59.391514+00:00", "root_dir": "Y:\\code\\task-worktrees\\main"}}
-{"timestamp": "2026-02-20T11:43:59.396542+00:00", "type": "handshake_start", "data": {"agent": "vaultspec-researcher"}}
-{"timestamp": "2026-02-20T11:44:29.400884+00:00", "type": "handshake_timeout", "data": {"agent": "vaultspec-researcher", "elapsed": 30.003763500018977, "timeout": 30.0}}

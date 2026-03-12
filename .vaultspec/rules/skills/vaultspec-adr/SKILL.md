@@ -47,8 +47,8 @@ Every document MUST strictly adhere to the following schema:
 
 - **Derive from Research:** ADRs should always be preceded by a
   `vaultspec-research` session.
-- **Dispatch Sub-Agent:** Invoke the `vaultspec-subagent` skill with
-  `vaultspec-writer`. Instruct it to "Draft an ADR for `{feature}` based on
+- **Draft ADR:** Load the `vaultspec-writer` agent persona.
+  Instruct it to "Draft an ADR for `{feature}` based on
   the findings in `[[...-research.md]]`. Use the template at
   `.vaultspec/rules/templates/adr.md`."
   - *Alternatives:* `vaultspec-adr-researcher` (if the research phase was

@@ -1,55 +1,34 @@
----
-trigger: always_on
----
+# vaultspec-subagents
 
-# Sub-Agents
+## Interpretation rule
 
-Sub-agents are the de facto standard for performing any
-meaningful work. They are invoked using the
-`vaultspec-subagent` skill.
+When framework materials say to invoke `vaultspec-subagent`, interpret that instruction semantically: delegate bounded work to an identified specialist role.
 
-## Mechanism
+## Always true
 
-This is the **utility skill** that powers the project's
-agentic workflows.
+- `vaultspec-subagent` is an internal framework convention for delegated specialist execution.
+- Delegation transport is environment-dependent.
+- Agent names are framework identities or personas, not guaranteed runnable endpoints.
 
-- **Primary Usage:** You will be instructed to use this
-  skill by high-level workflow skills (e.g.,
-  `vaultspec-execute` will tell you to "Invoke
-  `vaultspec-subagent` with `vaultspec-complex-executor`").
-- **Direct Usage:** You should only invoke this skill
-  directly if the user explicitly requests a specific,
-  isolated agent dispatch (e.g., "Dispatch the
-  vaultspec-code-reviewer to check file X") that falls
-  outside the standard Research -> Plan -> Execute workflow.
+## Required delegation contract
 
-## Internal Dispatch Protocol
+Any invocation of `vaultspec-subagent` must carry:
 
-Internally, the skill uses `vaultspec subagent`:
+- `agent`
+- `goal`
+- `constraints`
+- `expected result`
 
-```bash
-vaultspec subagent run \
-  --agent <agent_name> \
-  --goal "<task_description|plan_document>"
-```
+## Transport rule
 
-> `--agent`: The name of the agent to load
-> `--goal`: A clear, natural language description of the
-> task (or a `<Plan>` document path)
-> `--model` (Optional): Override the model
+Use the host environment's native delegation mechanism when one exists. Do not assume a shipped CLI, MCP dispatch surface, process model, stdout contract, or session-log behavior.
 
-## MCP Server (preferred)
+## Prohibited assumptions
 
-The subagent system is also available as an MCP server
-(`vaultspec-mcp`) configured in `.mcp.json`. When
-available, prefer MCP tool calls over CLI invocation:
+- Do not write or rely on `vaultspec subagent run ...` examples.
+- Do not claim that `vaultspec-mcp` exposes `list_agents` or `dispatch_agent` unless the current host explicitly proves it.
+- Do not treat framework agent names as automatically executable targets.
 
-- **`list_agents`**: Discover available agents and their
-  capabilities.
-- **`dispatch_agent`**: Dispatch a sub-agent with a task.
-  Parameters: `agent` (required), `task` (required),
-  `model` (optional), `mode` (optional: `read-write` or
-  `read-only`).
+## Fallback rule
 
-The MCP server wraps the same ACP dispatch logic and
-returns structured JSON results.
+If the host provides no delegation mechanism, execute the task directly while preserving the requested role separation, constraints, and expected result.

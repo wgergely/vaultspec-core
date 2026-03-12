@@ -1,9 +1,3 @@
-"""Root conftest for all vaultspec tests (both tests/ and src/vaultspec/*/tests/).
+from tests._windows_temp_compat import install_windows_temp_compat
 
-Discovered by pytest as the common ancestor of both test trees.
-Re-exports key constants and provides shared fixtures.
-"""
-
-from __future__ import annotations
-
-from tests.constants import PROJECT_ROOT, TEST_PROJECT, TEST_VAULT  # noqa: F401
+install_windows_temp_compat()

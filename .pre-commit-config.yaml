@@ -31,14 +31,14 @@ repos:
 
       - id: ty
         name: Type-check Python codebase (Ty)
-        entry: uv run python -m ty check src/vaultspec
+        entry: uv run python -m ty check src/vaultspec_core
         language: system
         types: [python]
         pass_filenames: false
 
       - id: check-naming
         name: Verify vault document naming and integrity
-        entry: uv run python -m vaultspec vault audit --verify
+        entry: uv run python -m vaultspec_core vault audit --verify
         language: system
         types: [markdown]
         pass_filenames: false

@@ -1,210 +1,179 @@
 # Hooks Guide
 
-Hooks let you attach automated actions to vaultspec lifecycle events. They fire
-automatically when the framework completes a lifecycle operation — no manual
-invocation required. Hook failures are always silent to the parent command:
-errors are logged at debug level and never interrupt your workflow.
+`vaultspec-core` supports simple local hooks for a small set of runtime
+events. Hooks are defined as YAML files, loaded from the workspace, and
+executed in order when their event fires.
 
----
+## What Hooks Are
 
-## Overview
+A hook file becomes a runtime hook object with:
 
-Hooks are YAML files stored in `.vaultspec/rules/hooks/`. Each file defines:
+- `name`: derived from the filename stem
+- `event`: required
+- `enabled`: optional, defaults to `true`
+- `actions`: ordered list of actions
 
-- **Which event** triggers the hook
-- **Whether the hook is enabled** (default: `true`)
-- **A list of actions** to execute in order — shell commands or agent dispatches
+Today, the only shipped action type is `shell`. It requires a `command`.
+Unknown action types are ignored with a warning rather than failing hook
+loading.
 
-The engine loads all `*.yaml` and `*.yml` files in the hooks directory when a
-lifecycle event fires. If a stem name appears in both `.yaml` and `.yml`, the
-`.yaml` file takes precedence and a warning is logged.
+## Where Hook Files Live
 
----
-
-## Supported Events
-
-| Event | Fires After | Context Variables |
-| ----- | ----------- | ----------------- |
-| `vault.document.created` | `vaultspec vault create` | `{path}`, `{root}`, `{event}` |
-| `vault.index.updated` | `vaultspec vault index` | `{root}`, `{event}` |
-| `config.synced` | `vaultspec sync-all` | `{root}`, `{event}` |
-| `audit.completed` | `vaultspec vault audit` | `{root}`, `{event}` |
-
-Context variables are available as `{placeholder}` strings inside `command` and
-`task` fields. Unrecognized placeholders are left unchanged.
-
----
-
-## YAML Schema
-
-```yaml
-event: <event-name>      # required — one of the 4 supported events above
-enabled: true            # optional — default true; set false to disable without deleting
-actions:
-  - type: shell
-    command: "echo {root}"          # supports {root}, {event}, {path} placeholders
-
-  - type: agent
-    name: vaultspec-docs-curator    # vaultspec agent name (must exist in .vaultspec/rules/agents/)
-    task: "Curate docs at {root}"   # goal string passed to the agent; supports placeholders
-```
-
-All fields at the top level are the same for every hook. The `actions` list is
-ordered — actions execute sequentially.
-
----
-
-## Shell Actions
-
-Shell actions run an arbitrary command in a subprocess.
-
-- **Timeout:** 60 seconds. If exceeded, the process is killed and the action is
-  recorded as failed.
-- **Security:** The command is tokenized with `shlex.split` (POSIX mode on Linux/macOS,
-  Windows-safe mode on Windows). It is never passed to a shell interpreter
-  (`shell=False`), so shell metacharacters like `&&`, `|`, and `$()` are not
-  interpreted. Use a wrapper script if you need shell composition.
-- **Exit code:** Non-zero exit is recorded as a failure in the result, but
-  never raises an exception in the parent command.
-
-```yaml
-actions:
-  - type: shell
-    command: "vaultspec vault audit --verify --root {root}"
-```
-
----
-
-## Agent Actions
-
-Agent actions dispatch a vaultspec sub-agent via `vaultspec subagent run`.
-
-- **Timeout:** 300 seconds. If exceeded, the process is killed and the action
-  is recorded as failed.
-- **Invocation:** `python -m vaultspec subagent run --agent <name> --goal <task>`
-- **Agent name:** Must match an agent definition in `.vaultspec/rules/agents/`.
-- **Task string:** Supports `{placeholder}` interpolation.
-
-```yaml
-actions:
-  - type: agent
-    name: vaultspec-docs-curator
-    task: "A new vault document was created at {path}. Review it for tag compliance and broken wiki-links."
-```
-
----
-
-## Error Behavior
-
-Hook failures are completely transparent to the parent lifecycle command:
-
-- Shell action fails (non-zero exit, timeout, or missing executable) — logged
-  at `WARNING` level, parent command continues.
-- Agent action fails (non-zero exit or timeout) — logged at `WARNING` level,
-  parent command continues.
-- YAML parse error — logged at `WARNING` level, that hook file is skipped.
-- Any unhandled exception inside `fire_hooks()` — caught and logged at `DEBUG`
-  level, parent command continues.
-
-To see hook output, run with `--verbose` or `--debug`:
-
-```bash
-vaultspec --verbose vault create --type research --feature my-feature
-```
-
----
-
-## Manual Testing
-
-Use `vaultspec hooks` subcommands to test hooks without running a full
-lifecycle command.
-
-**List all loaded hooks:**
-
-```bash
-vaultspec hooks list
-```
+Hooks live in:
 
 ```text
-Name                        Event                      Enabled
---------------------------------------------------------------
-example-audit-on-create     vault.document.created     false
-notify-on-sync              config.synced              true
+.vaultspec/rules/hooks/
 ```
 
-**Trigger hooks for a specific event:**
+The loader scans both:
 
-```bash
-vaultspec hooks run vault.document.created \
-  --path .vault/research/2026-02-23-my-feature-research.md
-```
+- `*.yaml`
+- `*.yml`
+
+If both files exist with the same stem, the `.yaml` file wins and the `.yml`
+duplicate is ignored.
+
+Hook names come from the filename stem, not from a YAML field.
+
+Example:
 
 ```text
-Triggering hooks for event 'vault.document.created'
-  [example-audit-on-create] shell: OK (0.4s)
+.vaultspec/rules/hooks/on-doc-created.yaml
 ```
 
-The `--path` flag sets the `{path}` context variable in hook templates. The
-`{root}` and `{event}` variables are always set automatically.
+This loads as the hook named `on-doc-created`.
 
----
+## Hook Schema
 
-## Creating a Hook
-
-- Create a YAML file in `.vaultspec/rules/hooks/`:
-
-  ```bash
-  touch .vaultspec/rules/hooks/my-hook.yaml
-  ```
-
-- Choose one of the 4 supported events and set it:
-
-  ```yaml
-  event: vault.document.created
-  ```
-
-- Add one or more actions:
-
-  ```yaml
-  actions:
-    - type: shell
-      command: "echo 'New doc created: {path}'"
-  ```
-
-- Set `enabled: true` (or omit it, since `true` is the default):
-
-  ```yaml
-  enabled: true
-  ```
-
-- Verify the hook loads correctly:
-
-  ```bash
-  vaultspec hooks list
-  ```
-
-- Test it manually before relying on the lifecycle trigger:
-
-   ```bash
-   vaultspec hooks run vault.document.created --path /path/to/doc.md
-   ```
-
----
-
-## Full Example
+The live schema is:
 
 ```yaml
-# .vaultspec/rules/hooks/curate-on-create.yaml
-#
-# Dispatches the docs-curator agent every time a new vault document is created.
-
 event: vault.document.created
 enabled: true
 actions:
   - type: shell
-    command: "vaultspec vault audit --verify --root {root}"
-
-  - type: agent
-    name: vaultspec-docs-curator
-    task: "A new vault document was created at {path} (event: {event}). Review the document for tag compliance and broken wiki-links, and fix any issues found."
+    command: "echo created {path}"
 ```
+
+Notes:
+
+- `event` is required.
+- `enabled` is optional. If omitted, the hook is enabled.
+- `actions` run in the order listed.
+- Each action must currently be `type: shell` with a `command`.
+
+## Supported Events
+
+These are the only supported events at runtime:
+
+| Event | Fired by | Context |
+| --- | --- | --- |
+| `vault.document.created` | `vaultspec-core vault add --type <doc-type> --feature <feature> [--title ...]` | `path`, `root`, `event` |
+| `config.synced` | `vaultspec-core sync-all` | `root`, `event` |
+| `audit.completed` | `vaultspec-core vault audit [--summary\|--features\|--verify\|--graph\|...]` | `root`, `event` |
+
+There is no live trigger for `vault.index.updated`.
+
+## Shell Action Behavior
+
+`shell` actions are plain command strings with simple placeholder
+interpolation.
+
+### Interpolation
+
+Interpolation is direct string replacement of `{key}` with the matching value
+from the event context.
+
+Example:
+
+```yaml
+actions:
+  - type: shell
+    command: "echo {event} {path}"
+```
+
+For `vault.document.created`, the available context keys are:
+
+- `{event}`
+- `{path}`
+- `{root}`
+
+For `config.synced` and `audit.completed`, the available keys are:
+
+- `{event}`
+- `{root}`
+
+Interpolation is simple string replacement, not a richer template language.
+
+### Execution Environment
+
+Shell commands run with:
+
+- `cwd` set to the resolved target workspace
+- `VAULTSPEC_TARGET_DIR` set in the environment
+- a `60s` timeout per command
+
+Write hook commands as workspace-relative operations.
+
+## Manual Testing
+
+List loaded hooks:
+
+```bash
+vaultspec-core hooks list
+```
+
+Run hooks for a specific event:
+
+```bash
+vaultspec-core hooks run vault.document.created --path .vault/research/example.md
+```
+
+Behavior of `hooks run`:
+
+- Unsupported events exit with code `1` and print the supported event set.
+- If no enabled hooks match the event, the command exits `0` quietly.
+
+## Commands That Naturally Fire Hooks
+
+Create a vault document:
+
+```bash
+vaultspec-core vault add --type research --feature hooks --title "Hook Notes"
+```
+
+Sync configuration:
+
+```bash
+vaultspec-core sync-all
+```
+
+Run a vault audit:
+
+```bash
+vaultspec-core vault audit --summary
+```
+
+A practical document-created hook:
+
+```yaml
+event: vault.document.created
+actions:
+  - type: shell
+    command: "echo created {path} in {root}"
+```
+
+## Non-Features And Pitfalls
+
+Keep these constraints in mind:
+
+- only three events are supported: `vault.document.created`, `config.synced`, and `audit.completed`
+- only `shell` actions are supported in the live schema
+- there is no subagent hook runtime, task field, or `vault.index.updated` trigger
+- examples should use `vaultspec-core` command names and top-level target selection such as `--target`
+- hook failure behavior is not fully hidden; write commands so failures are explicit and debuggable
+
+## See Also
+
+- [CLI Reference](./cli-reference.md)
+- [Vault Query Guide](./vault-query-guide.md)

@@ -28,8 +28,8 @@ clean the documentation vault."
 
 ### Dispatch the Curator
 
-Invoke the `vaultspec-subagent` skill with `vaultspec-docs-curator`. Instruct
-it to "Perform a full vault audit of `.vault/`. Validate frontmatter,
+Load the `vaultspec-docs-curator` agent persona. Instruct it to "Perform a
+full vault audit of `.vault/`. Validate frontmatter,
 wiki-links, naming conventions, template compliance, and directory structure.
 Fix violations in-place and produce an audit report."
 

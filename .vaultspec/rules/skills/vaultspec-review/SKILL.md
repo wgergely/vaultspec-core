@@ -2,7 +2,7 @@
 name: vaultspec-review
 description: >-
   Skill to conduct a formal code review. Audits code for safety, intent, and
-  quality. Mandates dispatching the vaultspec-code-reviewer agent.
+  quality. Mandates loading the vaultspec-code-reviewer agent persona.
 ---
 # Spec Review Skill (vaultspec-review)
 
@@ -25,7 +25,7 @@ implementation."
 
 ### Dispatch Reviewer
 
-Invoke the `vaultspec-subagent` skill with `vaultspec-code-reviewer`.
+Load the `vaultspec-code-reviewer` agent persona.
 Instruct it to:
 
 > "Perform a comprehensive code review of `{feature/files}`. Verify safety
@@ -36,7 +36,7 @@ Instruct it to:
 
 - **Pass:** If the reviewer finds no critical issues, you may proceed.
 - **Fail:** If the reviewer flags issues, you **MUST** invoke
-  `vaultspec-execute` (or dispatch an executor) to fix the issues, then
+  `vaultspec-execute` (or load an executor persona) to fix the issues, then
   re-run `vaultspec-review`.
 
 ## Persistence

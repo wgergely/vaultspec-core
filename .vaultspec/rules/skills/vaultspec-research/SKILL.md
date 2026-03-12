@@ -21,8 +21,10 @@ structured research and brainstorming."
 **Save findings to:** Research artifact at
 `.vault/research/yyyy-mm-dd-{feature}-{phase}-research.md`
 
-**Dispatch sub-agent:** Invoke the `vaultspec-subagent` skill with
-`vaultspec-adr-researcher`. Instruct it to "Conduct research on `{topic}`.
+Load the `vaultspec-adr-researcher` agent persona for focused work. When the
+task benefits from multiple researchers, coordinate them through the host
+environment rather than assuming a shipped MCP team-thread runtime. Instruct
+the researcher to "Conduct research on `{topic}`.
 Persist findings to `.vault/research/...`"
 
 ## Template

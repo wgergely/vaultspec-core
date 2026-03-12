@@ -1,259 +1,154 @@
-# Spec-Driven Development (SDD)
+# vaultspec Framework Manual
 
-vaultspec is a language-agnostic development framework. Rules, skills, and
-templates work with any language and toolchain. Agent personas reference the
-project's established conventions rather than prescribing specific tools.
+## Scope
 
-This folder contains the rule and template collection mandating the research,
-reference, ADR, and agent-based development process.
-The rules are compatible with Google Antigravity, Gemini CLI and Claude Code.
+This manual describes the current shipped product boundary for a `vaultspec` workspace.
 
-## User Manual
+- `vaultspec-core` manages the workspace on disk.
+- `vaultspec-mcp` exposes that same workspace to MCP clients.
+- `.vaultspec/` is the framework resource tree: the source material the runtime reads, validates, and syncs into tool-facing surfaces.
+- `.vault/` is the durable project record: research, decisions, plans, execution records, reviews, and related artifacts created within the framework.
 
-### The Workflow
+This README focuses on what lives under `.vaultspec/`, how the runtime consumes it, and what gets synced out of it.
 
-The system enforces a strict **Research -> Specify -> Plan -> Execute ->
-Verify** cycle. You do not simply "write code"; you build a trail of
-documentation that ensures quality and context preservation.
+## Directory Map
 
-**High-Level Summary:**
-
-- **Research (`vaultspec-research`)** & **Reference (`vaultspec-reference`)**
-  gather the data.
-- **Specify (`vaultspec-adr`)** formalizes the choice.
-- **Plan (`vaultspec-write`)** defines the steps.
-- **Execute (`vaultspec-execute`)** builds it.
-- **Verify (`vaultspec-review`)** validates it.
-- **Curate (`vaultspec-curate`)** cleans up.
-
-#### Detailed Steps
-
-- **Research (`vaultspec-research`)**:
-  - **Goal:** Understand the problem, explore libraries, and find "frontier"
-    patterns.
-  - **Agent:** `vaultspec-adr-researcher` (High Tier).
-  - **Output:** `.vault/research/...` artifact.
-  - *Usage:* "Activate `vaultspec-research` to investigate `{topic}`."
-
-- **Specify (`vaultspec-adr`)**:
-  - **Goal:** Make binding technical decisions based on your research.
-  - **Output:** `.vault/adr/...` artifact.
-  - *Usage:* "Activate `vaultspec-adr` to formalize our decision on
-    `{topic}`."
-
-- **Plan (`vaultspec-write`)**:
-  - **Goal:** Convert the ADR into a step-by-step implementation plan.
-  - **Agent:** `vaultspec-writer` (High Tier).
-  - **Output:** `.vault/plan/...` artifact.
-  - *Usage:* "Activate `vaultspec-write` to create a plan for `{feature}`."
-
-- **Execute (`vaultspec-execute`)**:
-  - **Goal:** Implement the plan using specialized sub-agents.
-  - **Agent:** Orchestrator (You) + Executors (`vaultspec-low-executor`,
-    `vaultspec-high-executor`).
-  - **Output:** Code changes + `.vault/exec/...` logs.
-  - *Usage:* "Activate `vaultspec-execute` to implement the plan."
-
-- **Verify (`vaultspec-review`)**:
-  - **Goal:** Validate the implementation against the plan and safety
-    standards.
-  - **Agent:** `vaultspec-code-reviewer` (High Tier).
-  - *Usage:* "Activate `vaultspec-review` to audit the implementation."
-
-- **Curate (`vaultspec-curate`)**:
-  - **Goal:** Maintain the hygiene of the `.vault/` vault.
-  - **Agent:** `vaultspec-docs-curator` (Medium Tier).
-  - *Usage:* "Activate `vaultspec-curate` to audit the vault."
-
-### Agent Reference
-
-| Agent | Tier | Role | When to use |
-| :--- | :--- | :--- | :--- |
-| `vaultspec-adr-researcher` | HIGH | Researcher | New tech, architecture |
-| `vaultspec-writer` | HIGH | Planner | After ADR approval |
-| `vaultspec-docs-curator` | MED | Librarian | Links, tags, schema |
-| `vaultspec-reference-auditor` | MED | Auditor | Codebase patterns |
-| `vaultspec-high-executor` | HIGH | Sr. Engineer | Refactors, new logic |
-| `vaultspec-standard-executor` | MED | Engineer | Feature work |
-| `vaultspec-low-executor` | LOW | Jr. Engineer | Rote tasks, fixes |
-| `vaultspec-code-reviewer` | HIGH | Reviewer | Safety, quality |
-
-## Context Management
-
-The system context is managed through config sync and system prompt assembly
-in `.vaultspec/`:
-
-- **`system/framework.md` (Bootstrap Prompt):** The XML-structured bootstrap
-  prompt that cold-starts an LLM agent with operational knowledge of
-  vaultspec — identity, pipeline phases, intent-to-skill mapping, dispatch
-  references, and folder conventions. Lives in `system/` with
-  `pipeline: config` frontmatter so it feeds into `config sync` output only
-  (not `system sync`).
-- **`system/project.md` (User-Editable):** A placeholder for
-  project-specific instructions, extra context, or user preferences. This
-  content is appended verbatim to the generated config files.
-- **`vaultspec config sync`:** This command synchronizes `system/framework.md`
-  and `system/project.md` into the root `AGENTS.md` and tool-specific files
-  (`CLAUDE.md`, `GEMINI.md`).
-- **`vaultspec system show`:** Displays the composable system prompt parts and
-  their generation targets.
-- **`vaultspec system sync`:** Assembles parts from `system/` into `SYSTEM.md`
-  and syncs it to tool destinations (e.g., `.gemini/SYSTEM.md`).
-
-**Syntactic Stability:**
-Framework context is stored in the **YAML frontmatter** (under the
-`system_framework` key) of the generated files to ensure it remains
-syntactically stable and separated from user-provided content.
-
-### File Responsibilities
-
-| File | Purpose | Managed By |
-| :--- | :--- | :--- |
-| `system/framework.md` | Bootstrap prompt | `config sync` |
-| `system/project.md` | Project context | User |
-| `AGENTS.md` | Root AI entry point | `vaultspec` |
-| `CLAUDE.md` | Claude Code config | `vaultspec` |
-| `GEMINI.md` | Gemini CLI config | `vaultspec` |
-| `system/` | Composable prompts | Developer |
-| `SYSTEM.md` | Gemini system prompt | `vaultspec` |
-
-## Overview Diagram
-
-> **Note:** The `vaultspec-subagent` skill is a **utility task** used
-> internally by other agents. It should **not** be called directly by the
-> user.
-
-```mermaid
-flowchart TD
-    %% Core Nodes
-    Feature["&lt;Feature&gt;<br/>The glue that binds them all"]
-    Research["&lt;Research&gt;<br/>Brainstorming & research<br/>(no routes)"]
-    Reference["&lt;Reference&gt;<br/>Technical audit"]
-    ADR["&lt;ADR&gt;<br/>Decision record"]
-    Plan{"**&lt;Plan&gt;**<br/>Actionable steps"}
-    StepRecord["&lt;Step Record&gt;<br/>&lt;Plan&gt; execution artifact"]
-    PhaseSummary["&lt;Phase Summary&gt;<br/>Summary after &lt;Steps&gt;"]
-    TaskSummary["&lt;Task Summary&gt;<br/>Summary after &lt;Phases&gt;"]
-    FinalFeature["&lt;Feature&gt; Implemented Code"]
-
-    %% Relationships
-    Feature --> Research
-    Feature --> Reference
-    Research --> ADR
-    Feature --> ADR
-    Reference --> ADR
-    ADR --> Plan
-    Plan --> StepRecord
-    StepRecord --> PhaseSummary
-    PhaseSummary --> TaskSummary
-    TaskSummary --> FinalFeature
-    FinalFeature -- Testing & Auditing --> Plan
+```text
+.vaultspec/
+├─ docs/                  Human-facing reference material for operators and contributors
+└─ rules/                 Runtime-managed framework sources
+   ├─ rules/              Behavioral rules and policy text consumed by generated surfaces
+   ├─ skills/             Task-specific workflow instructions and reusable procedures
+   ├─ agents/             Agent/persona inventory as framework content
+   ├─ system/             Composable system fragments for context, responsibility, and sync outputs
+   ├─ templates/          Templates for durable artifacts written under .vault/
+   └─ hooks/              Hook definitions and hook runtime resources
 ```
 
-## Markdown Files
+### What each subtree is for
 
-Workflows, agents, skills, and templates are defined in their respective
-subfolders without any tool specific yaml configuration headers or metadata.
-Tools reference relatively the `.vaultspec` folder and define their own
-tool-specific yaml configuration headers.
+| Path | Purpose |
+| --- | --- |
+| `.vaultspec/docs/` | Reference documentation for humans: concepts, command usage, hooks, querying the vault, and related guides. |
+| `.vaultspec/rules/rules/` | Stable rule text that shapes generated instructions and workspace behavior. |
+| `.vaultspec/rules/skills/` | Reusable skill definitions for focused workflows. |
+| `.vaultspec/rules/agents/` | The current inventory of agent/persona definitions as source content under the framework tree. |
+| `.vaultspec/rules/system/` | System-level prompt fragments and responsibility boundaries assembled into synced outputs. |
+| `.vaultspec/rules/templates/` | Canonical templates for records written into `.vault/`. |
+| `.vaultspec/rules/hooks/` | Hook definitions and resources used by the runtime hook system. |
 
-## Example Workflow
+## How The Runtime Uses `.vaultspec/`
 
-A possible workflow might look something like this, disregarding loopbacks
-and decision reversals:
+`vaultspec-core` treats `.vaultspec/` as a resource tree. It reads these sources, shows the effective state, validates them, and syncs generated outputs for the local workspace.
 
-```mermaid
-flowchart TD
-    %% NODES
-    START["Start: User Prompt"]
+### Bootstrap and full sync
 
-    %% Phase 1: Research
-    SK_RES["Skill: vaultspec-research<br/>Announce"]
-    SK_SUB_RES["Skill: vaultspec-subagent<br/>Run Command: vaultspec subagent"]
-    SA_RES["Agent: vaultspec-adr-researcher<br/>Search<br/>Write Artifact"]
-    PH1_END["Phase 1 Complete"]
+Use `init` to create or normalize the framework tree, and `sync-all` to refresh generated surfaces from the source resources.
 
-    %% Phase 2: Specify
-    SK_ADR["Skill: vaultspec-adr<br/>Announce<br/>Write ADR<br/>Notify"]
-    PH2_END["Phase 2 Complete"]
-
-    %% Phase 3: Plan
-    SK_REF["Skill: vaultspec-reference<br/>Announce"]
-    SK_SUB_REF["Skill: vaultspec-subagent<br/>Run Command: vaultspec subagent"]
-    SA_REF["Agent: vaultspec-reference-auditor<br/>Audit Ref<br/>Write Artifact"]
-
-    SK_WRITE["Skill: vaultspec-write<br/>Announce"]
-    SK_SUB_WRITE["Skill: vaultspec-subagent<br/>Run Command: vaultspec subagent"]
-    SA_WRITER["Agent: vaultspec-writer<br/>Plan Codebase<br/>Write Artifact"]
-    PH3_END["Phase 3 Complete"]
-
-    %% Phase 4: Execute
-    SK_EXEC["Skill: vaultspec-execute<br/>Announce"]
-    SK_SUB_EXEC["Skill: vaultspec-subagent<br/>Run Command: vaultspec subagent"]
-    SA_EXEC["Agent: vaultspec-high-executor<br/>Edit Code<br/>Validate"]
-
-    %% Phase 5: Verify
-    SK_REV["Skill: vaultspec-review<br/>Announce"]
-    SK_SUB_REV["Skill: vaultspec-subagent<br/>Run Command: vaultspec subagent"]
-    SA_REV["Agent: vaultspec-code-reviewer<br/>Audit Safety/Intent<br/>Report"]
-
-    EXEC_RET["Execution Return"]
-    PH4_END["Phase 4 Complete"]
-
-    %% Revision (if needed)
-    SK_FIX["Skill: vaultspec-execute (Fixes)<br/>Announce"]
-    SK_SUB_FIX["Skill: vaultspec-subagent<br/>Run Command: vaultspec subagent"]
-    SA_FIX["Agent: vaultspec-standard-executor<br/>Fix Code<br/>Verify"]
-    PH5_END["Phase 5 Complete"]
-
-    %% Conclusion
-    ACTION_GIT["Action: Commit<br/>git add<br/>git commit"]
-    END_NODE["End"]
-
-    %% EDGES
-    START --> SK_RES
-
-    %% Phase 1 Branching
-    SK_RES -- Main Flow --> PH1_END
-    SK_RES -- Invokes --> SK_SUB_RES
-    SK_SUB_RES -- Dispatches --> SA_RES
-    SA_RES -- Reconnects --> PH1_END
-
-    PH1_END --> SK_ADR
-    SK_ADR --> PH2_END
-
-    %% Phase 3 Branching
-    PH2_END --> SK_REF
-    SK_REF -- Main Flow --> SK_WRITE
-    SK_REF -- Invokes --> SK_SUB_REF
-    SK_SUB_REF -- Dispatches --> SA_REF
-    SA_REF -- Reconnects --> SK_WRITE
-
-    SK_WRITE -- Main Flow --> PH3_END
-    SK_WRITE -- Invokes --> SK_SUB_WRITE
-    SK_SUB_WRITE -- Dispatches --> SA_WRITER
-    SA_WRITER -- Reconnects --> PH3_END
-
-    %% Phase 4 Execution
-    PH3_END --> SK_EXEC
-    SK_EXEC -- Main Flow --> SK_REV
-    SK_EXEC -- Invokes --> SK_SUB_EXEC
-    SK_SUB_EXEC -- Dispatches --> SA_EXEC
-    SA_EXEC -- Reconnects --> SK_REV
-
-    %% Review Loop
-    SK_REV -- Invokes --> SK_SUB_REV
-    SK_SUB_REV -- Dispatches --> SA_REV
-    SA_REV -- Reconnects --> SK_REV
-
-    SK_REV -- "Pass" --> PH4_END
-    SK_REV -- "Fail/Revision" --> SK_FIX
-
-    %% Fix Loop
-    SK_FIX -- Invokes --> SK_SUB_FIX
-    SK_SUB_FIX -- Dispatches --> SA_FIX
-    SA_FIX -- Reconnects --> SK_REV
-
-    PH4_END --> ACTION_GIT
-    ACTION_GIT --> END_NODE
+```bash
+vaultspec-core init
+vaultspec-core sync-all
 ```
+
+### Inspect resource inventories
+
+Use the list/show commands to inspect what the runtime currently sees.
+
+```bash
+vaultspec-core rules list
+vaultspec-core skills list
+vaultspec-core agents list
+vaultspec-core config show
+vaultspec-core system show
+vaultspec-core hooks list
+```
+
+### Preview sync effects
+
+Use dry runs when you want to inspect planned changes before writing synced outputs.
+
+```bash
+vaultspec-core config sync --dry-run
+vaultspec-core system sync --dry-run
+```
+
+### Run hooks from the managed hook tree
+
+Hooks are sourced from `.vaultspec/rules/hooks/`, not from a legacy top-level hooks directory.
+
+```bash
+vaultspec-core hooks run vault.document.created --path .vault/research/example.md
+```
+
+## Synced Outputs And Tool Surfaces
+
+The framework source tree is not the same thing as the generated tool surfaces it produces.
+
+`vaultspec-core` can project `.vaultspec/` into workspace-facing outputs such as:
+
+- `AGENTS.md`
+- `.claude/...`
+- `.gemini/...`
+- `.agents/...`
+
+These synced outputs are derived artifacts. The editable source of truth remains under `.vaultspec/`, especially `.vaultspec/rules/` and `.vaultspec/docs/`. When framework resources change, resync the workspace rather than hand-maintaining generated copies.
+
+`vaultspec-mcp` is separate from those synced files. It does not define a second framework tree. Instead, it serves the same workspace model to MCP clients by pointing at the target workspace directory.
+
+Example client configuration:
+
+```json
+{
+  "mcpServers": {
+    "vaultspec-core": {
+      "command": "vaultspec-mcp",
+      "env": {
+        "VAULTSPEC_TARGET_DIR": "/path/to/workspace"
+      }
+    }
+  }
+}
+```
+
+## Relationship To `.vault/`
+
+`.vaultspec/` and `.vault/` serve different roles:
+
+- `.vaultspec/` contains framework resources: rules, skills, agents, system fragments, templates, hooks, and reference docs.
+- `.vault/` contains durable project records created within that framework.
+
+Typical `.vault/` operations use the framework resources defined in `.vaultspec/`:
+
+```bash
+vaultspec-core vault add --type research --feature example-feature --title "Initial research"
+vaultspec-core vault audit --summary
+vaultspec-core readiness
+vaultspec-core doctor
+```
+
+In practice:
+
+- `.vaultspec/rules/templates/` shapes how new records are created.
+- synced system and rule outputs shape how tools interact with those records.
+- audits and readiness checks help verify that the workspace remains coherent.
+
+## Documentation Map
+
+Use `.vaultspec/docs/` as the human-facing reference set for the framework. The key documents are:
+
+- [Concepts](./docs/concepts.md)
+- [CLI Reference](./docs/cli-reference.md)
+- [Hooks Guide](./docs/hooks-guide.md)
+- [Vault Query Guide](./docs/vault-query-guide.md)
+
+This README is the entry point. The detailed operator documentation lives in `.vaultspec/docs/`.
+
+## Non-Goals
+
+This manual does not cover:
+
+- a `subagent` CLI or any `vaultspec-subagent` command surface
+- packaged team or orchestration walkthroughs
+- historical ACP or A2A diagrams
+- stale artifact-choreography diagrams that do not match the current shipped runtime boundary
+- legacy flat `system/...` or `.vaultspec/hooks/` path layouts

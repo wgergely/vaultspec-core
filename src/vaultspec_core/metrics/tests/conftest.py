@@ -1,0 +1,24 @@
+"""Shared fixtures for metrics tests.
+
+Resets configuration state and binds metrics calculations to the bundled
+vaultcore fixture tree.
+"""
+
+import pytest
+
+from tests.constants import TEST_PROJECT
+
+from ...config import reset_config
+
+
+@pytest.fixture(autouse=True)
+def _reset_cfg():
+    reset_config()
+    yield
+    reset_config()
+
+
+@pytest.fixture
+def vault_root():
+    """Return the real test-project root for metrics testing."""
+    return TEST_PROJECT

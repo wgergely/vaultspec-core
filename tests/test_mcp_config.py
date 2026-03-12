@@ -20,17 +20,22 @@ class TestMcpConfig:
         data = json.loads((PROJECT_ROOT / "mcp.json").read_text())
         assert "mcpServers" in data
 
-    def test_vaultspec_mcp_entry_exists(self):
+    def test_vaultspec_core_entry_exists(self):
         data = json.loads((PROJECT_ROOT / "mcp.json").read_text())
-        assert "vaultspec-mcp" in data["mcpServers"]
+        assert "vaultspec-core" in data["mcpServers"]
 
     def test_command_is_uv(self):
         data = json.loads((PROJECT_ROOT / "mcp.json").read_text())
-        server = data["mcpServers"]["vaultspec-mcp"]
+        server = data["mcpServers"]["vaultspec-core"]
         assert server["command"] == "uv"
 
     def test_args_include_run(self):
         data = json.loads((PROJECT_ROOT / "mcp.json").read_text())
-        server = data["mcpServers"]["vaultspec-mcp"]
+        server = data["mcpServers"]["vaultspec-core"]
         assert "run" in server["args"]
         assert "vaultspec-mcp" in server["args"]
+
+    def test_uses_target_dir_env(self):
+        data = json.loads((PROJECT_ROOT / "mcp.json").read_text())
+        server = data["mcpServers"]["vaultspec-core"]
+        assert server["env"]["VAULTSPEC_TARGET_DIR"] == "."

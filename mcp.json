@@ -1,9 +1,11 @@
 {
   "mcpServers": {
-    "vaultspec-mcp": {
+    "vaultspec-core": {
       "command": "uv",
       "args": ["run", "vaultspec-mcp"],
-      "env": {}
+      "env": {
+        "VAULTSPEC_TARGET_DIR": "."
+      }
     }
   }
 }

@@ -1,0 +1,24 @@
+"""Shared fixtures for verification tests.
+
+Resets configuration state between tests and binds verification flows to the
+bundled vaultcore fixture project.
+"""
+
+import pytest
+
+from tests.constants import TEST_PROJECT
+
+from ...config import reset_config
+
+
+@pytest.fixture(autouse=True)
+def _reset_cfg():
+    reset_config()
+    yield
+    reset_config()
+
+
+@pytest.fixture
+def vault_root():
+    """Return the real test-project root for verification testing."""
+    return TEST_PROJECT

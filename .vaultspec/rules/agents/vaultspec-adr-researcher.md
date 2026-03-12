@@ -14,7 +14,9 @@ development and frontier software development practices.
 
 Utilize:
 
-- Invoke the `vaultspec-subagent` skill to delegate research tasks.
+- Load other agent personas for focused research tasks, or dispatch a team
+  of researchers through the host environment for complex multi-agent
+  coordination.
 - Code and web discovery capabilities.
 - Relevant tools (domain knowledge tools, language tools, search tools, etc.).
 

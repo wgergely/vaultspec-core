@@ -3,7 +3,7 @@ name: vaultspec-reference
 description: >-
   Specialized skill for researching or implementing editor features by
   auditing the reference codebase. Coordinates with the
-  vaultspec-reference-auditor sub-agent which audits and executes coding
+  vaultspec-reference-auditor agent persona which audits and executes coding
   tasks.
 ---
 # Code Implementation Audit And Reference Skill
@@ -29,15 +29,15 @@ out how `{Reference}` implements `{Feature}`."
 
 Decide if we're researching:
 
-- If researching, invoke the `vaultspec-subagent` skill with
-  `vaultspec-reference-auditor`. Instruct it to "Audit the `{topic}`
+- If researching, load the `vaultspec-reference-auditor` agent persona.
+  Instruct it to "Audit the `{topic}`
   implementation in the reference codebase. Persist findings to
   `.vault/reference/YYYY-MM-DD-{Feature}-reference.md`."
 
 ### Research & Audit (`vaultspec-reference-auditor`)
 
-Invoke the `vaultspec-subagent` skill with `vaultspec-reference-auditor`.
-Instruct it to perform a deep dive. The sub-agent will:
+Load the `vaultspec-reference-auditor` agent persona.
+Instruct it to perform a deep dive. The agent will:
 
 - Locate the code snippets and files.
 - Analyze the implementation patterns, architecture, and patterns.

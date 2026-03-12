@@ -5,61 +5,36 @@ description: Dispatch a sub-agent to perform a complex task. Use skill when you 
   sub-agents.
 ---
 
-# Dispatch Sub-Agent Skill
+# vaultspec-subagent
 
-> **Warning:** This is a **utility skill** intended for use by other agents
-> (e.g., `vaultspec-execute`, `vaultspec-research`). Users should generally
-> **not** invoke this skill directly; instead, use the high-level workflow
-> skills.
+## Purpose
 
-This skill is the de facto standard for performing any meaningful task. Use
-it to perform Research, audits, coding work, complex refactors, and any other
-task that requires more than a few lines of code.
+Use this skill to delegate bounded specialist work within the framework. It is
+an internal convention for role-based execution, not a promise of any
+particular command, service, or transport.
 
-## Usage
+## When to use
 
-```bash
-vaultspec subagent run \
-  --agent {agent_name} \
-  --goal "{task_description|plan_document}"
-```
+- A task benefits from a specialist persona or explicit role separation.
+- Another workflow says to invoke `vaultspec-subagent`.
+- The handoff needs a named agent identity and a defined result.
 
-> `--agent`: The name of the agent to load from `.vaultspec/rules/agents/`
-> `--goal`: A clear, natural language description of the task or a Plan path.
-> `--model` (Optional): Override the model defined in the agentfile.
+## Required handoff
 
-### Tooling Strategy
+Provide all of the following:
 
-Agents dispatched via this skill MUST prioritize the following tools for all
-repository operations:
+- `agent`: the framework identity or persona to apply
+- `goal`: the concrete outcome to produce
+- `constraints`: scope, rules, exclusions, and required context
+- `expected result`: the artifact, decision, or output to return
 
-- **Discovery**: Use the `fd` skill for locating files. DO NOT use `ls` or
-  `dir`.
-- **Search**: Use the `rg` (ripgrep) skill for searching content.
-- **Manipulation**: Use the `sg` (ast-grep) skill for complex code
-  manipulation and refactoring.
-- **Text Processing**: Use the `sd` (search-and-displace) skill for fast,
-  intuitive find-and-replace.
+## Environment note
 
-### Examples
+Host environments may implement delegation differently, or not at all. Agent
+names are framework resource identities, not guaranteed runnable endpoints.
 
-**Dispatch a research task:**
+## Fallback
 
-```bash
-vaultspec subagent run \
-  --agent vaultspec-adr-researcher \
-  --goal "Analyze trade-offs of Pattern A vs Pattern B for library crates."
-```
-
-**Dispatch a code review:**
-
-```bash
-vaultspec subagent run \
-  --agent vaultspec-code-reviewer \
-  --goal "Review the unsafe block in src/utils.rs."
-```
-
-## Behavior
-
-- The script will spawn the sub-agent process and stream output to stdout.
-- Session logs are written to a log file for the current session.
+If no delegation mechanism exists, execute the task directly while preserving
+the requested role separation. Keep the same agent identity, goal,
+constraints, and expected result in the handoff and output.
