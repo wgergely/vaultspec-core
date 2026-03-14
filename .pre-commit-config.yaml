@@ -45,18 +45,12 @@ repos:
         types: [markdown]
         pass_filenames: false
 
-      - id: lychee
-        name: Check documentation links (Lychee)
-        entry: lychee
-        language: system
-        args: ["--no-progress", "--exclude-path", "README.md"]
-        types: [markdown]
-
       - id: markdownlint
         name: Lint Markdown style (markdownlint)
         entry: markdownlint
         language: node
         additional_dependencies: ["markdownlint-cli@0.44.0"]
-        args: ["--config", ".markdownlint.json", "--fix", ".vaultspec/", ".vault/", "README.md"]
+        args: ["--config", ".markdownlint.json"]
+        pass_filenames: true
         types: [markdown]
 

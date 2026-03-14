@@ -561,4 +561,4 @@ The primary risk — ~2000 lines of new bridge code (including MCP tool injectio
 - [claude-agent-sdk on PyPI](https://pypi.org/project/claude-agent-sdk/) — v0.1.36
 - [@zed-industries/claude-code-acp](https://www.npmjs.com/package/@zed-industries/claude-code-acp) — Node.js ACP bridge
 - [ACP Specification](https://github.com/agentclientprotocol/agent-client-protocol) — Protocol spec
-- [Claude Code Teams](https://docs.anthropic.com/en/docs/claude-code/teams) — File-based coordination (2026)
+- [Claude Code Teams](https://code.claude.com/docs/en/agent-teams) — File-based coordination (2026)

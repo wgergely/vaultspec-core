@@ -14,6 +14,10 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NO_COLOR: "1"
+  FORCE_COLOR: "0"
+
 jobs:
   workflow-lint:
     name: Workflow Lint
@@ -104,8 +108,6 @@ jobs:
 
       - name: Run tests
         run: just test python
-        env:
-          NO_COLOR: "1"
 
   vault-audit:
     name: Vault Audit
