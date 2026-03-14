@@ -4,15 +4,19 @@ from __future__ import annotations
 
 import os
 
-# Set NO_COLOR before any Rich/Typer console is created.
-# Must be at module level so it takes effect at import time.
-os.environ["NO_COLOR"] = "1"
-
 import pytest
+import typer.rich_utils
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app as cli_app
 from vaultspec_core.core.types import init_paths
+
+# Disable Rich/Typer color output in tests.  NO_COLOR is the standard
+# mechanism (https://no-color.org/) and Rich respects it.  We also force
+# Typer's COLOR_SYSTEM to None to prevent ANSI on CI where pseudo-TTY
+# detection can override NO_COLOR.
+os.environ["NO_COLOR"] = "1"
+typer.rich_utils.COLOR_SYSTEM = None  # type: ignore[assignment]
 
 
 def setup_rules_dir(root):
