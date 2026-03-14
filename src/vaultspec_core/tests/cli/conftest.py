@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+import os
+
+# Set NO_COLOR before any Rich/Typer console is created.
+# Must be at module level so it takes effect at import time.
+os.environ["NO_COLOR"] = "1"
+
 import pytest
 from typer.testing import CliRunner
 
@@ -17,16 +23,6 @@ def setup_rules_dir(root):
 @pytest.fixture(scope="session")
 def runner():
     return CliRunner(env={"NO_COLOR": "1"})
-
-
-@pytest.fixture(autouse=True, scope="session")
-def _disable_color():
-    """Set NO_COLOR for the process so Rich consoles respect it."""
-    import os
-
-    os.environ["NO_COLOR"] = "1"
-    yield
-    os.environ.pop("NO_COLOR", None)
 
 
 @pytest.fixture
