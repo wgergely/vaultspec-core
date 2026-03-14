@@ -246,11 +246,7 @@ def system_sync(dry_run: bool = False, force: bool = False) -> None:
             rel = system_file.relative_to(_t.TARGET_DIR)
 
             # Safety guard
-            if (
-                system_file.exists()
-                and not _is_cli_managed(system_file)
-                and not force
-            ):
+            if system_file.exists() and not _is_cli_managed(system_file) and not force:
                 logger.warning("    [SKIP] %s - file exists with custom content.", rel)
                 logger.warning("           Use --force to overwrite.")
                 result.skipped += 1

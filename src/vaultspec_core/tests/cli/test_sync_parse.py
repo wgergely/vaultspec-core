@@ -123,9 +123,7 @@ class TestInitPaths:
         assert Tool.CODEX in _t.TOOL_CONFIGS
         assert _cfg(Tool.CLAUDE).name == "claude"
         assert _cfg(Tool.ANTIGRAVITY).config_file == test_project / "GEMINI.md"
-        assert _cfg(Tool.ANTIGRAVITY).rules_dir == (
-            test_project / ".agents" / "rules"
-        )
+        assert _cfg(Tool.ANTIGRAVITY).rules_dir == (test_project / ".agents" / "rules")
         assert _cfg(Tool.ANTIGRAVITY).skills_dir == (
             test_project / ".agents" / "skills"
         )
@@ -134,9 +132,7 @@ class TestInitPaths:
             test_project / ".codex" / "config.toml"
         )
         assert _cfg(Tool.CODEX).rules_dir is None
-        assert _cfg(Tool.CODEX).skills_dir == (
-            test_project / ".agents" / "skills"
-        )
+        assert _cfg(Tool.CODEX).skills_dir == (test_project / ".agents" / "skills")
         assert _cfg(Tool.CODEX).rule_ref_dir is None
 
 
