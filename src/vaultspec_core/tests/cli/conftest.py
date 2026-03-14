@@ -19,6 +19,16 @@ def runner():
     return CliRunner(env={"NO_COLOR": "1"})
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _disable_color():
+    """Set NO_COLOR for the process so Rich consoles respect it."""
+    import os
+
+    os.environ["NO_COLOR"] = "1"
+    yield
+    os.environ.pop("NO_COLOR", None)
+
+
 @pytest.fixture
 def test_project(tmp_path):
     """Provide an isolated test project directory with full structure."""

@@ -17,15 +17,17 @@ repos:
 
       - id: taplo-format
         name: Format TOML files (Taplo)
-        entry: npx @taplo/cli fmt
-        language: system
+        entry: taplo fmt
+        language: node
+        additional_dependencies: ["@taplo/cli@0.7.0"]
         types: [toml]
         pass_filenames: true
 
       - id: taplo-lint
         name: Lint TOML files (Taplo)
-        entry: npx @taplo/cli lint
-        language: system
+        entry: taplo lint
+        language: node
+        additional_dependencies: ["@taplo/cli@0.7.0"]
         types: [toml]
         pass_filenames: true
 
@@ -52,8 +54,9 @@ repos:
 
       - id: markdownlint
         name: Lint Markdown style (markdownlint)
-        entry: npx --yes markdownlint-cli
-        language: system
+        entry: markdownlint
+        language: node
+        additional_dependencies: ["markdownlint-cli@0.44.0"]
         args: ["--config", ".markdownlint.json", "--fix", ".vaultspec/", ".vault/", "README.md"]
         types: [markdown]
 

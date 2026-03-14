@@ -2,6 +2,7 @@
 accept = [200, 403, 410, 429, 502, 503]
 exclude = [
   '\[\[.*\]\]',
+  "^/[A-Z]:/",
   "https://www.npmjs.com/.*",
   "https://github.com/.*",
   "https://www.linuxfoundation.org/.*",
