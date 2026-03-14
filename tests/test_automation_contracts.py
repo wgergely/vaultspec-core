@@ -90,6 +90,7 @@ def test_test_all_runs_python_and_docker() -> None:
     assert "just test python" in justfile
     assert "just test docker" in justfile
     assert "just build docker" in justfile
+    assert "just build python" in justfile
 
 
 def test_fix_surface_includes_lint_markdown_and_vault() -> None:
@@ -153,7 +154,7 @@ def test_ci_workflow_uses_actionlint() -> None:
     jobs = ci["jobs"]
     steps = jobs["workflow-lint"]["steps"]
     used_actions = {step.get("uses") for step in steps if "uses" in step}
-    assert "rhysd/actionlint@v1" in used_actions
+    assert "docker://rhysd/actionlint:latest" in used_actions
 
 
 def test_ci_workflow_installs_node_and_lychee_for_config_and_link_checks() -> None:
@@ -162,7 +163,7 @@ def test_ci_workflow_installs_node_and_lychee_for_config_and_link_checks() -> No
     steps = jobs["lint-and-type"]["steps"]
     used_actions = {step.get("uses") for step in steps if "uses" in step}
     assert "actions/setup-node@v4" in used_actions
-    assert "taiki-e/install-action@lychee" in used_actions
+    assert "taiki-e/install-action@v2" in used_actions
 
 
 def test_docker_workflow_builds_and_smokes_on_pr() -> None:

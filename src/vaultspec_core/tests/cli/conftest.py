@@ -16,7 +16,7 @@ def setup_rules_dir(root):
 
 @pytest.fixture(scope="session")
 def runner():
-    return CliRunner()
+    return CliRunner(env={"NO_COLOR": "1"})
 
 
 @pytest.fixture

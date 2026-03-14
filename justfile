@@ -110,8 +110,13 @@ test target='all':
 
 build target:
   case "{{target}}" in \
+    python) \
+      uv build ;; \
     docker) \
       docker buildx build --load -t {{ local_image }} . ;; \
+    all) \
+      just build python && \
+      just build docker ;; \
     *) \
       echo "unknown build target: {{target}}" >&2; \
       exit 1 ;; \
