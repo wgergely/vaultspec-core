@@ -16,6 +16,10 @@ exclude = [
   "https://blog.jetbrains.com/.*",
   "http://blog.modelcontextprotocol.io/.*",
 ]
-exclude_path = ["README.md"]
+exclude_path = [
+  "README.md",
+  ".vault/audit/",
+  ".vault/research/",
+]
 no_progress = true
 verbose = "info"
