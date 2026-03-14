@@ -136,7 +136,7 @@ class TestIdempotency:
         )
 
     def test_configured_flag_prevents_reconfiguration(self):
-        """Once configured, a second call with different level must not change handlers."""
+        """Once configured, a second call must not change handlers."""
         logging_config.configure_logging()
         root = logging.getLogger()
         before = len(root.handlers)

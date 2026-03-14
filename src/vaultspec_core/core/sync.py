@@ -185,7 +185,8 @@ def sync_to_all_tools(
         sources: Resource map as returned by ``collect_*`` helpers.
         dir_attr: Attribute name on :class:`ToolConfig` that holds the
             destination directory (e.g. ``"rules_dir"``, ``"skills_dir"``).
-        transform_fn: Content transform callback ``(tool, name, meta, body) → str | None``.
+        transform_fn: Content transform callback
+            ``(tool, name, meta, body) → str | None``.
         label: Human-readable resource label used in log and summary output.
         prune: Remove destination files that are no longer in *sources*.
         dry_run: Log planned actions without writing.

@@ -1,50 +1,155 @@
 name: CI
+
 on:
   push:
-    branches: [main]
+    branches:
+      - "**"
   pull_request:
-    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  lint:
+  workflow-lint:
+    name: Workflow Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
-      - run: uv run ruff check .vaultspec/lib/src .vaultspec/lib/scripts .vaultspec/lib/tests
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  unit-tests:
+      - name: Lint GitHub Actions workflows
+        uses: rhysd/actionlint@v1
+
+  lint-and-type:
+    name: Lint, Type, Config, Link, and Markdown Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install lychee
+        uses: taiki-e/install-action@lychee
+
+      - name: Install just
+        uses: taiki-e/install-action@just
+
+      - name: Install dependencies
+        run: just sync dependencies
+
+      - name: Ruff
+        run: just check lint
+
+      - name: Ty
+        run: just check type
+
+      - name: Taplo
+        run: just check toml
+
+      - name: Lychee
+        run: just check links
+
+      - name: markdownlint
+        run: just check markdown
+
+  tests:
+    name: Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os:
+          - ubuntu-latest
+          - windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
-      - run: uv sync --extra dev
-      - run: uv run pytest .vaultspec/lib/src -m unit --tb=short -q
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  security-audit:
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install just
+        uses: taiki-e/install-action@just
+
+      - name: Install dependencies
+        run: just sync dependencies
+
+      - name: Run tests
+        run: just test python
+
+  vault-audit:
+    name: Vault Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
-      - run: uv sync --extra dev
-      - run: uv tool run pip-audit
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  type-check:
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install just
+        uses: taiki-e/install-action@just
+
+      - name: Install dependencies
+        run: just sync dependencies
+
+      - name: Verify vault structure and links
+        run: just check vault
+
+  dependency-audit:
+    name: Dependency Audit (pip-audit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
-      - run: uv sync --extra dev
-      - run: uv run ty check .vaultspec/lib/src .vaultspec/lib/scripts
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  # GPU tests require self-hosted runner with CUDA
-  # integration-tests:
-  #   runs-on: [self-hosted, gpu]
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: astral-sh/setup-uv@v4
-  #     - run: uv sync --extra dev --extra rag
-  #     - run: uv run pytest .vaultspec/lib/tests .vaultspec/lib/src --tb=short -q -m "not benchmark"
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install just
+        uses: taiki-e/install-action@just
+
+      - name: Install dependencies
+        run: just sync dependencies
+
+      - name: Python dependency vulnerability audit
+        run: just check dependencies

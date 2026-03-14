@@ -52,7 +52,8 @@ def register_tools(mcp: FastMCP) -> None:
         recent: bool = False,
         limit: int = 20,
     ) -> list[dict[str, Any]]:
-        """Query vault documents by text search, feature, type, related links, or recency.
+        """Query vault documents by text search, feature, type, related links,
+        or recency.
 
         Provide one or more filters to narrow results. Omitting all filters
         returns all documents up to ``limit``.

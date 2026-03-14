@@ -19,6 +19,19 @@ from vaultspec_core.vaultcore.models import DocType
 # ---------------------------------------------------------------------------
 
 
+def _vault_doc(doc_type: str, feature: str, date: str, heading: str = "") -> str:
+    text = (
+        "---\n"
+        f"tags:\n  - '#{doc_type}'\n  - '#{feature}'\n"
+        f"date: '{date}'\n"
+        "related: []\n"
+        "---\n"
+    )
+    if heading:
+        text += f"{heading}\n"
+    return text
+
+
 def _data(result) -> Any:
     """Extract Python object from a CallToolResult.
 
@@ -26,9 +39,8 @@ def _data(result) -> Any:
     For dict return types, structuredContent is the dict directly.
     Falls back to text content if structuredContent is absent.
     """
-    assert not result.isError, (
-        f"Tool returned error: {[c.text for c in result.content if hasattr(c, 'text')]}"
-    )
+    error_texts = [c.text for c in result.content if hasattr(c, "text")]
+    assert not result.isError, f"Tool returned error: {error_texts}"
     if result.structuredContent is not None:
         sc = result.structuredContent
         # list-returning tools are wrapped: {"result": [...]}
@@ -60,8 +72,6 @@ def vault_root(tmp_path):
     templates_dir = tmp_path / ".vaultspec" / "rules" / "templates"
     templates_dir.mkdir(parents=True)
 
-    today = datetime.date.today().isoformat()
-
     (templates_dir / "adr.md").write_text(
         "---\ntags:\n  - '#adr'\n  - '#{feature}'\n"
         "date: '{yyyy-mm-dd}'\nrelated: []\n---\n# {title}\n\nContent.\n"
@@ -79,11 +89,16 @@ def vault_root(tmp_path):
         "date: '{yyyy-mm-dd}'\nrelated: []\n---\n# {title}\n\nContent.\n"
     )
 
-    # .vaultspec/ agents, rules, skills dirs (for list_spec_resources / get_spec_resource)
+    # .vaultspec agents/rules/skills dirs for resource-listing tools
     agents_dir = tmp_path / ".vaultspec" / "rules" / "agents"
     agents_dir.mkdir(parents=True)
     (agents_dir / "test-agent.md").write_text(
-        "---\nname: test-agent\ndescription: A test agent.\n---\n\n# Instructions\n\nDo things.\n"
+        "---\n"
+        "name: test-agent\n"
+        "description: A test agent.\n"
+        "---\n\n"
+        "# Instructions\n\n"
+        "Do things.\n"
     )
 
     rules_dir = tmp_path / ".vaultspec" / "rules" / "rules"
@@ -95,7 +110,12 @@ def vault_root(tmp_path):
     skills_dir = tmp_path / ".vaultspec" / "rules" / "skills" / "vaultspec-test"
     skills_dir.mkdir(parents=True)
     (skills_dir / "SKILL.md").write_text(
-        "---\nname: vaultspec-test\ndescription: Test skill.\n---\n\n# Skill\n\nDo this.\n"
+        "---\n"
+        "name: vaultspec-test\n"
+        "description: Test skill.\n"
+        "---\n\n"
+        "# Skill\n\n"
+        "Do this.\n"
     )
 
     init_paths(tmp_path)
@@ -114,8 +134,8 @@ def vault_root(tmp_path):
 async def test_query_vault_by_query(vault_root):
     adr_dir = vault_root / ".vault" / "adr"
     (adr_dir / "2026-03-06-test-feat-adr.md").write_text(
-        "---\ntags:\n  - '#adr'\n  - '#test-feat'\ndate: '2026-03-06'\nrelated: []\n---\n"
-        "# Test Feature ADR\n\nSome searchable content.\n"
+        _vault_doc("adr", "test-feat", "2026-03-06", "# Test Feature ADR")
+        + "\nSome searchable content.\n"
     )
 
     mcp = create_server()
@@ -135,7 +155,7 @@ async def test_query_vault_by_query(vault_root):
 async def test_query_vault_by_feature(vault_root):
     adr_dir = vault_root / ".vault" / "adr"
     (adr_dir / "2026-03-06-my-feat-adr.md").write_text(
-        "---\ntags:\n  - '#adr'\n  - '#my-feat'\ndate: '2026-03-06'\nrelated: []\n---\n# ADR\n"
+        _vault_doc("adr", "my-feat", "2026-03-06", "# ADR")
     )
 
     mcp = create_server()
@@ -150,10 +170,10 @@ async def test_query_vault_by_feature(vault_root):
 async def test_query_vault_recent(vault_root):
     adr_dir = vault_root / ".vault" / "adr"
     (adr_dir / "2026-03-01-old-feat-adr.md").write_text(
-        "---\ntags:\n  - '#adr'\n  - '#old-feat'\ndate: '2026-03-01'\nrelated: []\n---\n# Old\n"
+        _vault_doc("adr", "old-feat", "2026-03-01", "# Old")
     )
     (adr_dir / "2026-03-06-new-feat-adr.md").write_text(
-        "---\ntags:\n  - '#adr'\n  - '#new-feat'\ndate: '2026-03-06'\nrelated: []\n---\n# New\n"
+        _vault_doc("adr", "new-feat", "2026-03-06", "# New")
     )
 
     mcp = create_server()
@@ -172,11 +192,18 @@ async def test_query_vault_related_to(vault_root):
 
     target = adr_dir / "2026-03-06-target-adr.md"
     target.write_text(
-        "---\ntags:\n  - '#adr'\n  - '#target'\ndate: '2026-03-06'\n"
-        "related:\n  - '[[2026-03-06-target-plan]]'\n---\n# Target\n"
+        "---\n"
+        "tags:\n"
+        "  - '#adr'\n"
+        "  - '#target'\n"
+        "date: '2026-03-06'\n"
+        "related:\n"
+        "  - '[[2026-03-06-target-plan]]'\n"
+        "---\n"
+        "# Target\n"
     )
     (plan_dir / "2026-03-06-target-plan.md").write_text(
-        "---\ntags:\n  - '#plan'\n  - '#target'\ndate: '2026-03-06'\nrelated: []\n---\n# Plan\n"
+        _vault_doc("plan", "target", "2026-03-06", "# Plan")
     )
 
     rel = str(target.relative_to(vault_root))
@@ -201,16 +228,14 @@ async def test_feature_status_lifecycle(vault_root):
     # Researching
     (
         vault_root / ".vault" / "research" / "2026-03-06-lifecycle-feat-research.md"
-    ).write_text(
-        "---\ntags:\n  - '#research'\n  - '#lifecycle-feat'\ndate: '2026-03-06'\nrelated: []\n---\n"
-    )
+    ).write_text(_vault_doc("research", "lifecycle-feat", "2026-03-06"))
     async with create_connected_server_and_client_session(mcp) as client:
         result = await client.call_tool("feature_status", {"feature": "lifecycle-feat"})
         assert _data(result)["status"] == "Researching"
 
     # Specified
     (vault_root / ".vault" / "adr" / "2026-03-06-lifecycle-feat-adr.md").write_text(
-        "---\ntags:\n  - '#adr'\n  - '#lifecycle-feat'\ndate: '2026-03-06'\nrelated: []\n---\n"
+        _vault_doc("adr", "lifecycle-feat", "2026-03-06")
     )
     async with create_connected_server_and_client_session(mcp) as client:
         result = await client.call_tool("feature_status", {"feature": "lifecycle-feat"})
@@ -218,7 +243,7 @@ async def test_feature_status_lifecycle(vault_root):
 
     # Planned
     (vault_root / ".vault" / "plan" / "2026-03-06-lifecycle-feat-plan.md").write_text(
-        "---\ntags:\n  - '#plan'\n  - '#lifecycle-feat'\ndate: '2026-03-06'\nrelated: []\n---\n"
+        _vault_doc("plan", "lifecycle-feat", "2026-03-06")
     )
     async with create_connected_server_and_client_session(mcp) as client:
         result = await client.call_tool("feature_status", {"feature": "lifecycle-feat"})
@@ -227,9 +252,7 @@ async def test_feature_status_lifecycle(vault_root):
     # In Progress
     (
         vault_root / ".vault" / "exec" / "2026-03-06-lifecycle-feat-exec-step1.md"
-    ).write_text(
-        "---\ntags:\n  - '#exec'\n  - '#lifecycle-feat'\ndate: '2026-03-06'\nrelated: []\n---\n"
-    )
+    ).write_text(_vault_doc("exec", "lifecycle-feat", "2026-03-06"))
     async with create_connected_server_and_client_session(mcp) as client:
         result = await client.call_tool("feature_status", {"feature": "lifecycle-feat"})
         assert _data(result)["status"] == "In Progress"
@@ -273,7 +296,7 @@ async def test_create_vault_document(vault_root):
 async def test_audit_vault_summary(vault_root):
     adr_dir = vault_root / ".vault" / "adr"
     (adr_dir / "2026-03-06-audit-feat-adr.md").write_text(
-        "---\ntags:\n  - '#adr'\n  - '#audit-feat'\ndate: '2026-03-06'\nrelated: []\n---\n# Title\n"
+        _vault_doc("adr", "audit-feat", "2026-03-06", "# Title")
     )
 
     mcp = create_server()
@@ -288,10 +311,10 @@ async def test_audit_vault_summary(vault_root):
 async def test_audit_vault_verify_clean(vault_root):
     # Vertical integrity requires every feature to have a plan document.
     (vault_root / ".vault" / "adr" / "2026-03-06-verify-feat-adr.md").write_text(
-        "---\ntags:\n  - '#adr'\n  - '#verify-feat'\ndate: '2026-03-06'\nrelated: []\n---\n# Title\n"
+        _vault_doc("adr", "verify-feat", "2026-03-06", "# Title")
     )
     (vault_root / ".vault" / "plan" / "2026-03-06-verify-feat-plan.md").write_text(
-        "---\ntags:\n  - '#plan'\n  - '#verify-feat'\ndate: '2026-03-06'\nrelated: []\n---\n# Plan\n"
+        _vault_doc("plan", "verify-feat", "2026-03-06", "# Plan")
     )
 
     mcp = create_server()

@@ -44,7 +44,8 @@ app = typer.Typer(
         "Examples:\n"
         "  vaultspec-core init\n"
         "  vaultspec-core sync-all\n"
-        '  vaultspec-core vault add --type research --feature example-feature --title "Initial research"\n'
+        "  vaultspec-core vault add --type research --feature "
+        'example-feature --title "Initial research"\n'
         "  vaultspec-core vault audit --summary\n"
         '  vaultspec-core rules add --name my-rule --content "Do not use mocks."\n'
     ),
@@ -96,7 +97,7 @@ def main(
     debug: Annotated[
         bool, typer.Option("--debug", "-d", help="Enable DEBUG logging")
     ] = False,
-    version: Annotated[
+    _version: Annotated[
         bool,
         typer.Option(
             "--version",

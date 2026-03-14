@@ -35,6 +35,10 @@ from vaultspec_core.vaultcore import parse_frontmatter
 pytestmark = [pytest.mark.unit]
 
 
+def _cfg(tool: Tool) -> ToolConfig:
+    return _types.TOOL_CONFIGS[tool]
+
+
 class TestCollectRules:
     def test_builtin_and_custom(self, test_project):
         """Both .builtin.md and plain .md files are collected from rules/rules/."""
@@ -167,8 +171,7 @@ class TestGenerateConfig:
         (test_project / ".vaultspec" / "rules" / "system" / "project.md").write_text(
             "Custom body", encoding="utf-8"
         )
-        cfg = _types.TOOL_CONFIGS["claude"]
-        content = _generate_config(cfg)
+        content = _generate_config(_cfg(Tool.CLAUDE))
         assert content is not None
         assert CONFIG_HEADER in content
         assert "Custom body" in content
@@ -177,14 +180,12 @@ class TestGenerateConfig:
         (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal body", encoding="utf-8"
         )
-        cfg = _types.TOOL_CONFIGS["claude"]
-        content = _generate_config(cfg)
+        content = _generate_config(_cfg(Tool.CLAUDE))
         assert content is not None
         assert CONFIG_HEADER in content
 
     def test_returns_none_without_internal(self, test_project):
-        cfg = _types.TOOL_CONFIGS["claude"]
-        content = _generate_config(cfg)
+        content = _generate_config(_cfg(Tool.CLAUDE))
         assert content is None
 
     def test_includes_rule_references(self, test_project):
@@ -195,8 +196,7 @@ class TestGenerateConfig:
         (test_project / ".claude" / "rules" / "my-rule.md").write_text(
             "rule content", encoding="utf-8"
         )
-        cfg = _types.TOOL_CONFIGS["claude"]
-        content = _generate_config(cfg)
+        content = _generate_config(_cfg(Tool.CLAUDE))
         assert content is not None
         assert "@rules/my-rule.md" in content
 
@@ -204,8 +204,7 @@ class TestGenerateConfig:
         (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal", encoding="utf-8"
         )
-        cfg = _types.TOOL_CONFIGS["codex"]
-        content = _generate_config(cfg)
+        content = _generate_config(_cfg(Tool.CODEX))
         assert content is None
 
     def test_antigravity_uses_workspace_rules_for_root_gemini(self, test_project):
@@ -216,8 +215,7 @@ class TestGenerateConfig:
         (test_project / ".agents" / "rules" / "workspace-rule.md").write_text(
             "rule content", encoding="utf-8"
         )
-        cfg = _types.TOOL_CONFIGS["antigravity"]
-        content = _generate_config(cfg)
+        content = _generate_config(_cfg(Tool.ANTIGRAVITY))
         assert content is not None
         assert "@.agents/rules/workspace-rule.md" in content
 
@@ -288,8 +286,7 @@ class TestGenerateSystemPrompt:
             "---\n---\n\n# SHARED CONTENT", encoding="utf-8"
         )
 
-        cfg = _types.TOOL_CONFIGS["gemini"]
-        content = _generate_system_prompt(cfg)
+        content = _generate_system_prompt(_cfg(Tool.GEMINI))
         assert content is not None
 
         # Verify ordering: base -> tool-specific -> shared
@@ -303,8 +300,7 @@ class TestGenerateSystemPrompt:
         (test_project / ".vaultspec" / "rules" / "system" / "extra.md").write_text(
             "---\n---\n\n# Extra", encoding="utf-8"
         )
-        cfg = _types.TOOL_CONFIGS["gemini"]
-        content = _generate_system_prompt(cfg)
+        content = _generate_system_prompt(_cfg(Tool.GEMINI))
         assert content is not None
         assert "# Extra" in content
 
@@ -318,21 +314,20 @@ class TestGenerateSystemPrompt:
         (test_project / ".vaultspec" / "rules" / "system" / "gemini-b.md").write_text(
             "---\ntool: gemini\n---\n\n# Gemini B", encoding="utf-8"
         )
-        cfg = _types.TOOL_CONFIGS["gemini"]
-        content = _generate_system_prompt(cfg)
+        content = _generate_system_prompt(_cfg(Tool.GEMINI))
         assert content is not None
         assert "# Gemini A" in content
         assert "# Gemini B" in content
 
     def test_returns_none_for_no_system_file(self, test_project):
-        cfg = _types.TOOL_CONFIGS["claude"]  # claude has system_file=None
-        content = _generate_system_prompt(cfg)
+        content = _generate_system_prompt(
+            _cfg(Tool.CLAUDE)
+        )  # claude has system_file=None
         assert content is None
 
     def test_returns_none_for_empty_parts(self, test_project):
         shutil.rmtree(test_project / ".vaultspec" / "rules" / "system")
-        cfg = _types.TOOL_CONFIGS["gemini"]
-        content = _generate_system_prompt(cfg)
+        content = _generate_system_prompt(_cfg(Tool.GEMINI))
         assert content is None
 
     def test_order_frontmatter_respected(self, test_project):
@@ -348,8 +343,7 @@ class TestGenerateSystemPrompt:
         (test_project / ".vaultspec" / "rules" / "system" / "operations.md").write_text(
             "---\n---\n\n# OPERATIONS", encoding="utf-8"
         )
-        cfg = _types.TOOL_CONFIGS["gemini"]
-        content = _generate_system_prompt(cfg)
+        content = _generate_system_prompt(_cfg(Tool.GEMINI))
         assert content is not None
         workflow_pos = content.index("# WORKFLOW")
         operations_pos = content.index("# OPERATIONS")
@@ -363,8 +357,7 @@ class TestGenerateSystemPrompt:
         (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "---\npipeline: config\n---\n\n# FRAMEWORK CONFIG", encoding="utf-8"
         )
-        cfg = _types.TOOL_CONFIGS["gemini"]
-        content = _generate_system_prompt(cfg)
+        content = _generate_system_prompt(_cfg(Tool.GEMINI))
         assert content is not None
         assert "# BASE" in content
         assert "# FRAMEWORK CONFIG" not in content
@@ -381,8 +374,7 @@ class TestGenerateSystemPrompt:
             "---\ndescription: Deploy service\n---\n\n# Deploy",
             encoding="utf-8",
         )
-        cfg = _types.TOOL_CONFIGS["gemini"]
-        content = _generate_system_prompt(cfg)
+        content = _generate_system_prompt(_cfg(Tool.GEMINI))
         assert content is not None
         assert "## Available Skills" in content
         assert "**vaultspec-deploy**" in content
@@ -397,8 +389,7 @@ class TestGenerateSystemRules:
         (test_project / ".vaultspec" / "rules" / "system" / "operations.md").write_text(
             "---\n---\n\n# OPERATIONS", encoding="utf-8"
         )
-        cfg = _types.TOOL_CONFIGS["claude"]
-        content = _generate_system_rules(cfg)
+        content = _generate_system_rules(_cfg(Tool.CLAUDE))
         assert content is not None
         assert "# BASE MANDATES" in content
         assert "# OPERATIONS" in content
@@ -417,8 +408,7 @@ class TestGenerateSystemRules:
         (test_project / ".vaultspec" / "rules" / "system" / "shared.md").write_text(
             "---\n---\n\n# SHARED", encoding="utf-8"
         )
-        cfg = _types.TOOL_CONFIGS["claude"]
-        content = _generate_system_rules(cfg)
+        content = _generate_system_rules(_cfg(Tool.CLAUDE))
         assert content is not None
         assert "# BASE" in content
         assert "# SHARED" in content
@@ -432,8 +422,7 @@ class TestGenerateSystemRules:
         (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "---\npipeline: config\n---\n\n# CONFIG ONLY", encoding="utf-8"
         )
-        cfg = _types.TOOL_CONFIGS["claude"]
-        content = _generate_system_rules(cfg)
+        content = _generate_system_rules(_cfg(Tool.CLAUDE))
         assert content is not None
         assert "# BASE" in content
         assert "# CONFIG ONLY" not in content
@@ -448,13 +437,12 @@ class TestGenerateSystemRules:
         (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE", encoding="utf-8"
         )
-        assert _generate_system_rules(_types.TOOL_CONFIGS["antigravity"]) is None
-        assert _generate_system_rules(_types.TOOL_CONFIGS["codex"]) is None
+        assert _generate_system_rules(_cfg(Tool.ANTIGRAVITY)) is None
+        assert _generate_system_rules(_cfg(Tool.CODEX)) is None
 
     def test_returns_none_for_empty_parts(self, test_project):
         shutil.rmtree(test_project / ".vaultspec" / "rules" / "system")
-        cfg = _types.TOOL_CONFIGS["claude"]
-        content = _generate_system_rules(cfg)
+        content = _generate_system_rules(_cfg(Tool.CLAUDE))
         assert content is None
 
     def test_order_frontmatter_respected(self, test_project):
@@ -468,8 +456,7 @@ class TestGenerateSystemRules:
         (test_project / ".vaultspec" / "rules" / "system" / "operations.md").write_text(
             "---\n---\n\n# OPERATIONS", encoding="utf-8"
         )
-        cfg = _types.TOOL_CONFIGS["claude"]
-        content = _generate_system_rules(cfg)
+        content = _generate_system_rules(_cfg(Tool.CLAUDE))
         assert content is not None
         workflow_pos = content.index("# WORKFLOW")
         operations_pos = content.index("# OPERATIONS")

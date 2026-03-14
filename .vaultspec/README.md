@@ -140,6 +140,9 @@ Use `.vaultspec/docs/` as the human-facing reference set for the framework. The 
 - [CLI Reference](./docs/cli-reference.md)
 - [Hooks Guide](./docs/hooks-guide.md)
 - [Vault Query Guide](./docs/vault-query-guide.md)
+- [Documentation Workflow](./docs/documentation-workflow.md)
+- [GitHub Workflows](./docs/github-workflows.md)
+- [Release & Deploy Runbook](./docs/release-deploy-runbook.md)
 
 This README is the entry point. The detailed operator documentation lives in `.vaultspec/docs/`.
 

@@ -1,11 +1,36 @@
 # vaultspec-core
 
+_Provisional headline: governed workflows for AI-assisted engineering._
+
+[![Python](https://img.shields.io/badge/python-3.13%2B-blue.svg)](./pyproject.toml)
+[![Tests](https://github.com/wgergely/vaultspec-core/actions/workflows/ci.yml/badge.svg)](https://github.com/wgergely/vaultspec-core/actions/workflows/ci.yml)
+[![Docker](https://github.com/wgergely/vaultspec-core/actions/workflows/docker.yml/badge.svg)](https://github.com/wgergely/vaultspec-core/actions/workflows/docker.yml)
+![Docker Requirement](https://img.shields.io/badge/docker-optional-lightgrey.svg)
+[![MCP](https://img.shields.io/badge/MCP-vaultspec--mcp-informational)](./.vaultspec/docs/vault-query-guide.md)
+
 `vaultspec-core` is a Python package for spec-driven workspace management.
 
 It operates a workspace around structured `.vaultspec/` and `.vault/`
 artifacts: initialize the workspace, sync framework resources, create and audit
 vault records, inspect hooks, assess readiness, and expose the same workspace
 through a local MCP server.
+
+> [!IMPORTANT]
+> CI is enforced on both push and pull requests. Every change is gated by lint,
+> type checks, tests, vault audit verification, dependency vulnerability
+> checks, and Docker build/publish validation.
+> Local Docker builds are developer smoke checks. GitHub Actions rebuilds from
+> source and publishes images to GHCR on `main` and version tags.
+
+## Headline Options
+
+Pick one as the final project strapline:
+
+1. `vaultspec-core: governed workflows for AI-assisted engineering`
+2. `Ship AI-assisted changes with auditable specs, plans, and execution records`
+3. `A spec-driven runtime for disciplined AI engineering in local workspaces`
+4. `From idea to verified delivery: research, decisions, plans, execution`
+5. `Make AI coding accountable: structured workflows, durable records, real audits`
 
 ## What It Ships
 
@@ -18,6 +43,7 @@ Installing the package gives you two executables:
 ## Requirements
 
 - Python `3.13+`
+- Docker is **not required** for local development or CI
 
 ## Install
 
@@ -120,4 +146,7 @@ The live MCP server is separate from the CLI. There is no live
 - [Vault Query Guide](./.vaultspec/docs/vault-query-guide.md) for MCP retrieval workflows
 - [Hooks Guide](./.vaultspec/docs/hooks-guide.md) for hook events and shell actions
 - [Concepts](./.vaultspec/docs/concepts.md) for the workspace and artifact model
+- [Documentation Workflow](./.vaultspec/docs/documentation-workflow.md) for bounded research, authoring, and editorial review
+- [GitHub Workflows](./.vaultspec/docs/github-workflows.md) for CI/CD gates and publishing flow
+- [Release & Deploy Runbook](./.vaultspec/docs/release-deploy-runbook.md) for local-to-cloud release steps and required GitHub settings
 - [Framework Manual](./.vaultspec/README.md) for `.vaultspec/` structure and framework resources

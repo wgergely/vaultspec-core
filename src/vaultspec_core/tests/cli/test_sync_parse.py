@@ -10,12 +10,19 @@ import pytest
 
 from ...core import init_paths
 from ...core.config_gen import _is_cli_managed
+from ...core.enums import Tool
 from ...core.helpers import atomic_write, build_file
 from ...core.sync import print_summary
 from ...core.types import SyncResult
 from ...vaultcore import parse_frontmatter
 
 pytestmark = [pytest.mark.unit]
+
+
+def _cfg(tool: Tool):
+    from ...core import types as _t
+
+    return _t.TOOL_CONFIGS[tool]
 
 
 class TestFrontmatter:
@@ -110,27 +117,27 @@ class TestInitPaths:
         from ...core import types as _t
 
         init_paths(test_project)
-        assert "claude" in _t.TOOL_CONFIGS
-        assert "gemini" in _t.TOOL_CONFIGS
-        assert "antigravity" in _t.TOOL_CONFIGS
-        assert "codex" in _t.TOOL_CONFIGS
-        assert _t.TOOL_CONFIGS["claude"].name == "claude"
-        assert _t.TOOL_CONFIGS["antigravity"].config_file == test_project / "GEMINI.md"
-        assert _t.TOOL_CONFIGS["antigravity"].rules_dir == (
+        assert Tool.CLAUDE in _t.TOOL_CONFIGS
+        assert Tool.GEMINI in _t.TOOL_CONFIGS
+        assert Tool.ANTIGRAVITY in _t.TOOL_CONFIGS
+        assert Tool.CODEX in _t.TOOL_CONFIGS
+        assert _cfg(Tool.CLAUDE).name == "claude"
+        assert _cfg(Tool.ANTIGRAVITY).config_file == test_project / "GEMINI.md"
+        assert _cfg(Tool.ANTIGRAVITY).rules_dir == (
             test_project / ".agents" / "rules"
         )
-        assert _t.TOOL_CONFIGS["antigravity"].skills_dir == (
+        assert _cfg(Tool.ANTIGRAVITY).skills_dir == (
             test_project / ".agents" / "skills"
         )
-        assert _t.TOOL_CONFIGS["codex"].config_file is None
-        assert _t.TOOL_CONFIGS["codex"].native_config_file == (
+        assert _cfg(Tool.CODEX).config_file is None
+        assert _cfg(Tool.CODEX).native_config_file == (
             test_project / ".codex" / "config.toml"
         )
-        assert _t.TOOL_CONFIGS["codex"].rules_dir is None
-        assert _t.TOOL_CONFIGS["codex"].skills_dir == (
+        assert _cfg(Tool.CODEX).rules_dir is None
+        assert _cfg(Tool.CODEX).skills_dir == (
             test_project / ".agents" / "skills"
         )
-        assert _t.TOOL_CONFIGS["codex"].rule_ref_dir is None
+        assert _cfg(Tool.CODEX).rule_ref_dir is None
 
 
 class TestSyncResult:

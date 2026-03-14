@@ -216,8 +216,11 @@ def system_show() -> None:
         targets_table.add_column("Path")
         targets_table.add_column("Status", style="dim")
         for tool_type, cfg in targets:
-            rel = cfg.system_file.relative_to(_t.TARGET_DIR)
-            managed = "CLI-managed" if _is_cli_managed(cfg.system_file) else "custom"
+            system_file = cfg.system_file
+            if system_file is None:
+                continue
+            rel = system_file.relative_to(_t.TARGET_DIR)
+            managed = "CLI-managed" if _is_cli_managed(system_file) else "custom"
             targets_table.add_row(tool_type.value, str(rel), f"[{managed}]")
         console.print(targets_table)
 
@@ -233,18 +236,19 @@ def system_sync(dry_run: bool = False, force: bool = False) -> None:
 
     for _tool_type, cfg in _t.TOOL_CONFIGS.items():
         # Path A: Tool has a system_file -> generate assembled SYSTEM.md
-        if cfg.system_file is not None:
+        system_file = cfg.system_file
+        if system_file is not None:
             content = _generate_system_prompt(cfg)
             if content is None:
                 result.skipped += 1
                 continue
 
-            rel = cfg.system_file.relative_to(_t.TARGET_DIR)
+            rel = system_file.relative_to(_t.TARGET_DIR)
 
             # Safety guard
             if (
-                cfg.system_file.exists()
-                and not _is_cli_managed(cfg.system_file)
+                system_file.exists()
+                and not _is_cli_managed(system_file)
                 and not force
             ):
                 logger.warning("    [SKIP] %s - file exists with custom content.", rel)
@@ -253,11 +257,11 @@ def system_sync(dry_run: bool = False, force: bool = False) -> None:
                 continue
 
             action = "[SKIP]"
-            if not cfg.system_file.exists():
+            if not system_file.exists():
                 action = "[ADD]"
             else:
                 try:
-                    if cfg.system_file.read_text(encoding="utf-8") != content:
+                    if system_file.read_text(encoding="utf-8") != content:
                         action = "[UPDATE]"
                 except Exception:
                     action = "[UPDATE]"
@@ -266,8 +270,8 @@ def system_sync(dry_run: bool = False, force: bool = False) -> None:
                 if dry_run:
                     logger.info("    %s %s", action, rel)
                 else:
-                    ensure_dir(cfg.system_file.parent)
-                    atomic_write(cfg.system_file, content)
+                    ensure_dir(system_file.parent)
+                    atomic_write(system_file, content)
 
                 if action == "[ADD]":
                     result.added += 1

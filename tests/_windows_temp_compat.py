@@ -70,7 +70,8 @@ def install_windows_temp_compat() -> None:
                 rootdir_stat = rootdir.stat()
                 if rootdir_stat.st_uid != uid:
                     raise OSError(
-                        f"The temporary directory {rootdir} is not owned by the current user. "
+                        f"The temporary directory {rootdir} is not owned by "
+                        "the current user. "
                         "Fix this and try again."
                     )
             keep = self._retention_count

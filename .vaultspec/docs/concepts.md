@@ -108,3 +108,4 @@ Start with the workspace. Learn the difference between framework resources and v
 - [CLI Reference](./cli-reference.md)
 - [Hooks Guide](./hooks-guide.md)
 - [Vault Query Guide](./vault-query-guide.md)
+- [Documentation Workflow](./documentation-workflow.md)

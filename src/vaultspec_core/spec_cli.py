@@ -50,7 +50,9 @@ from .core.commands import (
 logger = logging.getLogger(__name__)
 
 spec_app = typer.Typer(
-    help="Manage framework resources, synced outputs, hooks, and workspace maintenance.",
+    help=(
+        "Manage framework resources, synced outputs, hooks, and workspace maintenance."
+    ),
     no_args_is_help=True,
 )
 

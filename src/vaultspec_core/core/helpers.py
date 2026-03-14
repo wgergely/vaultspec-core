@@ -112,7 +112,8 @@ def atomic_write(path: Path, content: str) -> None:
             if os.name != "nt":
                 raise
             logger.warning(
-                "atomic_write falling back to copy+unlink for %s after replace failed: %s",
+                "atomic_write falling back to copy+unlink for %s "
+                "after replace failed: %s",
                 path,
                 exc,
             )

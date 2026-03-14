@@ -177,7 +177,7 @@ class TestCreateSubcommand:
             DocType.EXEC: "exec-step.md",
         }
 
-        for dt, filename in mapping.items():
+        for _doc_type, filename in mapping.items():
             tmpl_file = tmpl_dir / filename
             tmpl_file.write_text("T", encoding="utf-8")
 

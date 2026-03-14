@@ -197,9 +197,10 @@ def handle_audit(
                 limit=limit, doc_type=doc_type_filter, feature=feature
             )
 
-            results["graph"] = {
+            graph_results: dict[str, object] = {
                 "hotspots": [{"name": name, "count": count} for name, count in hotspots]
             }
+            results["graph"] = graph_results
 
             if not json_output:
                 title = "Graph Hotspots"
@@ -218,7 +219,7 @@ def handle_audit(
 
             if not type_filter and not feature:
                 f_rankings = vault_graph.get_feature_rankings(limit=limit)
-                results["graph"]["feature_rankings"] = [
+                graph_results["feature_rankings"] = [
                     {"feature": f, "count": c} for f, c in f_rankings
                 ]
                 if not json_output:
@@ -235,7 +236,7 @@ def handle_audit(
                     console.print(feat_table)
 
             invalid = vault_graph.get_invalid_links()
-            results["graph"]["invalid_links"] = [
+            graph_results["invalid_links"] = [
                 {"source": s, "target": t} for s, t in invalid
             ]
             if not json_output and invalid:
@@ -248,7 +249,7 @@ def handle_audit(
                     )
 
             orphans = vault_graph.get_orphaned()
-            results["graph"]["orphans"] = orphans
+            graph_results["orphans"] = orphans
             if not json_output and orphans:
                 console.print(
                     f"\n[bold yellow]Orphaned Documents ({len(orphans)}):[/bold yellow]"

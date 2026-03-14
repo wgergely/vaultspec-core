@@ -52,14 +52,14 @@ def test_project(tmp_path):
 def run_vaultspec(runner, *args, target=None):
     args_list = list(args)
     if target and "--target" not in args_list and "-t" not in args_list:
-        args_list = ["--target", str(target)] + args_list
+        args_list = ["--target", str(target), *args_list]
     return runner.invoke(cli_app, args_list)
 
 
 def run_vault(runner, *args, target=None):
     args_list = list(args)
     if target and "--target" not in args_list and "-t" not in args_list:
-        args_list = ["--target", str(target)] + args_list
+        args_list = ["--target", str(target), *args_list]
 
     # Ensure 'vault' is in args_list
     if "vault" not in args_list:
@@ -79,7 +79,7 @@ def run_vault(runner, *args, target=None):
 def run_spec(runner, *args, target=None):
     args_list = list(args)
     if target and "--target" not in args_list and "-t" not in args_list:
-        args_list = ["--target", str(target)] + args_list
+        args_list = ["--target", str(target), *args_list]
     return runner.invoke(cli_app, args_list)
 
 
