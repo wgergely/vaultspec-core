@@ -20,12 +20,12 @@ Currently, agents rely on generic file system tools (`list_directory`, `read_fil
 ## Decision
 We will implement dedicated "Agent Persona" tools within the `vaultspec-mcp` server (`vaultspec.mcp_server.vault_tools`).
 
-### 1. `search_vault`
-- **Purpose**: Semantic search for vault documents.
-- **Parameters**: `query` (text), `type` (optional: `#adr`, `#plan`, etc.), `feature` (optional: `#{feature}`).
-- **Behavior**: Scans all `.md` files in `.vault/`, parses frontmatter to filter by tags, and performs text search on content.
+### 1. `query_vault`
+- **Purpose**: Structured query for vault documents by metadata and content.
+- **Parameters**: `query` (text, optional), `type` (optional: `#adr`, `#plan`, etc.), `feature` (optional: `#{feature}`), `related_to` (optional: filter by document relationships), `recent` (optional: return recently modified), `limit` (optional: max results, default 20).
+- **Behavior**: Scans all `.md` files in `.vault/`, parses frontmatter to filter by tags and relationships, and performs text search on content.
 
-### 2. `get_feature_status`
+### 2. `feature_status`
 - **Purpose**: Derive the lifecycle stage of a feature.
 - **Parameters**: `feature` (feature name).
 - **Behavior**: Aggregates all documents sharing the `#{feature}` tag and determines status:
@@ -35,9 +35,9 @@ We will implement dedicated "Agent Persona" tools within the `vaultspec-mcp` ser
     - `Researching` (has `#research`)
     - `Unknown` (none)
 
-### 3. `create_document`
+### 3. `create_vault_document`
 - **Purpose**: Create compliant vault documents from templates.
-- **Parameters**: `type` (document type), `feature` (feature name), `title` (document title/topic).
+- **Parameters**: `type` (document type), `feature` (feature name), `title` (document title/topic), `extra_context` (optional: additional content to append).
 - **Behavior**:
     - Loads the corresponding template from `.vaultspec/rules/templates/`.
     - Injects context variables (`{feature}`, `{yyyy-mm-dd}`, `{title}`).
@@ -45,9 +45,10 @@ We will implement dedicated "Agent Persona" tools within the `vaultspec-mcp` ser
     - Writes the file to the correct subdirectory.
 
 ## Implementation Details
-- Tools will utilize `vaultspec.vaultcore` for parsing and validation.
-- Templates will be loaded from `vaultspec.core.types.TEMPLATES_DIR`.
-- Implementation will reside in `src/vaultspec/mcp_server/vault_tools.py`.
+- Tools utilize `vaultspec_core.vaultcore` for parsing and validation.
+- Templates are loaded from `vaultspec_core.core.types.TEMPLATES_DIR`.
+- Implementation resides in `src/vaultspec_core/mcp_server/vault_tools.py`.
+- Tool names were refined during implementation for consistency: `query_vault` (structured query, not just search), `feature_status` (drops redundant `get_` prefix), `create_vault_document` (scoped to vault namespace).
 
 ## Consequences
 - **Positive**: Agents can reliably interact with the vault without manual file manipulation errors. Enforces consistency.
