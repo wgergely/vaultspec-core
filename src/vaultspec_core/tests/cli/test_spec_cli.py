@@ -112,6 +112,26 @@ class TestSpecCliFunctional:
         assert (tmp_path / ".vault" / "plan").is_dir()
         assert (tmp_path / ".codex" / "config.toml").is_file()
 
+    def test_init_creates_codex_and_agents_structure(self, runner, tmp_path):
+        """init scaffolds Codex and shared .agents/ directories correctly."""
+        (tmp_path / ".vaultspec").mkdir()
+        result = run_spec(runner, "--target", str(tmp_path), "init", "--force")
+        assert result.exit_code == 0
+
+        # Codex native config
+        codex_toml = tmp_path / ".codex" / "config.toml"
+        assert codex_toml.is_file()
+        assert codex_toml.read_text(encoding="utf-8") == ""
+
+        # Shared .agents/ structure (used by Antigravity and Codex)
+        assert (tmp_path / ".agents" / "rules").is_dir()
+        assert (tmp_path / ".agents" / "workflows").is_dir()
+        assert (tmp_path / ".agents" / "skills").is_dir()
+
+        # Provider directories
+        assert (tmp_path / ".claude" / "rules").is_dir()
+        assert (tmp_path / ".gemini" / "rules").is_dir()
+
     def test_rules_list_output(self, runner, test_project):
         result = run_spec(runner, "rules", "list", target=test_project)
         assert result.exit_code == 0
