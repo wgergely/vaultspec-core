@@ -6,6 +6,8 @@ vault/spec-core command surfaces to keep terminal presentation consistent.
 
 from __future__ import annotations
 
+import os
+
 from rich.console import Console
 
 __all__ = ["get_console", "reset_console"]
@@ -25,7 +27,11 @@ def get_console() -> Console:
     """
     global _console
     if _console is None:
-        _console = Console(highlight=False, soft_wrap=True)
+        _console = Console(
+            highlight=False,
+            soft_wrap=True,
+            no_color="NO_COLOR" in os.environ,
+        )
     return _console
 
 

@@ -271,6 +271,41 @@ class TestGenerateConfig:
         assert 'service_tier = "flex"' in content
 
 
+class TestCodexNegativeCoverage:
+    """Verify Codex does NOT generate artifacts outside its native model."""
+
+    def test_codex_has_no_system_file(self, test_project):
+        """Codex ToolConfig must not declare a system_file."""
+        assert _cfg(Tool.CODEX).system_file is None
+
+    def test_codex_has_no_agents_dir(self, test_project):
+        """Codex agent definitions use TOML, not a synced agents_dir."""
+        assert _cfg(Tool.CODEX).agents_dir is None
+
+    def test_codex_emit_system_rule_disabled(self, test_project):
+        """Codex must not emit behavioral rules via the system rule fallback."""
+        assert _cfg(Tool.CODEX).emit_system_rule is False
+
+    def test_system_prompt_returns_none_for_codex(self, test_project):
+        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+            "---\n---\n\n# Base system prompt", encoding="utf-8"
+        )
+        assert _generate_system_prompt(_cfg(Tool.CODEX)) is None
+
+    def test_system_rules_returns_none_for_codex(self, test_project):
+        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+            "---\n---\n\n# Base system prompt", encoding="utf-8"
+        )
+        assert _generate_system_rules(_cfg(Tool.CODEX)) is None
+
+    def test_codex_native_config_returns_none_without_codex_keys(self, test_project):
+        """If no codex_* frontmatter keys exist, native config returns None."""
+        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
+            "---\nname: framework\n---\n\nInternal", encoding="utf-8"
+        )
+        assert _generate_codex_native_config() is None
+
+
 class TestGenerateSystemPrompt:
     def test_assembly_order(self, test_project):
         # base comes first

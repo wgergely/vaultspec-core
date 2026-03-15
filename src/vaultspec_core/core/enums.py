@@ -60,7 +60,6 @@ class Tool(StrEnum):
 
     CLAUDE = "claude"
     GEMINI = "gemini"
-    AGENTS = "agents"  # For AGENTS.md sync
     ANTIGRAVITY = "antigravity"
     CODEX = "codex"
 

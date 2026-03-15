@@ -14,6 +14,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+from pathlib import Path  # noqa: TC003 — Typer needs Path at runtime
 from typing import Annotated
 
 import typer
@@ -296,26 +297,159 @@ def cmd_system_sync(
 
 
 # --- top level commands ---
-@spec_app.command("sync-all")
-def cmd_sync_all(
+
+# Valid sync provider targets exposed to the CLI.
+_SYNC_PROVIDERS = {"all", "claude", "gemini", "antigravity", "codex"}
+
+
+def _sync_provider(
+    provider: str,
+    *,
+    prune: bool = False,
+    dry_run: bool = False,
+    force: bool = False,
+) -> None:
+    """Sync resources for a single provider target.
+
+    ``provider`` must be one of :data:`_SYNC_PROVIDERS`.  The special value
+    ``"all"`` syncs every provider and fires post-sync hooks.
+    """
+    from .core.enums import Tool
+
+    if provider == "all":
+        logger.info("Syncing all resources...")
+        rules_sync(prune=prune, dry_run=dry_run)
+        skills_sync(prune=prune, dry_run=dry_run)
+        agents_sync(prune=prune, dry_run=dry_run)
+        system_sync(dry_run=dry_run, force=force)
+        config_sync(dry_run=dry_run, force=force)
+
+        from .hooks import fire_hooks
+
+        fire_hooks(
+            "config.synced", {"root": str(_t.TARGET_DIR), "event": "config.synced"}
+        )
+        logger.info("Done.")
+        return
+
+    # Per-provider sync: filter TOOL_CONFIGS to only the requested tool.
+    requested: set[Tool] = set()
+    if provider == "claude":
+        requested = {Tool.CLAUDE}
+    elif provider == "gemini":
+        requested = {Tool.GEMINI}
+    elif provider == "antigravity":
+        requested = {Tool.ANTIGRAVITY}
+    elif provider == "codex":
+        requested = {Tool.CODEX}
+
+    original = dict(_t.TOOL_CONFIGS)
+    try:
+        _t.TOOL_CONFIGS = {k: v for k, v in original.items() if k in requested}
+        logger.info("Syncing provider: %s ...", provider)
+        rules_sync(prune=prune, dry_run=dry_run)
+        skills_sync(prune=prune, dry_run=dry_run)
+        agents_sync(prune=prune, dry_run=dry_run)
+        system_sync(dry_run=dry_run, force=force)
+        config_sync(dry_run=dry_run, force=force)
+        logger.info("Done.")
+    finally:
+        _t.TOOL_CONFIGS = original
+
+
+@spec_app.command("sync")
+def cmd_sync(
+    provider: Annotated[
+        str,
+        typer.Argument(
+            help="Provider to sync (all, claude, gemini, antigravity, codex)"
+        ),
+    ] = "all",
     prune: Annotated[bool, typer.Option("--prune", help="Remove stale files")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
     force: Annotated[
         bool, typer.Option("--force", help="Overwrite non-managed files")
     ] = False,
 ):
-    """Sync all rules, skills, agents, configs, and system prompts."""
-    logger.info("Syncing all resources...")
-    rules_sync(prune=prune, dry_run=dry_run)
-    skills_sync(prune=prune, dry_run=dry_run)
-    agents_sync(prune=prune, dry_run=dry_run)
-    system_sync(dry_run=dry_run, force=force)
-    config_sync(dry_run=dry_run, force=force)
+    """Sync rules, skills, agents, configs, and system prompts.
 
-    from .hooks import fire_hooks
+    Defaults to syncing all providers.  Pass a provider name to sync only
+    that provider (e.g. ``vaultspec-core sync claude``).
+    """
+    if provider not in _SYNC_PROVIDERS:
+        valid = ", ".join(sorted(_SYNC_PROVIDERS))
+        logger.error("Unknown sync provider '%s'. Valid: %s", provider, valid)
+        raise typer.Exit(code=1)
+    _sync_provider(provider, prune=prune, dry_run=dry_run, force=force)
 
-    fire_hooks("config.synced", {"root": str(_t.TARGET_DIR), "event": "config.synced"})
-    logger.info("Done.")
+
+@spec_app.command("install")
+def cmd_install(
+    path: Annotated[
+        Path,
+        typer.Argument(
+            help="Target directory (use '.' for current directory)",
+            exists=True,
+            dir_okay=True,
+            file_okay=False,
+            resolve_path=True,
+        ),
+    ],
+    upgrade: Annotated[
+        bool,
+        typer.Option("--upgrade", help="Re-sync builtin rules and firmware"),
+    ] = False,
+    providers: Annotated[
+        str,
+        typer.Option(
+            "--providers", help="Comma-separated providers (claude,gemini,codex)"
+        ),
+    ] = "all",
+):
+    """Deploy the vaultspec framework to a project directory.
+
+    Scaffolds the workspace structure and syncs all managed resources.
+    Use --upgrade to update builtin rules without re-scaffolding.
+
+    Examples:\n
+      vaultspec-core install .                    # install to cwd\n
+      vaultspec-core install /path/to/project     # install to specific dir\n
+      vaultspec-core install . --upgrade          # update firmware + re-sync\n
+    """
+    from .core.commands import install_run
+
+    install_run(path=path, upgrade=upgrade, providers=providers)
+
+
+@spec_app.command("uninstall")
+def cmd_uninstall(
+    path: Annotated[
+        Path,
+        typer.Argument(
+            help="Target directory to remove vaultspec from",
+            exists=True,
+            dir_okay=True,
+            file_okay=False,
+            resolve_path=True,
+        ),
+    ],
+    keep_vault: Annotated[
+        bool,
+        typer.Option("--keep-vault", help="Preserve .vault/ documentation"),
+    ] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview changes without removing")
+    ] = False,
+):
+    """Remove the vaultspec framework from a project directory.
+
+    Removes all managed artifacts (.vaultspec/, provider dirs, generated configs).
+    User-created .vault/ documents are preserved by default; use without
+    --keep-vault to remove everything.
+    """
+    from .core.commands import uninstall_run
+
+    uninstall_run(path=path, keep_vault=keep_vault, dry_run=dry_run)
 
 
 @spec_app.command("test")

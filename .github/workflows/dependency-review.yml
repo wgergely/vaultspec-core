@@ -1,3 +1,6 @@
+# NOTE: This workflow requires GitHub Advanced Security (GHAS) on private repos.
+# GHAS is free on public repos. If this job fails with a permissions error on a
+# private repo, either enable GHAS in repo settings or remove this workflow.
 name: Dependency Review
 
 on:

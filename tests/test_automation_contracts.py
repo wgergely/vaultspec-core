@@ -31,6 +31,8 @@ def test_justfile_contains_required_recipes() -> None:
         "test",
         "build",
         "publish",
+        "install",
+        "uninstall",
     }
     missing = [name for name in sorted(required) if not _recipe_exists(justfile, name)]
     assert not missing, f"Missing required just recipes: {missing}"
@@ -90,6 +92,7 @@ def test_test_all_runs_python_and_docker() -> None:
     assert "just test python" in justfile
     assert "just test docker" in justfile
     assert "just build docker" in justfile
+    assert "just build python" in justfile
 
 
 def test_fix_surface_includes_lint_markdown_and_vault() -> None:
@@ -153,7 +156,7 @@ def test_ci_workflow_uses_actionlint() -> None:
     jobs = ci["jobs"]
     steps = jobs["workflow-lint"]["steps"]
     used_actions = {step.get("uses") for step in steps if "uses" in step}
-    assert "rhysd/actionlint@v1" in used_actions
+    assert "docker://rhysd/actionlint:latest" in used_actions
 
 
 def test_ci_workflow_installs_node_and_lychee_for_config_and_link_checks() -> None:
@@ -162,7 +165,7 @@ def test_ci_workflow_installs_node_and_lychee_for_config_and_link_checks() -> No
     steps = jobs["lint-and-type"]["steps"]
     used_actions = {step.get("uses") for step in steps if "uses" in step}
     assert "actions/setup-node@v4" in used_actions
-    assert "taiki-e/install-action@lychee" in used_actions
+    assert "taiki-e/install-action@v2" in used_actions
 
 
 def test_docker_workflow_builds_and_smokes_on_pr() -> None:
@@ -189,6 +192,14 @@ def test_docker_publish_workflow_uses_standard_registry_actions() -> None:
     }
     missing = [action for action in sorted(required) if action not in used_actions]
     assert not missing, f"Docker publish workflow missing required actions: {missing}"
+
+
+def test_justfile_install_uninstall_delegate_to_cli() -> None:
+    justfile = _read("justfile")
+    assert "uv run vaultspec-core install" in justfile
+    assert "uv run vaultspec-core uninstall" in justfile
+    assert "install path='.':" in justfile or "install path='.' " in justfile
+    assert "uninstall path='.':" in justfile or "uninstall path='.' " in justfile
 
 
 def test_dockerfile_defaults_to_vaultspec_core_help() -> None:

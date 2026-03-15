@@ -25,9 +25,11 @@ from vaultspec_core.spec_cli import (
     agents_app,
     cmd_doctor,
     cmd_init,
+    cmd_install,
     cmd_readiness,
-    cmd_sync_all,
+    cmd_sync,
     cmd_test,
+    cmd_uninstall,
     config_app,
     hooks_app,
     rules_app,
@@ -43,7 +45,8 @@ app = typer.Typer(
         "vaultspec-core: Workspace runtime for vaultspec-managed projects.\n\n"
         "Examples:\n"
         "  vaultspec-core init\n"
-        "  vaultspec-core sync-all\n"
+        "  vaultspec-core install .\n"
+        "  vaultspec-core sync\n"
         "  vaultspec-core vault add --type research --feature "
         'example-feature --title "Initial research"\n'
         "  vaultspec-core vault audit --summary\n"
@@ -62,7 +65,9 @@ app.add_typer(system_app, name="system")
 app.add_typer(hooks_app, name="hooks")
 
 # Top-level commands from spec_cli
-app.command("sync-all")(cmd_sync_all)
+app.command("sync")(cmd_sync)
+app.command("install")(cmd_install)
+app.command("uninstall")(cmd_uninstall)
 app.command("test")(cmd_test)
 app.command("doctor")(cmd_doctor)
 app.command("init")(cmd_init)
@@ -119,8 +124,8 @@ def main(
         typer.echo(ctx.get_help())
         raise typer.Exit(0)
 
-    # Skip workspace resolution for the init command
-    if ctx.invoked_subcommand == "init":
+    # Skip workspace resolution for commands that manage their own target
+    if ctx.invoked_subcommand in ("init", "install", "uninstall"):
         target_override = target or Path.cwd()
         from vaultspec_core.core import types as _t
 

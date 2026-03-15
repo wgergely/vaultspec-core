@@ -3,29 +3,31 @@ repos:
     hooks:
       - id: ruff-check
         name: Lint and fix Python code (Ruff)
-        entry: ruff check --fix
+        entry: uv run ruff check --fix
         language: system
         types: [python]
         pass_filenames: true
 
       - id: ruff-format
         name: Format Python code (Ruff)
-        entry: ruff format
+        entry: uv run ruff format
         language: system
         types: [python]
         pass_filenames: true
 
       - id: taplo-format
         name: Format TOML files (Taplo)
-        entry: npx @taplo/cli fmt
-        language: system
+        entry: taplo fmt
+        language: node
+        additional_dependencies: ["@taplo/cli@0.7.0"]
         types: [toml]
         pass_filenames: true
 
       - id: taplo-lint
         name: Lint TOML files (Taplo)
-        entry: npx @taplo/cli lint
-        language: system
+        entry: taplo lint
+        language: node
+        additional_dependencies: ["@taplo/cli@0.7.0"]
         types: [toml]
         pass_filenames: true
 
@@ -43,17 +45,12 @@ repos:
         types: [markdown]
         pass_filenames: false
 
-      - id: lychee
-        name: Check documentation links (Lychee)
-        entry: lychee
-        language: system
-        args: ["--no-progress", "--exclude-path", "README.md"]
-        types: [markdown]
-
       - id: markdownlint
         name: Lint Markdown style (markdownlint)
-        entry: npx --yes markdownlint-cli
-        language: system
-        args: ["--config", ".markdownlint.json", "--fix", ".vaultspec/", ".vault/", "README.md"]
+        entry: markdownlint
+        language: node
+        additional_dependencies: ["markdownlint-cli@0.44.0"]
+        args: ["--config", ".markdownlint.json"]
+        pass_filenames: true
         types: [markdown]
 
