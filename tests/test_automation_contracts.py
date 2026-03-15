@@ -31,6 +31,8 @@ def test_justfile_contains_required_recipes() -> None:
         "test",
         "build",
         "publish",
+        "install",
+        "uninstall",
     }
     missing = [name for name in sorted(required) if not _recipe_exists(justfile, name)]
     assert not missing, f"Missing required just recipes: {missing}"
@@ -190,6 +192,14 @@ def test_docker_publish_workflow_uses_standard_registry_actions() -> None:
     }
     missing = [action for action in sorted(required) if action not in used_actions]
     assert not missing, f"Docker publish workflow missing required actions: {missing}"
+
+
+def test_justfile_install_uninstall_delegate_to_cli() -> None:
+    justfile = _read("justfile")
+    assert "uv run vaultspec-core install" in justfile
+    assert "uv run vaultspec-core uninstall" in justfile
+    assert "install path='.':" in justfile or "install path='.' " in justfile
+    assert "uninstall path='.':" in justfile or "uninstall path='.' " in justfile
 
 
 def test_dockerfile_defaults_to_vaultspec_core_help() -> None:

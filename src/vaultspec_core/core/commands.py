@@ -245,8 +245,131 @@ def init_run(force: bool = False, providers: str = "all") -> None:
         console.print(f"  {path}")
     console.print(
         f"Created [bold]{len(created)}[/bold] directories/files. "
-        "Run [bold]vaultspec-core sync-all[/bold] to sync."
+        "Run [bold]vaultspec-core sync[/bold] to sync."
     )
+
+
+def install_run(path: Path, upgrade: bool = False, providers: str = "all") -> None:
+    """Deploy the vaultspec framework to a project directory.
+
+    When ``upgrade`` is False, scaffolds the full workspace structure and
+    then syncs all managed resources.  When ``upgrade`` is True, re-syncs
+    builtin rules and firmware without re-scaffolding, preserving custom
+    user content.
+    """
+    from vaultspec_core.config import reset_config
+    from vaultspec_core.config.workspace import resolve_workspace
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core.types import init_paths
+
+    console = get_console()
+
+    # Set TARGET_DIR for init_run (which expects it pre-set)
+    _t.TARGET_DIR = path
+
+    if upgrade:
+        # Upgrade: resolve existing workspace, then re-sync
+        try:
+            layout = resolve_workspace(target_override=path)
+            init_paths(layout)
+        except Exception as e:
+            logger.error("Cannot upgrade: %s", e)
+            logger.error("Run 'vaultspec-core install %s' first.", path)
+            raise typer.Exit(code=1) from e
+
+        console.print(f"[bold]Upgrading vaultspec framework at {path}[/bold]")
+
+        from vaultspec_core.spec_cli import _sync_provider
+
+        _sync_provider("all", force=True)
+        console.print("[bold green]Upgrade complete.[/bold green]")
+    else:
+        # Fresh install: scaffold then sync
+        console.print(f"[bold]Installing vaultspec framework to {path}[/bold]")
+        init_run(force=False, providers=providers)
+
+        # Re-resolve after init so sync sees the new structure
+        reset_config()
+        layout = resolve_workspace(target_override=path)
+        init_paths(layout)
+
+        from vaultspec_core.spec_cli import _sync_provider
+
+        _sync_provider("all")
+        console.print("[bold green]Installation complete.[/bold green]")
+
+
+def uninstall_run(path: Path, keep_vault: bool = False, dry_run: bool = False) -> None:
+    """Remove the vaultspec framework from a project directory.
+
+    Removes managed directories and generated files.  The ``.vault/``
+    directory (user-authored documentation) is preserved unless
+    ``keep_vault`` is False.
+    """
+    import shutil
+
+    from vaultspec_core.console import get_console
+
+    console = get_console()
+
+    # Managed directories to remove
+    managed_dirs = [
+        path / ".vaultspec",
+        path / ".claude",
+        path / ".gemini",
+        path / ".agents",
+        path / ".codex",
+    ]
+    if not keep_vault:
+        managed_dirs.append(path / ".vault")
+
+    # Managed files to remove
+    managed_files = [
+        path / "CLAUDE.md",
+        path / "GEMINI.md",
+        path / "SYSTEM.md",
+        path / "AGENTS.md",
+        path / ".mcp.json",
+    ]
+
+    removed: list[str] = []
+    skipped: list[str] = []
+
+    for d in managed_dirs:
+        rel = str(d.relative_to(path))
+        if d.exists():
+            if dry_run:
+                console.print(f"  [dim]would remove[/dim] {rel}/")
+            else:
+                shutil.rmtree(d)
+            removed.append(f"{rel}/")
+        else:
+            skipped.append(f"{rel}/")
+
+    for f in managed_files:
+        rel = str(f.relative_to(path))
+        if f.exists():
+            if dry_run:
+                console.print(f"  [dim]would remove[/dim] {rel}")
+            else:
+                f.unlink()
+            removed.append(rel)
+        else:
+            skipped.append(rel)
+
+    if dry_run:
+        console.print(f"\n[bold]Dry run:[/bold] would remove {len(removed)} items")
+    elif removed:
+        console.print("[bold]Removed vaultspec framework:[/bold]")
+        for item in removed:
+            console.print(f"  {item}")
+        console.print(f"Removed [bold]{len(removed)}[/bold] items.")
+        if keep_vault:
+            console.print(
+                "[dim].vault/ preserved (use without --keep-vault to remove)[/dim]"
+            )
+    else:
+        console.print("Nothing to remove — vaultspec is not installed at this path.")
 
 
 def readiness_run(json_output: bool = False) -> None:
@@ -447,9 +570,7 @@ def readiness_run(json_output: bool = False) -> None:
     if rules_score < 4:
         recommendations.append("Create custom rules for project conventions")
     if rules_score == 4:
-        recommendations.append(
-            "Run 'vaultspec-core sync-all' to sync rules to all tools"
-        )
+        recommendations.append("Run 'vaultspec-core sync' to sync rules to all tools")
     if test_score < 5:
         recommendations.append("Add CI pipeline for automated testing")
 

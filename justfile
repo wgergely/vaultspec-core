@@ -122,6 +122,12 @@ build target:
       exit 1 ;; \
   esac
 
+install path='.' *args='':
+  uv run vaultspec-core install "{{path}}" {{args}}
+
+uninstall path='.' *args='':
+  uv run vaultspec-core uninstall "{{path}}" {{args}}
+
 publish target tag:
   case "{{target}}" in \
     docker-ghcr) \
