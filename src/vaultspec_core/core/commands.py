@@ -258,7 +258,7 @@ def install_run(path: Path, upgrade: bool = False, providers: str = "all") -> No
     user content.
     """
     from vaultspec_core.config import reset_config
-    from vaultspec_core.config.workspace import resolve_workspace
+    from vaultspec_core.config.workspace import WorkspaceError, resolve_workspace
     from vaultspec_core.console import get_console
     from vaultspec_core.core.types import init_paths
 
@@ -272,7 +272,7 @@ def install_run(path: Path, upgrade: bool = False, providers: str = "all") -> No
         try:
             layout = resolve_workspace(target_override=path)
             init_paths(layout)
-        except Exception as e:
+        except WorkspaceError as e:
             logger.error("Cannot upgrade: %s", e)
             logger.error("Run 'vaultspec-core install %s' first.", path)
             raise typer.Exit(code=1) from e
@@ -285,6 +285,17 @@ def install_run(path: Path, upgrade: bool = False, providers: str = "all") -> No
         console.print("[bold green]Upgrade complete.[/bold green]")
     else:
         # Fresh install: scaffold then sync
+        fw_dir = path / ".vaultspec"
+        if fw_dir.exists():
+            logger.error(
+                "vaultspec is already installed at %s. "
+                "Use --upgrade to update, or remove it first with "
+                "'vaultspec-core uninstall %s'.",
+                path,
+                path,
+            )
+            raise typer.Exit(code=1)
+
         console.print(f"[bold]Installing vaultspec framework to {path}[/bold]")
         init_run(force=False, providers=providers)
 
@@ -303,8 +314,8 @@ def uninstall_run(path: Path, keep_vault: bool = False, dry_run: bool = False) -
     """Remove the vaultspec framework from a project directory.
 
     Removes managed directories and generated files.  The ``.vault/``
-    directory (user-authored documentation) is preserved unless
-    ``keep_vault`` is False.
+    directory (user-authored documentation) is preserved when
+    ``keep_vault`` is True.
     """
     import shutil
 
@@ -333,7 +344,6 @@ def uninstall_run(path: Path, keep_vault: bool = False, dry_run: bool = False) -
     ]
 
     removed: list[str] = []
-    skipped: list[str] = []
 
     for d in managed_dirs:
         rel = str(d.relative_to(path))
@@ -343,8 +353,6 @@ def uninstall_run(path: Path, keep_vault: bool = False, dry_run: bool = False) -
             else:
                 shutil.rmtree(d)
             removed.append(f"{rel}/")
-        else:
-            skipped.append(f"{rel}/")
 
     for f in managed_files:
         rel = str(f.relative_to(path))
@@ -354,8 +362,6 @@ def uninstall_run(path: Path, keep_vault: bool = False, dry_run: bool = False) -
             else:
                 f.unlink()
             removed.append(rel)
-        else:
-            skipped.append(rel)
 
     if dry_run:
         console.print(f"\n[bold]Dry run:[/bold] would remove {len(removed)} items")
