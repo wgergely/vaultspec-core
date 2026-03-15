@@ -299,7 +299,7 @@ def cmd_system_sync(
 # --- top level commands ---
 
 # Valid sync provider targets exposed to the CLI.
-_SYNC_PROVIDERS = {"all", "claude", "gemini", "codex"}
+_SYNC_PROVIDERS = {"all", "claude", "gemini", "antigravity", "codex"}
 
 
 def _sync_provider(
@@ -332,13 +332,14 @@ def _sync_provider(
         logger.info("Done.")
         return
 
-    # Per-provider sync: filter TOOL_CONFIGS to only the requested tools.
-    # Gemini implicitly includes Antigravity (shared GEMINI.md config file).
+    # Per-provider sync: filter TOOL_CONFIGS to only the requested tool.
     requested: set[Tool] = set()
     if provider == "claude":
         requested = {Tool.CLAUDE}
     elif provider == "gemini":
-        requested = {Tool.GEMINI, Tool.ANTIGRAVITY}
+        requested = {Tool.GEMINI}
+    elif provider == "antigravity":
+        requested = {Tool.ANTIGRAVITY}
     elif provider == "codex":
         requested = {Tool.CODEX}
 
@@ -359,7 +360,10 @@ def _sync_provider(
 @spec_app.command("sync")
 def cmd_sync(
     provider: Annotated[
-        str, typer.Argument(help="Provider to sync (all, claude, gemini, codex)")
+        str,
+        typer.Argument(
+            help="Provider to sync (all, claude, gemini, antigravity, codex)"
+        ),
     ] = "all",
     prune: Annotated[bool, typer.Option("--prune", help="Remove stale files")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
