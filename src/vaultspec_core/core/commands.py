@@ -418,10 +418,8 @@ def install_run(
 
         console.print(f"[bold]Upgrading vaultspec framework at {path}[/bold]")
 
-        from vaultspec_core.spec_cli import _sync_provider
-
         sync_target = provider if provider not in ("all", "core") else "all"
-        _sync_provider(sync_target, force=True)
+        sync_provider(sync_target, force=True)
         console.print("[bold green]Upgrade complete.[/bold green]")
     else:
         fw_dir = path / ".vaultspec"
@@ -442,10 +440,8 @@ def install_run(
         layout = resolve_workspace(target_override=path)
         init_paths(layout)
 
-        from vaultspec_core.spec_cli import _sync_provider
-
         sync_target = provider if provider not in ("all", "core") else "all"
-        _sync_provider(sync_target)
+        sync_provider(sync_target)
         console.print("[bold green]Installation complete.[/bold green]")
 
 
@@ -952,3 +948,80 @@ def hooks_run(event: str, path: str | None = None) -> None:
                 console.print(f"    {line}")
         if r.error:
             console.print(f"    [red]error:[/red] {r.error}")
+
+
+# Valid sync provider targets exposed to the CLI.
+SYNC_PROVIDERS = {"all", "claude", "gemini", "antigravity", "codex"}
+
+
+def sync_provider(
+    provider: str,
+    *,
+    prune: bool = False,
+    dry_run: bool = False,
+    force: bool = False,
+) -> None:
+    """Sync resources for a single provider target.
+
+    ``provider`` must be one of :data:`SYNC_PROVIDERS`.  The special value
+    ``"all"`` syncs every provider and fires post-sync hooks.
+    """
+    from .agents import agents_sync
+    from .config_gen import config_sync
+    from .enums import Tool
+    from .rules import rules_sync
+    from .skills import skills_sync
+    from .system import system_sync
+
+    if provider == "all":
+        logger.info("Syncing all resources...")
+        rules_sync(prune=prune, dry_run=dry_run)
+        skills_sync(prune=prune, dry_run=dry_run)
+        agents_sync(prune=prune, dry_run=dry_run)
+        system_sync(dry_run=dry_run, force=force)
+        config_sync(dry_run=dry_run, force=force)
+
+        from vaultspec_core.hooks import fire_hooks
+
+        fire_hooks(
+            "config.synced", {"root": str(_t.TARGET_DIR), "event": "config.synced"}
+        )
+        logger.info("Done.")
+        return
+
+    # Validate provider is installed (skip if .vaultspec/ doesn't exist yet,
+    # which happens during install_run before the first sync).
+    from .manifest import read_manifest
+
+    installed = read_manifest(_t.TARGET_DIR)
+    if installed and provider not in installed:
+        logger.error(
+            "Provider '%s' is not installed. Run 'vaultspec-core install . %s' first.",
+            provider,
+            provider,
+        )
+        raise typer.Exit(code=1)
+
+    # Per-provider sync: filter TOOL_CONFIGS to only the requested tool.
+    requested: set[Tool] = set()
+    if provider == "claude":
+        requested = {Tool.CLAUDE}
+    elif provider == "gemini":
+        requested = {Tool.GEMINI}
+    elif provider == "antigravity":
+        requested = {Tool.ANTIGRAVITY}
+    elif provider == "codex":
+        requested = {Tool.CODEX}
+
+    original = dict(_t.TOOL_CONFIGS)
+    try:
+        _t.TOOL_CONFIGS = {k: v for k, v in original.items() if k in requested}
+        logger.info("Syncing provider: %s ...", provider)
+        rules_sync(prune=prune, dry_run=dry_run)
+        skills_sync(prune=prune, dry_run=dry_run)
+        agents_sync(prune=prune, dry_run=dry_run)
+        system_sync(dry_run=dry_run, force=force)
+        config_sync(dry_run=dry_run, force=force)
+        logger.info("Done.")
+    finally:
+        _t.TOOL_CONFIGS = original

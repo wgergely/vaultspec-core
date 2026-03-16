@@ -235,9 +235,9 @@ def cmd_sync(
         )
         raise typer.Exit(code=1)
 
-    from vaultspec_core.spec_cli import _sync_provider
+    from vaultspec_core.core.commands import sync_provider
 
-    _sync_provider(provider, prune=prune, dry_run=dry_run, force=force)
+    sync_provider(provider, prune=prune, dry_run=dry_run, force=force)
 
 
 # ---- Entry point -------------------------------------------------------------
