@@ -148,15 +148,16 @@ def doctor_run() -> None:
         console.print("\n[bold green]All checks passed.[/bold green]")
 
 
-def _scaffold_core(target: Path) -> list[str]:
+def _rel(target: Path, p: Path) -> str:
+    return str(p.relative_to(target)).replace("\\", "/")
+
+
+def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[str]:
     """Scaffold the .vaultspec/ and .vault/ directory structures.
 
-    Returns a list of relative paths that were created.
+    When *dry_run* is True, returns the manifest without writing anything.
     """
-    from vaultspec_core.config import get_config
-
-    cfg = get_config()
-    fw_dir = target / cfg.framework_dir
+    fw_dir = target / ".vaultspec"
     vault_dir = target / ".vault"
     created: list[str] = []
 
@@ -168,38 +169,43 @@ def _scaffold_core(target: Path) -> list[str]:
         "rules/system",
     ]:
         d = fw_dir / subdir
-        ensure_dir(d)
-        created.append(str(d.relative_to(target)))
+        if not dry_run:
+            ensure_dir(d)
+        created.append(_rel(target, d))
 
     for subdir in ["adr", "audit", "exec", "plan", "reference", "research"]:
         d = vault_dir / subdir
-        ensure_dir(d)
-        created.append(str(d.relative_to(target)))
+        if not dry_run:
+            ensure_dir(d)
+        created.append(_rel(target, d))
 
     sys_dir = fw_dir / "rules" / "system"
     fw_md = sys_dir / "framework.md"
     if not fw_md.exists():
-        fw_md.write_text(
-            "# Framework Configuration\n\nAdd framework bootstrap content here.\n",
-            encoding="utf-8",
-        )
-        created.append(str(fw_md.relative_to(target)))
+        if not dry_run:
+            ensure_dir(sys_dir)
+            fw_md.write_text(
+                "# Framework Configuration\n\nAdd framework bootstrap content here.\n",
+                encoding="utf-8",
+            )
+        created.append(_rel(target, fw_md))
 
     proj_md = sys_dir / "project.md"
     if not proj_md.exists():
-        proj_md.write_text(
-            "# Project Configuration\n\nAdd project-specific content here.\n",
-            encoding="utf-8",
-        )
-        created.append(str(proj_md.relative_to(target)))
+        if not dry_run:
+            proj_md.write_text(
+                "# Project Configuration\n\nAdd project-specific content here.\n",
+                encoding="utf-8",
+            )
+        created.append(_rel(target, proj_md))
 
     return created
 
 
-def _scaffold_provider(target: Path, tool: Tool) -> list[str]:
+def _scaffold_provider(target: Path, tool: Tool, *, dry_run: bool = False) -> list[str]:
     """Scaffold directories for a single provider based on its ToolConfig.
 
-    Returns a list of relative paths that were created.
+    When *dry_run* is True, returns the manifest without writing anything.
     """
     cfg = _t.TOOL_CONFIGS.get(tool)
     if cfg is None:
@@ -209,36 +215,47 @@ def _scaffold_provider(target: Path, tool: Tool) -> list[str]:
     caps = cfg.capabilities
 
     if ProviderCapability.RULES in caps and cfg.rules_dir:
-        ensure_dir(cfg.rules_dir)
-        created.append(str(cfg.rules_dir.relative_to(target)))
+        if not dry_run:
+            ensure_dir(cfg.rules_dir)
+        created.append(_rel(target, cfg.rules_dir))
 
     if ProviderCapability.SKILLS in caps and cfg.skills_dir:
-        ensure_dir(cfg.skills_dir)
-        rel = str(cfg.skills_dir.relative_to(target))
+        if not dry_run:
+            ensure_dir(cfg.skills_dir)
+        rel = _rel(target, cfg.skills_dir)
         if rel not in created:
             created.append(rel)
 
     if ProviderCapability.AGENTS in caps and cfg.agents_dir:
-        ensure_dir(cfg.agents_dir)
-        created.append(str(cfg.agents_dir.relative_to(target)))
+        if not dry_run:
+            ensure_dir(cfg.agents_dir)
+        created.append(_rel(target, cfg.agents_dir))
 
     if ProviderCapability.WORKFLOWS in caps:
         wf_dir = target / ".agents" / "workflows"
-        ensure_dir(wf_dir)
-        rel = str(wf_dir.relative_to(target))
+        if not dry_run:
+            ensure_dir(wf_dir)
+        rel = _rel(target, wf_dir)
         if rel not in created:
             created.append(rel)
 
+    if cfg.config_file:
+        created.append(_rel(target, cfg.config_file))
+
+    if cfg.rule_ref_config_file:
+        created.append(_rel(target, cfg.rule_ref_config_file))
+
     if cfg.native_config_file:
-        ensure_dir(cfg.native_config_file.parent)
-        if not cfg.native_config_file.exists():
-            cfg.native_config_file.write_text("", encoding="utf-8")
-            created.append(str(cfg.native_config_file.relative_to(target)))
+        if not dry_run:
+            ensure_dir(cfg.native_config_file.parent)
+            if not cfg.native_config_file.exists():
+                cfg.native_config_file.write_text("", encoding="utf-8")
+        created.append(_rel(target, cfg.native_config_file))
 
     return created
 
 
-def _scaffold_mcp_json(target: Path) -> list[str]:
+def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[str]:
     """Scaffold .mcp.json for MCP server integration."""
     import json
 
@@ -246,16 +263,17 @@ def _scaffold_mcp_json(target: Path) -> list[str]:
     if mcp_json.exists():
         return []
 
-    mcp_config = {
-        "mcpServers": {
-            "vaultspec-core": {
-                "command": "vaultspec-mcp",
-                "args": [],
-                "env": {"VAULTSPEC_TARGET_DIR": str(target.resolve())},
+    if not dry_run:
+        mcp_config = {
+            "mcpServers": {
+                "vaultspec-core": {
+                    "command": "vaultspec-mcp",
+                    "args": [],
+                    "env": {"VAULTSPEC_TARGET_DIR": str(target.resolve())},
+                }
             }
         }
-    }
-    mcp_json.write_text(json.dumps(mcp_config, indent=2) + "\n", encoding="utf-8")
+        mcp_json.write_text(json.dumps(mcp_config, indent=2) + "\n", encoding="utf-8")
     return [".mcp.json"]
 
 
@@ -305,6 +323,40 @@ def init_run(force: bool = False, provider: str = "all") -> None:
     )
 
 
+def _ensure_tool_configs(path: Path) -> None:
+    """Ensure TOOL_CONFIGS is populated, bootstrapping if needed.
+
+    On a fresh project where ``.vaultspec/`` doesn't exist yet, temporarily
+    creates the minimal structure so ``init_paths()`` can resolve the
+    workspace layout and populate TOOL_CONFIGS.  The temporary files are
+    cleaned up afterward.
+    """
+    from vaultspec_core.config import reset_config
+    from vaultspec_core.config.workspace import resolve_workspace
+    from vaultspec_core.core.types import init_paths
+
+    if _t.TOOL_CONFIGS:
+        return
+
+    fw_dir = path / ".vaultspec"
+    temp_scaffold = not fw_dir.exists()
+    fw_md = fw_dir / "rules" / "system" / "framework.md"
+
+    if temp_scaffold:
+        fw_md.parent.mkdir(parents=True, exist_ok=True)
+        fw_md.write_text("# placeholder", encoding="utf-8")
+
+    try:
+        reset_config()
+        layout = resolve_workspace(target_override=path)
+        init_paths(layout)
+    finally:
+        if temp_scaffold:
+            import shutil
+
+            shutil.rmtree(fw_dir, ignore_errors=True)
+
+
 def install_run(
     path: Path,
     provider: str = "all",
@@ -336,39 +388,23 @@ def install_run(
     _t.TARGET_DIR = path
 
     if dry_run:
-        # Dry-run: compute and display the manifest without writing
-        try:
-            reset_config()
-            layout = resolve_workspace(target_override=path)
-            init_paths(layout)
-        except Exception:
-            # For dry-run on a fresh project, init_paths may fail;
-            # fall back to basic path computation.
-            pass
+        _ensure_tool_configs(path)
 
-        console.print("[bold]Would create:[/bold]")
-        manifest = _scaffold_core(path) if not (path / ".vaultspec").exists() else []
+        manifest = _scaffold_core(path, dry_run=True)
         tools = _PROVIDER_TO_TOOLS.get(provider, [])
         for tool in tools:
-            cfg = _t.TOOL_CONFIGS.get(tool)
-            if cfg is None:
-                continue
-            caps = cfg.capabilities
-            for d in (cfg.rules_dir, cfg.skills_dir, cfg.agents_dir):
-                if d is not None:
-                    manifest.append(str(d.relative_to(path)))
-            if ProviderCapability.WORKFLOWS in caps:
-                manifest.append(".agents/workflows")
-            if cfg.config_file:
-                manifest.append(str(cfg.config_file.relative_to(path)))
-            if cfg.native_config_file:
-                manifest.append(str(cfg.native_config_file.relative_to(path)))
-            if cfg.rule_ref_config_file:
-                manifest.append(str(cfg.rule_ref_config_file.relative_to(path)))
+            manifest.extend(_scaffold_provider(path, tool, dry_run=True))
+        manifest.extend(_scaffold_mcp_json(path, dry_run=True))
 
-        for item in dict.fromkeys(manifest):
+        # Deduplicate preserving order
+        seen: dict[str, None] = {}
+        for item in manifest:
+            seen.setdefault(item, None)
+
+        console.print("[bold]Would create:[/bold]")
+        for item in seen:
             console.print(f"  {item}")
-        console.print(f"\n[bold]Dry run:[/bold] {len(dict.fromkeys(manifest))} items")
+        console.print(f"\n[bold]Dry run:[/bold] {len(seen)} items")
         return
 
     if upgrade:
@@ -461,6 +497,9 @@ def uninstall_run(
     from vaultspec_core.console import get_console
 
     from .manifest import providers_sharing_dir, remove_provider
+
+    _t.TARGET_DIR = path
+    _ensure_tool_configs(path)
 
     if provider not in VALID_PROVIDERS:
         logger.error(
