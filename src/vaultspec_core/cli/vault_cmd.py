@@ -1,7 +1,7 @@
 """Vault command group -- manage .vault/ documentation records.
 
-Provides stubs for vault operations that will be fully wired in later phases.
-Currently delegates to the existing vault_cli module for implemented commands.
+Provides commands for creating, querying, and auditing vault documents.
+Delegates to the vaultcore query engine and hydration module for backend logic.
 """
 
 from __future__ import annotations
@@ -43,8 +43,43 @@ def cmd_add(
     ] = None,
 ) -> None:
     """Create a new .vault/ document from a template."""
-    typer.echo("Not yet implemented", err=True)
-    raise typer.Exit(code=1)
+    from datetime import datetime
+
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core import types as _t
+    from vaultspec_core.vaultcore.hydration import create_vault_doc
+    from vaultspec_core.vaultcore.models import DocType
+
+    console = get_console()
+
+    # Resolve doc type enum
+    try:
+        dt = DocType(doc_type)
+    except ValueError:
+        valid = ", ".join(d.value for d in DocType)
+        console.print(
+            f"[red]Unknown document type '{doc_type}'. Valid types: {valid}[/red]"
+        )
+        raise typer.Exit(code=1) from None
+
+    # Default date to today
+    date_str = date or datetime.now().strftime("%Y-%m-%d")
+
+    try:
+        path = create_vault_doc(
+            root_dir=_t.TARGET_DIR,
+            doc_type=dt,
+            feature=feature.lstrip("#"),
+            date_str=date_str,
+            title=title,
+        )
+        console.print(f"[green]Created:[/green] {path}")
+    except FileNotFoundError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from None
+    except FileExistsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from None
 
 
 # ---- vault stats -------------------------------------------------------------
@@ -69,8 +104,24 @@ def cmd_stats(
     ] = False,
 ) -> None:
     """Show vault statistics and metrics."""
-    typer.echo("Not yet implemented", err=True)
-    raise typer.Exit(code=1)
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core import types as _t
+    from vaultspec_core.vaultcore.query import get_stats
+
+    stats = get_stats(_t.TARGET_DIR, feature=feature, doc_type=type_filter, date=date)
+    console = get_console()
+    console.print("[bold]Vault Statistics[/bold]")
+    console.print(f"  Total documents: {stats['total_docs']}")
+    console.print(f"  Total features:  {stats['total_features']}")
+    if stats["counts_by_type"]:
+        console.print("  By type:")
+        for dt, count in sorted(stats["counts_by_type"].items()):
+            console.print(f"    {dt}: {count}")
+    if orphaned or invalid:
+        if orphaned:
+            console.print(f"  Orphaned docs: {stats['orphaned_count']}")
+        if invalid:
+            console.print(f"  Invalid links: {stats['invalid_link_count']}")
 
 
 # ---- vault list --------------------------------------------------------------
@@ -89,8 +140,23 @@ def cmd_list(
     ] = None,
 ) -> None:
     """List vault documents, optionally filtered by type."""
-    typer.echo("Not yet implemented", err=True)
-    raise typer.Exit(code=1)
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core import types as _t
+    from vaultspec_core.vaultcore.query import list_documents
+
+    docs = list_documents(_t.TARGET_DIR, doc_type=doc_type, feature=feature, date=date)
+    console = get_console()
+    if not docs:
+        console.print("[dim]No documents found.[/dim]")
+        return
+    for d in docs:
+        parts = [f"[bold]{d.name}[/bold]"]
+        parts.append(f"[dim]{d.doc_type}[/dim]")
+        if d.feature:
+            parts.append(f"#{d.feature}")
+        if d.date:
+            parts.append(d.date)
+        console.print("  ".join(parts))
 
 
 # ---- vault doctor ------------------------------------------------------------
@@ -99,8 +165,32 @@ def cmd_list(
 @vault_app.command("doctor")
 def cmd_doctor() -> None:
     """Check vault health and integrity."""
-    typer.echo("Not yet implemented", err=True)
-    raise typer.Exit(code=1)
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core import types as _t
+    from vaultspec_core.vaultcore.query import get_stats
+
+    console = get_console()
+    stats = get_stats(_t.TARGET_DIR)
+    console.print("[bold]Vault Health Check[/bold]")
+    console.print(f"  Documents: {stats['total_docs']}")
+    console.print(f"  Features:  {stats['total_features']}")
+
+    issues = []
+    if stats["orphaned_count"] > 0:
+        issues.append(
+            f"{stats['orphaned_count']} orphaned documents (no incoming links)"
+        )
+    if stats["invalid_link_count"] > 0:
+        issues.append(
+            f"{stats['invalid_link_count']} invalid links (broken references)"
+        )
+
+    if issues:
+        console.print("[yellow]Issues found:[/yellow]")
+        for issue in issues:
+            console.print(f"  [yellow]![/yellow] {issue}")
+    else:
+        console.print("[green]No issues found.[/green]")
 
 
 # ---- vault feature list ------------------------------------------------------
@@ -117,8 +207,25 @@ def cmd_feature_list(
     ] = None,
 ) -> None:
     """List all feature tags in the vault."""
-    typer.echo("Not yet implemented", err=True)
-    raise typer.Exit(code=1)
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core import types as _t
+    from vaultspec_core.vaultcore.query import list_feature_details
+
+    features = list_feature_details(
+        _t.TARGET_DIR, date=date, doc_type=type_filter, orphaned_only=orphaned
+    )
+    console = get_console()
+    if not features:
+        console.print("[dim]No features found.[/dim]")
+        return
+    for f in features:
+        types_str = ", ".join(f["types"])
+        plan_marker = " [green]plan[/green]" if f["has_plan"] else ""
+        name = f["name"]
+        count = f["doc_count"]
+        console.print(
+            f"  [bold]{name}[/bold]  {count} docs  ({types_str}){plan_marker}"
+        )
 
 
 # ---- vault feature archive ---------------------------------------------------
@@ -129,5 +236,15 @@ def cmd_feature_archive(
     feature_tag: Annotated[str, typer.Argument(help="Feature tag to archive")],
 ) -> None:
     """Archive all documents for a feature tag."""
-    typer.echo("Not yet implemented", err=True)
-    raise typer.Exit(code=1)
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core import types as _t
+    from vaultspec_core.vaultcore.query import archive_feature
+
+    result = archive_feature(_t.TARGET_DIR, feature_tag)
+    console = get_console()
+    if result["archived_count"] == 0:
+        console.print(f"[dim]No documents found for feature '{feature_tag}'.[/dim]")
+    else:
+        console.print(f"[green]Archived {result['archived_count']} documents.[/green]")
+        for p in result["paths"]:
+            console.print(f"  {p}")
