@@ -16,7 +16,7 @@ from vaultspec_core.core.types import init_paths
 # Typer's COLOR_SYSTEM to None to prevent ANSI on CI where pseudo-TTY
 # detection can override NO_COLOR.
 os.environ["NO_COLOR"] = "1"
-typer.rich_utils.COLOR_SYSTEM = None  # type: ignore[assignment]
+typer.rich_utils.COLOR_SYSTEM = None
 
 
 def setup_rules_dir(root):

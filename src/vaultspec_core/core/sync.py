@@ -199,8 +199,16 @@ def sync_to_all_tools(
     if dest_path_fn is None:
         dest_path_fn = lambda dest_dir, name: dest_dir / name  # noqa: E731
 
+    # Read manifest to determine which providers to sync
+    from .manifest import read_manifest
+
+    installed = read_manifest(_t.TARGET_DIR)
+
     total = SyncResult()
     for tool_type, cfg in _t.TOOL_CONFIGS.items():
+        # Skip providers not in manifest (when manifest exists)
+        if installed and cfg.name not in installed:
+            continue
         dest_dir = getattr(cfg, dir_attr)
         if dest_dir is None:
             continue
