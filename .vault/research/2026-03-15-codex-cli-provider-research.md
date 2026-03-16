@@ -45,23 +45,19 @@ developers.openai.com/codex on 2026-03-15.
 - **Source:** https://developers.openai.com/codex/config-basic/,
   https://developers.openai.com/codex/config-reference/
 
-## Rules
+## Rules (behavioral)
 
-- **Supported:** Yes — via Starlark `.rules` files in `.codex/rules/`
-- **Format:** Starlark (Python-like safe execution language), NOT TOML
-- **Function:** `prefix_rule(pattern=..., decision=..., justification=...)`
-- **Decisions:** `"allow"` (default), `"prompt"`, `"forbidden"`
-- **Purpose:** Control which commands Codex can execute outside sandbox
-- **Project-level:** `.codex/rules/*.rules`
-- **User-level:** `~/.codex/rules/default.rules`
-- **config.toml reference:** `approval_policy.reject.rules` is a boolean
-  flag only — there is NO `[rules]` TOML table in config.toml
-- **Testing:** `codex execpolicy check --rules <file> -- <command>`
-- **Source:** https://developers.openai.com/codex/rules/
-- **CORRECTION (2026-03-16):** Earlier version of this document
-  incorrectly stated rules were in a `[rules]` TOML table in
-  config.toml. This was based on a search snippet inference, not
-  verified against the actual rules documentation page.
+- **Supported:** Yes — via `AGENTS.md` content and `@rules/...`
+  references, the same mechanism used by Claude and Gemini
+- **Delivery:** Vaultspec's behavioral rules (coding conventions, style
+  guides) are injected into `AGENTS.md` as rule references. Codex reads
+  `AGENTS.md` as its primary instruction file.
+- **This is NOT Codex's execution policy system.** Codex has a separate
+  `.codex/rules/*.rules` system (Starlark `prefix_rule()` calls) for
+  controlling command execution (allow/deny/prompt). That system manages
+  security policies, not coding conventions. Vaultspec does not interact
+  with Codex's execution policy system.
+- **Source:** https://developers.openai.com/codex/guides/agents-md/
 
 ## Skills
 
@@ -134,7 +130,7 @@ developers.openai.com/codex on 2026-03-15.
 
 | Capability | Supported | Format | Notes |
 |-----------|-----------|--------|-------|
-| RULES | Yes | Starlark (`.codex/rules/*.rules`) | `prefix_rule()` functions, NOT TOML |
+| RULES | Yes | Via AGENTS.md rule references | Same delivery as Claude/Gemini |
 | SKILLS | Yes | Markdown (SKILL.md) | `.agents/skills/`, shared with Antigravity |
 | AGENTS | Yes (experimental) | TOML (`[agents.*]` in config.toml) | Needs TOML adapter for config.toml |
 | ROOT_CONFIG | Yes | Markdown (AGENTS.md) | Same treatment as CLAUDE.md/GEMINI.md |
@@ -148,19 +144,12 @@ developers.openai.com/codex on 2026-03-15.
 | Instruction file | `./AGENTS.md` (downward walk) | `~/.codex/AGENTS.md` |
 | Override file | `./AGENTS.override.md` | `~/.codex/AGENTS.override.md` |
 | Config | `.codex/config.toml` | `~/.codex/config.toml` |
-| Rules | `.codex/rules/*.rules` (Starlark) | `~/.codex/rules/*.rules` |
+| Rules | Via `./AGENTS.md` rule references | Via `~/.codex/AGENTS.md` |
 | Skills | `.agents/skills/<name>/SKILL.md` | `~/.agents/skills/` or `~/.codex/skills/` |
 | Agents | In `.codex/config.toml` | In `~/.codex/config.toml` |
 | System | In `.codex/config.toml` | In `~/.codex/config.toml` |
 
 ## Known issues for vaultspec
-
-### Starlark adapter required for rules
-
-Codex rules are Starlark `.rules` files in `.codex/rules/`, not TOML
-tables. vaultspec needs a Starlark code generator that emits
-`prefix_rule()` calls from its rule definitions. This is a new file
-format distinct from both markdown and TOML.
 
 ### TOML adapter required for agents
 

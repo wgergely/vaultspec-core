@@ -155,9 +155,9 @@ lines would be split by renderers. However:
 
 If the managed block introduces `[agents.X]` and the user already has
 an `[agents.X]` table with the same role name, the file becomes invalid
-TOML. TOML does not allow duplicate table headers. (Note: Codex rules
-are Starlark files in `.codex/rules/`, NOT TOML — the table conflict
-concern applies only to agent definitions.)
+TOML. TOML does not allow duplicate table headers. (Note: Codex
+behavioral rules are delivered via AGENTS.md, not config.toml — the
+table conflict concern applies only to agent definitions.)
 
 **Additional TOML findings (from tomlkit research):**
 - `# <vaultspec type="config">` is valid TOML (comments accept any

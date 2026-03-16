@@ -10,7 +10,7 @@ related:
   - "[[2026-03-15-install-cmds-capability-audit]]"
 ---
 
-# Managed content blocks ADR: `<vaultspec>` tag system | (**status:** `proposed`)
+# Managed content blocks ADR: `<vaultspec>` tag system | (**status:** `accepted`)
 
 ## Problem Statement
 
@@ -155,14 +155,30 @@ that should persist across vaultspec sync operations.
 - Users can safely add content above, below, or around managed blocks.
 - Uninstall becomes non-destructive — user content is preserved.
 
-## Open questions requiring user approval
+## Approved decisions (2026-03-16)
 
-1. Should `<vaultspec>` tags support additional attributes beyond `type=`?
-   (e.g. `provider="claude"`, `version="1.0"`)
-2. Should the closing tag include the type? (`</vaultspec>` vs
-   `</vaultspec type="config">` — the latter aids debugging but is
-   not valid XML)
-3. Should multiple blocks of the same type be allowed in one file?
-   (proposed: no, error on duplicate)
-4. Should we add `tomlkit` as a required dependency or keep it optional
-   with graceful degradation?
+1. **Tag attributes:** `type=` only. Additional attributes deferred.
+2. **Closing tag:** `</vaultspec>` (simple, no type repetition).
+3. **Duplicates:** Error — strict + report mode. One block per type per
+   file. On any invalid state (duplicate, orphaned, nested), refuse to
+   write and return a structured error with line numbers. Never crash,
+   never auto-fix. The CLI logs the error and exits with non-zero code.
+4. **tomlkit:** Not added. String-based marker operations only, same
+   pattern as markdown. No new dependency.
+5. **Codex rules:** No separate adapter needed. Codex behavioral rules
+   are delivered via `AGENTS.md` rule references — the same mechanism
+   as Claude and Gemini. Codex's `.codex/rules/` system is for
+   execution policies (command allow/deny), not coding conventions.
+
+## Error handling contract
+
+| Condition | Severity | Action |
+|-----------|----------|--------|
+| Duplicate `<vaultspec type="X">` | Error | Refuse write, report line numbers |
+| Opening without closing | Error | Refuse write, report line number |
+| Closing without opening | Warning | Ignore orphan, proceed normally |
+| Nested `<vaultspec>` tags | Error | Refuse write, report both lines |
+| Tags inside fenced code blocks | N/A | Ignored (code fence state machine) |
+| File does not exist | OK | Create file with managed block |
+| File exists, no block | OK | Append managed block to end |
+| File exists, valid block | OK | Replace content between markers |
