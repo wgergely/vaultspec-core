@@ -170,6 +170,7 @@ cython_debug/
 
 # Antigravity
 .agent/
+.agents/
 
 # LanceDB vector store
 .lance/
