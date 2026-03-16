@@ -19,8 +19,8 @@ from vaultspec_core.core import (
     transform_skill,
 )
 from vaultspec_core.core.config_gen import (
-    _generate_codex_native_config,
-    _generate_config,
+    _generate_codex_native_config_body,
+    _generate_config_body,
 )
 from vaultspec_core.core.enums import Tool
 from vaultspec_core.core.system import (
@@ -171,21 +171,21 @@ class TestGenerateConfig:
         (test_project / ".vaultspec" / "rules" / "system" / "project.md").write_text(
             "Custom body", encoding="utf-8"
         )
-        content = _generate_config(_cfg(Tool.CLAUDE))
+        content = _generate_config_body(_cfg(Tool.CLAUDE))
         assert content is not None
-        assert CONFIG_HEADER in content
+        assert "Internal body" in content
         assert "Custom body" in content
 
     def test_internal_only(self, test_project):
         (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal body", encoding="utf-8"
         )
-        content = _generate_config(_cfg(Tool.CLAUDE))
+        content = _generate_config_body(_cfg(Tool.CLAUDE))
         assert content is not None
-        assert CONFIG_HEADER in content
+        assert "Internal body" in content
 
     def test_returns_none_without_internal(self, test_project):
-        content = _generate_config(_cfg(Tool.CLAUDE))
+        content = _generate_config_body(_cfg(Tool.CLAUDE))
         assert content is None
 
     def test_includes_rule_references(self, test_project):
@@ -196,7 +196,7 @@ class TestGenerateConfig:
         (test_project / ".claude" / "rules" / "my-rule.md").write_text(
             "rule content", encoding="utf-8"
         )
-        content = _generate_config(_cfg(Tool.CLAUDE))
+        content = _generate_config_body(_cfg(Tool.CLAUDE))
         assert content is not None
         assert "@.claude/rules/my-rule.md" in content
 
@@ -204,7 +204,7 @@ class TestGenerateConfig:
         (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal", encoding="utf-8"
         )
-        content = _generate_config(_cfg(Tool.CODEX))
+        content = _generate_config_body(_cfg(Tool.CODEX))
         assert content is not None
         assert "Internal" in content
 
@@ -216,7 +216,7 @@ class TestGenerateConfig:
         (test_project / ".agents" / "rules" / "workspace-rule.md").write_text(
             "rule content", encoding="utf-8"
         )
-        content = _generate_config(_cfg(Tool.ANTIGRAVITY))
+        content = _generate_config_body(_cfg(Tool.ANTIGRAVITY))
         assert content is not None
         assert "@.agents/rules/workspace-rule.md" in content
 
@@ -231,7 +231,7 @@ class TestGenerateConfig:
             "---\n\nInternal",
             encoding="utf-8",
         )
-        content = _generate_codex_native_config()
+        content = _generate_codex_native_config_body()
         assert content is not None
         assert 'model = "gpt-5-codex"' in content
         assert 'approval_policy = "on-request"' in content
@@ -246,7 +246,7 @@ class TestGenerateConfig:
             "---\ncodex_sandbox_mode: workspace-write\n---\n\nProject",
             encoding="utf-8",
         )
-        content = _generate_codex_native_config()
+        content = _generate_codex_native_config_body()
         assert content is not None
         assert 'sandbox_mode = "workspace-write"' in content
 
@@ -263,7 +263,7 @@ class TestGenerateConfig:
             "---\n\nInternal",
             encoding="utf-8",
         )
-        content = _generate_codex_native_config()
+        content = _generate_codex_native_config_body()
         assert content is not None
         assert 'model_reasoning_effort = "high"' in content
         assert 'model_reasoning_summary = "auto"' in content
@@ -304,7 +304,7 @@ class TestCodexNegativeCoverage:
         (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "---\nname: framework\n---\n\nInternal", encoding="utf-8"
         )
-        assert _generate_codex_native_config() is None
+        assert _generate_codex_native_config_body() is None
 
 
 class TestGenerateSystemPrompt:

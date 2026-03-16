@@ -176,7 +176,7 @@ class TestSyncAgents:
         codex_cfg = test_project / ".codex" / "config.toml"
         assert codex_cfg.exists()
         content = codex_cfg.read_text(encoding="utf-8")
-        assert "# BEGIN VAULTSPEC MANAGED CODEX AGENTS" in content
+        assert '# <vaultspec type="agents">' in content
         assert '[agents."vaultspec-worker"]' in content
         assert 'description = "worker"' in content
         assert 'model = "gpt-5-codex"' in content
@@ -330,16 +330,18 @@ class TestConfigSync:
         content = config_file.read_text(encoding="utf-8")
         assert "Custom user content" in content
 
-    def test_force_overwrites_custom_dest(self, test_project):
+    def test_preserves_user_content_and_adds_managed_block(self, test_project):
         (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal", encoding="utf-8"
         )
         config_file = test_project / "CLAUDE.md"
         config_file.write_text("# Hand-written", encoding="utf-8")
         config_sync()
-        assert config_file.read_text(encoding="utf-8") == "# Hand-written"
-        config_sync(force=True)
-        assert "AUTO-GENERATED" in config_file.read_text(encoding="utf-8")
+        content = config_file.read_text(encoding="utf-8")
+        # User content preserved, managed block added alongside.
+        assert "# Hand-written" in content
+        assert "<vaultspec" in content
+        assert "Internal" in content
 
     def test_generates_root_configs_for_antigravity_and_codex(self, test_project):
         (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
@@ -379,7 +381,7 @@ class TestConfigSync:
 
         codex_native = test_project / ".codex" / "config.toml"
         content = codex_native.read_text(encoding="utf-8")
-        assert "# BEGIN VAULTSPEC MANAGED CODEX CONFIG" in content
+        assert '# <vaultspec type="config">' in content
         assert 'model = "gpt-5-codex"' in content
         assert 'approval_policy = "on-request"' in content
         assert 'project_doc_fallback_filenames = ["AGENTS.md", "CLAUDE.md"]' in content
@@ -402,7 +404,7 @@ class TestConfigSync:
         config_sync()
 
         content = (test_project / ".codex" / "config.toml").read_text(encoding="utf-8")
-        assert "# BEGIN VAULTSPEC MANAGED CODEX CONFIG" in content
+        assert '# <vaultspec type="config">' in content
         assert 'sandbox_mode = "workspace-write"' in content
         assert '[agents."vaultspec-worker"]' in content
 
@@ -471,16 +473,22 @@ class TestEndToEnd:
         rules_sync(prune=True)
         assert not dest.exists()
 
-    def test_force_overwrite_cycle(self, test_project):
+    def test_managed_block_coexists_with_user_content(self, test_project):
         (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal", encoding="utf-8"
         )
         config_file = test_project / "CLAUDE.md"
-        config_file.write_text("# Custom", encoding="utf-8")
+        config_file.write_text("# Custom user content", encoding="utf-8")
         config_sync()
-        assert config_file.read_text(encoding="utf-8") == "# Custom"
-        config_sync(force=True)
-        assert "AUTO-GENERATED" in config_file.read_text(encoding="utf-8")
+        content = config_file.read_text(encoding="utf-8")
+        # Managed block added alongside user content.
+        assert "# Custom user content" in content
+        assert "<vaultspec" in content
+        assert "Internal" in content
+        # Second sync updates managed block, preserves user content.
+        config_sync()
+        content2 = config_file.read_text(encoding="utf-8")
+        assert "# Custom user content" in content2
 
 
 class TestEndToEndAllDestinations:
