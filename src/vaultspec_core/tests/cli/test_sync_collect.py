@@ -198,14 +198,15 @@ class TestGenerateConfig:
         )
         content = _generate_config(_cfg(Tool.CLAUDE))
         assert content is not None
-        assert "@rules/my-rule.md" in content
+        assert "@.claude/rules/my-rule.md" in content
 
-    def test_codex_does_not_generate_markdown_config(self, test_project):
+    def test_codex_generates_agents_md_with_rule_refs(self, test_project):
         (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal", encoding="utf-8"
         )
         content = _generate_config(_cfg(Tool.CODEX))
-        assert content is None
+        assert content is not None
+        assert "Internal" in content
 
     def test_antigravity_uses_workspace_rules_for_root_gemini(self, test_project):
         (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(

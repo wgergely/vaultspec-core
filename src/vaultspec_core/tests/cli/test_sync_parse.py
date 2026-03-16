@@ -127,13 +127,18 @@ class TestInitPaths:
         assert _cfg(Tool.ANTIGRAVITY).skills_dir == (
             test_project / ".agents" / "skills"
         )
-        assert _cfg(Tool.CODEX).config_file is None
+        assert _cfg(Tool.CODEX).config_file == test_project / "AGENTS.md"
         assert _cfg(Tool.CODEX).native_config_file == (
             test_project / ".codex" / "config.toml"
         )
         assert _cfg(Tool.CODEX).rules_dir is None
         assert _cfg(Tool.CODEX).skills_dir == (test_project / ".agents" / "skills")
         assert _cfg(Tool.CODEX).rule_ref_dir is None
+        # Claude config at project root
+        assert _cfg(Tool.CLAUDE).config_file == test_project / "CLAUDE.md"
+        # Gemini config at project root, skills via .agents/
+        assert _cfg(Tool.GEMINI).config_file == test_project / "GEMINI.md"
+        assert _cfg(Tool.GEMINI).skills_dir == (test_project / ".agents" / "skills")
 
 
 class TestSyncResult:

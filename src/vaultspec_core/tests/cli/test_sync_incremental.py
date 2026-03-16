@@ -138,7 +138,7 @@ class TestIncrementalConfig:
             "v1 framework", encoding="utf-8"
         )
         config_sync(force=True)
-        claude_cfg = test_project / ".claude" / "CLAUDE.md"
+        claude_cfg = test_project / "CLAUDE.md"
         assert "v1 framework" in claude_cfg.read_text(encoding="utf-8")
 
         (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
@@ -155,7 +155,7 @@ class TestIncrementalConfig:
             "project v1", encoding="utf-8"
         )
         config_sync(force=True)
-        claude_cfg = test_project / ".claude" / "CLAUDE.md"
+        claude_cfg = test_project / "CLAUDE.md"
         assert "project v1" in claude_cfg.read_text(encoding="utf-8")
 
         (test_project / ".vaultspec" / "rules" / "system" / "project.md").write_text(

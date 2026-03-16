@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .enums import DirName, FileName, Resource, Tool
+from .enums import DirName, FileName, ProviderCapability, Resource, Tool
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +43,16 @@ class ToolConfig:
             ``None`` if not applicable.
         rule_ref_dir: Directory whose markdown files should be referenced from
             ``config_file``. Defaults to ``rules_dir`` when omitted.
+        rule_ref_config_file: Optional secondary config file that carries
+            ``@rules/...`` references, separate from ``config_file``.  Used
+            by Gemini where ``.gemini/GEMINI.md`` holds rule references while
+            the root ``GEMINI.md`` holds shared framework content.
         system_file: Path to the tool's system prompt file, or ``None`` if the
             tool does not have a dedicated system file.
         emit_system_rule: Whether shared system content should be materialized
             as a rule file when ``system_file`` is absent.
+        capabilities: Declared provider capabilities.  Used by install, sync,
+            and dry-run to reason about what each provider supports.
     """
 
     name: str
@@ -56,8 +62,10 @@ class ToolConfig:
     config_file: Path | None = None
     native_config_file: Path | None = None
     rule_ref_dir: Path | None = None
+    rule_ref_config_file: Path | None = None
     system_file: Path | None = None
     emit_system_rule: bool = True
+    capabilities: frozenset[ProviderCapability] = frozenset()
 
 
 @dataclass
@@ -158,17 +166,49 @@ def init_paths(layout: Any) -> None:
     HOOKS_DIR = vaultspec / Resource.RULES.value / Resource.HOOKS.value
     shared_agents_root = target / DirName.ANTIGRAVITY.value
 
+    gemini_dir = target / cfg.gemini_dir
+
     # Build Tool Configurations
+    _pc = ProviderCapability
     TOOL_CONFIGS = {
-        Tool.CLAUDE: _create_tool_cfg(
-            Tool.CLAUDE, target, cfg.claude_dir, config=FileName.CLAUDE
+        Tool.CLAUDE: ToolConfig(
+            name=Tool.CLAUDE.value,
+            rules_dir=target / cfg.claude_dir / Resource.RULES.value,
+            skills_dir=target / cfg.claude_dir / Resource.SKILLS.value,
+            agents_dir=target / cfg.claude_dir / Resource.AGENTS.value,
+            config_file=target / FileName.CLAUDE.value,
+            rule_ref_dir=target / cfg.claude_dir / Resource.RULES.value,
+            capabilities=frozenset(
+                {
+                    _pc.RULES,
+                    _pc.SKILLS,
+                    _pc.AGENTS,
+                    _pc.ROOT_CONFIG,
+                    _pc.HOOKS,
+                    _pc.TEAMS,
+                    _pc.SCHEDULED_TASKS,
+                }
+            ),
         ),
-        Tool.GEMINI: _create_tool_cfg(
-            Tool.GEMINI,
-            target,
-            cfg.gemini_dir,
-            config=FileName.GEMINI,
-            system="SYSTEM.md",
+        Tool.GEMINI: ToolConfig(
+            name=Tool.GEMINI.value,
+            rules_dir=gemini_dir / Resource.RULES.value,
+            skills_dir=shared_agents_root / Resource.SKILLS.value,
+            agents_dir=gemini_dir / Resource.AGENTS.value,
+            config_file=target / FileName.GEMINI.value,
+            rule_ref_dir=gemini_dir / Resource.RULES.value,
+            rule_ref_config_file=gemini_dir / FileName.GEMINI.value,
+            system_file=gemini_dir / FileName.SYSTEM.value,
+            capabilities=frozenset(
+                {
+                    _pc.RULES,
+                    _pc.SKILLS,
+                    _pc.AGENTS,
+                    _pc.ROOT_CONFIG,
+                    _pc.SYSTEM,
+                    _pc.HOOKS,
+                }
+            ),
         ),
         Tool.ANTIGRAVITY: ToolConfig(
             name=Tool.ANTIGRAVITY.value,
@@ -179,18 +219,34 @@ def init_paths(layout: Any) -> None:
             rule_ref_dir=shared_agents_root / Resource.RULES.value,
             system_file=None,
             emit_system_rule=False,
+            capabilities=frozenset(
+                {
+                    _pc.RULES,
+                    _pc.SKILLS,
+                    _pc.ROOT_CONFIG,
+                    _pc.WORKFLOWS,
+                }
+            ),
         ),
         Tool.CODEX: ToolConfig(
             name=Tool.CODEX.value,
             rules_dir=None,
             skills_dir=shared_agents_root / Resource.SKILLS.value,
             agents_dir=None,
-            config_file=None,
+            config_file=target / FileName.AGENTS.value,
             native_config_file=(
                 target / DirName.CODEX.value / FileName.CONFIG_TOML.value
             ),
             rule_ref_dir=None,
             system_file=None,
             emit_system_rule=False,
+            capabilities=frozenset(
+                {
+                    _pc.RULES,
+                    _pc.SKILLS,
+                    _pc.AGENTS,
+                    _pc.ROOT_CONFIG,
+                }
+            ),
         ),
     }

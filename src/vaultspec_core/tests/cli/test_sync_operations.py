@@ -325,7 +325,7 @@ class TestConfigSync:
             "Custom user content", encoding="utf-8"
         )
         config_sync()
-        config_file = test_project / ".claude" / "CLAUDE.md"
+        config_file = test_project / "CLAUDE.md"
         assert config_file.exists()
         content = config_file.read_text(encoding="utf-8")
         assert "Custom user content" in content
@@ -334,7 +334,7 @@ class TestConfigSync:
         (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal", encoding="utf-8"
         )
-        config_file = test_project / ".claude" / "CLAUDE.md"
+        config_file = test_project / "CLAUDE.md"
         config_file.write_text("# Hand-written", encoding="utf-8")
         config_sync()
         assert config_file.read_text(encoding="utf-8") == "# Hand-written"
@@ -446,7 +446,7 @@ class TestEndToEnd:
 
         # Verify
         assert (test_project / ".claude" / "rules" / "no-swear.md").exists()
-        assert (test_project / ".claude" / "CLAUDE.md").exists()
+        assert (test_project / "CLAUDE.md").exists()
         assert (test_project / ".gemini" / "SYSTEM.md").exists()
 
     def test_modify_resync_cycle(self, test_project):
@@ -475,7 +475,7 @@ class TestEndToEnd:
         (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
             "Internal", encoding="utf-8"
         )
-        config_file = test_project / ".claude" / "CLAUDE.md"
+        config_file = test_project / "CLAUDE.md"
         config_file.write_text("# Custom", encoding="utf-8")
         config_sync()
         assert config_file.read_text(encoding="utf-8") == "# Custom"
@@ -524,7 +524,7 @@ class TestEndToEndAllDestinations:
         config_sync()
 
         # === Claude destination ===
-        assert (test_project / ".claude" / "CLAUDE.md").exists()
+        assert (test_project / "CLAUDE.md").exists()
         assert (test_project / ".claude" / "rules" / "no-swear.md").exists()
         assert (
             test_project / ".claude" / "rules" / "vaultspec-system.builtin.md"
@@ -534,11 +534,11 @@ class TestEndToEndAllDestinations:
         ).exists()
 
         # === Gemini destination ===
-        assert (test_project / ".gemini" / "GEMINI.md").exists()
         assert (test_project / ".gemini" / "rules" / "no-swear.md").exists()
         assert (test_project / ".gemini" / "SYSTEM.md").exists()
+        # Gemini skills go to .agents/skills/ (shared), not .gemini/skills/
         assert (
-            test_project / ".gemini" / "skills" / "vaultspec-deploy" / "SKILL.md"
+            test_project / ".agents" / "skills" / "vaultspec-deploy" / "SKILL.md"
         ).exists()
 
         # === Antigravity destination ===
@@ -547,9 +547,6 @@ class TestEndToEndAllDestinations:
         ag_content = antigravity_config.read_text(encoding="utf-8")
         assert "Framework instructions" in ag_content
         assert (test_project / ".agents" / "rules" / "no-swear.md").exists()
-        assert (
-            test_project / ".agents" / "skills" / "vaultspec-deploy" / "SKILL.md"
-        ).exists()
         # Antigravity must NOT get system builtin rule (emit_system_rule=False)
         assert not (
             test_project / ".agents" / "rules" / "vaultspec-system.builtin.md"
@@ -560,8 +557,6 @@ class TestEndToEndAllDestinations:
         assert codex_agents_md.exists()
         codex_agents_content = codex_agents_md.read_text(encoding="utf-8")
         assert "Framework instructions" in codex_agents_content
-        # Codex AGENTS.md must NOT include rule references
-        assert "@" not in codex_agents_content
 
         codex_toml = test_project / ".codex" / "config.toml"
         assert codex_toml.exists()
@@ -596,6 +591,6 @@ class TestEndToEndAllDestinations:
         assert not (test_project / ".claude" / "rules" / "dry-rule.md").exists()
         assert not (test_project / ".gemini" / "rules" / "dry-rule.md").exists()
         assert not (test_project / ".agents" / "rules" / "dry-rule.md").exists()
-        assert not (test_project / ".claude" / "CLAUDE.md").exists()
+        assert not (test_project / "CLAUDE.md").exists()
         assert not (test_project / ".gemini" / "SYSTEM.md").exists()
         assert not (test_project / "AGENTS.md").exists()
