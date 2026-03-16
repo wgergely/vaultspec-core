@@ -64,6 +64,20 @@ class Tool(StrEnum):
     CODEX = "codex"
 
 
+class ProviderCapability(StrEnum):
+    """Capabilities a provider can declare support for."""
+
+    RULES = "rules"
+    SKILLS = "skills"
+    AGENTS = "agents"
+    ROOT_CONFIG = "root_config"
+    SYSTEM = "system"
+    HOOKS = "hooks"
+    TEAMS = "teams"
+    SCHEDULED_TASKS = "scheduled_tasks"
+    WORKFLOWS = "workflows"
+
+
 class Resource(StrEnum):
     """Managed spec resource types."""
 
@@ -73,6 +87,7 @@ class Resource(StrEnum):
     SYSTEM = "system"
     TEMPLATES = "templates"
     HOOKS = "hooks"
+    WORKFLOWS = "workflows"
 
 
 class FileName(StrEnum):

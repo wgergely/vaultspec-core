@@ -2,30 +2,32 @@
 
 This module merges internal framework configuration, optional project-local
 configuration, and generated rule references into the config files consumed by
-supported tools. It also distinguishes CLI-managed files from custom files so
-sync operations can avoid unsafe overwrites.
+supported tools.  It uses ``<vaultspec>`` managed content blocks to co-exist
+with user-authored content in shared files like CLAUDE.md, GEMINI.md, and
+AGENTS.md.
 """
 
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
 
 from . import types as _t
 from .enums import Tool
 from .helpers import atomic_write, ensure_dir
 from .sync import print_summary
+from .tags import TagError, has_block, upsert_block
 from .types import SyncResult, ToolConfig
 
 logger = logging.getLogger(__name__)
 
-CODEX_CONFIG_BEGIN = "# BEGIN VAULTSPEC MANAGED CODEX CONFIG"
-CODEX_CONFIG_END = "# END VAULTSPEC MANAGED CODEX CONFIG"
-
 
 def _is_cli_managed(path_or_content: str | Path) -> bool:
-    """Return True if the file content contains the AUTO-GENERATED header."""
+    """Return True if the content contains a vaultspec managed block.
+
+    Detects both old-style ``AUTO-GENERATED`` headers and new-style
+    ``<vaultspec>`` tags for backward compatibility.
+    """
     if isinstance(path_or_content, Path):
         if not path_or_content.exists():
             return False
@@ -35,14 +37,12 @@ def _is_cli_managed(path_or_content: str | Path) -> bool:
             return False
     else:
         content = path_or_content
-    return _t.CONFIG_HEADER in content
+    # Check for both old header and new tag system.
+    return "<vaultspec " in content or _t.CONFIG_HEADER in content
 
 
 def _collect_rule_refs(cfg: ToolConfig) -> list[str]:
     """Scan the configured rule-reference directory for markdown rule files.
-
-    Args:
-        cfg: Configuration for the target tool.
 
     Returns:
         List of include strings (e.g. ``"@rules/my-rule.md"``) for every file
@@ -69,14 +69,6 @@ def _collect_rule_refs(cfg: ToolConfig) -> list[str]:
 def _toml_quote(value: str) -> str:
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
-
-
-def _strip_managed_codex_config_block(content: str) -> str:
-    pattern = re.compile(
-        rf"\n?{re.escape(CODEX_CONFIG_BEGIN)}\n.*?\n{re.escape(CODEX_CONFIG_END)}\n?",
-        re.DOTALL,
-    )
-    return pattern.sub("\n", content).strip()
 
 
 def _read_framework_project_parts() -> tuple[
@@ -174,27 +166,14 @@ def _render_codex_config_lines(meta: dict[str, object]) -> list[str]:
     return rendered
 
 
-def _generate_codex_native_config() -> str | None:
-    (
-        internal_meta,
-        _internal_body,
-        project_meta,
-        _custom_body,
-    ) = _read_framework_project_parts()
-    merged = _merge_codex_config_meta(internal_meta, project_meta)
-    lines = _render_codex_config_lines(merged)
-    if not lines:
-        return None
-    return f"{CODEX_CONFIG_BEGIN}\n" + "\n".join(lines) + f"\n{CODEX_CONFIG_END}"
+# ---------------------------------------------------------------------------
+# Content generators — produce the managed block body (without tags).
+# ---------------------------------------------------------------------------
 
 
-def _generate_config(cfg: ToolConfig) -> str | None:
-    """Assemble the complete configuration file for a tool destination."""
-
-    if cfg.config_file is None:
-        return None
-
-    if not _t.FRAMEWORK_CONFIG_SRC.exists():
+def _generate_config_body(cfg: ToolConfig) -> str | None:
+    """Assemble the managed block body for a tool's root config file."""
+    if cfg.config_file is None or not _t.FRAMEWORK_CONFIG_SRC.exists():
         return None
 
     (
@@ -210,7 +189,6 @@ def _generate_config(cfg: ToolConfig) -> str | None:
         body_parts.append("")
         body_parts.append(custom_body)
 
-    # Add rules
     refs = _collect_rule_refs(cfg)
     if refs:
         body_parts.append("")
@@ -221,37 +199,152 @@ def _generate_config(cfg: ToolConfig) -> str | None:
         for ref in refs:
             body_parts.append(f"@{ref}")
 
-    body = "\n".join(body_parts)
-    return f"{_t.CONFIG_HEADER}\n{body}"
+    return "\n".join(body_parts)
 
 
-def _generate_codex_agents_md() -> str | None:
-    """Assemble the managed root AGENTS.md content for Codex."""
-    if not _t.FRAMEWORK_CONFIG_SRC.exists():
+def _generate_rule_ref_body(cfg: ToolConfig) -> str | None:
+    """Generate body for a secondary config with rule references only."""
+    if cfg.rule_ref_config_file is None:
         return None
 
+    refs = _collect_rule_refs(cfg)
+    if not refs:
+        return None
+
+    body_parts = [
+        "## Rules",
+        "",
+        "You MUST respect these rules at all times:",
+        "",
+    ]
+    for ref in refs:
+        body_parts.append(f"@{ref}")
+
+    return "\n".join(body_parts)
+
+
+def _generate_codex_native_config_body() -> str | None:
+    """Generate body for Codex config.toml managed settings block."""
     (
-        _internal_meta,
-        internal_body,
-        _project_meta,
-        custom_body,
+        internal_meta,
+        _internal_body,
+        project_meta,
+        _custom_body,
     ) = _read_framework_project_parts()
+    merged = _merge_codex_config_meta(internal_meta, project_meta)
+    lines = _render_codex_config_lines(merged)
+    if not lines:
+        return None
+    return "\n".join(lines)
 
-    body_parts = [internal_body]
-    if custom_body:
-        body_parts.append("")
-        body_parts.append(custom_body)
 
-    return f"{_t.CONFIG_HEADER}\n{'\n'.join(body_parts)}"
+def _generate_codex_agents_body() -> str | None:
+    """Generate body for Codex config.toml managed agents block."""
+    from .agents import collect_agents
+
+    sources = collect_agents()
+    if not sources:
+        return None
+
+    lines = []
+    for filename, (_path, meta, body) in sorted(sources.items()):
+        agent_name = meta.get("name", filename.removesuffix(".md"))
+        description = meta.get(
+            "description",
+            body.strip().split("\n")[0] if body.strip() else "",
+        )
+        lines.append(f"[agents.{_toml_quote(str(agent_name))}]")
+        lines.append(f"description = {_toml_quote(str(description))}")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Sync helpers — write managed blocks into files.
+# ---------------------------------------------------------------------------
+
+
+def _sync_managed_md(
+    path: Path,
+    block_type: str,
+    body: str,
+    *,
+    dry_run: bool = False,
+    force: bool = False,
+) -> str:
+    """Upsert a ``<vaultspec>`` block into a markdown file.
+
+    Returns the action taken: ``"[ADD]"``, ``"[UPDT]"``, or ``"[SKIP]"``.
+    """
+    if path.exists():
+        existing = path.read_text(encoding="utf-8")
+        if has_block(existing, block_type):
+            # Block exists — always safe to update our own content.
+            if not dry_run:
+                updated = upsert_block(existing, block_type, body)
+                atomic_write(path, updated)
+            return "[UPDT]"
+        if _is_cli_managed(existing) or force:
+            # File is ours or force — upsert (append block).
+            if not dry_run:
+                updated = upsert_block(existing, block_type, body)
+                atomic_write(path, updated)
+            return "[UPDT]"
+        # File exists with user content, no managed block, no force.
+        # Append our block without destroying user content.
+        if not dry_run:
+            updated = upsert_block(existing, block_type, body)
+            atomic_write(path, updated)
+        return "[ADD]"
+    else:
+        # New file — create with managed block only.
+        if not dry_run:
+            ensure_dir(path.parent)
+            content = upsert_block("", block_type, body)
+            atomic_write(path, content)
+        return "[ADD]"
+
+
+def _sync_managed_toml(
+    path: Path,
+    block_type: str,
+    body: str,
+    *,
+    dry_run: bool = False,
+) -> str:
+    """Upsert a ``# <vaultspec>`` block into a TOML file.
+
+    Returns the action taken.
+    """
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+
+    try:
+        updated = upsert_block(existing, block_type, body, comment_prefix="# ")
+    except TagError as e:
+        logger.warning("Cannot update %s: %s", path, e)
+        return "[SKIP]"
+
+    if updated == existing:
+        return "[SKIP]"
+
+    if not dry_run:
+        ensure_dir(path.parent)
+        atomic_write(path, updated)
+
+    return "[ADD]" if not path.exists() else "[UPDT]"
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
 
 
 def config_show() -> None:
-    """Print the generated configuration content for every active tool destination."""
+    """Print the generated configuration content for every active tool."""
     import typer
 
     for tool_type, cfg in _t.TOOL_CONFIGS.items():
         typer.echo(f"--- {tool_type.value} config ---")
-        content = _generate_config(cfg)
+        content = _generate_config_body(cfg)
         if content:
             typer.echo(content)
         else:
@@ -260,91 +353,91 @@ def config_show() -> None:
 
 
 def config_sync(dry_run: bool = False, force: bool = False) -> None:
-    """Sync tool configuration files (CLAUDE.md, etc.) to their destinations.
+    """Sync tool configuration files using ``<vaultspec>`` managed blocks.
 
-    Args:
-        dry_run: If ``True``, log planned actions without writing.
-        force: If ``True``, overwrite non-managed files.
+    For markdown files (CLAUDE.md, GEMINI.md, AGENTS.md), inserts or
+    updates a ``<vaultspec type="config">`` block.  User content outside
+    the block is preserved.
+
+    For TOML files (.codex/config.toml), inserts or updates
+    ``# <vaultspec type="...">`` blocks.
     """
     result = SyncResult()
 
+    # --- Markdown root config files ---
     for _tool_type, cfg in _t.TOOL_CONFIGS.items():
         if not cfg.config_file:
             continue
 
-        content = _generate_config(cfg)
-        if not content:
+        body = _generate_config_body(cfg)
+        if not body:
             continue
 
-        action = "[SKIP]"
-        if not cfg.config_file.exists():
-            action = "[ADD]"
-        elif _is_cli_managed(cfg.config_file):
-            action = "[UPDT]"
-        elif force:
-            action = "[FORC]"
-
-        if action != "[SKIP]":
-            logger.info("%s %s", action, cfg.config_file)
-            if not dry_run:
-                ensure_dir(cfg.config_file.parent)
-                atomic_write(cfg.config_file, content)
-
-        if action == "[ADD]":
-            result.added += 1
-        elif action != "[SKIP]":
-            result.updated += 1
-
-    codex_path = _t.TARGET_DIR / "AGENTS.md"
-    codex_content = _generate_codex_agents_md()
-    if codex_content:
-        action = "[SKIP]"
-        if not codex_path.exists():
-            action = "[ADD]"
-        elif _is_cli_managed(codex_path):
-            action = "[UPDT]"
-        elif force:
-            action = "[FORC]"
-
-        if action != "[SKIP]":
-            logger.info("%s %s", action, codex_path)
-            if not dry_run:
-                atomic_write(codex_path, codex_content)
-
-        if action == "[ADD]":
-            result.added += 1
-        elif action != "[SKIP]":
-            result.updated += 1
-
-    codex_native_path = _t.TOOL_CONFIGS[Tool.CODEX].native_config_file
-    codex_native_content = _generate_codex_native_config()
-    if codex_native_path is not None and codex_native_content is not None:
-        existing = (
-            codex_native_path.read_text(encoding="utf-8")
-            if codex_native_path.exists()
-            else ""
+        action = _sync_managed_md(
+            cfg.config_file,
+            "config",
+            body,
+            dry_run=dry_run,
+            force=force,
         )
-        preserved = _strip_managed_codex_config_block(existing)
-        parts = [part for part in [preserved, codex_native_content] if part]
-        merged_content = "\n\n".join(parts).strip()
-        if merged_content:
-            merged_content += "\n"
-
-        action = "[SKIP]"
-        if not codex_native_path.exists():
-            action = "[ADD]"
-        elif existing != merged_content:
-            action = "[UPDT]"
-
-        if action != "[SKIP]":
-            logger.info("%s %s", action, codex_native_path)
-            if not dry_run:
-                ensure_dir(codex_native_path.parent)
-                atomic_write(codex_native_path, merged_content)
+        logger.info("%s %s", action, cfg.config_file)
 
         if action == "[ADD]":
             result.added += 1
         elif action == "[UPDT]":
             result.updated += 1
+
+    # --- Secondary rule-reference config files (.gemini/GEMINI.md) ---
+    for _tool_type, cfg in _t.TOOL_CONFIGS.items():
+        ref_body = _generate_rule_ref_body(cfg)
+        if not ref_body or cfg.rule_ref_config_file is None:
+            continue
+
+        action = _sync_managed_md(
+            cfg.rule_ref_config_file,
+            "rules",
+            ref_body,
+            dry_run=dry_run,
+            force=force,
+        )
+        logger.info("%s %s", action, cfg.rule_ref_config_file)
+
+        if action == "[ADD]":
+            result.added += 1
+        elif action == "[UPDT]":
+            result.updated += 1
+
+    # --- Codex native config (TOML) ---
+    codex_native_path = _t.TOOL_CONFIGS[Tool.CODEX].native_config_file
+    if codex_native_path is not None:
+        config_body = _generate_codex_native_config_body()
+        if config_body:
+            action = _sync_managed_toml(
+                codex_native_path,
+                "config",
+                config_body,
+                dry_run=dry_run,
+            )
+            if action != "[SKIP]":
+                logger.info("%s %s", action, codex_native_path)
+            if action == "[ADD]":
+                result.added += 1
+            elif action == "[UPDT]":
+                result.updated += 1
+
+        agents_body = _generate_codex_agents_body()
+        if agents_body:
+            action = _sync_managed_toml(
+                codex_native_path,
+                "agents",
+                agents_body,
+                dry_run=dry_run,
+            )
+            if action != "[SKIP]":
+                logger.info("%s %s", action, codex_native_path)
+            if action == "[ADD]":
+                result.added += 1
+            elif action == "[UPDT]":
+                result.updated += 1
 
     print_summary("Config", result)

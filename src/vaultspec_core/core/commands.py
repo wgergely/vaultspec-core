@@ -16,9 +16,23 @@ from pathlib import Path
 import typer
 
 from . import types as _t
+from .enums import ProviderCapability, Tool
 from .helpers import ensure_dir
 
 logger = logging.getLogger(__name__)
+
+# Valid provider arguments for install/uninstall commands.
+VALID_PROVIDERS = {"all", "core", "claude", "gemini", "antigravity", "codex"}
+
+# Map provider argument names to Tool enum members.
+_PROVIDER_TO_TOOLS: dict[str, list[Tool]] = {
+    "claude": [Tool.CLAUDE],
+    "gemini": [Tool.GEMINI],
+    "antigravity": [Tool.ANTIGRAVITY],
+    "codex": [Tool.CODEX],
+    "all": [Tool.CLAUDE, Tool.GEMINI, Tool.ANTIGRAVITY, Tool.CODEX],
+    "core": [],
+}
 
 VALID_CATEGORIES = {"all", "unit", "api", "quality"}
 
@@ -134,22 +148,19 @@ def doctor_run() -> None:
         console.print("\n[bold green]All checks passed.[/bold green]")
 
 
-def init_run(force: bool = False, providers: str = "all") -> None:
-    """Scaffold the .vaultspec/ and .vault/ directory structure."""
-    from vaultspec_core.config import get_config, reset_config
-    from vaultspec_core.config.workspace import resolve_workspace
-    from vaultspec_core.core.types import init_paths
+def _rel(target: Path, p: Path) -> str:
+    return str(p.relative_to(target)).replace("\\", "/")
 
-    cfg = get_config()
-    fw_dir = _t.TARGET_DIR / cfg.framework_dir
-    vault_dir = _t.TARGET_DIR / ".vault"
 
-    if fw_dir.exists() and not force:
-        logger.error("Error: %s already exists. Use --force to overwrite.", fw_dir)
-        raise typer.Exit(code=1)
+def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[str]:
+    """Scaffold the .vaultspec/ and .vault/ directory structures.
 
-    # Create .vaultspec/ structure
-    created = []
+    When *dry_run* is True, returns the manifest without writing anything.
+    """
+    fw_dir = target / ".vaultspec"
+    vault_dir = target / ".vault"
+    created: list[str] = []
+
     for subdir in [
         "rules/rules",
         "rules/skills",
@@ -158,90 +169,153 @@ def init_run(force: bool = False, providers: str = "all") -> None:
         "rules/system",
     ]:
         d = fw_dir / subdir
-        ensure_dir(d)
-        created.append(str(d.relative_to(_t.TARGET_DIR)))
+        if not dry_run:
+            ensure_dir(d)
+        created.append(_rel(target, d))
 
-    # Create .vault/ structure
     for subdir in ["adr", "audit", "exec", "plan", "reference", "research"]:
         d = vault_dir / subdir
-        ensure_dir(d)
-        created.append(str(d.relative_to(_t.TARGET_DIR)))
+        if not dry_run:
+            ensure_dir(d)
+        created.append(_rel(target, d))
 
-    # Create minimal stubs if they don't exist
     sys_dir = fw_dir / "rules" / "system"
     fw_md = sys_dir / "framework.md"
     if not fw_md.exists():
-        fw_md.write_text(
-            "# Framework Configuration\n\nAdd framework bootstrap content here.\n",
-            encoding="utf-8",
-        )
-        created.append(str(fw_md.relative_to(_t.TARGET_DIR)))
+        if not dry_run:
+            ensure_dir(sys_dir)
+            fw_md.write_text(
+                "# Framework Configuration\n\nAdd framework bootstrap content here.\n",
+                encoding="utf-8",
+            )
+        created.append(_rel(target, fw_md))
 
     proj_md = sys_dir / "project.md"
     if not proj_md.exists():
-        proj_md.write_text(
-            "# Project Configuration\n\nAdd project-specific content here.\n",
-            encoding="utf-8",
-        )
-        created.append(str(proj_md.relative_to(_t.TARGET_DIR)))
+        if not dry_run:
+            proj_md.write_text(
+                "# Project Configuration\n\nAdd project-specific content here.\n",
+                encoding="utf-8",
+            )
+        created.append(_rel(target, proj_md))
 
-    # Phase 4 Step 1: Force init_run to call reset_config() and
-    # re-resolve workspace after writing framework.md so scaffolding does not
-    # read stale config data.
-    reset_config()
-    layout = resolve_workspace(target_override=_t.TARGET_DIR)
-    init_paths(layout)
-    cfg = get_config()
+    return created
 
-    # Scaffold Providers
-    active_providers = [p.strip().lower() for p in providers.split(",")]
-    if "all" in active_providers:
-        active_providers = ["gemini", "claude"]
 
-    for provider in active_providers:
-        if provider == "gemini":
-            ensure_dir(_t.TARGET_DIR / ".gemini" / "rules")
-            created.append(".gemini/rules")
-        elif provider == "claude":
-            ensure_dir(_t.TARGET_DIR / ".claude" / "rules")
-            created.append(".claude/rules")
+def _scaffold_provider(target: Path, tool: Tool, *, dry_run: bool = False) -> list[str]:
+    """Scaffold directories for a single provider based on its ToolConfig.
 
-    # Scaffold Agents directory
-    ensure_dir(_t.TARGET_DIR / cfg.antigravity_dir / "rules")
-    ensure_dir(_t.TARGET_DIR / cfg.antigravity_dir / "workflows")
-    ensure_dir(_t.TARGET_DIR / cfg.antigravity_dir / "skills")
-    created.append(f"{cfg.antigravity_dir}/rules")
-    created.append(f"{cfg.antigravity_dir}/workflows")
-    created.append(f"{cfg.antigravity_dir}/skills")
+    When *dry_run* is True, returns the manifest without writing anything.
+    """
+    cfg = _t.TOOL_CONFIGS.get(tool)
+    if cfg is None:
+        return []
 
-    codex_cfg = _t.TARGET_DIR / ".codex" / "config.toml"
-    ensure_dir(codex_cfg.parent)
-    if not codex_cfg.exists():
-        codex_cfg.write_text("", encoding="utf-8")
-        created.append(".codex/config.toml")
+    created: list[str] = []
+    caps = cfg.capabilities
 
-    # Scaffold .mcp.json for MCP server integration
+    if ProviderCapability.RULES in caps and cfg.rules_dir:
+        if not dry_run:
+            ensure_dir(cfg.rules_dir)
+        created.append(_rel(target, cfg.rules_dir))
+
+    if ProviderCapability.SKILLS in caps and cfg.skills_dir:
+        if not dry_run:
+            ensure_dir(cfg.skills_dir)
+        rel = _rel(target, cfg.skills_dir)
+        if rel not in created:
+            created.append(rel)
+
+    if ProviderCapability.AGENTS in caps and cfg.agents_dir:
+        if not dry_run:
+            ensure_dir(cfg.agents_dir)
+        created.append(_rel(target, cfg.agents_dir))
+
+    if ProviderCapability.WORKFLOWS in caps:
+        wf_dir = target / ".agents" / "workflows"
+        if not dry_run:
+            ensure_dir(wf_dir)
+        rel = _rel(target, wf_dir)
+        if rel not in created:
+            created.append(rel)
+
+    if cfg.config_file:
+        created.append(_rel(target, cfg.config_file))
+
+    if cfg.rule_ref_config_file:
+        created.append(_rel(target, cfg.rule_ref_config_file))
+
+    if cfg.native_config_file:
+        if not dry_run:
+            ensure_dir(cfg.native_config_file.parent)
+            if not cfg.native_config_file.exists():
+                cfg.native_config_file.write_text("", encoding="utf-8")
+        created.append(_rel(target, cfg.native_config_file))
+
+    return created
+
+
+def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[str]:
+    """Scaffold .mcp.json for MCP server integration."""
     import json
 
-    mcp_json = _t.TARGET_DIR / ".mcp.json"
-    if not mcp_json.exists():
+    mcp_json = target / ".mcp.json"
+    if mcp_json.exists():
+        return []
+
+    if not dry_run:
         mcp_config = {
             "mcpServers": {
                 "vaultspec-core": {
                     "command": "vaultspec-mcp",
                     "args": [],
-                    "env": {"VAULTSPEC_TARGET_DIR": str(_t.TARGET_DIR.resolve())},
+                    "env": {"VAULTSPEC_TARGET_DIR": str(target.resolve())},
                 }
             }
         }
         mcp_json.write_text(json.dumps(mcp_config, indent=2) + "\n", encoding="utf-8")
-        created.append(str(mcp_json.relative_to(_t.TARGET_DIR)))
+    return [".mcp.json"]
+
+
+def init_run(force: bool = False, provider: str = "all") -> None:
+    """Scaffold the .vaultspec/ and .vault/ directory structure."""
+    from vaultspec_core.config import get_config, reset_config
+    from vaultspec_core.config.workspace import resolve_workspace
+    from vaultspec_core.core.types import init_paths
+
+    cfg = get_config()
+    fw_dir = _t.TARGET_DIR / cfg.framework_dir
+
+    if fw_dir.exists() and not force:
+        logger.error("Error: %s already exists. Use --force to overwrite.", fw_dir)
+        raise typer.Exit(code=1)
+
+    created = _scaffold_core(_t.TARGET_DIR)
+
+    # Re-resolve workspace after writing framework.md stubs
+    reset_config()
+    layout = resolve_workspace(target_override=_t.TARGET_DIR)
+    init_paths(layout)
+
+    # Scaffold provider directories
+    tools = _PROVIDER_TO_TOOLS.get(provider, [])
+    for tool in tools:
+        created.extend(_scaffold_provider(_t.TARGET_DIR, tool))
+
+    created.extend(_scaffold_mcp_json(_t.TARGET_DIR))
+
+    # Write provider manifest
+    from .manifest import add_providers
+
+    provider_names = [t.value for t in tools]
+    if provider_names:
+        add_providers(_t.TARGET_DIR, provider_names)
 
     from vaultspec_core.console import get_console
 
     console = get_console()
     console.print("[bold]Initialized vaultspec-core structure:[/bold]")
-    for path in created:
+    for path in dict.fromkeys(created):
         console.print(f"  {path}")
     console.print(
         f"Created [bold]{len(created)}[/bold] directories/files. "
@@ -249,26 +323,91 @@ def init_run(force: bool = False, providers: str = "all") -> None:
     )
 
 
-def install_run(path: Path, upgrade: bool = False, providers: str = "all") -> None:
+def _ensure_tool_configs(path: Path) -> None:
+    """Ensure TOOL_CONFIGS is populated, bootstrapping if needed.
+
+    On a fresh project where ``.vaultspec/`` doesn't exist yet, temporarily
+    creates the minimal structure so ``init_paths()`` can resolve the
+    workspace layout and populate TOOL_CONFIGS.  The temporary files are
+    cleaned up afterward.
+    """
+    from vaultspec_core.config import reset_config
+    from vaultspec_core.config.workspace import resolve_workspace
+    from vaultspec_core.core.types import init_paths
+
+    if _t.TOOL_CONFIGS:
+        return
+
+    fw_dir = path / ".vaultspec"
+    temp_scaffold = not fw_dir.exists()
+    fw_md = fw_dir / "rules" / "system" / "framework.md"
+
+    if temp_scaffold:
+        fw_md.parent.mkdir(parents=True, exist_ok=True)
+        fw_md.write_text("# placeholder", encoding="utf-8")
+
+    try:
+        reset_config()
+        layout = resolve_workspace(target_override=path)
+        init_paths(layout)
+    finally:
+        if temp_scaffold:
+            import shutil
+
+            shutil.rmtree(fw_dir, ignore_errors=True)
+
+
+def install_run(
+    path: Path,
+    provider: str = "all",
+    upgrade: bool = False,
+    dry_run: bool = False,
+) -> None:
     """Deploy the vaultspec framework to a project directory.
 
-    When ``upgrade`` is False, scaffolds the full workspace structure and
-    then syncs all managed resources.  When ``upgrade`` is True, re-syncs
-    builtin rules and firmware without re-scaffolding, preserving custom
-    user content.
+    Args:
+        path: Target directory.
+        provider: Provider to install (``all``, ``core``, ``claude``, etc.).
+        upgrade: Re-sync builtin rules without re-scaffolding.
+        dry_run: Preview the manifest of files that would be created.
     """
     from vaultspec_core.config import reset_config
     from vaultspec_core.config.workspace import WorkspaceError, resolve_workspace
     from vaultspec_core.console import get_console
     from vaultspec_core.core.types import init_paths
 
-    console = get_console()
+    if provider not in VALID_PROVIDERS:
+        logger.error(
+            "Unknown provider '%s'. Valid: %s",
+            provider,
+            ", ".join(sorted(VALID_PROVIDERS)),
+        )
+        raise typer.Exit(code=1)
 
-    # Set TARGET_DIR for init_run (which expects it pre-set)
+    console = get_console()
     _t.TARGET_DIR = path
 
+    if dry_run:
+        _ensure_tool_configs(path)
+
+        manifest = _scaffold_core(path, dry_run=True)
+        tools = _PROVIDER_TO_TOOLS.get(provider, [])
+        for tool in tools:
+            manifest.extend(_scaffold_provider(path, tool, dry_run=True))
+        manifest.extend(_scaffold_mcp_json(path, dry_run=True))
+
+        # Deduplicate preserving order
+        seen: dict[str, None] = {}
+        for item in manifest:
+            seen.setdefault(item, None)
+
+        console.print("[bold]Would create:[/bold]")
+        for item in seen:
+            console.print(f"  {item}")
+        console.print(f"\n[bold]Dry run:[/bold] {len(seen)} items")
+        return
+
     if upgrade:
-        # Upgrade: resolve existing workspace, then re-sync
         try:
             layout = resolve_workspace(target_override=path)
             init_paths(layout)
@@ -281,10 +420,10 @@ def install_run(path: Path, upgrade: bool = False, providers: str = "all") -> No
 
         from vaultspec_core.spec_cli import _sync_provider
 
-        _sync_provider("all", force=True)
+        sync_target = provider if provider not in ("all", "core") else "all"
+        _sync_provider(sync_target, force=True)
         console.print("[bold green]Upgrade complete.[/bold green]")
     else:
-        # Fresh install: scaffold then sync
         fw_dir = path / ".vaultspec"
         if fw_dir.exists():
             logger.error(
@@ -297,71 +436,169 @@ def install_run(path: Path, upgrade: bool = False, providers: str = "all") -> No
             raise typer.Exit(code=1)
 
         console.print(f"[bold]Installing vaultspec framework to {path}[/bold]")
-        init_run(force=False, providers=providers)
+        init_run(force=False, provider=provider)
 
-        # Re-resolve after init so sync sees the new structure
         reset_config()
         layout = resolve_workspace(target_override=path)
         init_paths(layout)
 
         from vaultspec_core.spec_cli import _sync_provider
 
-        _sync_provider("all")
+        sync_target = provider if provider not in ("all", "core") else "all"
+        _sync_provider(sync_target)
         console.print("[bold green]Installation complete.[/bold green]")
 
 
-def uninstall_run(path: Path, keep_vault: bool = False, dry_run: bool = False) -> None:
+def _collect_provider_artifacts(
+    path: Path, tool: Tool
+) -> tuple[list[Path], list[Path]]:
+    """Return (directories, files) managed by a single provider."""
+    from .enums import DirName, FileName
+
+    cfg = _t.TOOL_CONFIGS.get(tool)
+    dirs: list[Path] = []
+    files: list[Path] = []
+
+    if tool == Tool.CLAUDE:
+        dirs.append(path / DirName.CLAUDE.value)
+        files.append(path / FileName.CLAUDE.value)
+    elif tool == Tool.GEMINI:
+        dirs.append(path / DirName.GEMINI.value)
+        # Root GEMINI.md is shared with Antigravity — handled below
+    elif tool == Tool.ANTIGRAVITY:
+        dirs.append(path / DirName.ANTIGRAVITY.value)
+        files.append(path / FileName.GEMINI.value)
+    elif tool == Tool.CODEX:
+        dirs.append(path / DirName.CODEX.value)
+        files.append(path / FileName.AGENTS.value)
+
+    if cfg and cfg.native_config_file and cfg.native_config_file.parent not in dirs:
+        dirs.append(cfg.native_config_file.parent)
+
+    return dirs, files
+
+
+def uninstall_run(
+    path: Path,
+    provider: str = "all",
+    keep_vault: bool = False,
+    dry_run: bool = False,
+) -> None:
     """Remove the vaultspec framework from a project directory.
 
-    Removes managed directories and generated files.  The ``.vault/``
-    directory (user-authored documentation) is preserved when
-    ``keep_vault`` is True.
+    Args:
+        path: Target directory.
+        provider: Provider to uninstall (``all``, ``core``, ``<provider>``).
+        keep_vault: Preserve ``.vault/`` documentation directory.
+        dry_run: Preview what would be removed without deleting.
     """
     import shutil
 
     from vaultspec_core.console import get_console
 
+    from .manifest import providers_sharing_dir, remove_provider
+
+    _t.TARGET_DIR = path
+    _ensure_tool_configs(path)
+
+    if provider not in VALID_PROVIDERS:
+        logger.error(
+            "Unknown provider '%s'. Valid: %s",
+            provider,
+            ", ".join(sorted(VALID_PROVIDERS)),
+        )
+        raise typer.Exit(code=1)
+
     console = get_console()
-
-    # Managed directories to remove
-    managed_dirs = [
-        path / ".vaultspec",
-        path / ".claude",
-        path / ".gemini",
-        path / ".agents",
-        path / ".codex",
-    ]
-    if not keep_vault:
-        managed_dirs.append(path / ".vault")
-
-    # Managed files to remove
-    managed_files = [
-        path / "CLAUDE.md",
-        path / "GEMINI.md",
-        path / "SYSTEM.md",
-        path / "AGENTS.md",
-        path / ".mcp.json",
-    ]
-
     removed: list[str] = []
 
-    for d in managed_dirs:
-        rel = str(d.relative_to(path))
+    if provider == "all":
+        # Remove everything
+        managed_dirs = [
+            path / ".vaultspec",
+            path / ".claude",
+            path / ".gemini",
+            path / ".agents",
+            path / ".codex",
+        ]
+        if not keep_vault:
+            managed_dirs.append(path / ".vault")
+
+        managed_files = [
+            path / "CLAUDE.md",
+            path / "GEMINI.md",
+            path / "AGENTS.md",
+            path / ".mcp.json",
+        ]
+
+        for d in managed_dirs:
+            if d.exists():
+                rel = str(d.relative_to(path))
+                if dry_run:
+                    console.print(f"  [dim]would remove[/dim] {rel}/")
+                else:
+                    shutil.rmtree(d)
+                removed.append(f"{rel}/")
+
+        for f in managed_files:
+            if f.exists():
+                rel = str(f.relative_to(path))
+                if dry_run:
+                    console.print(f"  [dim]would remove[/dim] {rel}")
+                else:
+                    f.unlink()
+                removed.append(rel)
+
+    elif provider == "core":
+        d = path / ".vaultspec"
         if d.exists():
+            rel = str(d.relative_to(path))
             if dry_run:
                 console.print(f"  [dim]would remove[/dim] {rel}/")
             else:
                 shutil.rmtree(d)
             removed.append(f"{rel}/")
 
-    for f in managed_files:
-        rel = str(f.relative_to(path))
-        if f.exists():
-            if dry_run:
-                console.print(f"  [dim]would remove[/dim] {rel}")
-            else:
-                f.unlink()
-            removed.append(rel)
+    else:
+        # Per-provider uninstall with shared directory protection
+        tools = _PROVIDER_TO_TOOLS.get(provider, [])
+        for tool in tools:
+            dirs, files = _collect_provider_artifacts(path, tool)
+
+            for d in dirs:
+                if not d.exists():
+                    continue
+                # Check if another installed provider still needs this dir
+                sharing = providers_sharing_dir(path, d, exclude=provider)
+                if sharing:
+                    logger.info(
+                        "Preserving %s (still used by: %s)",
+                        d.relative_to(path),
+                        ", ".join(sorted(sharing)),
+                    )
+                    continue
+
+                rel = str(d.relative_to(path))
+                if dry_run:
+                    console.print(f"  [dim]would remove[/dim] {rel}/")
+                else:
+                    shutil.rmtree(d)
+                removed.append(f"{rel}/")
+
+            for f in files:
+                if not f.exists():
+                    continue
+                rel = str(f.relative_to(path))
+                if dry_run:
+                    console.print(f"  [dim]would remove[/dim] {rel}")
+                else:
+                    f.unlink()
+                removed.append(rel)
+
+        # Update manifest
+        if not dry_run:
+            for tool in tools:
+                remove_provider(path, tool.value)
 
     if dry_run:
         console.print(f"\n[bold]Dry run:[/bold] would remove {len(removed)} items")

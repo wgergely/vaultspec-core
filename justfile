@@ -122,11 +122,11 @@ build target:
       exit 1 ;; \
   esac
 
-install path='.' *args='':
-  uv run vaultspec-core install "{{path}}" {{args}}
+install path='.' provider='all' *args='':
+  uv run vaultspec-core install "{{path}}" {{provider}} {{args}}
 
-uninstall path='.' *args='':
-  uv run vaultspec-core uninstall "{{path}}" {{args}}
+uninstall path='.' provider='all' *args='':
+  uv run vaultspec-core uninstall "{{path}}" {{provider}} {{args}}
 
 publish target tag:
   case "{{target}}" in \

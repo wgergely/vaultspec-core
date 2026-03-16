@@ -8,7 +8,6 @@ delegates cross-tool propagation to the shared sync engine.
 from __future__ import annotations
 
 import logging
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -28,9 +27,6 @@ from .sync import print_summary, sync_files
 from .types import SyncResult
 
 logger = logging.getLogger(__name__)
-
-CODEX_MANAGED_BEGIN = "# BEGIN VAULTSPEC MANAGED CODEX AGENTS"
-CODEX_MANAGED_END = "# END VAULTSPEC MANAGED CODEX AGENTS"
 
 
 def collect_agents() -> dict[str, tuple[Path, dict[str, Any], str]]:
@@ -56,14 +52,6 @@ def transform_agent(_tool: Tool, _name: str, meta: dict[str, Any], body: str) ->
         Assembled file content string.
     """
     return build_file(meta, body)
-
-
-def _strip_codex_managed_block(content: str) -> str:
-    pattern = re.compile(
-        rf"\n?{re.escape(CODEX_MANAGED_BEGIN)}\n.*?\n{re.escape(CODEX_MANAGED_END)}\n?",
-        re.DOTALL,
-    )
-    return pattern.sub("\n", content).strip()
 
 
 def _toml_quote(value: str) -> str:
@@ -139,25 +127,25 @@ def _render_codex_agent(name: str, meta: dict[str, Any], body: str) -> str:
     return "\n".join(lines)
 
 
-def _build_codex_managed_block(
+def _build_codex_agents_body(
     sources: dict[str, tuple[Path, dict[str, Any], str]],
 ) -> str:
+    """Render Codex agent definitions as TOML content (body only)."""
     rendered_agents = []
     for name, (_path, meta, body) in sorted(sources.items()):
         rendered_agents.append(_render_codex_agent(name, meta, body))
     if not rendered_agents:
         return ""
-    return (
-        f"{CODEX_MANAGED_BEGIN}\n"
-        + "\n\n".join(rendered_agents)
-        + f"\n{CODEX_MANAGED_END}"
-    )
+    return "\n\n".join(rendered_agents)
 
 
 def _sync_codex_agents(
     sources: dict[str, tuple[Path, dict[str, Any], str]],
+    prune: bool = False,
     dry_run: bool = False,
 ) -> SyncResult:
+    from .tags import TagError, has_block, strip_block, upsert_block
+
     result = SyncResult()
     codex_cfg = _t.TOOL_CONFIGS.get(Tool.CODEX)
     if codex_cfg is None or codex_cfg.native_config_file is None:
@@ -166,20 +154,29 @@ def _sync_codex_agents(
     path = codex_cfg.native_config_file
     existed = path.exists()
     existing = path.read_text(encoding="utf-8") if existed else ""
-    preserved = _strip_codex_managed_block(existing)
-    managed = _build_codex_managed_block(sources)
+    body = _build_codex_agents_body(sources)
 
-    parts = []
-    if preserved:
-        parts.append(preserved)
-    if managed:
-        parts.append(managed)
-    new_content = "\n\n".join(parts).strip()
-    if new_content:
-        new_content += "\n"
+    if not body:
+        # No agents to sync. If pruning, strip any existing block.
+        if prune and existed and has_block(existing, "agents"):
+            try:
+                new_content = strip_block(existing, "agents")
+            except TagError as e:
+                logger.warning("Cannot prune agents from %s: %s", path, e)
+                result.errors.append(str(e))
+                return result
+            if not dry_run:
+                atomic_write(path, new_content)
+            result.pruned = 1
+        else:
+            result.skipped = 1
+        return result
 
-    if not new_content and not existed:
-        result.skipped = 1
+    try:
+        new_content = upsert_block(existing, "agents", body, comment_prefix="# ")
+    except TagError as e:
+        logger.warning("Cannot sync agents to %s: %s", path, e)
+        result.errors.append(str(e))
         return result
 
     if existing == new_content:
@@ -292,7 +289,7 @@ def agents_sync(dry_run: bool = False, prune: bool = False) -> None:
         total.skipped += result.skipped
         total.errors.extend(result.errors)
 
-    codex_result = _sync_codex_agents(sources, dry_run=dry_run)
+    codex_result = _sync_codex_agents(sources, prune=prune, dry_run=dry_run)
     total.added += codex_result.added
     total.updated += codex_result.updated
     total.pruned += codex_result.pruned
