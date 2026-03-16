@@ -30,7 +30,7 @@ provider targeting and dry-run support.
 **Outcome:** A hardened install/uninstall/sync surface with correct
 provider file locations, a formalized capability model, provider-scoped
 operations, dry-run manifests, shared directory ownership tracking, and
-a TOML adapter for Codex config.toml rules/agents.
+a Starlark generator for Codex rules and a TOML adapter for Codex agents.
 
 ### Reference documents
 
@@ -126,15 +126,19 @@ a TOML adapter for Codex config.toml rules/agents.
   (Decision 7): generate a file at `.gemini/GEMINI.md` containing
   `@rules/...` references for Gemini CLI's subdirectory discovery.
   This is separate from the root `./GEMINI.md` shared with Antigravity.
-- [ ] 3.4 Implement TOML adapter for Codex `config.toml`:
-  - New function `_sync_codex_toml_rules(dry_run)` that reads
-    `.codex/config.toml`, writes/updates `[rules]` section
-  - New function `_sync_codex_toml_agents(dry_run)` that reads
-    `.codex/config.toml`, writes/updates `[agents.*]` tables
+- [ ] 3.4 Implement Starlark generator for Codex rules:
+  - New function that generates `prefix_rule()` calls from vaultspec
+    rule definitions
+  - Writes `.codex/rules/*.rules` files (Starlark format)
+  - Codex rules are NOT in config.toml — they are Starlark files
+  - Source: https://developers.openai.com/codex/rules/
+- [ ] 3.5 Implement TOML adapter for Codex agents in `config.toml`:
+  - Write `[agents.<name>]` sub-tables into config.toml
   - Must preserve all other settings in the file
-  - Use `tomllib` (stdlib 3.11+) for reading, `tomli-w` or manual
-    serialization for writing
-- [ ] 3.5 Wire TOML adapter into `config_sync()` for Codex provider
+  - config.toml schema rejects unknown top-level keys
+    (`additionalProperties: false`) — cannot add `[vaultspec]` namespace
+  - Use managed block markers to delimit vaultspec-managed agents
+- [ ] 3.6 Wire Starlark + TOML adapters into `config_sync()` for Codex
 
 ---
 
@@ -284,8 +288,8 @@ a TOML adapter for Codex config.toml rules/agents.
 - [ ] 9.2 Contract test: each `ProviderCapability` value maps to at
   least one provider
 - [ ] 9.3 Contract test: capability set is consistent with ToolConfig
-  fields (if RULES declared, rules_dir must not be None OR
-  native_config_file must exist for TOML-based rules)
+  fields (if RULES declared, rules_dir must not be None OR provider
+  has a native rules mechanism like Starlark files)
 - [ ] 9.4 Test `install . core --dry-run` lists only `.vaultspec/` and
   `.vault/`
 - [ ] 9.5 Test `install . claude --dry-run` lists `.vaultspec/` +
@@ -302,7 +306,7 @@ a TOML adapter for Codex config.toml rules/agents.
   uninstall
 - [ ] 9.13 Test AGENTS.md gets rule references (via standard pipeline)
 - [ ] 9.14 Test `.gemini/GEMINI.md` secondary config contains rule refs
-- [ ] 9.15 Test TOML adapter writes rules to `.codex/config.toml`
+- [ ] 9.15 Test Starlark generator writes rules to `.codex/rules/`
 - [ ] 9.16 Test TOML adapter writes agents to `.codex/config.toml`
 - [ ] 9.17 Update justfile contract tests for new recipe signatures
 
@@ -316,8 +320,9 @@ a TOML adapter for Codex config.toml rules/agents.
 4. `just install . --upgrade --dry-run` — shows what would be updated
 5. `just uninstall . claude --dry-run` — lists only claude artifacts
 6. `vaultspec-core sync claude` — syncs only claude provider
-7. `vaultspec-core sync codex` — syncs codex including TOML rules/agents
+7. `vaultspec-core sync codex` — syncs codex including Starlark rules + TOML agents
 8. Root config files at project root: `CLAUDE.md`, `GEMINI.md`, `AGENTS.md`
 9. `.gemini/GEMINI.md` contains rule references
-10. `.codex/config.toml` contains `[rules]` and `[agents.*]` sections
+10. `.codex/rules/` contains Starlark `.rules` files
+11. `.codex/config.toml` contains `[agents.*]` sections
 11. CI passes on all 6 jobs

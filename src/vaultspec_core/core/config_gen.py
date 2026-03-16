@@ -22,8 +22,6 @@ logger = logging.getLogger(__name__)
 
 CODEX_CONFIG_BEGIN = "# BEGIN VAULTSPEC MANAGED CODEX CONFIG"
 CODEX_CONFIG_END = "# END VAULTSPEC MANAGED CODEX CONFIG"
-CODEX_RULES_BEGIN = "# BEGIN VAULTSPEC MANAGED CODEX RULES"
-CODEX_RULES_END = "# END VAULTSPEC MANAGED CODEX RULES"
 CODEX_AGENTS_BEGIN = "# BEGIN VAULTSPEC MANAGED CODEX AGENTS"
 CODEX_AGENTS_END = "# END VAULTSPEC MANAGED CODEX AGENTS"
 
@@ -87,7 +85,6 @@ def _strip_managed_codex_config_block(content: str) -> str:
     result = content
     for begin, end in [
         (CODEX_CONFIG_BEGIN, CODEX_CONFIG_END),
-        (CODEX_RULES_BEGIN, CODEX_RULES_END),
         (CODEX_AGENTS_BEGIN, CODEX_AGENTS_END),
     ]:
         result = _strip_managed_block(result, begin, end)
@@ -187,27 +184,6 @@ def _render_codex_config_lines(meta: dict[str, object]) -> list[str]:
                 rendered.append(f"{target_key} = [{rendered_items}]")
 
     return rendered
-
-
-def _generate_codex_rules_block() -> str | None:
-    """Generate TOML ``[rules]`` block for Codex config.toml.
-
-    Reads vaultspec rule sources and renders them as Codex-native TOML
-    rule comments referencing each managed rule.  Returns ``None`` if no
-    rules are defined.
-    """
-    from .rules import collect_rules
-
-    sources = collect_rules()
-    if not sources:
-        return None
-
-    lines = [CODEX_RULES_BEGIN, "[rules]"]
-    for filename, (_path, meta, _body) in sorted(sources.items()):
-        rule_name = meta.get("name", filename.removesuffix(".md"))
-        lines.append(f"# Rule: {rule_name}")
-    lines.append(CODEX_RULES_END)
-    return "\n".join(lines)
 
 
 def _generate_codex_agents_block() -> str | None:
@@ -391,7 +367,6 @@ def config_sync(dry_run: bool = False, force: bool = False) -> None:
             b
             for b in [
                 _generate_codex_native_config(),
-                _generate_codex_rules_block(),
                 _generate_codex_agents_block(),
             ]
             if b

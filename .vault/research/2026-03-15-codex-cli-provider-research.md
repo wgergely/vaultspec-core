@@ -47,15 +47,21 @@ developers.openai.com/codex on 2026-03-15.
 
 ## Rules
 
-- **Supported:** Yes — via `[rules]` section in `config.toml`
-- **Format:** TOML configuration, NOT markdown files in a directory
-- **Purpose:** Block or control specific commands (e.g. block `git commit`
-  outside sandbox)
-- **No `.codex/rules/` directory** — rules are inline TOML config
-- **Implication:** vaultspec will need a custom TOML adapter to write and
-  manage Codex rules, since the current sync pipeline assumes markdown
-  files in a rules directory
-- **Source:** https://developers.openai.com/codex/config-advanced/
+- **Supported:** Yes — via Starlark `.rules` files in `.codex/rules/`
+- **Format:** Starlark (Python-like safe execution language), NOT TOML
+- **Function:** `prefix_rule(pattern=..., decision=..., justification=...)`
+- **Decisions:** `"allow"` (default), `"prompt"`, `"forbidden"`
+- **Purpose:** Control which commands Codex can execute outside sandbox
+- **Project-level:** `.codex/rules/*.rules`
+- **User-level:** `~/.codex/rules/default.rules`
+- **config.toml reference:** `approval_policy.reject.rules` is a boolean
+  flag only — there is NO `[rules]` TOML table in config.toml
+- **Testing:** `codex execpolicy check --rules <file> -- <command>`
+- **Source:** https://developers.openai.com/codex/rules/
+- **CORRECTION (2026-03-16):** Earlier version of this document
+  incorrectly stated rules were in a `[rules]` TOML table in
+  config.toml. This was based on a search snippet inference, not
+  verified against the actual rules documentation page.
 
 ## Skills
 
@@ -92,7 +98,11 @@ developers.openai.com/codex on 2026-03-15.
 - **Orchestration:** Codex handles spawning, routing, result consolidation.
   `spawn_agents_on_csv` for batch processing.
 - **Implication:** vaultspec cannot sync agents to Codex via markdown
-  files. Would need TOML adapter similar to rules.
+  files. Needs a TOML adapter to write `[agents.<name>]` sub-tables
+  into config.toml. Note: config.toml schema has
+  `additionalProperties: false` at root, so custom top-level tables
+  like `[vaultspec]` are rejected — but `[agents.<name>]` sub-tables
+  for custom role names ARE allowed by the schema.
 - **Source:** https://developers.openai.com/codex/multi-agent/
 
 ## System prompt
@@ -124,9 +134,9 @@ developers.openai.com/codex on 2026-03-15.
 
 | Capability | Supported | Format | Notes |
 |-----------|-----------|--------|-------|
-| RULES | Yes | TOML (`[rules]` in config.toml) | Needs custom TOML adapter |
+| RULES | Yes | Starlark (`.codex/rules/*.rules`) | `prefix_rule()` functions, NOT TOML |
 | SKILLS | Yes | Markdown (SKILL.md) | `.agents/skills/`, shared with Antigravity |
-| AGENTS | Yes (experimental) | TOML (`[agents.*]` in config.toml) | Needs custom TOML adapter |
+| AGENTS | Yes (experimental) | TOML (`[agents.*]` in config.toml) | Needs TOML adapter for config.toml |
 | ROOT_CONFIG | Yes | Markdown (AGENTS.md) | Same treatment as CLAUDE.md/GEMINI.md |
 | SYSTEM | Minimal | TOML key (`model_instructions_file`) | Not a standalone file |
 | HOOKS | Minimal | TOML key (`notify`) | Single event only |
@@ -138,20 +148,29 @@ developers.openai.com/codex on 2026-03-15.
 | Instruction file | `./AGENTS.md` (downward walk) | `~/.codex/AGENTS.md` |
 | Override file | `./AGENTS.override.md` | `~/.codex/AGENTS.override.md` |
 | Config | `.codex/config.toml` | `~/.codex/config.toml` |
-| Rules | In `.codex/config.toml` | In `~/.codex/config.toml` |
+| Rules | `.codex/rules/*.rules` (Starlark) | `~/.codex/rules/*.rules` |
 | Skills | `.agents/skills/<name>/SKILL.md` | `~/.agents/skills/` or `~/.codex/skills/` |
 | Agents | In `.codex/config.toml` | In `~/.codex/config.toml` |
 | System | In `.codex/config.toml` | In `~/.codex/config.toml` |
 
 ## Known issues for vaultspec
 
-### TOML adapter required for rules and agents
+### Starlark adapter required for rules
 
-Codex rules and agent definitions live in `config.toml` as TOML tables,
-not as markdown files in directories. The current vaultspec sync pipeline
-assumes markdown files in `rules_dir`. Supporting Codex rules/agents
-requires a new TOML-aware adapter that can read/write sections of
-`config.toml` without clobbering other settings.
+Codex rules are Starlark `.rules` files in `.codex/rules/`, not TOML
+tables. vaultspec needs a Starlark code generator that emits
+`prefix_rule()` calls from its rule definitions. This is a new file
+format distinct from both markdown and TOML.
+
+### TOML adapter required for agents
+
+Codex agent definitions live in `config.toml` as `[agents.<name>]`
+TOML sub-tables. The config.toml schema rejects unknown top-level
+keys (`additionalProperties: false`) so vaultspec cannot add its own
+namespace table. Agent roles must be written as standard
+`[agents.<name>]` entries. Requires managed block markers
+(`# <vaultspec type="agents">`) to delimit vaultspec-managed agent
+entries from user-defined ones.
 
 ### `_generate_codex_agents_md()` audit finding
 

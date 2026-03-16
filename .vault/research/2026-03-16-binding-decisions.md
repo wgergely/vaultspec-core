@@ -70,12 +70,16 @@ Current shape is correct:
 1. Add `config_file` → `TARGET_DIR / "AGENTS.md"` to Codex ToolConfig
 2. Remove `_generate_codex_agents_md()` — use standard `_generate_config()`
 3. Keep `native_config_file` → `.codex/config.toml`
-4. TOML adapter for BOTH rules AND agents is **first-class work** (not
+4. Codex adapters for rules AND agents are **first-class work** (not
    deferred):
-   - Read/write `[rules]` section in `.codex/config.toml`
-   - Read/write `[agents.*]` tables in `.codex/config.toml`
-   - Without clobbering other settings
+   - **Rules:** Generate Starlark `.rules` files in `.codex/rules/`
+     (Codex rules are `prefix_rule()` calls in Starlark, NOT TOML)
+   - **Agents:** Read/write `[agents.*]` tables in `.codex/config.toml`
+     using managed block markers
    - Implementation in Phase 4 (sync revision)
+   - **CORRECTION (2026-03-16):** Original decision referenced
+     `[rules]` in config.toml. Verified against
+     developers.openai.com/codex/rules/ — rules are Starlark files.
 
 ## Decision 7: Gemini rules via `.gemini/GEMINI.md` secondary config — APPROVED
 
@@ -134,7 +138,7 @@ included automatically.
 |-------|-------|
 | config_file | `TARGET_DIR / "AGENTS.md"` |
 | native_config_file | `.codex/config.toml` |
-| rules_dir | None (TOML adapter, first-class) |
+| rules_dir | None (Starlark `.codex/rules/*.rules`, first-class) |
 | skills_dir | `.agents/skills/` |
-| agents_dir | None (TOML adapter, first-class) |
+| agents_dir | None (TOML `[agents.*]` in config.toml, first-class) |
 | system_file | None |

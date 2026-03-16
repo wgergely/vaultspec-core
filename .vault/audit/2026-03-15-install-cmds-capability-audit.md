@@ -97,7 +97,7 @@ All 8 binding decisions approved on 2026-03-16. Full details at
 - [ ] Add Codex `config_file` → `TARGET_DIR / "AGENTS.md"`
 - [ ] Add `.gemini/GEMINI.md` secondary config for Gemini rule references
 - [ ] Delete `_generate_codex_agents_md()` and special-case in `config_sync()`
-- [ ] Implement TOML adapter for Codex rules (`[rules]` in config.toml)
+- [ ] Implement Starlark generator for Codex rules (`.codex/rules/*.rules`)
 - [ ] Implement TOML adapter for Codex agents (`[agents.*]` in config.toml)
 - [ ] Implement `.vaultspec/providers.json` manifest for shared dir tracking
 - [ ] Remove all `.agent/` (singular) references from codebase
@@ -114,4 +114,16 @@ All 8 binding decisions approved on 2026-03-16. Full details at
 | CLAUDE.md location ambiguity | Move to root `./CLAUDE.md` | 2 |
 | `.agent/` singular references | Remove all, no backward compat | User instruction |
 | Shared `.agents/skills/` ownership | Provider manifest + uninstall co-dependency check | 3 |
-| Codex TOML adapter | First-class work for both rules and agents | 6 |
+| Codex adapters | Starlark rules + TOML agents, first-class | 6 |
+
+### Active code issues
+
+#### `_generate_codex_rules_block()` writes `[rules]` into config.toml
+
+- **File:** `config_gen.py:192`
+- **Issue:** Implemented during Phase 3 based on the incorrect assumption
+  that Codex rules live in a `[rules]` TOML table. Verified that Codex
+  rules are actually Starlark `.rules` files in `.codex/rules/`.
+- **Action required:** Remove `_generate_codex_rules_block()` and
+  `CODEX_RULES_BEGIN/END` constants. Replace with a Starlark file
+  generator that writes to `.codex/rules/`.
