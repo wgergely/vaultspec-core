@@ -37,9 +37,7 @@ from .system import system_show as system_show
 from .system import system_sync as system_sync
 from .types import AGENTS_SRC_DIR as AGENTS_SRC_DIR
 from .types import CONFIG_HEADER as CONFIG_HEADER
-from .types import FRAMEWORK_CONFIG_SRC as FRAMEWORK_CONFIG_SRC
 from .types import HOOKS_DIR as HOOKS_DIR
-from .types import PROJECT_CONFIG_SRC as PROJECT_CONFIG_SRC
 from .types import ROOT_DIR as ROOT_DIR
 from .types import RULES_SRC_DIR as RULES_SRC_DIR
 from .types import SKILLS_SRC_DIR as SKILLS_SRC_DIR

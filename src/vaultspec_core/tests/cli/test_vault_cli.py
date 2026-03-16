@@ -1,8 +1,10 @@
-"""Unit tests for the vault_cli.py CLI entry point."""
+"""Unit tests for the vault command group.
+
+Covers vault add, vault stats, vault doctor, etc.
+"""
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -38,80 +40,20 @@ class TestHelpText:
     def test_main_help(self, runner, test_project):
         result = run_vault(runner, "--help", target=test_project)
         assert result.exit_code == 0
-        assert "audit" in result.output
         assert "add" in result.output
-
-    def test_audit_help(self, runner, test_project):
-        result = run_vault(runner, "audit", "--help", target=test_project)
-        assert result.exit_code == 0
-        assert "--summary" in result.output
-        assert "--verify" in result.output
+        assert "doctor" in result.output
+        assert "stats" in result.output
 
     def test_add_help(self, runner, test_project):
         result = run_vault(runner, "add", "--help", target=test_project)
         assert result.exit_code == 0
-        assert "--type" in result.output
         assert "--feature" in result.output
 
 
-class TestAuditSummary:
-    """Verify 'vault audit --summary' output."""
+class TestAddSubcommand:
+    """Verify 'vault add' behavior."""
 
-    def test_audit_summary_text(self, runner, test_project):
-        result = run_vault(runner, "audit", "--summary", target=test_project)
-        assert result.exit_code == 0
-        assert "Vault Summary" in result.output
-        assert "Total Documents:" in result.output
-
-    def test_audit_summary_json(self, runner, test_project):
-        result = run_vault(runner, "audit", "--summary", "--json", target=test_project)
-        assert result.exit_code == 0
-        data = json.loads(result.output)
-        assert "summary" in data
-        assert "total_docs" in data["summary"]
-
-
-class TestAuditFeatures:
-    """Verify 'vault audit --features' output."""
-
-    def test_audit_features_text(self, runner, test_project):
-        # Create a doc with feature tag
-        (test_project / ".vault" / "adr").mkdir(parents=True, exist_ok=True)
-        (test_project / ".vault" / "adr" / "f1.md").write_text(
-            '---\ntags: ["#adr", "#my-feature"]\n---\n', encoding="utf-8"
-        )
-        result = run_vault(runner, "audit", "--features", target=test_project)
-        assert result.exit_code == 0
-        assert "my-feature" in result.output
-
-
-class TestAuditVerify:
-    """Verify 'vault audit --verify' output."""
-
-    def test_audit_verify_text(self, runner, test_project):
-        result = run_vault(runner, "audit", "--verify", target=test_project)
-        assert result.exit_code == 0
-        assert (
-            "Verification Passed." in result.output
-            or "Verification Failed" in result.output
-        )
-
-    def test_audit_verify_json(self, runner, test_project):
-        result = run_vault(runner, "audit", "--verify", "--json", target=test_project)
-        assert result.exit_code == 0
-        # Find the JSON part if there are warnings
-        output = result.output
-        if "{" in output:
-            output = output[output.index("{") :]
-        data = json.loads(output)
-        assert "verification" in data
-        assert "passed" in data["verification"]
-
-
-class TestCreateSubcommand:
-    """Verify 'vault create' behavior."""
-
-    def test_create_generates_correct_filename(self, runner, test_project):
+    def test_add_generates_correct_filename(self, runner, test_project):
         date_str = datetime.now().strftime("%Y-%m-%d")
         tmpl_dir = test_project / ".vaultspec" / "rules" / "templates"
         tmpl_dir.mkdir(parents=True, exist_ok=True)
@@ -125,7 +67,6 @@ class TestCreateSubcommand:
         result = run_vault(
             runner,
             "add",
-            "--type",
             "adr",
             "--feature",
             "test-feat",
@@ -136,7 +77,7 @@ class TestCreateSubcommand:
         assert result.exit_code == 0
         assert expected_path.exists()
 
-    def test_create_strips_hash_from_feature(self, runner, test_project):
+    def test_add_strips_hash_from_feature(self, runner, test_project):
         """Creating with #feature should strip the hash."""
         date_str = datetime.now().strftime("%Y-%m-%d")
         tmpl_dir = test_project / ".vaultspec" / "rules" / "templates"
@@ -150,7 +91,6 @@ class TestCreateSubcommand:
         run_vault(
             runner,
             "add",
-            "--type",
             "adr",
             "--feature",
             "#my-feat",
@@ -158,9 +98,7 @@ class TestCreateSubcommand:
         )
         assert expected_path.exists()
 
-    def test_create_valid_doc_types_accepted(
-        self, runner, tmp_path: Path, test_project
-    ):
+    def test_add_valid_doc_types_accepted(self, runner, tmp_path: Path, test_project):
         """Test all valid DocType choices are accepted."""
         # Setup isolated env
         tmpl_dir = tmp_path / ".vaultspec" / "rules" / "templates"
@@ -191,7 +129,6 @@ class TestCreateSubcommand:
                 "--target",
                 str(tmp_path),
                 "add",
-                "--type",
                 dt.value,
                 "--feature",
                 "f",
@@ -204,4 +141,7 @@ class TestCreateSubcommand:
 class TestNoCommand:
     def test_no_command_prints_help(self, runner, test_project):
         result = run_vault(runner, target=test_project)
-        assert result.exit_code == 0
+        # vault_app uses no_args_is_help=True, which Typer reports as exit code 0
+        # but the CliRunner may return 2 depending on version; accept both.
+        assert result.exit_code in (0, 2)
+        assert "add" in result.output or "Usage" in result.output

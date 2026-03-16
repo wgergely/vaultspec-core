@@ -60,29 +60,36 @@ class TestNamespaceRouting:
         """``vaultspec vault --help`` exits 0 and shows subcommands."""
         result = run_vaultspec(runner, "vault", "--help", target=test_project)
         assert result.exit_code == 0
-        assert "audit" in result.output
         assert "add" in result.output
+        assert "doctor" in result.output
+
+    def test_spec_namespace_help(self, runner, test_project):
+        """``vaultspec spec --help`` exits 0 and shows subcommands."""
+        result = run_vaultspec(runner, "spec", "--help", target=test_project)
+        assert result.exit_code == 0
+        assert "rules" in result.output
+        assert "skills" in result.output
 
 
 class TestSpecCliFallthrough:
-    """Verify commands that fall through to spec_cli are routed correctly."""
+    """Verify commands under the spec group are routed correctly."""
 
     def test_rules_help(self, runner, test_project):
-        """``vaultspec rules --help`` exits 0 and shows rules subcommands."""
-        result = run_vaultspec(runner, "rules", "--help", target=test_project)
+        """``vaultspec spec rules --help`` exits 0 and shows rules subcommands."""
+        result = run_vaultspec(runner, "spec", "rules", "--help", target=test_project)
         assert result.exit_code == 0
         assert "list" in result.output
 
     def test_skills_help(self, runner, test_project):
-        """``vaultspec skills --help`` exits 0."""
-        result = run_vaultspec(runner, "skills", "--help", target=test_project)
+        """``vaultspec spec skills --help`` exits 0."""
+        result = run_vaultspec(runner, "spec", "skills", "--help", target=test_project)
         assert result.exit_code == 0
 
-    def test_doctor_runs(self, runner, test_project):
-        """``vaultspec doctor`` exits 0 and output contains 'Python:'."""
-        result = run_vaultspec(runner, "doctor", target=test_project)
+    def test_vault_doctor_runs(self, runner, test_project):
+        """``vaultspec vault doctor`` exits 0 and output contains health check."""
+        result = run_vaultspec(runner, "vault", "doctor", target=test_project)
         assert result.exit_code == 0
-        assert "Python:" in result.output
+        assert "Vault Health Check" in result.output
 
     def test_unknown_command_fails(self, runner, test_project):
         """``vaultspec nonexistent`` fails."""
