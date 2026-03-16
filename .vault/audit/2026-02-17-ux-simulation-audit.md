@@ -212,10 +212,10 @@ Traceback (most recent call last):
 |-------|---------|---------|
 | vaultspec-research | Structured research & brainstorming | 9/10 -- Clear, well-documented |
 | vaultspec-adr | Architecture Decision Records | 8/10 -- Good template reference |
-| vaultspec-reference | Reference auditing | 7/10 -- Specialized but clear |
-| vaultspec-write | Plan writing | 8/10 -- Good integration guidance |
+| vaultspec-code-reference | Reference auditing | 7/10 -- Specialized but clear |
+| vaultspec-write-plan | Plan writing | 8/10 -- Good integration guidance |
 | vaultspec-execute | Plan execution | 9/10 -- Excellent delegation model |
-| vaultspec-review | Code review | 8/10 -- Clear audit criteria |
+| vaultspec-code-review | Code review | 8/10 -- Clear audit criteria |
 | vaultspec-curate | Vault maintenance | 7/10 -- Useful but niche |
 | vaultspec-subagent | Agent dispatch (internal) | 8/10 -- Good MCP integration docs |
 | vaultspec-fd/rg/sd/sg | CLI tool wrappers | 6/10 -- Useful but feel bolted-on |

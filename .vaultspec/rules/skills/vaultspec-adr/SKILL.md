@@ -5,29 +5,23 @@ description: >-
   completing research. ADRs document significant architectural choices,
   their context, and consequences.
 ---
-# Architecture Decision Record (ADR) Skill
 
-When to use this skill:
+# ADR: Architecture Decision Record Writing Skill
 
+Use this skill:
 - After a `vaultspec-research` session has concluded with a recommendation.
+- When multiple competing technical choices need a grounding document.
 - When a significant architectural decision is made that affects the
-  project's direction.
-- To document the "why" behind major technical choices.
+  project's fundations, feature set, or development trajectory.
+- To document the blast radius, "why", "what" of major architectural choices.
 
-**Announce at start:** "I'm using the `vaultspec-adr` skill to create and
-persist an ADR."
+## Required steps
 
-**Save ADR to:**
-`.vault/adr/yyyy-mm-dd-{feature}-{phase}-adr.md`
-
-**Read and link related Research from:**
-`.vault/research/yyyy-mm-dd-{feature}-{phase}-research.md`.
-Terminate if related Research is not found and prompt user to first invoke
-`vaultspec-research`.
-
-## Template
-
-- You MUST read and use the template at `.vaultspec/rules/templates/adr.md`.
+  - **Announce at start:** "I'm using the `vaultspec-adr` skill to create a new ADR."
+  - **You MUST read and use the template** at `.vaultspec/rules/templates/adr.md`.
+  - **MUST save document to:** `.vault/adr/yyyy-mm-dd-{feature}-{phase}-adr.md`
+  - **Read and link related Research from:** `.vault/research/yyyy-mm-dd-{feature}-{phase}-research.md`.
+  - **Terminate if related research is not found** and prompt user to first invoke `vaultspec-research`.
 
 ### Frontmatter & Tagging Mandate
 
@@ -45,13 +39,11 @@ Every document MUST strictly adhere to the following schema:
 
 ## Workflow
 
-- **Derive from Research:** ADRs should always be preceded by a
+- **Derive from Ressearch:** ADRs should always be preceded by a
   `vaultspec-research` session.
-- **Draft ADR:** Load the `vaultspec-writer` agent persona.
-  Instruct it to "Draft an ADR for `{feature}` based on
-  the findings in `[[...-research.md]]`. Use the template at
-  `.vaultspec/rules/templates/adr.md`."
-  - *Alternatives:* `vaultspec-adr-researcher` (if the research phase was
-    skipped or needs synthesis).
+- **CRITICAL: you MUST always** present adr findings as an interactive prompt
+  for user approval. Without explicit user sign-off the ADR is considere null and void.
+- **Draft ADR using an appropiate agent persona**, like `vaultspec-write-planr`
+- Associate ADR with `{feature}` based on the findings in `[[...-research.md]]`.
 - **Linking:** Use `[[wiki-links]]` for references. DO NOT use `@ref` or
   `[label](path)`.

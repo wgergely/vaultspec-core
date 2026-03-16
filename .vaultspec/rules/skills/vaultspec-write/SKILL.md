@@ -1,15 +1,17 @@
 ---
-name: vaultspec-write
+name: vaultspec-write-plan
 description: >-
   Use this skill to write implementation plans, task flows. It must be
   explicitly called after a vaultspec-adr skill has yielded an approved ADR
   document.
 ---
-# Spec Write Skill (vaultspec-write)
 
-Use this skill to write task steps for **non-trivial work, such as new
-features, complex auditing, or refactoring**. MUST be used when explicitly
-prompted to "write task" or "write plan".
+# Write Implementation Skill
+
+Use this skill to:
+- Write the required implementation plan grounded with research and ADRs.
+- plan **non-trivial work, such as new features, complex auditing, or refactoring**.
+- when user explicitly asked to "write task" or "write plan".
 
 This skill MUST be called after `vaultspec-adr` concludes with architectural
 approval. Do NOT use for trivial tasks.
@@ -59,7 +61,7 @@ Every document MUST strictly adhere to the following schema:
 
 - **Research**: Ensure `vaultspec-adr-researcher` has answered questions.
 - **Linking**: Ensure the Plan uses `[[wiki-links]]`.
-- **Drafting**: Load the `vaultspec-writer` agent persona.
+- **Drafting**: Load the `vaultspec-write-planr` agent persona.
   Instruct it to "Create an implementation plan for `{feature}` based on
   `[[...-adr.md]]`. Use the template at `.vaultspec/rules/templates/plan.md`."
 - **Review**: Present the saved Plan to the user.
@@ -73,5 +75,5 @@ Every document MUST strictly adhere to the following schema:
   ```
 
 - **Approval Loop**: User must explicitly approve the Plan. If changes are
-  requested, load the `vaultspec-writer` agent persona.
+  requested, load the `vaultspec-write-planr` agent persona.
   Instruct it to "Revise the plan based on user feedback: `{feedback}`."

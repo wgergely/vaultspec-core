@@ -6,43 +6,39 @@ description: >-
   for complex multi-agent execution. Use when you have a plan document to
   execute.
 ---
-# Spec Execution Skill (vaultspec-execute)
 
-This skill governs the autonomous execution of Plans. It ensures that code
-is written by the appropriate tiered executor, audited for safety, and
-documented correctly.
+# Implementation Plan: Code Writing Skill
 
-## Instructions
+Use this skill:
+- To begin the execution of an implementation `plan`.
+- To ensure code is written by the appropriate agent.
 
-### Plan Initiation
 
-- This skill MUST be invoked to execute an implementation Plan located at
+## Required Steps
+
+- This skill MUST be invoked to execute an implementation `.vault/plan` located at
   `.vault/plan/yyyy-mm-dd-{feature}-{phase}-plan.md`.
 - Read and parse the Plan to understand the scope, complexity, and specific
-  steps.
+  steps
+- Read and parse all linked document to understand context for code challange.
 
-### Executor Delegation
+## Executor Delegation
 
-Load the appropriate executor agent persona for focused work. When the task
-needs multiple specialists, coordinate them through the host environment rather
-than assuming a shipped MCP team-thread runtime. Instruct the executor to
-"Execute the plan at
-`[[...-plan.md]]`. Start with Phase `{X}`."
-
-- **Complex Tasks:** `vaultspec-high-executor` (High Tier). Use for
-  architectural changes or core logic refactors.
-- **Standard Tasks:** `vaultspec-standard-executor` (Medium Tier). Use for
-  typical features and components.
-- **Simple Tasks:** `vaultspec-low-executor` (Low Tier). Use for
-  straightforward edits or documentation.
+Assume the persona of a delegator.
+- Use parallel sub-agents, or autonomous agent team to execute complex plans.
+- Use appropriate executor agent persona. When the task
+needs multiple specialists, coordinate them.
+- Always instruct the coders to execute the current plan, and to read grounding
+  research, adrs and the `[[...-plan.md]]`.
+- Always instruct to "Start with Phase `{X}`."
 
 ### Step Execution & Logging
 
-- Execute the Plan step-by-step or in logical batches.
-- Ensure the executor writes a Step Record to
+- Execute the plan step-by-step or in logical batches.
+- **Coder must write a Step Record** to
   `.vault/exec/yyyy-mm-dd-{feature}/yyyy-mm-dd-{feature}-{phase}-{step}.md`
   for every completed phase.
-- **Template**: You MUST read and use the template at
+- **Coder or supervisor must MUST read and use the template** at
   `.vaultspec/rules/templates/exec-step.md`.
 
 ### Frontmatter & Tagging Mandate (Artifacts)
@@ -63,9 +59,9 @@ following schema:
 ### Mandatory Code Review
 
 - After an executor completes a step (or the full plan), you MUST invoke the
-  `vaultspec-review` skill.
-- This will load the `vaultspec-code-reviewer` persona to audit for safety,
-  intent, and quality.
+  `vaultspec-code-review` skill or a relevant code-review skill.
+- For code reviews always utilize the `vaultspec-code-reviewer` persona to audit
+  for safety, intent, and quality.
 - If the reviewer identifies **CRITICAL** or **HIGH** issues, you MUST
   resolve them by loading an executor again before proceeding.
 

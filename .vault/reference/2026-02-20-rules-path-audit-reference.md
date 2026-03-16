@@ -90,7 +90,7 @@ These references should read `.vaultspec/rules/templates/`.
   ```
   STATUS: STALE — omits `rules/` segment.
 
-### `.vaultspec/rules/skills/vaultspec-write.md`
+### `.vaultspec/rules/skills/vaultspec-write-plan.md`
 
 - **Line 48:** `.vaultspec/templates/plan.md`
   ```
@@ -120,7 +120,7 @@ These references should read `.vaultspec/rules/templates/`.
   ```
   STATUS: STALE — omits `rules/` segment.
 
-### `.vaultspec/rules/skills/vaultspec-review.md`
+### `.vaultspec/rules/skills/vaultspec-code-review.md`
 
 - **Line 51:** `.vaultspec/templates/code-review.md`
   ```
@@ -129,7 +129,7 @@ These references should read `.vaultspec/rules/templates/`.
   ```
   STATUS: STALE — omits `rules/` segment.
 
-### `.vaultspec/rules/agents/vaultspec-writer.md`
+### `.vaultspec/rules/agents/vaultspec-write-planr.md`
 
 - **Line 41:** `.vaultspec/templates/plan.md`
   ```
@@ -241,13 +241,13 @@ These `.vaultspec/` paths correctly go through `rules/`:
 | `.vaultspec/rules/skills/vaultspec-research.md` | 36 | `.vaultspec/templates/research.md` | STALE |
 | `.vaultspec/rules/skills/vaultspec-adr.md` | 36 | `.vaultspec/templates/adr.md` | STALE |
 | `.vaultspec/rules/skills/vaultspec-adr.md` | 59 | `.vaultspec/templates/adr.md` | STALE |
-| `.vaultspec/rules/skills/vaultspec-write.md` | 48 | `.vaultspec/templates/plan.md` | STALE |
-| `.vaultspec/rules/skills/vaultspec-write.md` | 70 | `.vaultspec/templates/plan.md` | STALE |
+| `.vaultspec/rules/skills/vaultspec-write-plan.md` | 48 | `.vaultspec/templates/plan.md` | STALE |
+| `.vaultspec/rules/skills/vaultspec-write-plan.md` | 70 | `.vaultspec/templates/plan.md` | STALE |
 | `.vaultspec/rules/skills/vaultspec-execute.md` | 47 | `.vaultspec/templates/exec-step.md` | STALE |
 | `.vaultspec/rules/skills/vaultspec-execute.md` | 79 | `.vaultspec/templates/exec-summary.md` | STALE |
-| `.vaultspec/rules/skills/vaultspec-review.md` | 51 | `.vaultspec/templates/code-review.md` | STALE |
-| `.vaultspec/rules/agents/vaultspec-writer.md` | 41 | `.vaultspec/templates/plan.md` | STALE |
-| `.vaultspec/rules/agents/vaultspec-writer.md` | 60 | `.vaultspec/templates/plan.md` | STALE |
+| `.vaultspec/rules/skills/vaultspec-code-review.md` | 51 | `.vaultspec/templates/code-review.md` | STALE |
+| `.vaultspec/rules/agents/vaultspec-write-planr.md` | 41 | `.vaultspec/templates/plan.md` | STALE |
+| `.vaultspec/rules/agents/vaultspec-write-planr.md` | 60 | `.vaultspec/templates/plan.md` | STALE |
 | `.vaultspec/rules/agents/vaultspec-simple-executor.md` | 39 | `.vaultspec/templates/exec-step.md` | STALE |
 | `.vaultspec/rules/agents/vaultspec-code-reviewer.md` | 75 | `.vaultspec/templates/code-review.md` | STALE |
 | `.vaultspec/rules/agents/vaultspec-adr-researcher.md` | 77 | `.vaultspec/templates/research.md` | STALE |
@@ -262,5 +262,5 @@ These `.vaultspec/` paths correctly go through `rules/`:
 - `.vaultspec/rules/system/base.md`, `gemini.md`, `operations.md`, `operations-gemini.md`, `project.md`, `workflow.md`
 - `.vaultspec/rules/rules/vaultspec-documentation.builtin.md`
 - `.vaultspec/rules/rules/vaultspec-subagents.builtin.md`
-- `.vaultspec/rules/agents/vaultspec-complex-executor.md`, `vaultspec-docs-curator.md`, `vaultspec-reference-auditor.md`, `vaultspec-researcher.md`, `vaultspec-standard-executor.md`
-- `.vaultspec/rules/skills/vaultspec-curate.md`, `vaultspec-fd.md`, `vaultspec-reference.md`, `vaultspec-rg.md`, `vaultspec-sd.md`, `vaultspec-sg.md`, `vaultspec-test-health.md`, `vaultspec-test-marketing.md`
+- `.vaultspec/rules/agents/vaultspec-complex-executor.md`, `vaultspec-docs-curator.md`, `vaultspec-code-reference-agent.md`, `vaultspec-researcher.md`, `vaultspec-standard-executor.md`
+- `.vaultspec/rules/skills/vaultspec-curate.md`, `vaultspec-fd.md`, `vaultspec-code-reference.md`, `vaultspec-rg.md`, `vaultspec-sd.md`, `vaultspec-sg.md`, `vaultspec-test-health.md`, `vaultspec-test-marketing.md`

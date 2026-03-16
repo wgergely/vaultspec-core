@@ -28,8 +28,8 @@ Where appropriate, load and use the following skills:
 
 - `vaultspec-research`
 - `vaultspec-adr`
-- `vaultspec-reference`
-- `vaultspec-write`
+- `vaultspec-code-reference`
+- `vaultspec-write-plan`
 - `vaultspec-execute`
 
 Agent personas define specialized roles. They can be utilised directly,

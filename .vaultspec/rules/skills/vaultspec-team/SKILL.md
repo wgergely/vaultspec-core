@@ -1,10 +1,9 @@
 ---
 name: vaultspec-team
 description: >-
-  Form and manage a multi-agent team to perform complex, parallelizable tasks.
-  Use this skill when a task is too large for a single agent persona or benefits
-  from specialized agents working in coordination.
+Skill to start coding teams for tacking difficult coding challanges.
 ---
+
 # Team Coordination Skill (vaultspec-team)
 
 This skill defines how to supervise multiple specialized agent personas when a
@@ -35,18 +34,3 @@ Use this skill when you need a supervised team shape such as:
 - researcher -> author -> editor
 - researcher -> executor -> reviewer
 - supervisor with multiple parallel specialists
-
-## Tooling Strategy
-
-Teams MUST prioritize the same core repository tools as individual agents:
-
-- **Discovery**: `fd`
-- **Search**: `rg`
-- **Manipulation**: `sg`
-- **Text Processing**: `sd`
-
-## Supervision
-
-The coordination loop remains host-supervised. Do not claim or assume a
-shipped MCP team-thread runtime unless the product surface explicitly provides
-it.

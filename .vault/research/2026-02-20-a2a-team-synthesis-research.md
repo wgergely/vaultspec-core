@@ -228,4 +228,4 @@ send_team_message(team_id, content, recipient?) -> message_id
 4. **Execute Phase 2**: `team-create` / `team-dissolve` CLI commands + basic integration test.
 5. **Execute Phase 3**: MCP tools (`create_team`, `get_team_status`, `dissolve_team`).
 6. **Execute Phase 4**: Full test suite with `TeamCoordinatorFixture` + mock agents.
-7. **Review**: Code review via `vaultspec-review` before merge.
+7. **Review**: Code review via `vaultspec-code-review` before merge.

@@ -29,8 +29,8 @@ does not mandate a specific dispatch protocol.
 |---------|------|------|
 | `vaultspec-adr-researcher` | HIGH | Research & ADR formulation |
 | `vaultspec-researcher` | HIGH | Discovery & synthesis |
-| `vaultspec-reference-auditor` | MEDIUM | External codebase pattern audit |
-| `vaultspec-writer` | HIGH | Plan creation & task orchestration |
+| `vaultspec-code-reference-agent` | MEDIUM | External codebase pattern audit |
+| `vaultspec-write-planr` | HIGH | Plan creation & task orchestration |
 | `vaultspec-high-executor` | HIGH | Complex architectural implementation |
 | `vaultspec-standard-executor` | MEDIUM | Standard feature work |
 | `vaultspec-low-executor` | LOW | Straightforward edits & fixes |

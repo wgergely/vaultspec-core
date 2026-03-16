@@ -85,7 +85,7 @@ The regulatory environment strongly supports the vaultspec positioning.
 The EU AI Act and enterprise compliance frameworks demand:
 
 - **Audit logs** of AI decisions and human review steps — vaultspec's `.vault/exec/` records satisfy this
-- **Documentation of AI-generated code review** — vaultspec-review enforces mandatory post-execution review
+- **Documentation of AI-generated code review** — vaultspec-code-review enforces mandatory post-execution review
 - **Rationale for architectural decisions** — ADRs in `.vault/adr/` provide traceable decision records
 - **Risk documentation** — research artifacts in `.vault/research/` document pre-decision analysis
 

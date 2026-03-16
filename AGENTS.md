@@ -20,15 +20,15 @@ subsequent phases depend on.
 |----------|--------------------|-----------------------|-------------------|
 | Research | vaultspec-research | .vault/research/...   | —                 |
 | Specify  | vaultspec-adr      | .vault/adr/...        | Research artifact |
-| Plan     | vaultspec-write    | .vault/plan/...       | ADR artifact      |
+| Plan     | vaultspec-write-plan    | .vault/plan/...       | ADR artifact      |
 | Execute  | vaultspec-execute  | .vault/exec/.../steps | Approved plan     |
-| Verify   | vaultspec-review   | .vault/exec/.../review| Completed step(s) |
+| Verify   | vaultspec-code-review   | .vault/exec/.../review| Completed step(s) |
 
 Supporting phases, invoked when appropriate:
 
 | Phase     | Skill               | Purpose                                    |
 |-----------|---------------------|--------------------------------------------|
-| Reference | vaultspec-reference | Audit external codebases for patterns      |
+| Reference | vaultspec-code-reference | Audit external codebases for patterns      |
 | Curate    | vaultspec-curate    | Maintain .vault/ hygiene — links, tags     |
 
 Trivial fixes and direct edits do not require the full pipeline. Use judgment
@@ -43,10 +43,10 @@ Interpret user intent and invoke the appropriate skill:
 |------------------------------------|---------------------|
 | "Research X" / "Investigate"       | vaultspec-research  |
 | "Decide on X" / "Create an ADR"    | vaultspec-adr       |
-| "How does [codebase] implement X?" | vaultspec-reference |
-| "Plan the implementation"          | vaultspec-write     |
+| "How does [codebase] implement X?" | vaultspec-code-reference |
+| "Plan the implementation"          | vaultspec-write-plan     |
 | "Execute the plan" / "Build it"    | vaultspec-execute   |
-| "Review the code" / "Verify"       | vaultspec-review    |
+| "Review the code" / "Verify"       | vaultspec-code-review    |
 | "Clean up docs" / "Curate"         | vaultspec-curate    |
 | "Start a new feature" (broad)      | vaultspec-research  |
 
@@ -76,7 +76,7 @@ research/). Each artifact follows a template from `.vaultspec/rules/templates/`
 with YAML frontmatter, wiki-links, and a two-tag taxonomy.
 
 The user must approve plans before execution proceeds. Code review via
-vaultspec-review is mandatory after execution.
+vaultspec-code-review is mandatory after execution.
 
 ## Rules
 

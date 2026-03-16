@@ -66,7 +66,7 @@ Source paths (actual codebase, not ADR's legacy `.vaultspec/lib/` paths):
 - `Phase 3` -- Create `vaultspec-team` skill and update rules
     1. Create `.vaultspec/rules/skills/vaultspec-team.md` following the 72-line structural template from `vaultspec-subagent.md` (5 sections: Title/Warning, Usage, Tooling Strategy, Examples, Behavior). Document the 8 team MCP tools with usage examples. Include the same mandatory tooling block (fd, rg, sg, sd).
     2. Update `vaultspec-subagents.builtin.md` (both copies: `.claude/rules/` and `.vaultspec/rules/`) to reference `vs-agents-mcp` as the MCP server name and acknowledge `vaultspec-team` as the parallel dispatch pathway for multi-agent work.
-    3. Update all 7 workflow skill files (`vaultspec-adr.md`, `vaultspec-execute.md`, `vaultspec-research.md`, `vaultspec-review.md`, `vaultspec-curate.md`, `vaultspec-reference.md`, `vaultspec-write.md`) with conditional dispatch language: "Single agent: Invoke `vaultspec-subagent` / Team: Invoke `vaultspec-team`".
+    3. Update all 7 workflow skill files (`vaultspec-adr.md`, `vaultspec-execute.md`, `vaultspec-research.md`, `vaultspec-code-review.md`, `vaultspec-curate.md`, `vaultspec-code-reference.md`, `vaultspec-write-plan.md`) with conditional dispatch language: "Single agent: Invoke `vaultspec-subagent` / Team: Invoke `vaultspec-team`".
     4. Update the 4 agent files (`vaultspec-complex-executor.md`, `vaultspec-standard-executor.md`, `vaultspec-simple-executor.md`, `vaultspec-adr-researcher.md`) with the same conditional language. For mandatory code review blocks, add: "Team: Invoke `vaultspec-team` with role=reviewer".
     5. Update framework-level references in `CLAUDE.md` and `framework.md` (2 locations) to include `vaultspec-team` in the dispatch table.
 

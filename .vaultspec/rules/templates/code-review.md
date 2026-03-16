@@ -1,10 +1,10 @@
 ---
 # ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
-# Directory tag (hardcoded - DO NOT CHANGE - based on .vault/exec/ location)
+# REFERENCE: #{feature} #adr #audit #plan #reference #research
+# Directory tag (hardcoded - DO NOT CHANGE - based on .vault/audit/ location)
 # Feature tag (replace {feature} with your feature name, e.g., #editor-demo)
 tags:
-  - "#exec"
+  - "#audit"
   - "#{feature}"
 # ISO date format (e.g., 2026-02-06)
 date: "{yyyy-mm-dd}"
@@ -17,33 +17,7 @@ related:
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 
-# `{feature}` code review
+# `{feature}` Code Review
 
-<!-- STATUS MUST BE ONE OF: PASS | FAIL | REVISION REQUIRED -->
-
-**Status:** `{PASS|FAIL|REVISION REQUIRED}`
-
-## Audit Context
-
-- **Plan:** `[[{yyyy-mm-dd-feature-plan}]]`
-- **Scope:** List of files or modules reviewed
-
-## Findings
-
-Classify findings by Severity: CRITICAL, HIGH, MEDIUM, LOW
-
-### Critical / High (Must Fix)
-
-- **[CRITICAL]** `{Location}`: `{Description}`
-- **[HIGH]** `{Location}`: `{Description}`
-
-### Medium / Low (Recommended)
-
-- **[MEDIUM]** `{Location}`: `{Description}`
-- **[LOW]** `{Location}`: `{Description}`
-
-## Recommendations
-
-Actionable next steps. If FAIL, list specific requirements for re-submission.
-
-## Notes
+<!-- Persistent log of audit findings appended below. -->
+<!-- Use: {TOPIC}-### | {LEVEL} | {Summary} \n {DESCRIPTION} format-->

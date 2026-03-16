@@ -21,7 +21,7 @@ The project uses a set of agent skills defined in `.vaultspec/rules/skills`. The
 | `vaultspec-curate` | `.../skills/vaultspec-curate.md` | `.../skills/vaultspec-curate/SKILL.md` | 🔴 Fail |
 | `vaultspec-execute` | `.../skills/vaultspec-execute.md` | `.../skills/vaultspec-execute/SKILL.md` | 🔴 Fail |
 | `vaultspec-research` | `.../skills/vaultspec-research.md` | `.../skills/vaultspec-research/SKILL.md` | 🔴 Fail |
-| `vaultspec-write` | `.../skills/vaultspec-write.md` | `.../skills/vaultspec-write/SKILL.md` | 🔴 Fail |
+| `vaultspec-write-plan` | `.../skills/vaultspec-write-plan.md` | `.../skills/vaultspec-write-plan/SKILL.md` | 🔴 Fail |
 | *(All others)* | `.../*.md` | `.../*/SKILL.md` | 🔴 Fail |
 
 ### 2. Metadata Violations
