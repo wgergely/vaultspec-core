@@ -220,3 +220,36 @@ def list_feature_details(
         )
 
     return results
+
+
+def archive_feature(root_dir: Path, feature: str) -> dict:
+    """Move all documents for a feature into .vault/_archive/.
+
+    Preserves directory structure under the archive folder.
+
+    Returns dict with: archived_count, paths (list of new paths).
+    """
+    import shutil
+
+    from ..config import get_config
+
+    cfg = get_config()
+    vault_dir = root_dir / cfg.docs_dir
+    archive_dir = vault_dir / "_archive"
+
+    feature = feature.lstrip("#")
+    docs = list_documents(root_dir, feature=feature)
+
+    if not docs:
+        return {"archived_count": 0, "paths": []}
+
+    archived: list[str] = []
+    for doc in docs:
+        # Preserve subdirectory (e.g., adr/, plan/)
+        rel = doc.path.relative_to(vault_dir)
+        dest = archive_dir / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(doc.path), str(dest))
+        archived.append(str(dest.relative_to(root_dir)))
+
+    return {"archived_count": len(archived), "paths": archived}

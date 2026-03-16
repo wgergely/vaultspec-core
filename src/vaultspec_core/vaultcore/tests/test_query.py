@@ -105,3 +105,59 @@ class TestListFeatureDetails:
             assert "name" in f
             assert "doc_count" in f
             assert "types" in f
+
+
+class TestArchiveFeature:
+    def test_archive_moves_docs(self, tmp_path):
+        """Archiving moves all docs for a feature into .vault/_archive/."""
+        from ..query import archive_feature
+
+        # Set up a mini vault with a doc
+        vault_dir = tmp_path / ".vault" / "adr"
+        vault_dir.mkdir(parents=True)
+        doc = vault_dir / "2026-03-16-test-feature-adr.md"
+        doc.write_text(
+            "---\ntags:\n  - adr\n  - test-feature\ndate: 2026-03-16\n---\nContent.\n",
+            encoding="utf-8",
+        )
+
+        result = archive_feature(tmp_path, "test-feature")
+        assert result["archived_count"] == 1
+        assert not doc.exists()  # Original moved
+        archive_dir = tmp_path / ".vault" / "_archive"
+        assert archive_dir.exists()
+        # File should be under _archive/adr/
+        assert (archive_dir / "adr" / doc.name).exists()
+
+    def test_archive_nonexistent_feature(self, tmp_path):
+        """Archiving a feature with no docs returns zero count."""
+        from ..query import archive_feature
+
+        # Set up an empty vault
+        vault_dir = tmp_path / ".vault" / "adr"
+        vault_dir.mkdir(parents=True)
+
+        result = archive_feature(tmp_path, "nonexistent-feature-xyz")
+        assert result["archived_count"] == 0
+        assert result["paths"] == []
+
+    def test_archive_preserves_subdir_structure(self, tmp_path):
+        """Archived docs maintain their type subdirectory."""
+        from ..query import archive_feature
+
+        # Create docs in different type dirs
+        for dtype in ("adr", "plan"):
+            d = tmp_path / ".vault" / dtype
+            d.mkdir(parents=True)
+            f = d / f"2026-03-16-my-feat-{dtype}.md"
+            content = (
+                f"---\ntags:\n  - {dtype}\n  - my-feat\n"
+                f"date: 2026-03-16\n---\nContent.\n"
+            )
+            f.write_text(content, encoding="utf-8")
+
+        result = archive_feature(tmp_path, "my-feat")
+        assert result["archived_count"] == 2
+        archive = tmp_path / ".vault" / "_archive"
+        assert (archive / "adr" / "2026-03-16-my-feat-adr.md").exists()
+        assert (archive / "plan" / "2026-03-16-my-feat-plan.md").exists()
