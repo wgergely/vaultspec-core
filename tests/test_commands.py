@@ -26,7 +26,7 @@ def test_init_run_scaffolds_antigravity_workspace_layout() -> None:
         _t.TARGET_DIR = tmp_path
         reset_config()
 
-        init_run(force=False, providers="all")
+        init_run(force=False, provider="all")
 
         assert (tmp_path / ".agents" / "rules").is_dir()
         assert (tmp_path / ".agents" / "workflows").is_dir()

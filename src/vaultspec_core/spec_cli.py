@@ -395,16 +395,20 @@ def cmd_install(
             resolve_path=True,
         ),
     ],
+    provider: Annotated[
+        str,
+        typer.Argument(
+            help="Provider to install (all, core, claude, gemini, antigravity, codex)"
+        ),
+    ] = "all",
     upgrade: Annotated[
         bool,
         typer.Option("--upgrade", help="Re-sync builtin rules and firmware"),
     ] = False,
-    providers: Annotated[
-        str,
-        typer.Option(
-            "--providers", help="Comma-separated providers (claude,gemini,codex)"
-        ),
-    ] = "all",
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview changes without writing"),
+    ] = False,
 ):
     """Deploy the vaultspec framework to a project directory.
 
@@ -412,13 +416,15 @@ def cmd_install(
     Use --upgrade to update builtin rules without re-scaffolding.
 
     Examples:\n
-      vaultspec-core install .                    # install to cwd\n
-      vaultspec-core install /path/to/project     # install to specific dir\n
+      vaultspec-core install .                    # install all providers\n
+      vaultspec-core install . core               # framework only, no providers\n
+      vaultspec-core install . claude             # framework + claude\n
       vaultspec-core install . --upgrade          # update firmware + re-sync\n
+      vaultspec-core install . claude --dry-run   # preview what would be created\n
     """
     from .core.commands import install_run
 
-    install_run(path=path, upgrade=upgrade, providers=providers)
+    install_run(path=path, provider=provider, upgrade=upgrade, dry_run=dry_run)
 
 
 @spec_app.command("uninstall")
@@ -433,6 +439,12 @@ def cmd_uninstall(
             resolve_path=True,
         ),
     ],
+    provider: Annotated[
+        str,
+        typer.Argument(
+            help="Provider to uninstall (all, core, claude, gemini, antigravity, codex)"
+        ),
+    ] = "all",
     keep_vault: Annotated[
         bool,
         typer.Option("--keep-vault", help="Preserve .vault/ documentation"),
@@ -444,12 +456,16 @@ def cmd_uninstall(
     """Remove the vaultspec framework from a project directory.
 
     Removes all managed artifacts (.vaultspec/, provider dirs, generated configs).
-    User-created .vault/ documents are preserved by default; use without
-    --keep-vault to remove everything.
+    Use a provider name to remove only that provider's artifacts.
+
+    Examples:\n
+      vaultspec-core uninstall .                  # remove everything\n
+      vaultspec-core uninstall . claude           # remove only claude\n
+      vaultspec-core uninstall . --dry-run        # preview what would be removed\n
     """
     from .core.commands import uninstall_run
 
-    uninstall_run(path=path, keep_vault=keep_vault, dry_run=dry_run)
+    uninstall_run(path=path, provider=provider, keep_vault=keep_vault, dry_run=dry_run)
 
 
 @spec_app.command("test")
@@ -479,9 +495,15 @@ def cmd_init(
     force: Annotated[
         bool, typer.Option("--force", help="Overwrite existing structure")
     ] = False,
+    provider: Annotated[
+        str,
+        typer.Argument(
+            help="Provider to scaffold (all, core, claude, gemini, antigravity, codex)"
+        ),
+    ] = "all",
 ):
     """Initialize or normalize a workspace scaffold."""
-    init_run(force=force)
+    init_run(force=force, provider=provider)
 
 
 @spec_app.command("readiness")
