@@ -44,15 +44,13 @@ app = typer.Typer(
     help=(
         "vaultspec-core: Workspace runtime for vaultspec-managed projects.\n\n"
         "Examples:\n"
-        "  vaultspec-core init\n"
         "  vaultspec-core install .\n"
         "  vaultspec-core sync\n"
-        "  vaultspec-core vault add --type research --feature "
-        'example-feature --title "Initial research"\n'
-        "  vaultspec-core vault audit --summary\n"
-        '  vaultspec-core rules add --name my-rule --content "Do not use mocks."\n'
+        "  vaultspec-core vault stats\n"
+        '  vaultspec-core spec rules add --name my-rule --content "Do not use mocks."\n'
     ),
     no_args_is_help=True,
+    add_completion=False,
 )
 
 # Sub-command groups
@@ -90,17 +88,17 @@ def main(
         typer.Option(
             "--target",
             "-t",
-            help="Workspace root directory",
+            help=(
+                "Select installation destination folder."
+                ' Use "." for current working directory.'
+            ),
             dir_okay=True,
             file_okay=False,
             resolve_path=True,
         ),
     ] = None,
-    verbose: Annotated[
-        bool, typer.Option("--verbose", "-v", help="Enable INFO logging")
-    ] = False,
     debug: Annotated[
-        bool, typer.Option("--debug", "-d", help="Enable DEBUG logging")
+        bool, typer.Option("--debug", "-d", help="Enable debug logging")
     ] = False,
     _version: Annotated[
         bool,
@@ -115,9 +113,7 @@ def main(
 ):
     """Initialize workspace and logging."""
     # 1. Setup logging
-    log_level = (
-        logging.DEBUG if debug else (logging.INFO if verbose else logging.WARNING)
-    )
+    log_level = logging.DEBUG if debug else logging.WARNING
     configure_logging(level=log_level, debug=debug)
 
     if ctx.invoked_subcommand is None:
