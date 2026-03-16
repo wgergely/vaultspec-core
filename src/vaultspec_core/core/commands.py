@@ -487,6 +487,7 @@ def uninstall_run(
     provider: str = "all",
     keep_vault: bool = False,
     dry_run: bool = False,
+    force: bool = False,
 ) -> None:
     """Remove the vaultspec framework from a project directory.
 
@@ -495,12 +496,21 @@ def uninstall_run(
         provider: Provider to uninstall (``all``, ``core``, ``<provider>``).
         keep_vault: Preserve ``.vault/`` documentation directory.
         dry_run: Preview what would be removed without deleting.
+        force: Required to execute. Uninstall is destructive.
     """
     import shutil
 
     from vaultspec_core.console import get_console
 
     from .manifest import providers_sharing_dir, remove_provider
+
+    # Safety gate: require --force for destructive operations
+    if not force and not dry_run:
+        logger.error(
+            "Uninstall is destructive. Pass --force to confirm, "
+            "or use --dry-run to preview."
+        )
+        raise typer.Exit(code=1)
 
     _t.TARGET_DIR = path
     _ensure_tool_configs(path)
@@ -512,6 +522,10 @@ def uninstall_run(
             ", ".join(sorted(VALID_PROVIDERS)),
         )
         raise typer.Exit(code=1)
+
+    # Uninstalling "core" cascades to all providers
+    if provider == "core":
+        provider = "all"
 
     console = get_console()
     removed: list[str] = []
@@ -552,16 +566,6 @@ def uninstall_run(
                 else:
                     f.unlink()
                 removed.append(rel)
-
-    elif provider == "core":
-        d = path / ".vaultspec"
-        if d.exists():
-            rel = str(d.relative_to(path))
-            if dry_run:
-                console.print(f"  [dim]would remove[/dim] {rel}/")
-            else:
-                shutil.rmtree(d)
-            removed.append(f"{rel}/")
 
     else:
         # Per-provider uninstall with shared directory protection

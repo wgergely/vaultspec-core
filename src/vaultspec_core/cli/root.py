@@ -194,7 +194,7 @@ def cmd_uninstall(
     ] = False,
     force: Annotated[
         bool,
-        typer.Option("--force", help="Force uninstall (reserved for Phase 3)"),
+        typer.Option("--force", help="Required to execute. Uninstall is destructive."),
     ] = False,
 ) -> None:
     """Remove the vaultspec framework from a project directory.
@@ -209,7 +209,13 @@ def cmd_uninstall(
     """
     from vaultspec_core.core.commands import uninstall_run
 
-    uninstall_run(path=path, provider=provider, keep_vault=keep_vault, dry_run=dry_run)
+    uninstall_run(
+        path=path,
+        provider=provider,
+        keep_vault=keep_vault,
+        dry_run=dry_run,
+        force=force,
+    )
 
 
 @app.command("sync")
