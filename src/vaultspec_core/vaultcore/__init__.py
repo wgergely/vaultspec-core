@@ -17,5 +17,9 @@ from .models import DocumentMetadata as DocumentMetadata
 from .models import VaultConstants as VaultConstants
 from .parser import parse_frontmatter as parse_frontmatter
 from .parser import parse_vault_metadata as parse_vault_metadata
+from .query import VaultDocument as VaultDocument
+from .query import get_stats as get_stats
+from .query import list_documents as list_documents
+from .query import list_feature_details as list_feature_details
 from .scanner import get_doc_type as get_doc_type
 from .scanner import scan_vault as scan_vault
