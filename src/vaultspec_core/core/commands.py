@@ -362,6 +362,7 @@ def install_run(
     provider: str = "all",
     upgrade: bool = False,
     dry_run: bool = False,
+    force: bool = False,
 ) -> None:
     """Deploy the vaultspec framework to a project directory.
 
@@ -370,6 +371,7 @@ def install_run(
         provider: Provider to install (``all``, ``core``, ``claude``, etc.).
         upgrade: Re-sync builtin rules without re-scaffolding.
         dry_run: Preview the manifest of files that would be created.
+        force: Override contents if installation already exists.
     """
     from vaultspec_core.config import reset_config
     from vaultspec_core.config.workspace import WorkspaceError, resolve_workspace
@@ -401,10 +403,16 @@ def install_run(
         for item in manifest:
             seen.setdefault(item, None)
 
-        console.print("[bold]Would create:[/bold]")
-        for item in seen:
-            console.print(f"  {item}")
-        console.print(f"\n[bold]Dry run:[/bold] {len(seen)} items")
+        from .dry_run import DryRunItem, DryRunStatus, render_dry_run_tree
+
+        dry_items = [
+            DryRunItem(
+                path=item,
+                status=DryRunStatus.EXISTS if Path(item).exists() else DryRunStatus.NEW,
+            )
+            for item in seen
+        ]
+        render_dry_run_tree(dry_items, title="Install preview")
         return
 
     if upgrade:
@@ -423,11 +431,11 @@ def install_run(
         console.print("[bold green]Upgrade complete.[/bold green]")
     else:
         fw_dir = path / ".vaultspec"
-        if fw_dir.exists():
+        if fw_dir.exists() and not force:
             logger.error(
                 "vaultspec is already installed at %s. "
-                "Use --upgrade to update, or remove it first with "
-                "'vaultspec-core uninstall %s'.",
+                "Use --upgrade to update, --force to override, or remove it "
+                "first with 'vaultspec-core uninstall %s'.",
                 path,
                 path,
             )

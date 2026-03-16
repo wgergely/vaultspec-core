@@ -143,7 +143,9 @@ def cmd_install(
     ] = False,
     force: Annotated[
         bool,
-        typer.Option("--force", help="Force install (reserved for Phase 3)"),
+        typer.Option(
+            "--force", help="Override contents if installation already exists"
+        ),
     ] = False,
 ) -> None:
     """Deploy the vaultspec framework to a project directory.
@@ -160,7 +162,9 @@ def cmd_install(
     """
     from vaultspec_core.core.commands import install_run
 
-    install_run(path=path, provider=provider, upgrade=upgrade, dry_run=dry_run)
+    install_run(
+        path=path, provider=provider, upgrade=upgrade, dry_run=dry_run, force=force
+    )
 
 
 @app.command("uninstall")
