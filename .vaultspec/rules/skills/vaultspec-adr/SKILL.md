@@ -43,7 +43,7 @@ Every document MUST strictly adhere to the following schema:
   `vaultspec-research` session.
 - **CRITICAL: you MUST always** present adr findings as an interactive prompt
   for user approval. Without explicit user sign-off the ADR is considere null and void.
-- **Draft ADR using an appropiate agent persona**, like `vaultspec-write-planr`
+- **Draft ADR using an appropiate agent persona**, like `vaultspec-writer`
 - Associate ADR with `{feature}` based on the findings in `[[...-research.md]]`.
 - **Linking:** Use `[[wiki-links]]` for references. DO NOT use `@ref` or
   `[label](path)`.

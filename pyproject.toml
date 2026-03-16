@@ -135,6 +135,9 @@ target-version = "py313"
     "src/vaultspec_core/core/*.py" = ["TC003"]
     # FastMCP inspects tool annotations at runtime, so Context must be importable.
     "src/vaultspec_core/mcp_server/vault_tools.py" = ["TC002"]
+    # CLI stub commands accept Typer params that are not yet wired to backends.
+    "src/vaultspec_core/cli/vault_cmd.py" = ["ARG001"]
+    "src/vaultspec_core/cli/root.py" = ["ARG001"]
 
     [tool.ruff.lint.isort]
     known-first-party = ["vaultspec_core"]

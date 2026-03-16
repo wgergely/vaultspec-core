@@ -1212,7 +1212,7 @@ Audit the repository state specifically for blocking issues created by other con
 
 #### 106. [Detected] gent-removal Branch Breakage
 * **Issue:** The repository is currently in a broken state due to the gent-removal refactoring. 
-* **Detail:** The aultspec CLI currently fails to launch entirely. Attempting to run aultspec subagent run --agent vaultspec-write-planr throws ImportError: cannot import name 'AGENTS_SRC_DIR' from 'vaultspec.core.types'. This indicates that the gent-removal plan was executed partially or sloppily by the previous execution agent. They deleted AGENTS_SRC_DIR from core/types.py but failed to clean up the import statements in core/__init__.py. 
+* **Detail:** The aultspec CLI currently fails to launch entirely. Attempting to run aultspec subagent run --agent vaultspec-writer throws ImportError: cannot import name 'AGENTS_SRC_DIR' from 'vaultspec.core.types'. This indicates that the gent-removal plan was executed partially or sloppily by the previous execution agent. They deleted AGENTS_SRC_DIR from core/types.py but failed to clean up the import statements in core/__init__.py. 
 * **Triage:** Critical Blocker - We cannot dispatch the aultspec-writer agent using the native aultspec subagent command because the framework itself is broken.
 * **Proposed Action:** We must either pause and fix the ImportError manually (so the CLI boots), OR we must manually write the .vault/plan/2026-03-05-cli-target-refactor-plan.md artifact using standard file writing tools instead of relying on the broken aultspec-writer subagent to do it for us.
 

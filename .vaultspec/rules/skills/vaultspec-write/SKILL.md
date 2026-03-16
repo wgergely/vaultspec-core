@@ -13,8 +13,8 @@ Use this skill to:
 - plan **non-trivial work, such as new features, complex auditing, or refactoring**.
 - when user explicitly asked to "write task" or "write plan".
 
-This skill MUST be called after `vaultspec-adr` concludes with architectural
-approval. Do NOT use for trivial tasks.
+This skill **MUST always** be called after `vaultspec-adr` concludes with architectural
+approval.
 
 ## Important
 
@@ -25,13 +25,11 @@ approval. Do NOT use for trivial tasks.
 ## Rules
 
 - **Announce:** Explicitly state you are starting the planning phase.
-- **ADR is King:** ADRs are binding.
-- **Research Backs ADR:** Research provides context for the ADR.
-- **ADR Backs Implementation:** The Plan must strictly follow the ADR.
-- **Discovery:** Use `fd` and `rg` to investigate the current codebase state.
-  Do not assume; verify.
-- **Abstraction:** Do **NOT** include granular implementation details (code
-  snippets) unless requested. Focus on _what_ and _where_.
+- **Must reference research and ADRs**. Read these in full prior to writing the plan.
+- Ensure no knowledge gap remains prior to writing plan. Call vaultspec- research skills
+  if more information is needed.
+- **Abstraction:** Do **NOT** include granular code details. The plan should outline
+the PHASES, STEPS but not the code. Focus on **what** and **where**.
 - **Persistence:**
   - Plans: `.vault/plan/yyyy-mm-dd-{feature}-{phase}-plan.md`
   - Phase Summaries:
@@ -59,12 +57,12 @@ Every document MUST strictly adhere to the following schema:
 
 ## Workflow
 
-- **Research**: Ensure `vaultspec-adr-researcher` has answered questions.
+- **Research**: Ensure vaultspec research agents has answered questions.
 - **Linking**: Ensure the Plan uses `[[wiki-links]]`.
-- **Drafting**: Load the `vaultspec-write-planr` agent persona.
+- **Drafting**: If working with sug-agents use `vaultspec-writer` agent persona.
   Instruct it to "Create an implementation plan for `{feature}` based on
   `[[...-adr.md]]`. Use the template at `.vaultspec/rules/templates/plan.md`."
-- **Review**: Present the saved Plan to the user.
+- **Review**: Present the saved Plan summary to the user before executing.
 - **Provide an absolute link** and prompt user:
 
   ```markdown
@@ -75,5 +73,7 @@ Every document MUST strictly adhere to the following schema:
   ```
 
 - **Approval Loop**: User must explicitly approve the Plan. If changes are
-  requested, load the `vaultspec-write-planr` agent persona.
-  Instruct it to "Revise the plan based on user feedback: `{feedback}`."
+  requested, load the `vaultspec-writer` agent personaa again to make changes.
+  If more research and grounding is required use the appropiate vaultspec research skills
+  and agents.
+  Instruct them to "Revise the plan based on user feedback: `{feedback}`."

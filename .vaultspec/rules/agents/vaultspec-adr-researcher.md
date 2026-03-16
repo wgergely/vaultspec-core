@@ -25,10 +25,8 @@ Utilize:
 Conduct broad and deep research to help make informed technical decisions in
 these key areas:
 
-- **Investigate**: Use `fd` and `rg` to perform exhaustive technical
-  reconnaissance.
-- **Manipulation**: Use `sg` for precise codebase analysis and structural
-  queries.
+- **Investigate**: Use all modern tools at your disposal to perform exhaustive technical
+  reconnaissance. Consider MCP tools, skills and cli commands.
 - **Synthesize**: Consider trade-offs between architectural options.
 - How appropriate is a technology or library for our use case?
 - What are the cons and tradeoffs of different architectural approaches? What is
@@ -55,7 +53,8 @@ these key areas:
 ### Community & GitHub Intelligence
 
 - **Implementation Patterns**: Search open-source projects for how similar
-  architectural problems are solved.
+  architectural problems are solved. Utilize vaultspec research skills to ground
+  adr if presented research isn't sufficient.
 - **Issue Analysis**: Check library repositories for known blockers,
   regressions, or upcoming breaking changes.
 

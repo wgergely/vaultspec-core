@@ -129,7 +129,7 @@ These references should read `.vaultspec/rules/templates/`.
   ```
   STATUS: STALE — omits `rules/` segment.
 
-### `.vaultspec/rules/agents/vaultspec-write-planr.md`
+### `.vaultspec/rules/agents/vaultspec-writer.md`
 
 - **Line 41:** `.vaultspec/templates/plan.md`
   ```
@@ -246,8 +246,8 @@ These `.vaultspec/` paths correctly go through `rules/`:
 | `.vaultspec/rules/skills/vaultspec-execute.md` | 47 | `.vaultspec/templates/exec-step.md` | STALE |
 | `.vaultspec/rules/skills/vaultspec-execute.md` | 79 | `.vaultspec/templates/exec-summary.md` | STALE |
 | `.vaultspec/rules/skills/vaultspec-code-review.md` | 51 | `.vaultspec/templates/code-review.md` | STALE |
-| `.vaultspec/rules/agents/vaultspec-write-planr.md` | 41 | `.vaultspec/templates/plan.md` | STALE |
-| `.vaultspec/rules/agents/vaultspec-write-planr.md` | 60 | `.vaultspec/templates/plan.md` | STALE |
+| `.vaultspec/rules/agents/vaultspec-writer.md` | 41 | `.vaultspec/templates/plan.md` | STALE |
+| `.vaultspec/rules/agents/vaultspec-writer.md` | 60 | `.vaultspec/templates/plan.md` | STALE |
 | `.vaultspec/rules/agents/vaultspec-simple-executor.md` | 39 | `.vaultspec/templates/exec-step.md` | STALE |
 | `.vaultspec/rules/agents/vaultspec-code-reviewer.md` | 75 | `.vaultspec/templates/code-review.md` | STALE |
 | `.vaultspec/rules/agents/vaultspec-adr-researcher.md` | 77 | `.vaultspec/templates/research.md` | STALE |
