@@ -332,6 +332,19 @@ def _sync_provider(
         logger.info("Done.")
         return
 
+    # Validate provider is installed (skip if .vaultspec/ doesn't exist yet,
+    # which happens during install_run before the first sync).
+    from .core.manifest import read_manifest
+
+    installed = read_manifest(_t.TARGET_DIR)
+    if installed and provider not in installed:
+        logger.error(
+            "Provider '%s' is not installed. Run 'vaultspec-core install . %s' first.",
+            provider,
+            provider,
+        )
+        raise typer.Exit(code=1)
+
     # Per-provider sync: filter TOOL_CONFIGS to only the requested tool.
     requested: set[Tool] = set()
     if provider == "claude":

@@ -198,8 +198,72 @@ def test_justfile_install_uninstall_delegate_to_cli() -> None:
     justfile = _read("justfile")
     assert "uv run vaultspec-core install" in justfile
     assert "uv run vaultspec-core uninstall" in justfile
-    assert "install path='.':" in justfile or "install path='.' " in justfile
-    assert "uninstall path='.':" in justfile or "uninstall path='.' " in justfile
+    assert "install path='.' " in justfile
+    assert "uninstall path='.' " in justfile
+    # Provider parameter in recipes
+    assert "provider='all'" in justfile
+
+
+def test_provider_capability_enum_covers_all_tools() -> None:
+    """Every Tool enum member must have a ToolConfig with non-empty capabilities."""
+    from vaultspec_core.core.enums import Tool
+    from vaultspec_core.core.types import init_paths
+
+    init_paths(ROOT)
+    from vaultspec_core.core import types as _t
+
+    for tool in Tool:
+        cfg = _t.TOOL_CONFIGS.get(tool)
+        assert cfg is not None, f"Tool {tool.value} has no ToolConfig"
+        assert cfg.capabilities, f"Tool {tool.value} has empty capabilities"
+
+
+def test_provider_capability_consistency() -> None:
+    """Capability declarations must be consistent with ToolConfig fields."""
+    from vaultspec_core.core.enums import ProviderCapability, Tool
+    from vaultspec_core.core.types import init_paths
+
+    init_paths(ROOT)
+    from vaultspec_core.core import types as _t
+
+    for tool in Tool:
+        cfg = _t.TOOL_CONFIGS.get(tool)
+        if cfg is None:
+            continue
+        caps = cfg.capabilities
+        if ProviderCapability.RULES in caps:
+            assert cfg.rules_dir is not None or cfg.native_config_file is not None, (
+                f"{tool.value} declares RULES but has no rules_dir"
+                " or native_config_file"
+            )
+        if ProviderCapability.SKILLS in caps:
+            assert cfg.skills_dir is not None, (
+                f"{tool.value} declares SKILLS but has no skills_dir"
+            )
+        if ProviderCapability.ROOT_CONFIG in caps:
+            assert cfg.config_file is not None, (
+                f"{tool.value} declares ROOT_CONFIG but has no config_file"
+            )
+
+
+def test_every_capability_has_at_least_one_provider() -> None:
+    """Each ProviderCapability value must map to at least one provider."""
+    from vaultspec_core.core.enums import ProviderCapability, Tool
+    from vaultspec_core.core.types import init_paths
+
+    init_paths(ROOT)
+    from vaultspec_core.core import types as _t
+
+    for cap in ProviderCapability:
+        providers = [
+            tool.value
+            for tool in Tool
+            if cap
+            in _t.TOOL_CONFIGS.get(
+                tool, type("", (), {"capabilities": frozenset()})()
+            ).capabilities
+        ]
+        assert providers, f"ProviderCapability.{cap.name} has no providers"
 
 
 def test_dockerfile_defaults_to_vaultspec_core_help() -> None:
