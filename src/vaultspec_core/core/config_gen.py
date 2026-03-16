@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 
 CODEX_CONFIG_BEGIN = "# BEGIN VAULTSPEC MANAGED CODEX CONFIG"
 CODEX_CONFIG_END = "# END VAULTSPEC MANAGED CODEX CONFIG"
+CODEX_RULES_BEGIN = "# BEGIN VAULTSPEC MANAGED CODEX RULES"
+CODEX_RULES_END = "# END VAULTSPEC MANAGED CODEX RULES"
+CODEX_AGENTS_BEGIN = "# BEGIN VAULTSPEC MANAGED CODEX AGENTS"
+CODEX_AGENTS_END = "# END VAULTSPEC MANAGED CODEX AGENTS"
 
 
 def _is_cli_managed(path_or_content: str | Path) -> bool:
@@ -71,12 +75,23 @@ def _toml_quote(value: str) -> str:
     return f'"{escaped}"'
 
 
-def _strip_managed_codex_config_block(content: str) -> str:
+def _strip_managed_block(content: str, begin: str, end: str) -> str:
     pattern = re.compile(
-        rf"\n?{re.escape(CODEX_CONFIG_BEGIN)}\n.*?\n{re.escape(CODEX_CONFIG_END)}\n?",
+        rf"\n?{re.escape(begin)}\n.*?\n{re.escape(end)}\n?",
         re.DOTALL,
     )
     return pattern.sub("\n", content).strip()
+
+
+def _strip_managed_codex_config_block(content: str) -> str:
+    result = content
+    for begin, end in [
+        (CODEX_CONFIG_BEGIN, CODEX_CONFIG_END),
+        (CODEX_RULES_BEGIN, CODEX_RULES_END),
+        (CODEX_AGENTS_BEGIN, CODEX_AGENTS_END),
+    ]:
+        result = _strip_managed_block(result, begin, end)
+    return result
 
 
 def _read_framework_project_parts() -> tuple[
@@ -174,6 +189,51 @@ def _render_codex_config_lines(meta: dict[str, object]) -> list[str]:
     return rendered
 
 
+def _generate_codex_rules_block() -> str | None:
+    """Generate TOML ``[rules]`` block for Codex config.toml.
+
+    Reads vaultspec rule sources and renders them as Codex-native TOML
+    rule comments referencing each managed rule.  Returns ``None`` if no
+    rules are defined.
+    """
+    from .rules import collect_rules
+
+    sources = collect_rules()
+    if not sources:
+        return None
+
+    lines = [CODEX_RULES_BEGIN, "[rules]"]
+    for filename, (_path, meta, _body) in sorted(sources.items()):
+        rule_name = meta.get("name", filename.removesuffix(".md"))
+        lines.append(f"# Rule: {rule_name}")
+    lines.append(CODEX_RULES_END)
+    return "\n".join(lines)
+
+
+def _generate_codex_agents_block() -> str | None:
+    """Generate TOML ``[agents.*]`` tables for Codex config.toml.
+
+    Reads vaultspec agent sources and renders them as Codex-native TOML
+    agent role definitions.  Returns ``None`` if no agents are defined.
+    """
+    from .agents import collect_agents
+
+    sources = collect_agents()
+    if not sources:
+        return None
+
+    lines = [CODEX_AGENTS_BEGIN]
+    for filename, (_path, meta, body) in sorted(sources.items()):
+        agent_name = meta.get("name", filename.removesuffix(".md"))
+        description = meta.get(
+            "description", body.strip().split("\n")[0] if body.strip() else ""
+        )
+        lines.append(f"[agents.{_toml_quote(str(agent_name))}]")
+        lines.append(f"description = {_toml_quote(str(description))}")
+    lines.append(CODEX_AGENTS_END)
+    return "\n".join(lines)
+
+
 def _generate_codex_native_config() -> str | None:
     (
         internal_meta,
@@ -225,24 +285,29 @@ def _generate_config(cfg: ToolConfig) -> str | None:
     return f"{_t.CONFIG_HEADER}\n{body}"
 
 
-def _generate_codex_agents_md() -> str | None:
-    """Assemble the managed root AGENTS.md content for Codex."""
-    if not _t.FRAMEWORK_CONFIG_SRC.exists():
+def _generate_rule_ref_config(cfg: ToolConfig) -> str | None:
+    """Generate a secondary config file containing only rule references.
+
+    Used by Gemini where ``.gemini/GEMINI.md`` carries ``@rules/...``
+    references while the root ``GEMINI.md`` holds shared framework content.
+    """
+    if cfg.rule_ref_config_file is None:
         return None
 
-    (
-        _internal_meta,
-        internal_body,
-        _project_meta,
-        custom_body,
-    ) = _read_framework_project_parts()
+    refs = _collect_rule_refs(cfg)
+    if not refs:
+        return None
 
-    body_parts = [internal_body]
-    if custom_body:
-        body_parts.append("")
-        body_parts.append(custom_body)
+    body_parts = [
+        "## Rules",
+        "",
+        "You MUST respect these rules at all times:",
+        "",
+    ]
+    for ref in refs:
+        body_parts.append(f"@{ref}")
 
-    return f"{_t.CONFIG_HEADER}\n{'\n'.join(body_parts)}"
+    return f"{_t.CONFIG_HEADER}\n" + "\n".join(body_parts)
 
 
 def config_show() -> None:
@@ -295,21 +360,25 @@ def config_sync(dry_run: bool = False, force: bool = False) -> None:
         elif action != "[SKIP]":
             result.updated += 1
 
-    codex_path = _t.TARGET_DIR / "AGENTS.md"
-    codex_content = _generate_codex_agents_md()
-    if codex_content:
+    # Sync secondary rule-reference config files (e.g. .gemini/GEMINI.md)
+    for _tool_type, cfg in _t.TOOL_CONFIGS.items():
+        ref_content = _generate_rule_ref_config(cfg)
+        if not ref_content or cfg.rule_ref_config_file is None:
+            continue
+
         action = "[SKIP]"
-        if not codex_path.exists():
+        if not cfg.rule_ref_config_file.exists():
             action = "[ADD]"
-        elif _is_cli_managed(codex_path):
+        elif _is_cli_managed(cfg.rule_ref_config_file):
             action = "[UPDT]"
         elif force:
             action = "[FORC]"
 
         if action != "[SKIP]":
-            logger.info("%s %s", action, codex_path)
+            logger.info("%s %s", action, cfg.rule_ref_config_file)
             if not dry_run:
-                atomic_write(codex_path, codex_content)
+                ensure_dir(cfg.rule_ref_config_file.parent)
+                atomic_write(cfg.rule_ref_config_file, ref_content)
 
         if action == "[ADD]":
             result.added += 1
@@ -317,34 +386,43 @@ def config_sync(dry_run: bool = False, force: bool = False) -> None:
             result.updated += 1
 
     codex_native_path = _t.TOOL_CONFIGS[Tool.CODEX].native_config_file
-    codex_native_content = _generate_codex_native_config()
-    if codex_native_path is not None and codex_native_content is not None:
-        existing = (
-            codex_native_path.read_text(encoding="utf-8")
-            if codex_native_path.exists()
-            else ""
-        )
-        preserved = _strip_managed_codex_config_block(existing)
-        parts = [part for part in [preserved, codex_native_content] if part]
-        merged_content = "\n\n".join(parts).strip()
-        if merged_content:
-            merged_content += "\n"
+    if codex_native_path is not None:
+        managed_blocks = [
+            b
+            for b in [
+                _generate_codex_native_config(),
+                _generate_codex_rules_block(),
+                _generate_codex_agents_block(),
+            ]
+            if b
+        ]
+        if managed_blocks:
+            existing = (
+                codex_native_path.read_text(encoding="utf-8")
+                if codex_native_path.exists()
+                else ""
+            )
+            preserved = _strip_managed_codex_config_block(existing)
+            parts = [part for part in [preserved, *managed_blocks] if part]
+            merged_content = "\n\n".join(parts).strip()
+            if merged_content:
+                merged_content += "\n"
 
-        action = "[SKIP]"
-        if not codex_native_path.exists():
-            action = "[ADD]"
-        elif existing != merged_content:
-            action = "[UPDT]"
+            action = "[SKIP]"
+            if not codex_native_path.exists():
+                action = "[ADD]"
+            elif existing != merged_content:
+                action = "[UPDT]"
 
-        if action != "[SKIP]":
-            logger.info("%s %s", action, codex_native_path)
-            if not dry_run:
-                ensure_dir(codex_native_path.parent)
-                atomic_write(codex_native_path, merged_content)
+            if action != "[SKIP]":
+                logger.info("%s %s", action, codex_native_path)
+                if not dry_run:
+                    ensure_dir(codex_native_path.parent)
+                    atomic_write(codex_native_path, merged_content)
 
-        if action == "[ADD]":
-            result.added += 1
-        elif action == "[UPDT]":
-            result.updated += 1
+            if action == "[ADD]":
+                result.added += 1
+            elif action == "[UPDT]":
+                result.updated += 1
 
     print_summary("Config", result)
