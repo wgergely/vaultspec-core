@@ -75,9 +75,18 @@ def check_references(
 ) -> CheckResult:
     """Check for missing cross-references within features.
 
-    For each feature, finds research docs not referenced by any plan or ADR
-    in the same feature.  With --fix, adds the missing [[wiki-link]] to the
-    first available plan or ADR.
+    For each feature, finds research documents not referenced by any plan
+    or ADR in the same feature.
+
+    Args:
+        root_dir: Project root directory.
+        feature: Restrict checks to a single feature (without ``#``).
+        fix: When ``True``, adds the missing ``[[wiki-link]]`` to the
+            ``related:`` field of the first available ADR or plan.
+
+    Returns:
+        :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
+        check name ``"references"``.
     """
     from ...graph import VaultGraph
     from ..models import DocType

@@ -15,7 +15,6 @@ from pathlib import Path
 from . import types as _t
 from .enums import Tool
 from .helpers import atomic_write, ensure_dir
-from .sync import print_summary
 from .tags import TagError, has_block, upsert_block
 from .types import SyncResult, ToolConfig
 
@@ -322,18 +321,22 @@ def _sync_managed_toml(
 # ---------------------------------------------------------------------------
 
 
-def config_show() -> None:
-    """Print the generated configuration content for every active tool."""
-    import typer
+def config_show() -> list[dict[str, str]]:
+    """Return the generated configuration content for every active tool.
 
+    Returns:
+        A list of dicts, each with ``"tool"`` and ``"content"`` keys.
+    """
+    items: list[dict[str, str]] = []
     for tool_type, cfg in _t.TOOL_CONFIGS.items():
-        typer.echo(f"--- {tool_type.value} config ---")
         content = _generate_config_body(cfg)
-        if content:
-            typer.echo(content)
-        else:
-            typer.echo("(No internal framework config found)")
-        typer.echo()
+        items.append(
+            {
+                "tool": tool_type.value,
+                "content": content or "(No internal framework config found)",
+            }
+        )
+    return items
 
 
 def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
@@ -445,5 +448,4 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
         # NOTE: Codex agents block is managed by agents_sync/_sync_codex_agents,
         # not here, to avoid conflicting writes to the same TOML block.
 
-    print_summary("Config", result)
     return result

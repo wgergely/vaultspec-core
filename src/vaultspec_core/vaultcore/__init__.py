@@ -3,8 +3,8 @@
 The `vaultcore` package provides the reusable primitives for working with
 `.vault/` documents: `models` defines the domain objects, `parser` extracts
 frontmatter and metadata, `links` reads wiki-link relationships, `scanner`
-discovers and classifies files, and `hydration` scaffolds new records from
-templates.
+discovers and classifies files, `query` provides document listing and feature
+archive operations, and `hydration` scaffolds new records from templates.
 """
 
 from .hydration import create_vault_doc as create_vault_doc

@@ -20,7 +20,16 @@ from .scanner import get_doc_type, scan_vault
 
 @dataclass
 class VaultDocument:
-    """A resolved vault document with parsed metadata."""
+    """A resolved vault document with parsed metadata.
+
+    Attributes:
+        path: Absolute filesystem path to the document.
+        name: Filename stem (no extension).
+        doc_type: Document type value string (e.g. ``"adr"``, ``"plan"``).
+        feature: Feature name extracted from the non-type tag, or ``None``.
+        date: ISO 8601 date string from frontmatter or filename, or ``None``.
+        tags: Raw tag list from frontmatter.
+    """
 
     path: Path
     name: str
@@ -92,10 +101,16 @@ def list_documents(
 
     Args:
         root_dir: Project root directory.
-        doc_type: Filter by type. Standard types: adr, audit, exec, plan,
-            reference, research. Special types: "orphaned", "invalid".
-        feature: Filter by feature tag (without # prefix).
-        date: Filter by date string (YYYY-MM-DD).
+        doc_type: Filter by type. Standard types: ``adr``, ``audit``,
+            ``exec``, ``plan``, ``reference``, ``research``. Special
+            values: ``"orphaned"`` (no incoming links), ``"invalid"``
+            (contains broken outgoing links).
+        feature: Filter by feature tag (without ``#`` prefix).
+        date: Filter by exact date string (``YYYY-MM-DD``).
+
+    Returns:
+        Ordered list of :class:`VaultDocument` instances matching all
+        supplied filters.
     """
     docs = _scan_all(root_dir)
 
@@ -133,8 +148,18 @@ def get_stats(
 ) -> dict:
     """Compute vault statistics with optional filters.
 
-    Returns dict with: total_docs, total_features, counts_by_type,
-    orphaned_count, invalid_link_count.
+    Args:
+        root_dir: Project root directory.
+        feature: Restrict counts to a single feature (without ``#``).
+        doc_type: Restrict counts to a single document type.
+        date: Restrict to documents matching this date (``YYYY-MM-DD``).
+
+    Returns:
+        Dict with keys: ``total_docs``, ``total_features``,
+        ``counts_by_type`` (``dict[str, int]``), ``orphaned_count``,
+        ``invalid_link_count``. Orphan and invalid counts are always
+        computed against the full unfiltered vault via
+        :class:`~vaultspec_core.graph.VaultGraph`.
     """
     docs = list_documents(root_dir, feature=feature, doc_type=doc_type, date=date)
 
@@ -172,10 +197,21 @@ def list_feature_details(
     doc_type: str | None = None,
     orphaned_only: bool = False,
 ) -> list[dict]:
-    """List features with enriched metadata.
+    """List features with enriched per-feature metadata.
 
-    Returns list of dicts with: name, doc_count, types (set of doc types
-    present), earliest_date, has_plan.
+    Args:
+        root_dir: Project root directory.
+        date: Exclude features whose earliest document date is after this
+            value (``YYYY-MM-DD``).
+        doc_type: Restrict to features that contain at least one document
+            of this type.
+        orphaned_only: When ``True``, return only features where every
+            document is orphaned (no incoming wiki-links).
+
+    Returns:
+        List of dicts sorted by feature name, each with keys: ``name``,
+        ``doc_count``, ``types`` (sorted list), ``earliest_date``,
+        ``has_plan``.
     """
     docs = _scan_all(root_dir)
 

@@ -37,6 +37,7 @@ prod *args='':
 #    test      pytest, docker smoke
 #    build     uv build, docker build
 #    publish   docker push
+#    precommit pre-commit hook management (install, upgrade, run)
 #
 #  Examples:
 #    just dev deps sync
@@ -65,9 +66,11 @@ dev target *args='':
       just _dev-build {{args}} ;; \
     publish) \
       just _dev-publish {{args}} ;; \
+    precommit) \
+      just _dev-precommit {{args}} ;; \
     *) \
       echo "unknown dev target: {{target}}" >&2; \
-      echo "  targets: deps lint format audit test build publish" >&2; \
+      echo "  targets: deps lint format audit test build publish precommit" >&2; \
       exit 1 ;; \
   esac
 
@@ -97,6 +100,7 @@ _dev-deps target='sync':
       uv lock --upgrade ;; \
     *) \
       echo "unknown dev deps target: {{target}}" >&2; \
+      echo "  targets: sync upgrade lock lock-upgrade" >&2; \
       exit 1 ;; \
   esac
 
@@ -120,7 +124,7 @@ _dev-lint target='all':
         exit 127; \
       fi ;; \
     toml) \
-      npx --yes @taplo/cli lint *.toml ;; \
+      npx --yes @taplo/cli lint "$(pwd)"/*.toml ;; \
     markdown) \
       npx --yes markdownlint-cli \
         --config .markdownlint.json \
@@ -144,6 +148,7 @@ _dev-lint target='all':
       just _dev-lint workflow ;; \
     *) \
       echo "unknown dev lint target: {{target}}" >&2; \
+      echo "  targets: python type links toml markdown workflow all" >&2; \
       exit 1 ;; \
   esac
 
@@ -153,7 +158,7 @@ _dev-format target='all':
       uv run ruff format src tests && \
       uv run ruff check --fix src tests ;; \
     toml) \
-      npx --yes @taplo/cli fmt *.toml ;; \
+      npx --yes @taplo/cli fmt "$(pwd)"/*.toml ;; \
     markdown) \
       npx --yes markdownlint-cli \
         --config .markdownlint.json --fix \
@@ -164,6 +169,7 @@ _dev-format target='all':
       just _dev-format markdown ;; \
     *) \
       echo "unknown dev format target: {{target}}" >&2; \
+      echo "  targets: python toml markdown all" >&2; \
       exit 1 ;; \
   esac
 
@@ -177,6 +183,7 @@ _dev-audit target:
       uv run pip-audit --strict -r "$tmp" ;; \
     *) \
       echo "unknown dev audit target: {{target}}" >&2; \
+      echo "  targets: deps" >&2; \
       exit 1 ;; \
   esac
 
@@ -194,6 +201,7 @@ _dev-test target='all':
       just _dev-test docker ;; \
     *) \
       echo "unknown dev test target: {{target}}" >&2; \
+      echo "  targets: python docker all" >&2; \
       exit 1 ;; \
   esac
 
@@ -209,6 +217,7 @@ _dev-build target:
       just _dev-build docker ;; \
     *) \
       echo "unknown dev build target: {{target}}" >&2; \
+      echo "  targets: python docker all" >&2; \
       exit 1 ;; \
   esac
 
@@ -219,5 +228,20 @@ _dev-publish target tag:
         --push -t {{ image }}:{{tag}} . ;; \
     *) \
       echo "unknown dev publish target: {{target}}" >&2; \
+      echo "  targets: docker-ghcr" >&2; \
+      exit 1 ;; \
+  esac
+
+_dev-precommit target='run':
+  case "{{target}}" in \
+    install) \
+      uv run pre-commit install ;; \
+    upgrade) \
+      uv run pre-commit autoupdate ;; \
+    run) \
+      uv run pre-commit run --all-files ;; \
+    *) \
+      echo "unknown dev precommit target: {{target}}" >&2; \
+      echo "  targets: install upgrade run" >&2; \
       exit 1 ;; \
   esac

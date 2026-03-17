@@ -10,11 +10,15 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-
-import typer
+from typing import Any
 
 from . import types as _t
 from .enums import ProviderCapability, Tool
+from .exceptions import (
+    ProviderError,
+    ProviderNotInstalledError,
+    WorkspaceNotInitializedError,
+)
 from .helpers import ensure_dir
 
 logger = logging.getLogger(__name__)
@@ -149,18 +153,37 @@ def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[tuple[str
     return [(".mcp.json", "mcp")]
 
 
-def init_run(force: bool = False, provider: str = "all") -> None:
-    """Scaffold the .vaultspec/ and .vault/ directory structure."""
+def _validate_provider(provider: str) -> None:
+    """Validate that *provider* is a known provider name.
+
+    Raises:
+        ProviderError: If *provider* is not in :data:`VALID_PROVIDERS`.
+    """
+    if provider not in VALID_PROVIDERS:
+        raise ProviderError(
+            f"Unknown provider '{provider}'. "
+            f"Valid: {', '.join(sorted(VALID_PROVIDERS))}"
+        )
+
+
+def init_run(force: bool = False, provider: str = "all") -> list[tuple[str, str]]:
+    """Scaffold the .vaultspec/ and .vault/ directory structure.
+
+    Returns:
+        A deduplicated list of ``(relative_path, label)`` tuples for all
+        created directories and files.
+    """
     from vaultspec_core.config import get_config, reset_config
     from vaultspec_core.config.workspace import resolve_workspace
     from vaultspec_core.core.types import init_paths
+
+    from .exceptions import ResourceExistsError
 
     cfg = get_config()
     fw_dir = _t.TARGET_DIR / cfg.framework_dir
 
     if fw_dir.exists() and not force:
-        logger.error("Error: %s already exists. Use --force to overwrite.", fw_dir)
-        raise typer.Exit(code=1)
+        raise ResourceExistsError(f"{fw_dir} already exists. Use --force to overwrite.")
 
     created = _scaffold_core(_t.TARGET_DIR)
 
@@ -196,20 +219,12 @@ def init_run(force: bool = False, provider: str = "all") -> None:
     if provider_names:
         add_providers(_t.TARGET_DIR, provider_names)
 
-    from vaultspec_core.console import get_console
-
-    console = get_console()
-    console.print("[bold]Initialized vaultspec-core structure:[/bold]")
     # Deduplicate by relative path, preserving order
     seen: dict[str, str] = {}
     for rel, label in created:
         seen.setdefault(rel, label)
-    for rel in seen:
-        console.print(f"  {rel}")
-    console.print(
-        f"Created [bold]{len(seen)}[/bold] directories/files. "
-        "Run [bold]vaultspec-core sync[/bold] to sync."
-    )
+
+    return list(seen.items())
 
 
 def _ensure_tool_configs(path: Path) -> None:
@@ -258,7 +273,7 @@ def install_run(
     upgrade: bool = False,
     dry_run: bool = False,
     force: bool = False,
-) -> None:
+) -> dict[str, Any]:
     """Deploy the vaultspec framework to a project directory.
 
     Args:
@@ -267,21 +282,25 @@ def install_run(
         upgrade: Re-sync builtin rules without re-scaffolding.
         dry_run: Preview the manifest of files that would be created.
         force: Override contents if installation already exists.
+
+    Returns:
+        A dict describing the result:
+        - ``"action"``: ``"dry_run"``, ``"upgrade"``, or ``"install"``
+        - ``"items"``: list of ``(path, label)`` tuples (for dry_run)
+        - ``"seeded_count"``: number of re-seeded files (for upgrade)
+
+    Raises:
+        ProviderError: If *provider* is invalid.
+        ResourceExistsError: If already installed and *force*/*upgrade* not set.
     """
     from vaultspec_core.config import reset_config
     from vaultspec_core.config.workspace import WorkspaceError, resolve_workspace
-    from vaultspec_core.console import get_console
     from vaultspec_core.core.types import init_paths
 
-    if provider not in VALID_PROVIDERS:
-        logger.error(
-            "Unknown provider '%s'. Valid: %s",
-            provider,
-            ", ".join(sorted(VALID_PROVIDERS)),
-        )
-        raise typer.Exit(code=1)
+    from .exceptions import ResourceExistsError
 
-    console = get_console()
+    _validate_provider(provider)
+
     _t.TARGET_DIR = path
 
     if dry_run:
@@ -305,39 +324,23 @@ def install_run(
         for rel, label in manifest:
             seen.setdefault(rel, label)
 
-        from .dry_run import DryRunItem, DryRunStatus, render_dry_run_tree
-
-        dry_items = [
-            DryRunItem(
-                path=str(path / rel).replace("\\", "/"),
-                status=(
-                    DryRunStatus.EXISTS if (path / rel).exists() else DryRunStatus.NEW
-                ),
-                label=label,
-            )
-            for rel, label in seen.items()
-        ]
-        render_dry_run_tree(dry_items, title=f"Install preview → {path}")
-        return
+        return {"action": "dry_run", "items": list(seen.items()), "path": path}
 
     if upgrade:
         try:
             layout = resolve_workspace(target_override=path)
             init_paths(layout)
         except WorkspaceError as e:
-            logger.error("Cannot upgrade: %s", e)
-            logger.error("Run 'vaultspec-core install %s' first.", path)
-            raise typer.Exit(code=1) from e
-
-        console.print(f"[bold]Upgrading vaultspec framework at {path}[/bold]")
+            raise WorkspaceNotInitializedError(
+                f"Cannot upgrade: {e}",
+                hint=f"Run 'vaultspec-core install {path}' first.",
+            ) from e
 
         # Re-seed builtins (force=True overwrites existing)
         from vaultspec_core.builtins import seed_builtins
 
         fw_dir = path / ".vaultspec"
         seeded = seed_builtins(fw_dir / "rules", force=True)
-        if seeded:
-            console.print(f"  Re-seeded [bold]{len(seeded)}[/bold] builtin files.")
 
         # Re-snapshot builtins for revert support
         from .revert import snapshot_builtins
@@ -346,29 +349,25 @@ def install_run(
 
         sync_target = provider if provider not in ("all", "core") else "all"
         sync_provider(sync_target, force=True)
-        console.print("[bold green]Upgrade complete.[/bold green]")
-    else:
-        fw_dir = path / ".vaultspec"
-        if fw_dir.exists() and not force:
-            logger.error(
-                "vaultspec is already installed at %s. "
-                "Use --upgrade to update, --force to override, or remove it "
-                "first with 'vaultspec-core uninstall %s'.",
-                path,
-                path,
-            )
-            raise typer.Exit(code=1)
+        return {"action": "upgrade", "seeded_count": len(seeded), "path": path}
 
-        console.print(f"[bold]Installing vaultspec framework to {path}[/bold]")
-        init_run(force=force, provider=provider)
+    fw_dir = path / ".vaultspec"
+    if fw_dir.exists() and not force:
+        raise ResourceExistsError(
+            f"vaultspec is already installed at {path}. "
+            "Use --upgrade to update, --force to override, or remove it "
+            f"first with 'vaultspec-core uninstall {path}'."
+        )
 
-        reset_config()
-        layout = resolve_workspace(target_override=path)
-        init_paths(layout)
+    created = init_run(force=force, provider=provider)
 
-        sync_target = provider if provider not in ("all", "core") else "all"
-        sync_provider(sync_target)
-        console.print("[bold green]Installation complete.[/bold green]")
+    reset_config()
+    layout = resolve_workspace(target_override=path)
+    init_paths(layout)
+
+    sync_target = provider if provider not in ("all", "core") else "all"
+    sync_provider(sync_target)
+    return {"action": "install", "items": created, "path": path}
 
 
 def _collect_provider_artifacts(
@@ -406,7 +405,7 @@ def uninstall_run(
     keep_vault: bool = False,
     dry_run: bool = False,
     force: bool = False,
-) -> None:
+) -> dict[str, Any]:
     """Remove the vaultspec framework from a project directory.
 
     Args:
@@ -415,37 +414,34 @@ def uninstall_run(
         keep_vault: Preserve ``.vault/`` documentation directory.
         dry_run: Preview what would be removed without deleting.
         force: Required to execute. Uninstall is destructive.
+
+    Returns:
+        A dict describing the result:
+        - ``"action"``: ``"dry_run"`` or ``"uninstall"``
+        - ``"removed"``: list of ``(path, label)`` tuples
+
+    Raises:
+        ProviderError: If *provider* is invalid or *force* not set.
     """
     import shutil
-
-    from vaultspec_core.console import get_console
 
     from .manifest import providers_sharing_dir, remove_provider
 
     # Safety gate: require --force for destructive operations
     if not force and not dry_run:
-        logger.error(
+        raise ProviderError(
             "Uninstall is destructive. Pass --force to confirm, "
             "or use --dry-run to preview."
         )
-        raise typer.Exit(code=1)
 
     _t.TARGET_DIR = path
     _ensure_tool_configs(path)
 
-    if provider not in VALID_PROVIDERS:
-        logger.error(
-            "Unknown provider '%s'. Valid: %s",
-            provider,
-            ", ".join(sorted(VALID_PROVIDERS)),
-        )
-        raise typer.Exit(code=1)
+    _validate_provider(provider)
 
     # Uninstalling "core" cascades to all providers
-    if provider == "core":
-        provider = "all"
+    effective_provider = "all" if provider == "core" else provider
 
-    console = get_console()
     removed: list[tuple[str, str]] = []  # (path, label)
 
     # Label mapping for well-known directories and files
@@ -464,7 +460,7 @@ def uninstall_run(
         ".mcp.json": "mcp",
     }
 
-    if provider == "all":
+    if effective_provider == "all":
         # Remove everything
         managed_dirs = [
             path / ".vaultspec",
@@ -499,7 +495,7 @@ def uninstall_run(
 
     else:
         # Per-provider uninstall with shared directory protection
-        tools = _PROVIDER_TO_TOOLS.get(provider, [])
+        tools = _PROVIDER_TO_TOOLS.get(effective_provider, [])
         for tool in tools:
             dirs, files = _collect_provider_artifacts(path, tool)
 
@@ -507,7 +503,7 @@ def uninstall_run(
                 if not d.exists():
                     continue
                 # Check if another installed provider still needs this dir
-                sharing = providers_sharing_dir(path, d, exclude=provider)
+                sharing = providers_sharing_dir(path, d, exclude=effective_provider)
                 if sharing:
                     logger.info(
                         "Preserving %s (still used by: %s)",
@@ -532,100 +528,87 @@ def uninstall_run(
             for tool in tools:
                 remove_provider(path, tool.value)
 
-    if dry_run:
-        from .dry_run import DryRunItem, DryRunStatus, render_dry_run_tree
-
-        dry_items = [
-            DryRunItem(path=item_path, status=DryRunStatus.DELETE, label=label)
-            for item_path, label in removed
-        ]
-        render_dry_run_tree(dry_items, title=f"Uninstall preview → {path}")
-    elif removed:
-        console.print("[bold]Removed vaultspec framework:[/bold]")
-        for item_path, _label in removed:
-            console.print(f"  {item_path}")
-        console.print(f"Removed [bold]{len(removed)}[/bold] items.")
-        if keep_vault:
-            console.print(
-                "[dim].vault/ preserved"
-                " (pass --remove-vault to also remove"
-                " documentation)[/dim]"
-            )
-    else:
-        console.print("Nothing to remove — vaultspec is not installed at this path.")
+    action = "dry_run" if dry_run else "uninstall"
+    return {
+        "action": action,
+        "removed": removed,
+        "keep_vault": keep_vault,
+        "path": path,
+    }
 
 
-def hooks_list() -> None:
-    """List all defined hooks."""
-    from rich import box
-    from rich.table import Table
+def hooks_list_data() -> dict[str, Any]:
+    """Return structured data about all defined hooks.
 
-    from vaultspec_core.console import get_console
+    Returns:
+        A dict with:
+        - ``"hooks"``: list of dicts with ``"name"``, ``"enabled"``,
+          ``"event"``, ``"actions"`` keys.
+        - ``"supported_events"``: sorted list of supported event names.
+        - ``"hooks_dir"``: relative path to hooks directory.
+    """
     from vaultspec_core.hooks import SUPPORTED_EVENTS, load_hooks
 
-    console = get_console()
     hooks = load_hooks(_t.HOOKS_DIR)
-    if not hooks:
-        rel = _t.HOOKS_DIR.relative_to(_t.TARGET_DIR)
-        console.print("No hooks defined.")
-        console.print(f"  Add [dim].yaml[/dim] files to [bold]{rel}/[/bold]")
-        console.print(
-            "\n[dim]Supported events:[/dim] " + ", ".join(sorted(SUPPORTED_EVENTS))
-        )
-        return
-
-    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
-    table.add_column("Name", no_wrap=True)
-    table.add_column("Status")
-    table.add_column("Event")
-    table.add_column("Actions")
-
+    hooks_data = []
     for hook in hooks:
-        if hook.enabled:
-            status = "[bold green]enabled[/bold green]"
-        else:
-            status = "[dim]disabled[/dim]"
         actions = ", ".join(a.command for a in hook.actions if a.action_type == "shell")
-        table.add_row(hook.name, status, hook.event, actions)
+        hooks_data.append(
+            {
+                "name": hook.name,
+                "enabled": hook.enabled,
+                "event": hook.event,
+                "actions": actions,
+            }
+        )
 
-    console.print(table)
+    rel = str(_t.HOOKS_DIR.relative_to(_t.TARGET_DIR))
+    return {
+        "hooks": hooks_data,
+        "supported_events": sorted(SUPPORTED_EVENTS),
+        "hooks_dir": rel,
+    }
 
 
-def hooks_run(event: str, path: str | None = None) -> None:
-    """Trigger hooks for an event."""
+def hooks_run(event: str, path: str | None = None) -> list[dict[str, Any]]:
+    """Trigger hooks for an event.
+
+    Returns:
+        A list of result dicts with ``"hook_name"``, ``"action_type"``,
+        ``"success"``, ``"output"``, ``"error"`` keys.
+
+    Raises:
+        ProviderError: If the event is not in SUPPORTED_EVENTS.
+    """
     from vaultspec_core.hooks import SUPPORTED_EVENTS, load_hooks, trigger
 
     if event not in SUPPORTED_EVENTS:
-        logger.error("Unknown event: %s", event)
-        logger.error("Supported: %s", ", ".join(sorted(SUPPORTED_EVENTS)))
-        raise typer.Exit(code=1)
+        raise ProviderError(
+            f"Unknown event: {event}. Supported: {', '.join(sorted(SUPPORTED_EVENTS))}"
+        )
 
     hooks = load_hooks(_t.HOOKS_DIR)
     matching = [h for h in hooks if h.event == event and h.enabled]
     if not matching:
         logger.info("No enabled hooks for event: %s", event)
-        return
+        return []
 
     ctx = {"root": str(_t.TARGET_DIR), "event": event}
     if path:
         ctx["path"] = path
 
-    from vaultspec_core.console import get_console
-
-    console = get_console()
     logger.info("Triggering %d hook(s) for '%s'...", len(matching), event)
     results = trigger(hooks, event, ctx)
-    for r in results:
-        if r.success:
-            icon = "[bold green]OK[/bold green]"
-        else:
-            icon = "[bold red]FAIL[/bold red]"
-        console.print(f"  {r.hook_name} ({r.action_type}): {icon}")
-        if r.output:
-            for line in r.output.splitlines()[:5]:
-                console.print(f"    {line}")
-        if r.error:
-            console.print(f"    [red]error:[/red] {r.error}")
+    return [
+        {
+            "hook_name": r.hook_name,
+            "action_type": r.action_type,
+            "success": r.success,
+            "output": r.output,
+            "error": r.error,
+        }
+        for r in results
+    ]
 
 
 # Valid sync provider targets exposed to the CLI.
@@ -638,23 +621,28 @@ def sync_provider(
     prune: bool = False,
     dry_run: bool = False,
     force: bool = False,
-) -> None:
+) -> list[_t.SyncResult]:
     """Sync resources for a single provider target.
 
     ``provider`` must be one of :data:`SYNC_PROVIDERS`.  The special value
     ``"all"`` syncs every provider and fires post-sync hooks.
+
+    Returns:
+        A list of :class:`SyncResult` objects from each sync pass.
+
+    Raises:
+        ProviderError: If *provider* is invalid.
+        WorkspaceNotInitializedError: If ``.vaultspec/`` does not exist.
+        ProviderNotInstalledError: If the specified provider is not installed.
     """
     if provider not in SYNC_PROVIDERS:
-        logger.error(
-            "Unknown sync target '%s'. Valid: %s",
-            provider,
-            ", ".join(sorted(SYNC_PROVIDERS)),
+        raise ProviderError(
+            f"Unknown sync target '{provider}'. "
+            f"Valid: {', '.join(sorted(SYNC_PROVIDERS))}"
         )
-        raise typer.Exit(code=1)
 
     from .agents import agents_sync
     from .config_gen import config_sync
-    from .enums import Tool
     from .rules import rules_sync
     from .skills import skills_sync
     from .system import system_sync
@@ -668,105 +656,19 @@ def sync_provider(
             config_sync(dry_run=dry_run, force=force),
         ]
 
-    def _infer_label(item_path: str) -> str:
-        """Infer a human-readable label from a sync output path."""
-        # Normalise to forward slashes for matching
-        p = item_path.replace("\\", "/")
-
-        # Provider detection from path segments
-        provider_map = {
-            "/.claude/": "claude",
-            "/.gemini/": "gemini",
-            "/.agents/": "antigravity",
-            "/.codex/": "codex",
-        }
-        provider_name = ""
-        for segment, name in provider_map.items():
-            if segment in p:
-                provider_name = name
-                break
-
-        # Config files at root level
-        config_map = {
-            "/CLAUDE.md": "claude (config)",
-            "/GEMINI.md": "gemini (config)",
-            "/AGENTS.md": "codex (config)",
-            "/config.toml": "codex (config)",
-        }
-        for suffix, lbl in config_map.items():
-            if p.endswith(suffix):
-                return lbl
-
-        # Resource type detection
-        if "/rules/" in p:
-            return f"{provider_name} (rules)" if provider_name else "rules"
-        if "/skills/" in p:
-            return f"{provider_name} (skills)" if provider_name else "skills"
-        if "/agents/" in p:
-            return f"{provider_name} (agents)" if provider_name else "agents"
-        if "SYSTEM.md" in p or "system" in p.lower():
-            return f"{provider_name} (system)" if provider_name else "system"
-
-        return provider_name or ""
-
-    def _render_dry_tree(results: list[_t.SyncResult], title: str) -> None:
-        from .dry_run import DryRunItem, DryRunStatus, render_dry_run_tree
-
-        action_map = {
-            "[ADD]": DryRunStatus.NEW,
-            "[UPDATE]": DryRunStatus.UPDATE,
-            "[DELETE]": DryRunStatus.DELETE,
-        }
-        all_items = []
-        for r in results:
-            for item_path, action in r.items:
-                status = action_map.get(action, DryRunStatus.UPDATE)
-                all_items.append(
-                    DryRunItem(
-                        path=item_path,
-                        status=status,
-                        label=_infer_label(item_path),
-                    )
-                )
-        if all_items:
-            render_dry_run_tree(all_items, title=title)
-        else:
-            from vaultspec_core.console import get_console
-
-            get_console().print(f"[dim]{title}: no changes[/dim]")
-
     # Guard: refuse to sync if vaultspec isn't installed at the target
     vaultspec_dir = _t.TARGET_DIR / ".vaultspec"
     if not vaultspec_dir.exists():
-        logger.error(
-            "No .vaultspec/ found at %s. Run 'vaultspec-core install %s' first.",
-            _t.TARGET_DIR,
-            _t.TARGET_DIR,
+        raise WorkspaceNotInitializedError(
+            f"No .vaultspec/ found at {_t.TARGET_DIR}.",
+            hint=f"Run 'vaultspec-core install {_t.TARGET_DIR}' first.",
         )
-        raise typer.Exit(code=1)
-
-    def _warn_if_empty(results: list[_t.SyncResult]) -> None:
-        total_changes = sum(r.added + r.updated for r in results)
-        total_skipped = sum(r.skipped for r in results)
-        if total_changes == 0 and total_skipped == 0:
-            from vaultspec_core.console import get_console
-
-            console = get_console()
-            console.print(
-                "[bold yellow]Warning:[/bold yellow] Sync produced 0 files. "
-                "The .vaultspec/rules/ source directories may be empty.\n"
-                "  Run [bold]vaultspec-core install . --upgrade[/bold] "
-                "to re-seed builtin content."
-            )
 
     if provider == "all":
         logger.info("Syncing all resources...")
         results = _run_all_syncs()
 
-        if dry_run:
-            _render_dry_tree(results, f"Sync preview → {_t.TARGET_DIR}")
-        else:
-            _warn_if_empty(results)
+        if not dry_run:
             from vaultspec_core.hooks import fire_hooks
 
             fire_hooks(
@@ -774,20 +676,17 @@ def sync_provider(
                 {"root": str(_t.TARGET_DIR), "event": "config.synced"},
             )
             logger.info("Done.")
-        return
+        return results
 
-    # Validate provider is installed (skip if .vaultspec/ doesn't exist yet,
-    # which happens during install_run before the first sync).
+    # Validate provider is installed
     from .manifest import read_manifest
 
     installed = read_manifest(_t.TARGET_DIR)
     if installed and provider not in installed:
-        logger.error(
-            "Provider '%s' is not installed. Run 'vaultspec-core install . %s' first.",
-            provider,
-            provider,
+        raise ProviderNotInstalledError(
+            f"Provider '{provider}' is not installed.",
+            hint=f"Run 'vaultspec-core install . {provider}' first.",
         )
-        raise typer.Exit(code=1)
 
     # Per-provider sync: filter TOOL_CONFIGS to only the requested tool.
     requested: set[Tool] = set()
@@ -805,10 +704,8 @@ def sync_provider(
         _t.TOOL_CONFIGS = {k: v for k, v in original.items() if k in requested}
         logger.info("Syncing provider: %s ...", provider)
         results = _run_all_syncs()
-
-        if dry_run:
-            _render_dry_tree(results, f"Sync preview ({provider}) → {_t.TARGET_DIR}")
-        else:
+        if not dry_run:
             logger.info("Done.")
+        return results
     finally:
         _t.TOOL_CONFIGS = original

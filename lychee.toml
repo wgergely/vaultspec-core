@@ -20,6 +20,8 @@ exclude_path = [
   "README.md",
   ".vault/audit/",
   ".vault/research/",
+  ".vault\\\\audit\\\\",
+  ".vault\\\\research\\\\",
 ]
 no_progress = true
 verbose = "info"

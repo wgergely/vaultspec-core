@@ -1,14 +1,8 @@
-"""Bootstrap the FastMCP application for the current vault/spec-core tools.
+"""Bootstrap the FastMCP application for the vaultspec MCP server.
 
-This module constructs the MCP server, attaches the active vault/spec-core tool
-surface, and provides the runtime entry boundary for `vaultspec-mcp`. It
-supports both root-CLI-injected context and standalone fallback configuration.
-
-Usage:
-    Call `create_server()` to construct the configured FastMCP instance, use
-    `main(...)` as the Typer callback entry boundary, and use `run()` as the
-    zero-argument console-script entrypoint for serving the current tool
-    surface.
+Constructs the MCP server with two tools (``find`` and ``create``),
+and provides the runtime entry boundary for ``vaultspec-mcp``.
+Supports both root-CLI-injected context and standalone configuration.
 """
 
 from __future__ import annotations
@@ -43,11 +37,13 @@ def create_server() -> FastMCP:
     """Create and configure the unified FastMCP server instance."""
     mcp = FastMCP(
         name="vaultspec-mcp",
-        instructions=("Unified MCP server for the vaultspec framework. "),
+        instructions=(
+            "Vault document discovery and authoring for vaultspec-managed projects."
+        ),
         lifespan=_lifespan,
     )
 
-    # Register tool modules
+    # Register tool surface (find + create)
     register_vault_tools(mcp)
 
     return mcp

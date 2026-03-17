@@ -12,7 +12,7 @@ from ...core import init_paths
 from ...core.config_gen import _is_cli_managed
 from ...core.enums import Tool
 from ...core.helpers import atomic_write, build_file
-from ...core.sync import print_summary
+from ...core.sync import format_summary
 from ...core.types import SyncResult
 from ...vaultcore import parse_frontmatter
 
@@ -151,16 +151,14 @@ class TestSyncResult:
         assert r.errors == []
 
 
-class TestPrintSummary:
-    def test_print_summary_no_changes(self, capsys, test_project):
-        print_summary("Test", SyncResult())
-        captured = capsys.readouterr()
-        assert "no changes" in captured.out
+class TestFormatSummary:
+    def test_format_summary_no_changes(self, test_project):
+        result = format_summary("Test", SyncResult())
+        assert "no changes" in result
 
-    def test_print_summary_with_counts(self, capsys, test_project):
+    def test_format_summary_with_counts(self, test_project):
         r = SyncResult(added=2, updated=1, pruned=3)
-        print_summary("Rules", r)
-        captured = capsys.readouterr()
-        assert "2 added" in captured.out
-        assert "1 updated" in captured.out
-        assert "3 pruned" in captured.out
+        result = format_summary("Rules", r)
+        assert "2 added" in result
+        assert "1 updated" in result
+        assert "3 pruned" in result

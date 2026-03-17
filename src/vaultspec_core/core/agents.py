@@ -12,10 +12,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import typer
-
 from . import types as _t
 from .enums import Tool
+from .exceptions import ResourceExistsError
 from .helpers import (
     _launch_editor,
     atomic_write,
@@ -23,7 +22,7 @@ from .helpers import (
     collect_md_resources,
     ensure_dir,
 )
-from .sync import print_summary, sync_files
+from .sync import sync_files
 from .types import SyncResult
 
 logger = logging.getLogger(__name__)
@@ -40,17 +39,7 @@ def collect_agents() -> dict[str, tuple[Path, dict[str, Any], str]]:
 
 
 def transform_agent(_tool: Tool, _name: str, meta: dict[str, Any], body: str) -> str:
-    """Transform an agent definition for a specific tool destination.
-
-    Args:
-        tool: Target tool enum or string.
-        name: Source filename (e.g. ``"my-agent.md"``).
-        meta: Parsed source frontmatter.
-        body: Markdown body text of the agent instructions.
-
-    Returns:
-        Assembled file content string.
-    """
+    """Transform an agent definition for a specific tool destination."""
     return build_file(meta, body)
 
 
@@ -159,7 +148,6 @@ def _sync_codex_agents(
     abs_path = str(path).replace("\\", "/")
 
     if not body:
-        # No agents to sync. If pruning, strip any existing block.
         if prune and existed and has_block(existing, "agents"):
             try:
                 new_content = strip_block(existing, "agents")
@@ -201,39 +189,38 @@ def _sync_codex_agents(
     return result
 
 
-def agents_list() -> None:
-    """Print a tabular list of all available agents with their descriptions."""
-    from rich import box
-    from rich.table import Table
+def agents_list() -> list[dict[str, str]]:
+    """Return a list of agent metadata dicts.
 
-    from vaultspec_core.console import get_console
-
+    Each dict contains ``"name"`` and ``"description"``.
+    """
     sources = collect_agents()
-    if not sources:
-        get_console().print("No managed agents found.")
-        return
-
-    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
-    table.add_column("Name", no_wrap=True)
-    table.add_column("Description", max_width=50, overflow="ellipsis")
-
+    items: list[dict[str, str]] = []
     for name, (_path, meta, _body) in sources.items():
-        table.add_row(name, meta.get("description", ""))
-
-    get_console().print(table)
+        items.append({"name": name, "description": meta.get("description", "")})
+    return items
 
 
 def agents_add(
     name: str,
     description: str = "",
     force: bool = False,
-) -> None:
+    *,
+    interactive: bool | None = None,
+) -> Path:
     """Scaffold a new agent definition.
 
     Args:
         name: Agent name.
         description: Short description.
         force: Whether to overwrite existing.
+        interactive: Override TTY detection.  ``None`` means auto-detect.
+
+    Returns:
+        Path to the created agent file.
+
+    Raises:
+        ResourceExistsError: If the agent exists and *force* is ``False``.
     """
     ensure_dir(_t.AGENTS_SRC_DIR)
 
@@ -241,13 +228,16 @@ def agents_add(
     file_path = _t.AGENTS_SRC_DIR / file_name
 
     if file_path.exists() and not force:
-        logger.error("Error: Agent '%s' exists. Use --force to overwrite.", file_name)
-        raise typer.Exit(code=1)
+        raise ResourceExistsError(
+            f"Agent '{file_name}' exists. Use --force to overwrite."
+        )
 
     fm = {"name": name, "description": description}
     body = "# Instructions\n\nAdd agent instructions here.\n"
 
-    if sys.stdin.isatty() and not description:
+    is_interactive = interactive if interactive is not None else sys.stdin.isatty()
+
+    if is_interactive and not description:
         from ..config import get_config
 
         editor = get_config().editor
@@ -263,15 +253,11 @@ def agents_add(
         file_path.write_text(content, encoding="utf-8")
 
     logger.info("Created agent: %s", file_path)
+    return file_path
 
 
 def agents_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
-    """Sync all agent definitions to every configured tool destination.
-
-    Args:
-        dry_run: If ``True``, log planned actions without writing.
-        prune: If ``True``, remove stale agent files.
-    """
+    """Sync all agent definitions to every configured tool destination."""
     sources = collect_agents()
     total = SyncResult()
 
@@ -305,5 +291,4 @@ def agents_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
     if Tool.CODEX in active_configs:
         codex_result = _sync_codex_agents(sources, prune=prune, dry_run=dry_run)
         _merge(codex_result)
-    print_summary("Agents", total)
     return total

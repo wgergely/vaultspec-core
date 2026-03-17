@@ -37,7 +37,12 @@ _FENCE_RE = re.compile(r"^(`{3,}|~{3,})")
 
 
 class TagError(Exception):
-    """Raised when managed tags are in an invalid state."""
+    """Raised when ``<vaultspec>`` managed tags are in an invalid state.
+
+    Attributes:
+        line: 1-based line number where the error was detected, or ``None``
+            if not applicable.
+    """
 
     def __init__(self, message: str, line: int | None = None) -> None:
         self.line = line
@@ -46,13 +51,23 @@ class TagError(Exception):
 
 @dataclass
 class TagBlock:
-    """Location of a parsed managed block within file content."""
+    """Location of a parsed ``<vaultspec>`` managed block within file content.
+
+    All line numbers are 1-based (matching editor conventions).
+
+    Attributes:
+        block_type: The ``type`` attribute value (e.g. ``"config"``).
+        start_line: Line number of the opening ``<vaultspec>`` tag.
+        end_line: Line number of the closing ``</vaultspec>`` tag.
+        content_start: First line of the block body (line after opening tag).
+        content_end: Last line of the block body (line before closing tag).
+    """
 
     block_type: str
-    start_line: int  # 1-based line number of the opening tag
-    end_line: int  # 1-based line number of the closing tag
-    content_start: int  # 1-based line after opening tag
-    content_end: int  # 1-based line before closing tag
+    start_line: int
+    end_line: int
+    content_start: int
+    content_end: int
 
 
 def _is_inside_fence(fence_state: str | None) -> bool:
@@ -62,13 +77,18 @@ def _is_inside_fence(fence_state: str | None) -> bool:
 def find_blocks(content: str) -> list[TagBlock]:
     """Find all ``<vaultspec>`` blocks in *content*.
 
-    Raises :class:`TagError` on malformed states:
-    - Unclosed opening tag
-    - Duplicate blocks with the same type
-    - Nested ``<vaultspec>`` tags
+    Skips tags inside fenced code blocks (``` or ~~~).
+    Orphaned closing tags are silently ignored.
 
-    Orphaned closing tags (``</vaultspec>`` without a matching open) are
-    silently ignored per the error handling contract.
+    Args:
+        content: Full file content to parse.
+
+    Returns:
+        List of :class:`TagBlock` instances in document order.
+
+    Raises:
+        TagError: On unclosed opening tags, duplicate block types, or nested
+            ``<vaultspec>`` tags.
     """
     lines = content.splitlines()
     blocks: list[TagBlock] = []
@@ -145,7 +165,17 @@ def find_blocks(content: str) -> list[TagBlock]:
 
 
 def has_block(content: str, block_type: str) -> bool:
-    """Return True if *content* contains a managed block of *block_type*."""
+    """Return ``True`` if *content* contains a managed block of *block_type*.
+
+    Returns ``False`` (rather than raising) when tags are malformed.
+
+    Args:
+        content: Full file content to search.
+        block_type: The ``type`` attribute to look for (e.g. ``"config"``).
+
+    Returns:
+        ``True`` if a block with the given type exists.
+    """
     try:
         return any(b.block_type == block_type for b in find_blocks(content))
     except TagError:
@@ -153,7 +183,19 @@ def has_block(content: str, block_type: str) -> bool:
 
 
 def get_block_content(content: str, block_type: str) -> str | None:
-    """Extract the content of a managed block, or None if not found."""
+    """Extract the inner content of a managed block.
+
+    Args:
+        content: Full file content to search.
+        block_type: The ``type`` attribute to look for.
+
+    Returns:
+        Block body as a string (may be empty string for an empty block),
+        or ``None`` if no block of the given type exists.
+
+    Raises:
+        TagError: If the file has malformed tags.
+    """
     blocks = find_blocks(content)
     lines = content.splitlines()
     for b in blocks:

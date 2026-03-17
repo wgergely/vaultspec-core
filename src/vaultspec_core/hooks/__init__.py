@@ -1,7 +1,17 @@
-"""Expose the hooks package facade for event-triggered runtime behavior.
+"""Declarative lifecycle hooks for vault/spec-core events.
 
-This package re-exports the `engine` surface that loads hook definitions and
-executes them for supported vault/spec-core events.
+Loads YAML hook definitions from ``.vaultspec/hooks/``, validates them against
+:data:`SUPPORTED_EVENTS`, and executes their shell actions with re-entrancy
+protection and a 60-second timeout per action.
+
+Exports:
+    :func:`load_hooks`: Parse hook YAML files into :class:`Hook` instances.
+    :func:`trigger`: Execute all enabled hooks matching a given event.
+    :func:`fire_hooks`: Convenience wrapper; silently swallows errors.
+    :class:`Hook`: Hook definition loaded from YAML.
+    :class:`HookAction`: A single action within a hook.
+    :class:`HookResult`: Result of executing a single hook action.
+    :data:`SUPPORTED_EVENTS`: Frozenset of valid event names.
 """
 
 from .engine import SUPPORTED_EVENTS as SUPPORTED_EVENTS

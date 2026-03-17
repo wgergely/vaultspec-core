@@ -12,10 +12,9 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import typer
-
 from . import types as _t
 from .enums import Tool
+from .exceptions import ResourceExistsError
 from .helpers import _launch_editor, build_file, collect_md_resources, ensure_dir
 from .sync import sync_to_all_tools
 
@@ -43,15 +42,6 @@ def transform_rule(tool: Tool, name: str, _meta: dict[str, Any], body: str) -> s
 
     Adds a YAML frontmatter block with ``trigger: always_on`` and a ``name``
     key derived from the filename stem.
-
-    Args:
-        tool: Target tool enum or string.
-        name: Source filename (e.g. ``"my-rule.md"``).
-        _meta: Parsed source frontmatter (currently unused).
-        body: Markdown body text of the rule.
-
-    Returns:
-        Assembled file content string with the appropriate frontmatter.
     """
     if isinstance(tool, str):
         tool = Tool(tool)
@@ -62,39 +52,43 @@ def transform_rule(tool: Tool, name: str, _meta: dict[str, Any], body: str) -> s
     return build_file(fm, body)
 
 
-def rules_list() -> None:
-    """Print a tabular list of all available rules, indicating built-in vs. custom."""
-    from rich import box
-    from rich.table import Table
+def rules_list() -> list[dict[str, str]]:
+    """Return a list of rule metadata dicts.
 
-    from vaultspec_core.console import get_console
-
-    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
-    table.add_column("Name", no_wrap=True)
-    table.add_column("Source")
-
+    Each dict contains ``"name"`` and ``"source"`` (``"Built-in"`` or
+    ``"Custom"``).
+    """
+    items: list[dict[str, str]] = []
     if _t.RULES_SRC_DIR.exists():
         for f in sorted(_t.RULES_SRC_DIR.glob("*.md")):
             source = "Built-in" if f.name.endswith(".builtin.md") else "Custom"
-            table.add_row(f.name, source)
-
-    get_console().print(table)
+            items.append({"name": f.name, "source": source})
+    return items
 
 
 def rules_add(
     name: str,
     content: str | None = None,
     force: bool = False,
-) -> None:
-    """Scaffold a new custom rule file, opening the editor when running interactively.
-
-    When stdin is a TTY, writes a scaffold and opens the configured editor.
-    Otherwise, reads content from stdin.
+    *,
+    interactive: bool | None = None,
+) -> Path:
+    """Scaffold a new custom rule file.
 
     Args:
         name: Rule name.
-        content: Optional rule content.
+        content: Optional rule content.  When ``None`` and *interactive* is
+            ``True``, opens the configured editor.  When ``None`` and
+            *interactive* is ``False``, reads from stdin.
         force: Whether to overwrite an existing rule.
+        interactive: Override TTY detection.  ``None`` means auto-detect via
+            ``sys.stdin.isatty()``.
+
+    Returns:
+        Path to the created rule file.
+
+    Raises:
+        ResourceExistsError: If the rule exists and *force* is ``False``.
     """
     ensure_dir(_t.RULES_SRC_DIR)
 
@@ -102,13 +96,16 @@ def rules_add(
     file_path = _t.RULES_SRC_DIR / file_name
 
     if file_path.exists() and not force:
-        logger.error("Error: Rule '%s' exists. Use --force to overwrite.", file_name)
-        raise typer.Exit(code=1)
+        raise ResourceExistsError(
+            f"Rule '{file_name}' exists. Use --force to overwrite."
+        )
 
     rule_content = content
 
+    is_interactive = interactive if interactive is not None else sys.stdin.isatty()
+
     if not rule_content:
-        if sys.stdin.isatty():
+        if is_interactive:
             from ..config import get_config
 
             editor = get_config().editor
@@ -120,7 +117,7 @@ def rules_add(
                 logger.info("Rule saved to %s", file_path)
             except Exception as e:
                 logger.error("Error opening editor: %s", e, exc_info=True)
-            return
+            return file_path
         else:
             rule_content = sys.stdin.read()
 
@@ -128,15 +125,11 @@ def rules_add(
     full = build_file(fm, (rule_content or "").lstrip())
     file_path.write_text(full, encoding="utf-8")
     logger.info("Created custom rule: %s", file_path)
+    return file_path
 
 
 def rules_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
-    """Sync all rule definitions to every configured tool destination.
-
-    Args:
-        dry_run: If ``True``, log planned actions without writing.
-        prune: If ``True``, remove stale rule files.
-    """
+    """Sync all rule definitions to every configured tool destination."""
     return sync_to_all_tools(
         sources=collect_rules(),
         dir_attr="rules_dir",

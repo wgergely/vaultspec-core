@@ -16,13 +16,13 @@ date: 2026-03-11
 - MCP server key scaffolded into `mcp.json`: `vaultspec-core`
 
 Programmatic evidence:
-- [pyproject.toml](/Y:/code/vaultspec-core-worktrees/main/pyproject.toml#L38)
-- [pyproject.toml](/Y:/code/vaultspec-core-worktrees/main/pyproject.toml#L50)
-- [mcp.json](/Y:/code/vaultspec-core-worktrees/main/mcp.json#L3)
-- [src/vaultspec_core/cli.py](/Y:/code/vaultspec-core-worktrees/main/src/vaultspec_core/cli.py#L43)
-- [src/vaultspec_core/mcp_server/app.py](/Y:/code/vaultspec-core-worktrees/main/src/vaultspec_core/mcp_server/app.py#L44)
-- [tests/test_package_metadata.py](/Y:/code/vaultspec-core-worktrees/main/tests/test_package_metadata.py#L17)
-- [tests/test_mcp_config.py](/Y:/code/vaultspec-core-worktrees/main/tests/test_mcp_config.py#L25)
+- [pyproject.toml](../../pyproject.toml#L38)
+- [pyproject.toml](../../pyproject.toml#L50)
+- [mcp.json](../../mcp.json#L3)
+- [src/vaultspec_core/cli/root.py](../../src/vaultspec_core/cli/root.py#L43)
+- [src/vaultspec_core/mcp_server/app.py](../../src/vaultspec_core/mcp_server/app.py#L44)
+- [tests/test_package_metadata.py](../../tests/test_package_metadata.py#L17)
+- [tests/test_mcp_config.py](../../tests/test_mcp_config.py#L25)
 
 ## Acceptable Versus Stale Uses Of `vaultspec`
 
@@ -50,7 +50,7 @@ Stale or contract-significant drift:
    Type: documentation/config defect
 
    Evidence:
-   - [.vaultspec/rules/hooks/example-audit-on-create.yaml](/Y:/code/vaultspec-core-worktrees/main/.vaultspec/rules/hooks/example-audit-on-create.yaml#L3)
+   - [.vaultspec/rules/hooks/example-audit-on-create.yaml](../../.vaultspec/rules/hooks/example-audit-on-create.yaml#L3)
 
    Problems:
    - uses `vaultspec vault audit --verify`
@@ -62,15 +62,15 @@ Stale or contract-significant drift:
    Type: documentation/rule defect with contract implications
 
    Evidence:
-   - [.vaultspec/rules/system/framework.md](/Y:/code/vaultspec-core-worktrees/main/.vaultspec/rules/system/framework.md#L63)
-   - [.vaultspec/rules/skills/vaultspec-execute/SKILL.md](/Y:/code/vaultspec-core-worktrees/main/.vaultspec/rules/skills/vaultspec-execute/SKILL.md#L5)
-   - [.vaultspec/rules/skills/vaultspec-execute/SKILL.md](/Y:/code/vaultspec-core-worktrees/main/.vaultspec/rules/skills/vaultspec-execute/SKILL.md#L27)
-   - [.vaultspec/rules/skills/vaultspec-research/SKILL.md](/Y:/code/vaultspec-core-worktrees/main/.vaultspec/rules/skills/vaultspec-research/SKILL.md#L25)
-   - [.vaultspec/rules/skills/vaultspec-team/SKILL.md](/Y:/code/vaultspec-core-worktrees/main/.vaultspec/rules/skills/vaultspec-team/SKILL.md#L26)
-   - [.vaultspec/rules/agents/vaultspec-adr-researcher.md](/Y:/code/vaultspec-core-worktrees/main/.vaultspec/rules/agents/vaultspec-adr-researcher.md#L18)
-   - [.vaultspec/rules/agents/vaultspec-high-executor.md](/Y:/code/vaultspec-core-worktrees/main/.vaultspec/rules/agents/vaultspec-high-executor.md#L18)
-   - [.vaultspec/rules/agents/vaultspec-low-executor.md](/Y:/code/vaultspec-core-worktrees/main/.vaultspec/rules/agents/vaultspec-low-executor.md#L18)
-   - [.vaultspec/rules/agents/vaultspec-standard-executor.md](/Y:/code/vaultspec-core-worktrees/main/.vaultspec/rules/agents/vaultspec-standard-executor.md#L18)
+   - [.vaultspec/rules/system/03-vaultspec.md](../../.vaultspec/rules/system/03-vaultspec.md#L63)
+   - [.vaultspec/rules/skills/vaultspec-execute/SKILL.md](../../.vaultspec/rules/skills/vaultspec-execute/SKILL.md#L5)
+   - [.vaultspec/rules/skills/vaultspec-execute/SKILL.md](../../.vaultspec/rules/skills/vaultspec-execute/SKILL.md#L27)
+   - [.vaultspec/rules/skills/vaultspec-research/SKILL.md](../../.vaultspec/rules/skills/vaultspec-research/SKILL.md#L25)
+   - [.vaultspec/rules/skills/vaultspec-team/SKILL.md](../../.vaultspec/rules/skills/vaultspec-team/SKILL.md#L26)
+   - [.vaultspec/rules/agents/vaultspec-adr-researcher.md](../../.vaultspec/rules/agents/vaultspec-adr-researcher.md#L18)
+   - [.vaultspec/rules/agents/vaultspec-high-executor.md](../../.vaultspec/rules/agents/vaultspec-high-executor.md#L18)
+   - [.vaultspec/rules/agents/vaultspec-low-executor.md](../../.vaultspec/rules/agents/vaultspec-low-executor.md#L18)
+   - [.vaultspec/rules/agents/vaultspec-standard-executor.md](../../.vaultspec/rules/agents/vaultspec-standard-executor.md#L18)
 
    Problem:
    - these files describe a shipped MCP capability that is not present in the
@@ -80,7 +80,7 @@ Stale or contract-significant drift:
    Type: config/documentation defect
 
    Evidence:
-   - [.env.example](/Y:/code/vaultspec-core-worktrees/main/.env.example#L1)
+   - [.env.example](../../.env.example#L1)
 
    Problems:
    - header still brands the file as `vaultspec`
@@ -95,10 +95,10 @@ Stale or contract-significant drift:
    Type: documentation defect
 
    Evidence:
-   - [.agents/GEMINI.md](/Y:/code/vaultspec-core-worktrees/main/.agents/GEMINI.md#L6)
-   - [src/vaultspec_core/config/config.py](/Y:/code/vaultspec-core-worktrees/main/src/vaultspec_core/config/config.py#L1)
-   - [src/vaultspec_core/config/workspace.py](/Y:/code/vaultspec-core-worktrees/main/src/vaultspec_core/config/workspace.py#L1)
-   - [src/vaultspec_core/core/helpers.py](/Y:/code/vaultspec-core-worktrees/main/src/vaultspec_core/core/helpers.py#L1)
+   - `.agents/GEMINI.md` (removed)
+   - [src/vaultspec_core/config/config.py](../../src/vaultspec_core/config/config.py#L1)
+   - [src/vaultspec_core/config/workspace.py](../../src/vaultspec_core/config/workspace.py#L1)
+   - [src/vaultspec_core/core/helpers.py](../../src/vaultspec_core/core/helpers.py#L1)
 
    Note:
    - most of these are concept/framework references, not executable-name bugs
@@ -109,7 +109,7 @@ Stale or contract-significant drift:
    Type: documentation defect
 
    Evidence:
-   - [.vaultspec/docs/cli-reference.md](/Y:/code/vaultspec-core-worktrees/main/.vaultspec/docs/cli-reference.md#L371)
+   - `.vaultspec/docs/cli-reference.md` (removed)
 
    Note:
    - these notes are currently truthful, but they identify unresolved product
@@ -121,8 +121,8 @@ Stale or contract-significant drift:
    Type: editorial only
 
    Examples:
-   - [.vaultspec/docs/cli-reference.md](/Y:/code/vaultspec-core-worktrees/main/.vaultspec/docs/cli-reference.md#L5)
-   - [.vaultspec/docs/concepts.md](/Y:/code/vaultspec-core-worktrees/main/.vaultspec/docs/concepts.md#L94)
+   - `.vaultspec/docs/cli-reference.md` (removed)
+   - `.vaultspec/docs/concepts.md` (removed)
 
    This is acceptable when it clearly refers to the conceptual framework rather
    than the executable name.
@@ -163,7 +163,7 @@ Stale or contract-significant drift:
 ## Addendum: Root CLI `mcp` Dead Branch
 
 - The special-case `ctx.invoked_subcommand == "mcp"` branch in
-  [src/vaultspec_core/cli.py](/Y:/code/vaultspec-core-worktrees/main/src/vaultspec_core/cli.py#L1)
+  [src/vaultspec_core/cli/root.py](../../src/vaultspec_core/cli/root.py#L1)
   was dead compatibility code for an older root-CLI MCP path.
 - The live packaged surface ships MCP through the separate
   `vaultspec-mcp` executable, not through `vaultspec-core mcp`.

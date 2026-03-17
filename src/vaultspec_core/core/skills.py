@@ -13,10 +13,9 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import typer
-
 from . import types as _t
 from .enums import FileName, Tool
+from .exceptions import ResourceExistsError
 from .helpers import _launch_editor, build_file, ensure_dir
 from .sync import sync_to_all_tools
 
@@ -53,59 +52,28 @@ def collect_skills() -> dict[str, tuple[Path, dict[str, Any], str]]:
 
 
 def transform_skill(_tool: Tool, name: str, _meta: dict[str, Any], body: str) -> str:
-    """Transform a skill definition for a specific tool destination.
-
-    Assembles a YAML-frontmattered file containing the skill's name and
-    description alongside its Markdown body.
-
-    Args:
-        _tool: Target tool name (unused; accepted for interface consistency).
-        name: Skill directory name (e.g. ``"vaultspec-execute"``).
-        _meta: Parsed frontmatter dict; may contain ``"description"``.
-        body: Markdown body text of the skill definition.
-
-    Returns:
-        Assembled file content string with YAML frontmatter.
-    """
+    """Transform a skill definition for a specific tool destination."""
     description = _meta.get("description", "")
     fm = {"name": name, "description": description}
     return build_file(fm, body)
 
 
 def skill_dest_path(dest_dir: Path, name: str) -> Path:
-    """Return the destination path for a skill's SKILL.md file.
-
-    Args:
-        dest_dir: Base skills directory for the target tool.
-        name: Skill directory name (e.g. ``"vaultspec-execute"``).
-
-    Returns:
-        The full path ``dest_dir / name / SKILL.md``.
-    """
+    """Return the destination path for a skill's SKILL.md file."""
     return dest_dir / name / FileName.SKILL.value
 
 
-def skills_list() -> None:
-    """Print a tabular list of all available skills with their descriptions."""
-    from rich import box
-    from rich.table import Table
+def skills_list() -> list[dict[str, str]]:
+    """Return a list of skill metadata dicts.
 
-    from vaultspec_core.console import get_console
-
+    Each dict contains ``"name"`` and ``"description"``.
+    """
     sources = collect_skills()
-    if not sources:
-        get_console().print("No managed skills found.")
-        return
-
-    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
-    table.add_column("Name", no_wrap=True)
-    table.add_column("Description", max_width=60, overflow="ellipsis")
-
+    items: list[dict[str, str]] = []
     for name, meta_tuple in sources.items():
         _path, meta, _body = meta_tuple
-        table.add_row(name, meta.get("description", ""))
-
-    get_console().print(table)
+        items.append({"name": name, "description": meta.get("description", "")})
+    return items
 
 
 def skills_add(
@@ -113,17 +81,23 @@ def skills_add(
     description: str = "",
     force: bool = False,
     template: str | None = None,
-) -> None:
-    """Scaffold a new skill directory with a SKILL.md and open it in the user's editor.
-
-    The skill name is automatically prefixed with ``vaultspec-`` if not already.
-    When running interactively (TTY), opens the editor after writing the scaffold.
+    *,
+    interactive: bool | None = None,
+) -> Path:
+    """Scaffold a new skill directory with a SKILL.md.
 
     Args:
         name: Skill name.
         description: Optional skill description.
         force: Whether to overwrite an existing skill.
         template: Optional template name to pre-populate.
+        interactive: Override TTY detection.  ``None`` means auto-detect.
+
+    Returns:
+        Path to the created SKILL.md file.
+
+    Raises:
+        ResourceExistsError: If the skill exists and *force* is ``False``.
     """
     ensure_dir(_t.SKILLS_SRC_DIR)
 
@@ -135,8 +109,9 @@ def skills_add(
     file_path = skill_dir / "SKILL.md"
 
     if skill_dir.exists() and not force:
-        logger.error("Error: Skill '%s' exists. Use --force to overwrite.", skill_name)
-        raise typer.Exit(code=1)
+        raise ResourceExistsError(
+            f"Skill '{skill_name}' exists. Use --force to overwrite."
+        )
 
     ensure_dir(skill_dir)
 
@@ -155,7 +130,9 @@ def skills_add(
     fm = {"name": skill_name, "description": description}
     scaffold = build_file(fm, body)
 
-    if sys.stdin.isatty():
+    is_interactive = interactive if interactive is not None else sys.stdin.isatty()
+
+    if is_interactive:
         file_path.write_text(scaffold, encoding="utf-8")
         from ..config import get_config
 
@@ -170,14 +147,11 @@ def skills_add(
         file_path.write_text(scaffold, encoding="utf-8")
         logger.info("Created skill: %s", file_path)
 
+    return file_path
+
 
 def skills_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
-    """Sync all skill definitions to every configured tool destination.
-
-    Args:
-        dry_run: If ``True``, log planned actions without writing.
-        prune: If ``True``, remove stale skill files.
-    """
+    """Sync all skill definitions to every configured tool destination."""
     return sync_to_all_tools(
         sources=collect_skills(),
         dir_attr="skills_dir",

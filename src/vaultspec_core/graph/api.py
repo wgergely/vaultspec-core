@@ -1,32 +1,23 @@
 """Build, query, and render the vault document relationship graph.
 
-This module turns ``vaultcore`` scanning, metadata parsing, and wiki-link
-extraction into a queryable directed graph of ``.vault/`` documents backed
-by ``networkx.DiGraph``.  It delegates to mature libraries wherever
-possible:
+Turns ``vaultcore`` scanning, metadata parsing, and wiki-link extraction into
+a queryable directed graph of ``.vault/`` documents backed by
+``networkx.DiGraph``. Delegates rendering to ``phart`` (ASCII topology) and
+``rich`` (hierarchical tree), and serialisation to
+``networkx.readwrite.json_graph``.
 
-- **networkx** — graph data structure, algorithms (centrality, density,
-  connected components, degree analysis), and JSON serialisation via
-  ``networkx.readwrite.json_graph.node_link_data``.
-- **phart** — native ASCII rendering of the networkx DiGraph for terminal
-  output (``ASCIIRenderer``).
-- **rich** — hierarchical tree view grouped by feature / doc-type.
-
-Public API
-----------
-- :class:`DocNode` — rich node carrying full frontmatter, body, and
-  connection metadata for a single vault document.
-- :class:`GraphMetrics` — computed shape / size statistics for the graph.
-- :class:`VaultGraph` — the main entry point.  Instantiate with a vault
-  root directory, then call query, render, or serialisation methods.
-
-Usage::
+Example::
 
     graph = VaultGraph(root_dir)
     tree  = graph.render_tree(feature="my-feature")   # Rich Tree
-    ascii = graph.render_ascii(feature="my-feature")   # phart ASCII
-    data  = graph.to_dict(feature="my-feature")        # JSON-ready dict
-    stats = graph.metrics()                            # GraphMetrics
+    ascii = graph.render_ascii(feature="my-feature")  # phart ASCII
+    data  = graph.to_dict(feature="my-feature")       # JSON-ready dict
+    stats = graph.metrics()                           # GraphMetrics
+
+Exports:
+    :class:`DocNode`: Node carrying full frontmatter, body, and link metadata.
+    :class:`GraphMetrics`: Computed shape and size statistics for the graph.
+    :class:`VaultGraph`: Main entry point; instantiate with a vault root dir.
 """
 
 from __future__ import annotations
@@ -99,11 +90,15 @@ class DocNode:
     in_links: set[str] = field(default_factory=set)
 
     def to_nx_attrs(self) -> dict[str, Any]:
-        """Return networkx-compatible node attribute dict.
+        """Return a networkx-compatible node attribute dict.
 
         Converts non-serialisable types (sets, Path, enums) to plain
         JSON-friendly values suitable for storage on a ``nx.DiGraph``
         node and for ``nx.node_link_data`` serialisation.
+
+        Returns:
+            Dict with string-valued ``path``, sorted lists for ``tags``,
+            ``out_links``, and ``in_links``, and ``None``-safe scalar fields.
         """
         return {
             "name": self.name,
@@ -169,7 +164,14 @@ class GraphMetrics:
     nodes_by_feature: dict[str, int] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-serialisable dictionary of metrics."""
+        """Return a JSON-serialisable dictionary of all metrics.
+
+        Converts ``max_in_degree`` and ``max_out_degree`` tuples to
+        ``{"node": str, "count": int}`` dicts for clean JSON output.
+
+        Returns:
+            Flat dict of all metric fields; safe to pass to ``json.dumps``.
+        """
         d = asdict(self)
         d["max_in_degree"] = {
             "node": self.max_in_degree[0],
@@ -423,10 +425,13 @@ class VaultGraph:
 
     @property
     def digraph(self) -> nx.DiGraph:
-        """The underlying ``networkx.DiGraph`` for direct algorithm use.
+        """The underlying ``networkx.DiGraph`` for direct algorithm access.
 
         Consumers may call any ``networkx`` function on this object
         (e.g. ``nx.pagerank(graph.digraph)``).
+
+        Returns:
+            The internal ``nx.DiGraph`` instance; not a copy.
         """
         return self._digraph
 
@@ -455,6 +460,9 @@ class VaultGraph:
 
         Args:
             name: Document stem (graph key).
+
+        Returns:
+            The matching :class:`DocNode`, or ``None`` if not found.
         """
         return self.nodes.get(name)
 
@@ -532,14 +540,22 @@ class VaultGraph:
         )
 
     def get_invalid_links(self) -> list[tuple[str, str]]:
-        """Return ``(source, target)`` pairs for broken links."""
+        """Return all broken link pairs recorded during graph construction.
+
+        Returns:
+            List of ``(source, target)`` tuples where *target* does not
+            exist as a node in the graph.
+        """
         return list(self._invalid_links)
 
     def get_feature_nodes(self, feature: str) -> list[DocNode]:
-        """Return all nodes for *feature*, sorted by date then name.
+        """Return all nodes tagged with *feature*, sorted by date then name.
 
         Args:
             feature: Feature name (without ``#`` prefix).
+
+        Returns:
+            List of :class:`DocNode` instances sorted by ``(date, name)``.
         """
         tag = f"#{feature}" if not feature.startswith("#") else feature
         nodes = [n for n in self.nodes.values() if tag in n.tags]

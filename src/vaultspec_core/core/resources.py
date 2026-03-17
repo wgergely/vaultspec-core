@@ -11,8 +11,7 @@ import logging
 import shutil
 from pathlib import Path
 
-import typer
-
+from .exceptions import ResourceExistsError, ResourceNotFoundError
 from .helpers import _launch_editor, ensure_dir
 
 logger = logging.getLogger(__name__)
@@ -33,26 +32,38 @@ def _resolve_path(name: str, base_dir: Path, is_dir: bool) -> tuple[str, Path]:
 
 def resource_show(
     name: str, *, base_dir: Path, label: str, is_dir: bool = False
-) -> None:
-    """Read and print the contents of a resource file."""
+) -> str:
+    """Read and return the contents of a resource file.
+
+    Returns:
+        The file content as a string.
+
+    Raises:
+        ResourceNotFoundError: If the resource does not exist.
+    """
     _canonical, file_path = _resolve_path(name, base_dir, is_dir)
 
     if not file_path.exists():
-        logger.error("Error: %s '%s' not found.", label, name)
-        raise typer.Exit(code=1)
+        raise ResourceNotFoundError(f"{label} '{name}' not found.")
 
-    typer.echo(file_path.read_text(encoding="utf-8"))
+    return file_path.read_text(encoding="utf-8")
 
 
 def resource_edit(
     name: str, *, base_dir: Path, label: str, is_dir: bool = False
-) -> None:
-    """Open a resource file in the configured text editor."""
+) -> Path:
+    """Open a resource file in the configured text editor.
+
+    Returns:
+        The path to the resource file that was opened.
+
+    Raises:
+        ResourceNotFoundError: If the resource does not exist.
+    """
     _canonical, file_path = _resolve_path(name, base_dir, is_dir)
 
     if not file_path.exists():
-        logger.error("Error: %s '%s' not found.", label, name)
-        raise typer.Exit(code=1)
+        raise ResourceNotFoundError(f"{label} '{name}' not found.")
 
     from ..config import get_config
 
@@ -63,6 +74,8 @@ def resource_edit(
     except Exception as e:
         logger.error("Error opening editor: %s", e, exc_info=True)
 
+    return file_path
+
 
 def resource_remove(
     name: str,
@@ -71,26 +84,41 @@ def resource_remove(
     label: str,
     force: bool = False,
     is_dir: bool = False,
-) -> None:
-    """Delete a resource file (or directory) from disk, with optional confirmation."""
+    confirm_fn: object | None = None,
+) -> bool:
+    """Delete a resource file (or directory) from disk, with optional confirmation.
+
+    Args:
+        confirm_fn: Optional callable ``(prompt: str) -> bool`` for interactive
+            confirmation.  When ``None`` and ``force`` is ``False``, the
+            removal is skipped (non-interactive callers should pass ``force=True``).
+
+    Returns:
+        ``True`` if the resource was removed, ``False`` if skipped.
+
+    Raises:
+        ResourceNotFoundError: If the resource does not exist.
+    """
     _canonical, file_path = _resolve_path(name, base_dir, is_dir)
 
     # For directory resources, check the parent dir exists
     check_path = file_path.parent if is_dir else file_path
     if not check_path.exists():
-        logger.error("Error: %s '%s' not found.", label, name)
-        raise typer.Exit(code=1)
+        raise ResourceNotFoundError(f"{label} '{name}' not found.")
 
-    if not force and not typer.confirm(
-        f"Are you sure you want to remove {label} '{name}'?"
-    ):
-        return
+    if not force:
+        if confirm_fn is None:
+            return False
+        # confirm_fn is a callable
+        if not confirm_fn(f"Are you sure you want to remove {label} '{name}'?"):  # type: ignore[operator]
+            return False
 
     if is_dir:
         shutil.rmtree(check_path)
     else:
         file_path.unlink()
     logger.info("Removed %s: %s", label, name)
+    return True
 
 
 def resource_rename(
@@ -100,8 +128,16 @@ def resource_rename(
     base_dir: Path,
     label: str,
     is_dir: bool = False,
-) -> None:
-    """Rename a resource file or directory on disk."""
+) -> Path:
+    """Rename a resource file or directory on disk.
+
+    Returns:
+        The new path after renaming.
+
+    Raises:
+        ResourceNotFoundError: If the source resource does not exist.
+        ResourceExistsError: If the destination already exists.
+    """
     if is_dir:
         old_path = base_dir / old_name
         new_path = base_dir / new_name
@@ -112,13 +148,12 @@ def resource_rename(
         new_path = base_dir / new_file
 
     if not old_path.exists():
-        logger.error("Error: %s '%s' not found.", label, old_name)
-        raise typer.Exit(code=1)
+        raise ResourceNotFoundError(f"{label} '{old_name}' not found.")
 
     if new_path.exists():
-        logger.error("Error: Destination '%s' already exists.", new_name)
-        raise typer.Exit(code=1)
+        raise ResourceExistsError(f"Destination '{new_name}' already exists.")
 
     ensure_dir(base_dir)
     shutil.move(str(old_path), str(new_path))
     logger.info("Renamed %s '%s' to '%s'.", label, old_name, new_name)
+    return new_path
