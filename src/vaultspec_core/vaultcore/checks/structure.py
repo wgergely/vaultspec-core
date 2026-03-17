@@ -34,7 +34,6 @@ def _fix_filename(doc_path: Path, root_dir: Path, result: CheckResult) -> None:
     filename = doc_path.name
     rel = doc_path.relative_to(root_dir)
 
-    # Fix 1: Wrong filename suffix
     expected_suffix = f"-{doc_type.value}.md"
     needs_rename = False
 
@@ -72,7 +71,6 @@ def _fix_filename(doc_path: Path, root_dir: Path, result: CheckResult) -> None:
             else:
                 logger.warning("Cannot rename %s: target exists", filename)
 
-    # Fix 2: Missing date prefix
     if not re.match(r"^\d{4}-\d{2}-\d{2}-", filename):
         today = datetime.now().strftime("%Y-%m-%d")
         new_filename = f"{today}-{filename}"
@@ -100,19 +98,24 @@ def check_structure(
 ) -> CheckResult:
     """Check vault directory structure and filename conventions.
 
-    Detects:
-    - Unsupported subdirectories in .vault/
-    - Files in .vault/ root (should be in subdirectories)
-    - Filenames that deviate from YYYY-MM-DD-<feature>-<type>.md convention
+    Detects unsupported subdirectories in ``.vault/``, files placed directly
+    in the ``.vault/`` root, and filenames deviating from the
+    ``YYYY-MM-DD-<feature>-<type>.md`` convention.
 
-    With --fix: renames files with wrong suffixes or missing date prefixes.
+    Args:
+        root_dir: Project root directory.
+        fix: When ``True``, renames files with wrong type suffixes or
+            missing date prefixes.
+
+    Returns:
+        :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
+        check name ``"structure"``.
     """
     from ..models import VaultConstants
     from ..scanner import get_doc_type, scan_vault
 
     result = CheckResult(check_name="structure", supports_fix=True)
 
-    # Check directory structure (not fixable)
     for msg in VaultConstants.validate_vault_structure(root_dir):
         result.diagnostics.append(
             CheckDiagnostic(
@@ -122,14 +125,12 @@ def check_structure(
             )
         )
 
-    # Check filenames
     for doc_path in scan_vault(root_dir):
         doc_type = get_doc_type(doc_path, root_dir)
         errors = VaultConstants.validate_filename(doc_path.name, doc_type)
 
         if errors and fix:
             _fix_filename(doc_path, root_dir, result)
-            # Re-check after fix attempt
             if doc_path.exists():
                 remaining = VaultConstants.validate_filename(doc_path.name, doc_type)
                 for msg in remaining:

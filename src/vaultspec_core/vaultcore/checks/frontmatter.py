@@ -43,7 +43,7 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
     metadata, _ = parse_vault_metadata(content)
     doc_type = get_doc_type(doc_path, root_dir)
 
-    # Fix 1: Normalize tags — ensure they have # prefix
+    # Fix 1: Normalize tags
     new_tags = []
     tags_changed = False
     for tag in metadata.tags:
@@ -55,10 +55,9 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
 
     # Fix 2: If no tags but has feature: field, construct tags
     if not metadata.tags:
-        # Try to extract feature from a bare 'feature:' field
         feature_match = re.search(r"^feature:\s*(.+)$", yaml_block, re.MULTILINE)
         if feature_match and doc_type:
-            feature_val = feature_match.group(1).strip().strip("\"'")
+            feature_val = feature_match.group(1).strip().strip("\"\'")
             if not feature_val.startswith("#"):
                 feature_val = f"#{feature_val}"
             new_tags = [doc_type.tag, feature_val]
@@ -71,7 +70,6 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
     # Fix 3: Date format normalization
     date_val = metadata.date
     if date_val:
-        # Handle datetime objects serialized as strings
         date_str = str(date_val).strip()
         date_match = re.match(r"^(\d{4}-\d{2}-\d{2})", date_str)
         if date_match and date_str != date_match.group(1):
@@ -88,7 +86,6 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
         for tag in new_tags if new_tags else metadata.tags:
             lines.append(f'  - "{tag}"')
     else:
-        # Preserve original tags block
         for line in yaml_block.split("\n"):
             stripped = line.strip()
             if stripped.startswith("tags") or (
@@ -106,7 +103,6 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
         for link in metadata.related:
             lines.append(f'  - "{link}"')
 
-    # Preserve any other fields from original YAML
     known_keys = {"tags", "date", "related", "feature"}
     for line in yaml_block.split("\n"):
         stripped = line.strip()
@@ -133,8 +129,23 @@ def check_frontmatter(
 ) -> CheckResult:
     """Validate frontmatter of all vault documents.
 
-    Checks: tag count, tag format, date presence/format, related link format.
-    With --fix, attempts to normalize tags and dates.
+    Enforces :meth:`~vaultspec_core.vaultcore.models.DocumentMetadata.validate`
+    rules: exactly two tags (one directory, one feature), valid ISO 8601 date,
+    and ``[[wiki-link]]`` format for ``related`` entries.
+
+    Args:
+        root_dir: Project root directory.
+        feature: Restrict checks to documents with this feature tag
+            (without ``#``).
+        doc_type_filter: Restrict checks to documents of this type
+            (e.g. ``"adr"``).
+        fix: When ``True``, attempt to auto-correct tag prefixes,
+            reconstruct tags from a bare ``feature:`` field, and
+            normalize date formats.
+
+    Returns:
+        :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
+        check name ``"frontmatter"``.
     """
     from ..parser import parse_vault_metadata
     from ..scanner import get_doc_type, scan_vault
@@ -142,7 +153,6 @@ def check_frontmatter(
     result = CheckResult(check_name="frontmatter", supports_fix=True)
 
     for doc_path in scan_vault(root_dir):
-        # Type filter
         if doc_type_filter:
             dt = get_doc_type(doc_path, root_dir)
             if dt and dt.value != doc_type_filter:
@@ -155,7 +165,6 @@ def check_frontmatter(
 
         metadata, _ = parse_vault_metadata(content)
 
-        # Feature filter
         if feature:
             from ..models import DocType
 
@@ -184,7 +193,6 @@ def check_frontmatter(
                         severity=Severity.INFO,
                     )
                 )
-                # Re-validate after fix
                 new_content = doc_path.read_text(encoding="utf-8")
                 new_metadata, _ = parse_vault_metadata(new_content)
                 remaining_errors = new_metadata.validate()

@@ -29,7 +29,18 @@ def check_links(
 ) -> CheckResult:
     """Check wiki-links follow Obsidian convention (no ``.md`` extension).
 
-    With ``--fix``, rewrites ``[[name.md]]`` → ``[[name]]`` in-place.
+    Detects ``[[name.md]]`` patterns in both frontmatter ``related:`` fields
+    and markdown body text.
+
+    Args:
+        root_dir: Project root directory.
+        feature: Restrict checks to documents with this feature tag
+            (without ``#``).
+        fix: When ``True``, rewrites ``[[name.md]]`` to ``[[name]]`` in-place.
+
+    Returns:
+        :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
+        check name ``"links"``.
     """
     from ..parser import parse_vault_metadata
     from ..scanner import scan_vault
@@ -42,7 +53,6 @@ def check_links(
         except (OSError, UnicodeDecodeError):
             continue
 
-        # Feature filter
         if feature:
             metadata, _ = parse_vault_metadata(content)
             from ..models import DocType

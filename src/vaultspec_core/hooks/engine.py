@@ -1,12 +1,12 @@
 """Load, validate, and execute declarative vaultspec hooks.
 
-This module is the runtime for hook definitions stored as YAML files under
-``.vaultspec/hooks/``. It parses hook documents into typed models, filters them
-by supported event, and executes their actions while guarding against
-re-entrant event loops.
+Runtime for hook definitions stored as YAML files under ``.vaultspec/hooks/``.
+Parses hook documents into typed models, filters them by supported event, and
+executes their shell actions while guarding against re-entrant event loops.
 
-Usage centers on ``load_hooks()`` to read hook definitions and ``trigger()`` or
-``fire_hooks()`` to execute the hooks bound to a specific event.
+Usage centers on :func:`load_hooks` to read hook definitions and
+:func:`trigger` or :func:`fire_hooks` to execute hooks bound to a specific
+event.
 """
 
 from __future__ import annotations
@@ -318,7 +318,7 @@ def _execute_shell(
     """Execute a shell command action.
 
     Interpolates ``{key}`` placeholders in the command string, then runs it
-    via :func:`subprocess.run` with a 60-second timeout.
+    via ``subprocess.Popen`` with a 60-second timeout.
 
     Args:
         hook_name: Name of the parent hook (for result attribution).

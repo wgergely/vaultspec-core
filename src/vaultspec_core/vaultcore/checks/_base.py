@@ -19,6 +19,8 @@ __all__ = ["CheckDiagnostic", "CheckResult", "Severity", "render_check_result"]
 
 
 class Severity(StrEnum):
+    """Diagnostic severity level for vault health check findings."""
+
     ERROR = "error"
     WARNING = "warning"
     INFO = "info"
@@ -26,7 +28,17 @@ class Severity(StrEnum):
 
 @dataclass
 class CheckDiagnostic:
-    """A single finding from a vault health check."""
+    """A single finding from a vault health check.
+
+    Attributes:
+        path: Relative path to the affected document, or ``None`` for
+            vault-wide findings.
+        message: Human-readable description of the issue.
+        severity: Urgency level; one of :class:`Severity`.
+        fixable: ``True`` when ``--fix`` can resolve this diagnostic.
+        fix_description: Short description of the corrective action, or
+            ``None`` when not applicable.
+    """
 
     path: Path | None
     message: str
@@ -37,7 +49,15 @@ class CheckDiagnostic:
 
 @dataclass
 class CheckResult:
-    """Aggregated result from a single check pass."""
+    """Aggregated result from a single check pass.
+
+    Attributes:
+        check_name: Identifier string displayed in CLI output
+            (e.g. ``"frontmatter"``).
+        diagnostics: All findings produced by this check.
+        fixed_count: Number of issues auto-corrected when run with ``--fix``.
+        supports_fix: ``True`` when this checker accepts a ``fix=True`` argument.
+    """
 
     check_name: str
     diagnostics: list[CheckDiagnostic] = field(default_factory=list)
@@ -46,18 +66,22 @@ class CheckResult:
 
     @property
     def error_count(self) -> int:
+        """Number of ERROR-severity diagnostics."""
         return sum(1 for d in self.diagnostics if d.severity == Severity.ERROR)
 
     @property
     def warning_count(self) -> int:
+        """Number of WARNING-severity diagnostics."""
         return sum(1 for d in self.diagnostics if d.severity == Severity.WARNING)
 
     @property
     def info_count(self) -> int:
+        """Number of INFO-severity diagnostics."""
         return sum(1 for d in self.diagnostics if d.severity == Severity.INFO)
 
     @property
     def is_clean(self) -> bool:
+        """``True`` when no diagnostics were produced."""
         return len(self.diagnostics) == 0
 
 

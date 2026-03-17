@@ -42,6 +42,15 @@ def transform_rule(tool: Tool, name: str, _meta: dict[str, Any], body: str) -> s
 
     Adds a YAML frontmatter block with ``trigger: always_on`` and a ``name``
     key derived from the filename stem.
+
+    Args:
+        tool: Target :class:`~vaultspec_core.core.enums.Tool`.
+        name: Source filename (stem used as rule name).
+        _meta: Original frontmatter dict (unused; overridden by generated meta).
+        body: Markdown body of the rule source file.
+
+    Returns:
+        Rendered file content with generated YAML frontmatter prepended.
     """
     if isinstance(tool, str):
         tool = Tool(tool)

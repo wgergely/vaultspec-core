@@ -19,10 +19,19 @@ def check_features(
 ) -> CheckResult:
     """Check that features have appropriate document type coverage.
 
-    Rules:
-    - Feature with only exec docs but no plan or ADR: WARNING
-    - Feature with plan but no ADR: WARNING
-    - Feature with ADR but no research: INFO (soft recommendation)
+    Rules enforced:
+
+    - exec only, no plan or ADR: WARNING
+    - plan present, no ADR: WARNING
+    - ADR present, no research: INFO (soft recommendation)
+
+    Args:
+        root_dir: Project root directory.
+        feature: Restrict checks to a single feature (without ``#``).
+
+    Returns:
+        :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
+        check name ``"features"``. Does not support ``--fix``.
     """
     from ..query import _scan_all
 
@@ -30,13 +39,11 @@ def check_features(
 
     docs = _scan_all(root_dir)
 
-    # Group by feature
     by_feature: dict[str, set[str]] = {}
     for d in docs:
         if d.feature:
             by_feature.setdefault(d.feature, set()).add(d.doc_type)
 
-    # Filter
     if feature:
         feat = feature.lstrip("#")
         by_feature = {k: v for k, v in by_feature.items() if k == feat}
@@ -49,7 +56,6 @@ def check_features(
         has_plan = "plan" in types
         has_research = "research" in types
         has_exec = "exec" in types
-        # Exec-only features lack planning docs
         if has_exec and not has_plan and not has_adr:
             result.diagnostics.append(
                 CheckDiagnostic(
@@ -66,7 +72,6 @@ def check_features(
                 )
             )
 
-        # Plan without ADR
         if has_plan and not has_adr:
             result.diagnostics.append(
                 CheckDiagnostic(
@@ -80,7 +85,6 @@ def check_features(
                 )
             )
 
-        # ADR without research (soft check)
         if has_adr and not has_research:
             result.diagnostics.append(
                 CheckDiagnostic(

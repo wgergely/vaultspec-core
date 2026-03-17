@@ -29,7 +29,14 @@ __all__ = [
 
 
 class LayoutMode(Enum):
-    """How VaultSpec was invoked and where paths point."""
+    """How the workspace layout was resolved.
+
+    Attributes:
+        STANDALONE: No explicit target override; root was inferred from git
+            detection or cwd.
+        EXPLICIT: Target directory was provided via ``--target`` or
+            ``VAULTSPEC_TARGET_DIR``.
+    """
 
     STANDALONE = "standalone"
     EXPLICIT = "explicit"
@@ -268,7 +275,11 @@ def discover_git(start: Path) -> GitInfo | None:
 
 
 class WorkspaceError(Exception):
-    """Raised when workspace layout validation fails."""
+    """Raised when workspace layout resolution or validation fails.
+
+    Typically indicates a missing ``.vaultspec/`` directory or an unreachable
+    target path.  Caught by the CLI root callback and converted to an error exit.
+    """
 
 
 def _validate(layout: WorkspaceLayout) -> None:

@@ -39,7 +39,18 @@ def collect_agents() -> dict[str, tuple[Path, dict[str, Any], str]]:
 
 
 def transform_agent(_tool: Tool, _name: str, meta: dict[str, Any], body: str) -> str:
-    """Transform an agent definition for a specific tool destination."""
+    """Transform an agent definition for a specific tool destination.
+
+    Args:
+        _tool: Target :class:`~vaultspec_core.core.enums.Tool` (unused; present
+            for the standard transform callback signature).
+        _name: Source filename (unused).
+        meta: Frontmatter dict from the agent source file.
+        body: Markdown body of the agent source file.
+
+    Returns:
+        Rendered file content with YAML frontmatter prepended.
+    """
     return build_file(meta, body)
 
 
@@ -257,7 +268,16 @@ def agents_add(
 
 
 def agents_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
-    """Sync all agent definitions to every configured tool destination."""
+    """Sync all agent definitions to every configured tool destination.
+
+    Args:
+        dry_run: If ``True``, log planned actions without writing files.
+        prune: If ``True``, remove destination agents not present in sources.
+
+    Returns:
+        Accumulated :class:`~vaultspec_core.core.types.SyncResult` across
+        all active tool destinations.
+    """
     sources = collect_agents()
     total = SyncResult()
 

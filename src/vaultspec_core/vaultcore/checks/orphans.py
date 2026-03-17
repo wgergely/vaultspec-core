@@ -19,7 +19,19 @@ def check_orphans(
 ) -> CheckResult:
     """Find documents with no incoming wiki-links.
 
-    These documents are unreachable from any other vault document.
+    Delegates orphan detection to
+    :meth:`~vaultspec_core.graph.VaultGraph.get_orphaned`. Unreachable
+    documents are flagged as WARNING-severity diagnostics; each diagnostic
+    includes outgoing link targets as a suggested starting point.
+
+    Args:
+        root_dir: Project root directory.
+        feature: Restrict results to documents with this feature tag
+            (without ``#``).
+
+    Returns:
+        :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
+        check name ``"orphans"``. Does not support ``--fix``.
     """
     from ...graph import VaultGraph
 
@@ -31,7 +43,6 @@ def check_orphans(
     for name in sorted(orphan_names):
         node = graph.nodes[name]
 
-        # Feature filter (normalize: always compare stripped values)
         if feature:
             feat = feature.lstrip("#")
             node_features = {t.lstrip("#") for t in node.tags}
@@ -41,7 +52,6 @@ def check_orphans(
         doc_type_str = node.doc_type.value if node.doc_type else "unknown"
         rel_path = node.path.relative_to(root_dir)
 
-        # Suggest potential link targets based on name similarity
         suggestion = ""
         if node.out_links:
             suggestion = f"Links out to: {', '.join(sorted(node.out_links)[:3])}"

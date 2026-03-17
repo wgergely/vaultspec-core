@@ -9,7 +9,12 @@ from __future__ import annotations
 
 
 class VaultSpecError(Exception):
-    """Base exception for all vaultspec-core domain errors."""
+    """Base exception for all vaultspec-core domain errors.
+
+    Attributes:
+        hint: Optional actionable guidance shown below the error message in
+            CLI and MCP output.
+    """
 
     def __init__(self, message: str, *, hint: str = "") -> None:
         super().__init__(message)

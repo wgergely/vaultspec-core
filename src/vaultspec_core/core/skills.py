@@ -52,14 +52,32 @@ def collect_skills() -> dict[str, tuple[Path, dict[str, Any], str]]:
 
 
 def transform_skill(_tool: Tool, name: str, _meta: dict[str, Any], body: str) -> str:
-    """Transform a skill definition for a specific tool destination."""
+    """Transform a skill definition for a specific tool destination.
+
+    Args:
+        _tool: Target :class:`~vaultspec_core.core.enums.Tool` (unused).
+        name: Skill directory name (e.g. ``"vaultspec-execute"``).
+        _meta: Original frontmatter dict; ``description`` is re-used.
+        body: Markdown body of the SKILL.md source file.
+
+    Returns:
+        Rendered SKILL.md content with regenerated frontmatter.
+    """
     description = _meta.get("description", "")
     fm = {"name": name, "description": description}
     return build_file(fm, body)
 
 
 def skill_dest_path(dest_dir: Path, name: str) -> Path:
-    """Return the destination path for a skill's SKILL.md file."""
+    """Return the destination path for a skill's SKILL.md file.
+
+    Args:
+        dest_dir: Root skills destination directory.
+        name: Skill directory name (e.g. ``"vaultspec-execute"``).
+
+    Returns:
+        Full path to the ``SKILL.md`` file inside the skill subdirectory.
+    """
     return dest_dir / name / FileName.SKILL.value
 
 

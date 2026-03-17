@@ -18,7 +18,14 @@ _SNAPSHOT_DIR = "_snapshots"
 
 
 def is_builtin(filename: str) -> bool:
-    """Check if a filename represents a builtin resource."""
+    """Return ``True`` if *filename* ends with the ``.builtin.md`` suffix.
+
+    Args:
+        filename: Resource filename to test.
+
+    Returns:
+        ``True`` for builtin resources, ``False`` for custom resources.
+    """
     return filename.endswith(_BUILTIN_SUFFIX)
 
 
@@ -107,10 +114,16 @@ def revert_resource(vaultspec_dir: Path, category: str, filename: str) -> dict:
 
 
 def list_modified_builtins(vaultspec_dir: Path) -> list[dict]:
-    """List builtin resources that differ from their snapshots.
+    """List builtin resources that differ from their install-time snapshots.
 
-    Returns list of dicts with keys: category, filename,
-    status ("modified", "missing", "ok").
+    Args:
+        vaultspec_dir: The ``.vaultspec`` directory to inspect.
+
+    Returns:
+        List of dicts with keys ``"category"`` (str), ``"filename"`` (str),
+        ``"path"`` (str), and ``"status"`` — one of ``"modified"``,
+        ``"missing"``, or ``"ok"``.  Returns an empty list when no snapshots
+        exist.
     """
     snapshot_dir = vaultspec_dir / _SNAPSHOT_DIR
     rules_dir = vaultspec_dir / "rules"

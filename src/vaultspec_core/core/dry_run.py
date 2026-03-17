@@ -12,7 +12,15 @@ from enum import StrEnum
 
 
 class DryRunStatus(StrEnum):
-    """Status categories for dry-run items."""
+    """Status categories for dry-run items.
+
+    Attributes:
+        NEW: File will be created at the destination.
+        EXISTS: File already exists and content is unchanged.
+        UPDATE: File already exists and will be overwritten.
+        OVERRIDE: Managed builtin file overridden by user content.
+        DELETE: Stale destination file will be removed.
+    """
 
     NEW = "new"
     EXISTS = "exists"
@@ -32,16 +40,30 @@ STATUS_STYLE: dict[DryRunStatus, tuple[str, str]] = {
 
 @dataclass
 class DryRunItem:
-    """A single item in a dry-run preview."""
+    """A single item in a dry-run preview.
+
+    Attributes:
+        path: Destination file path (forward-slash normalised).
+        status: Planned action for this file.
+        label: Category label grouping related items (e.g. ``"claude/rules"``,
+            ``"core"``, ``"config"``).  Empty string means no grouping.
+    """
 
     path: str
     status: DryRunStatus
     label: str = ""
-    """Category label (e.g. 'claude/rules', 'core', 'config')."""
 
 
 def group_by_label(items: list[DryRunItem]) -> dict[str, list[DryRunItem]]:
-    """Group items by label, preserving insertion order."""
+    """Group items by label, preserving insertion order.
+
+    Args:
+        items: Flat list of :class:`DryRunItem` instances.
+
+    Returns:
+        Ordered mapping of label string to its constituent items.  Items
+        with an empty label are grouped under the ``""`` key.
+    """
     groups: dict[str, list[DryRunItem]] = defaultdict(list)
     for item in items:
         groups[item.label].append(item)
@@ -49,7 +71,15 @@ def group_by_label(items: list[DryRunItem]) -> dict[str, list[DryRunItem]]:
 
 
 def count_by_status(items: list[DryRunItem]) -> dict[DryRunStatus, int]:
-    """Return counts of items grouped by status."""
+    """Return counts of items grouped by status.
+
+    Args:
+        items: Flat list of :class:`DryRunItem` instances.
+
+    Returns:
+        Mapping of each :class:`DryRunStatus` present in *items* to its
+        occurrence count.
+    """
     by_status: dict[DryRunStatus, int] = {}
     for item in items:
         by_status[item.status] = by_status.get(item.status, 0) + 1

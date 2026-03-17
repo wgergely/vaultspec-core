@@ -21,17 +21,19 @@ from vaultspec_core.core.dry_run import (
 
 
 def render_dry_run_tree(items: Sequence[DryRunItem], *, title: str = "Preview") -> None:
-    """Render a coloured tree of dry-run items to the console.
+    """Render a coloured Rich tree of dry-run items to the console.
 
-    Items with a ``label`` are grouped under that label as a sub-tree.
-    Items without a label appear at the root level.
+    Items with a non-empty ``label`` are grouped under a sub-tree branch;
+    unlabelled items appear at the root level.  A summary line with
+    per-status counts is printed after the tree.
 
-    Colour coding:
-    - green (+) = new
-    - dim (=) = already exists, no change
-    - yellow (~) = will be updated
-    - bold yellow (!) = will be overridden
-    - red (-) = will be deleted
+    Status colour coding: ``+`` green (new), ``=`` dim (no change),
+    ``~`` yellow (update), ``!`` bold yellow (override), ``-`` red (delete).
+
+    Args:
+        items: Sequence of :class:`~vaultspec_core.core.dry_run.DryRunItem`
+            to render.
+        title: Title displayed at the root node of the tree.
     """
     from rich.tree import Tree
 

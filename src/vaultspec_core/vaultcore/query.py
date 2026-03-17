@@ -262,11 +262,17 @@ def list_feature_details(
 
 
 def archive_feature(root_dir: Path, feature: str) -> dict:
-    """Move all documents for a feature into .vault/_archive/.
+    """Move all documents for a feature into ``.vault/_archive/``.
 
-    Preserves directory structure under the archive folder.
+    Preserves the per-type subdirectory structure under the archive folder.
 
-    Returns dict with: archived_count, paths (list of new paths).
+    Args:
+        root_dir: Project root directory.
+        feature: Feature name to archive (leading ``#`` is stripped).
+
+    Returns:
+        Dict with keys: ``archived_count`` (int), ``paths`` (list of
+        strings -- new paths relative to ``root_dir``).
     """
     import shutil
 

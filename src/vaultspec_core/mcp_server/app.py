@@ -1,8 +1,9 @@
 """Bootstrap the FastMCP application for the vaultspec MCP server.
 
-Constructs the MCP server with two tools (``find`` and ``create``),
-and provides the runtime entry boundary for ``vaultspec-mcp``.
-Supports both root-CLI-injected context and standalone configuration.
+Constructs the ``FastMCP`` instance, registers the vault tool surface, and
+provides the runtime entry boundary for ``vaultspec-mcp``. Supports both
+root-CLI-injected context (via ``ctx.obj``) and standalone fallback
+configuration via :func:`~vaultspec_core.config.get_config`.
 """
 
 from __future__ import annotations
@@ -34,7 +35,14 @@ async def _lifespan(_app: FastMCP) -> AsyncIterator[None]:
 
 
 def create_server() -> FastMCP:
-    """Create and configure the unified FastMCP server instance."""
+    """Create and configure the FastMCP server instance.
+
+    Instantiates :class:`~mcp.server.fastmcp.FastMCP` and registers the vault
+    tool surface via :func:`~vaultspec_core.mcp_server.vault_tools.register_tools`.
+
+    Returns:
+        Configured :class:`~mcp.server.fastmcp.FastMCP` instance ready to serve.
+    """
     mcp = FastMCP(
         name="vaultspec-mcp",
         instructions=(
@@ -50,7 +58,19 @@ def create_server() -> FastMCP:
 
 
 def _serve(ctx_obj: dict | None = None) -> None:
-    """Resolve runtime context and start the MCP stdio server."""
+    """Resolve runtime context, initialise paths, and start the MCP stdio server.
+
+    Configures logging to stderr (to protect JSON-RPC on stdout), resolves
+    ``root_dir`` from injected CLI context or fallback config, initialises
+    core path globals via ``init_paths``, then calls ``mcp.run()``.
+
+    Args:
+        ctx_obj: Optional Typer context object injected by the root CLI app.
+            Must contain ``"layout"`` and ``"target"`` keys when present.
+
+    Raises:
+        typer.Exit: If ``root_dir`` cannot be resolved in standalone mode.
+    """
     from ..core.types import init_paths
     from ..logging_config import configure_logging
 
@@ -86,7 +106,12 @@ def _serve(ctx_obj: dict | None = None) -> None:
 
 @app.callback(invoke_without_command=True)
 def main(ctx: typer.Context) -> None:
-    """Typer callback entrypoint for vaultspec-mcp."""
+    """Typer callback entrypoint for vaultspec-mcp.
+
+    Args:
+        ctx: Typer context carrying the optional ``obj`` dict injected by
+            the root CLI app (contains ``"layout"`` and ``"target"`` keys).
+    """
     _serve(ctx.obj)
 
 

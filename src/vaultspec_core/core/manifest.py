@@ -25,9 +25,14 @@ def _manifest_path(target: Path) -> Path:
 
 
 def read_manifest(target: Path) -> set[str]:
-    """Read the set of installed provider names from the manifest.
+    """Read installed provider names from ``.vaultspec/providers.json``.
 
-    Returns an empty set if the manifest does not exist or is malformed.
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        Set of installed provider name strings (e.g. ``{"claude", "gemini"}``),
+        or an empty set if the manifest is absent or malformed.
     """
     path = _manifest_path(target)
     if not path.exists():
@@ -41,7 +46,12 @@ def read_manifest(target: Path) -> set[str]:
 
 
 def write_manifest(target: Path, providers: set[str]) -> None:
-    """Write the provider manifest with the given set of provider names."""
+    """Persist *providers* to ``.vaultspec/providers.json``.
+
+    Args:
+        target: Workspace root directory.
+        providers: Set of provider name strings to record as installed.
+    """
     path = _manifest_path(target)
     path.parent.mkdir(parents=True, exist_ok=True)
     data = {
@@ -52,7 +62,15 @@ def write_manifest(target: Path, providers: set[str]) -> None:
 
 
 def add_providers(target: Path, names: list[str]) -> set[str]:
-    """Add providers to the manifest and return the updated set."""
+    """Add *names* to the manifest and return the updated provider set.
+
+    Args:
+        target: Workspace root directory.
+        names: Provider names to add (e.g. ``["claude", "gemini"]``).
+
+    Returns:
+        Updated set of all installed provider names.
+    """
     current = read_manifest(target)
     current.update(names)
     write_manifest(target, current)
@@ -60,7 +78,15 @@ def add_providers(target: Path, names: list[str]) -> set[str]:
 
 
 def remove_provider(target: Path, name: str) -> set[str]:
-    """Remove a provider from the manifest and return the remaining set."""
+    """Remove *name* from the manifest and return the remaining provider set.
+
+    Args:
+        target: Workspace root directory.
+        name: Provider name to remove.
+
+    Returns:
+        Updated set of remaining installed provider names.
+    """
     current = read_manifest(target)
     current.discard(name)
     write_manifest(target, current)
