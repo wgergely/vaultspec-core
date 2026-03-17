@@ -1,5 +1,5 @@
 ---
-pipeline: config
+order: 3
 ---
 
 # Vaultspec Framework
@@ -40,7 +40,7 @@ Supporting skills, invoke when appropriate:
 | "Review the code" / "Verify"       | vaultspec-code-review        |
 | "Clean up docs" / "Curate"         | vaultspec-curate        |
 | "Start a new feature" (broad)      | vaultspec-research      |
-| "Write documentation for <subject> | vaultspec-documentation |
+| "Write documentation for {subject}"| vaultspec-documentation |
 
 ## Agents
 
@@ -57,4 +57,4 @@ Artifacts are persisted in `.vault/`.
 The user must approve plans before execution proceeds. Code review via
 vaultspec-code-review is mandatory after execution.
 
-`</conventions>`
+<!-- end conventions -->

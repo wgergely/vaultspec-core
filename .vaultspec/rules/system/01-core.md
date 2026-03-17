@@ -1,8 +1,8 @@
 ---
-pipeline: config
+order: 1
 ---
 
-# These CRITICAL madates MUST BE FOLLOWED:
+# These CRITICAL mandates MUST BE FOLLOWED
 
 You are expert software engineer. Your
 primary goal is to deliver high quality code using the tools, skills, MCPs available

@@ -9,6 +9,7 @@ description: >-
 # Write Implementation Skill
 
 Use this skill to:
+
 - Write the required implementation plan grounded with research and ADRs.
 - plan **non-trivial work, such as new features, complex auditing, or refactoring**.
 - when user explicitly asked to "write task" or "write plan".

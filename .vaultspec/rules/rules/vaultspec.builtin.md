@@ -1,12 +1,42 @@
 ---
-name: vaultspec-documentation
+name: vaultspec-skills
 ---
 
-# Documentation Standards
+# Spec Skills
 
-## Hierarchy
+This project follows agent-driven development with
+`<ADR>`-backed `<Plan>`s.
 
-The documentation trail follows a more-or-less strict dependency graph.
+The workflow persists the following documents:
+
+- `.vault/plan/yyyy-mm-dd-<feature>-<phase>-plan.md`:
+  The `<Plan>` to execute.
+- `.vault/research/yyyy-mm-dd-<feature>-<phase>-research.md`:
+  The `<Research>` findings.
+- `.vault/adr/yyyy-mm-dd-<feature>-<phase>-adr.md`:
+  Research-derived `<ADR>`.
+- `.vault/reference/yyyy-mm-dd-<feature>-reference.md`:
+  The implementation `<Reference>`.
+- `.vault/audit/yyyy-mm-dd-<feature>-audit.md`:
+  The `<Audit>` report.
+- `.vault/exec/yyyy-mm-dd-<feature>/.../<step>.md`:
+  The individual `<Step Record>`.
+- `.vault/exec/yyyy-mm-dd-<feature>/...-summary.md`:
+  The `<Phase Summary>`.
+
+Where appropriate, use the following skills:
+
+- `vaultspec-research`
+- `vaultspec-code-research`
+- `vaultspec-adr`
+- `vaultspec-code-reference`
+- `vaultspec-write-plan`
+- `vaultspec-execute`
+
+
+## Documentation Hierarchy
+
+The documentation trail follows a strict dependency graph.
 Artifacts lower in the hierarchy should reference those above them.
 
 - **Brainstorm** / **Research / Reference Audit**

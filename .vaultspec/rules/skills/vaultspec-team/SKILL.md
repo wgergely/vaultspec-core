@@ -1,7 +1,6 @@
 ---
 name: vaultspec-team
-description: >-
-Skill to start coding teams for tacking difficult coding challanges.
+description: Skill to start coding teams for tackling difficult coding challenges.
 ---
 
 # Team Coordination Skill (vaultspec-team)

@@ -10,6 +10,7 @@ description: >-
 # Code Research
 
 Use this skill:
+
 - When auditing, researching, or implementing a specific technical implementation.
 - When you need to identify a reference project.
 - When need to ground current task with source code references to see
@@ -35,6 +36,7 @@ explicitly requires direct code referencing.
 Use `vaultspec-code-reference-agent` to perform deep dives.
 
 Coordinate the agents to:
+
 - Locate the code snippets and files.
 - Analyze the implementation patterns, architecture, and patterns.
 - Persist a Reference blueprint to

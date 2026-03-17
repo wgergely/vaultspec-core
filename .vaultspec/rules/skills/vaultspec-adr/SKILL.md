@@ -9,6 +9,7 @@ description: >-
 # ADR: Architecture Decision Record Writing Skill
 
 Use this skill:
+
 - After a `vaultspec-research` session has concluded with a recommendation.
 - When multiple competing technical choices need a grounding document.
 - When a significant architectural decision is made that affects the
@@ -17,11 +18,11 @@ Use this skill:
 
 ## Required steps
 
-  - **Announce at start:** "I'm using the `vaultspec-adr` skill to create a new ADR."
-  - **You MUST read and use the template** at `.vaultspec/rules/templates/adr.md`.
-  - **MUST save document to:** `.vault/adr/yyyy-mm-dd-{feature}-{phase}-adr.md`
-  - **Read and link related Research from:** `.vault/research/yyyy-mm-dd-{feature}-{phase}-research.md`.
-  - **Terminate if related research is not found** and prompt user to first invoke `vaultspec-research`.
+- **Announce at start:** "I'm using the `vaultspec-adr` skill to create a new ADR."
+- **You MUST read and use the template** at `.vaultspec/rules/templates/adr.md`.
+- **MUST save document to:** `.vault/adr/yyyy-mm-dd-{feature}-{phase}-adr.md`
+- **Read and link related Research from:** `.vault/research/yyyy-mm-dd-{feature}-{phase}-research.md`.
+- **Terminate if related research is not found** and prompt user to first invoke `vaultspec-research`.
 
 ### Frontmatter & Tagging Mandate
 

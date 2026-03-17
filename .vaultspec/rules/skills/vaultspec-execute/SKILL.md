@@ -10,6 +10,7 @@ description: >-
 # Implementation Plan: Code Writing Skill
 
 Use this skill:
+
 - To begin the execution of an implementation `plan`.
 - To ensure code is written by the appropriate agent.
 
@@ -25,6 +26,7 @@ Use this skill:
 ## Executor Delegation
 
 Assume the persona of a delegator.
+
 - Use parallel sub-agents, or autonomous agent team to execute complex plans.
 - Use appropriate executor agent persona. When the task
 needs multiple specialists, coordinate them.

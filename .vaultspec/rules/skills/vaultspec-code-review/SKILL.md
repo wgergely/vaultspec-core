@@ -32,7 +32,7 @@ implementation."
 - Code review is not a code fixer skill - do NOT modify the codebase.
 
 
-## IMPORTANT:
+## IMPORTANT
 
 - **Template:** You MUST read and use the template at
   `.vaultspec/rules/templates/code-review.md`.

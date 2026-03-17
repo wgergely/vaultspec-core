@@ -1,5 +1,5 @@
 ---
-pipeline: config
+order: 2
 ---
 
 # Operational Guidelines
