@@ -30,7 +30,14 @@ def extract_wiki_links(content: str) -> set[str]:
     # Matches [[Link Name]] or [[Link Name|Display Name]]
     pattern = r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]"
     matches = re.findall(pattern, content)
-    return {m.strip() for m in matches}
+    targets = set()
+    for m in matches:
+        target = m.strip()
+        # Tolerate .md extensions (Obsidian convention: [[note-name]] without extension)
+        if target.endswith(".md"):
+            target = target[:-3]
+        targets.add(target)
+    return targets
 
 
 def extract_related_links(related: list[str]) -> set[str]:
@@ -51,7 +58,11 @@ def extract_related_links(related: list[str]) -> set[str]:
         # related links are expected to be [[Link Name]]
         match = re.match(r"^\[\[([^\]|]+)(?:\|[^\]]+)?\]\]$", link)
         if match:
-            links.add(match.group(1).strip())
+            target = match.group(1).strip()
+            # Strip .md (Obsidian wiki-link convention)
+            if target.endswith(".md"):
+                target = target[:-3]
+            links.add(target)
         else:
             malformed_count += 1
             logger.debug("Malformed related link: %s", link)

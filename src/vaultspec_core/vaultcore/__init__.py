@@ -23,4 +23,5 @@ from .query import get_stats as get_stats
 from .query import list_documents as list_documents
 from .query import list_feature_details as list_feature_details
 from .scanner import get_doc_type as get_doc_type
+from .scanner import list_features as list_features
 from .scanner import scan_vault as scan_vault

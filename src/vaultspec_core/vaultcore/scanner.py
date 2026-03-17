@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 from .models import DocType
 
-__all__ = ["get_doc_type", "scan_vault"]
+__all__ = ["get_doc_type", "list_features", "scan_vault"]
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,39 @@ def scan_vault(root_dir: pathlib.Path) -> Iterator[pathlib.Path]:
         file_count += 1
         yield path
     logger.info("Scanned vault: found %d markdown files", file_count)
+
+
+def list_features(root_dir: pathlib.Path) -> set[str]:
+    """Infer the set of feature names from tags across all vault documents.
+
+    Args:
+        root_dir: Project root containing the docs directory.
+
+    Returns:
+        Set of feature name strings (without the leading ``#``).
+    """
+    from .parser import parse_vault_metadata
+
+    logger.debug("Extracting features from vault")
+    features: set[str] = set()
+    skip_count = 0
+    for path in scan_vault(root_dir):
+        try:
+            content = path.read_text(encoding="utf-8")
+            metadata, _ = parse_vault_metadata(content)
+            for tag in metadata.tags:
+                if not DocType.from_tag(tag):
+                    features.add(tag.lstrip("#"))
+        except (OSError, UnicodeDecodeError):
+            skip_count += 1
+            logger.warning("Failed to read feature tags from %s", path.name)
+            continue
+    logger.info(
+        "Feature extraction complete: found %d features, skipped %d files",
+        len(features),
+        skip_count,
+    )
+    return features
 
 
 def get_doc_type(path: pathlib.Path, root_dir: pathlib.Path) -> DocType | None:

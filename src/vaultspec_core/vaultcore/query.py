@@ -63,6 +63,9 @@ def _scan_all(root_dir: Path) -> list[VaultDocument]:
         if isinstance(tags, str):
             tags = [tags]
         feature = _parse_feature_from_tags(tags, dt_str)
+        # Fallback: if no feature from tags, check bare 'feature:' field
+        if not feature and "feature" in meta:
+            feature = str(meta["feature"]).lstrip("#").strip().lower() or None
         date = meta.get("date") or _parse_date_from_filename(doc_path.name)
 
         docs.append(

@@ -53,6 +53,8 @@ def hydrate_template(
     if title:
         placeholders["title"] = title
         placeholders["topic"] = title  # alias used in research template
+        placeholders["phase"] = title  # alias used in plan/exec templates
+        placeholders["step"] = title  # alias used in exec template
 
     # Perform replacements for both styles
     for key, value in placeholders.items():
