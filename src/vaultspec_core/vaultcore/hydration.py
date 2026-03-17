@@ -129,6 +129,20 @@ def create_vault_doc(
     if target_path.exists():
         raise FileExistsError(f"File already exists at {target_path}")
 
+    # Guard against stem collisions — a file with the same stem in a
+    # different type directory would cause silent overwrites in the
+    # graph (nodes are keyed by stem).
+    stem = target_path.stem
+    docs_dir = root_dir / get_config().docs_dir
+    if docs_dir.exists():
+        for existing in docs_dir.rglob("*.md"):
+            if existing.stem == stem and existing != target_path:
+                raise FileExistsError(
+                    f"A file with stem '{stem}' already exists at "
+                    f"{existing.relative_to(root_dir)}. "
+                    f"Choose a different name to avoid graph key collisions."
+                )
+
     target_dir.mkdir(parents=True, exist_ok=True)
     target_path.write_text(hydrated, encoding="utf-8")
     logger.info("Created %s", target_path)

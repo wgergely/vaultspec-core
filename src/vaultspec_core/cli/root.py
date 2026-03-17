@@ -113,6 +113,18 @@ def main(
 # ---- Top-level commands ------------------------------------------------------
 
 
+def _handle_error(exc: Exception) -> None:
+    """Convert a domain exception to a CLI error exit."""
+    from vaultspec_core.core.exceptions import VaultSpecError
+
+    if isinstance(exc, VaultSpecError):
+        typer.echo(f"Error: {exc}", err=True)
+        if exc.hint:
+            typer.echo(f"  Hint: {exc.hint}", err=True)
+        raise typer.Exit(code=1) from exc
+    raise exc
+
+
 @app.command("install")
 def cmd_install(
     ctx: typer.Context,
@@ -152,6 +164,7 @@ def cmd_install(
       vaultspec-core install claude --dry-run      # preview what would be created\n
     """
     from vaultspec_core.core.commands import install_run
+    from vaultspec_core.core.exceptions import VaultSpecError
 
     path: Path = ctx.obj["target"]
 
@@ -169,9 +182,54 @@ def cmd_install(
         if not dry_run:
             path.mkdir(parents=False, exist_ok=True)
 
-    install_run(
-        path=path, provider=provider, upgrade=upgrade, dry_run=dry_run, force=force
-    )
+    try:
+        result = install_run(
+            path=path, provider=provider, upgrade=upgrade, dry_run=dry_run, force=force
+        )
+    except VaultSpecError as exc:
+        _handle_error(exc)
+        return  # unreachable, but satisfies type checker
+
+    # Render result
+    from vaultspec_core.console import get_console
+
+    console = get_console()
+
+    if result["action"] == "dry_run":
+        from vaultspec_core.cli.rendering import render_dry_run_tree
+        from vaultspec_core.core.dry_run import (
+            DryRunItem,
+            DryRunStatus,
+        )
+
+        items = result["items"]
+        dry_items = [
+            DryRunItem(
+                path=str(path / rel).replace("\\", "/"),
+                status=(
+                    DryRunStatus.EXISTS if (path / rel).exists() else DryRunStatus.NEW
+                ),
+                label=label,
+            )
+            for rel, label in items
+        ]
+        render_dry_run_tree(dry_items, title=f"Install preview → {path}")
+    elif result["action"] == "upgrade":
+        console.print(f"[bold]Upgraded vaultspec framework at {path}[/bold]")
+        seeded = result.get("seeded_count", 0)
+        if seeded:
+            console.print(f"  Re-seeded [bold]{seeded}[/bold] builtin files.")
+        console.print("[bold green]Upgrade complete.[/bold green]")
+    else:
+        console.print(f"[bold]Installed vaultspec framework to {path}[/bold]")
+        items = result.get("items", [])
+        for rel, _label in items:
+            console.print(f"  {rel}")
+        console.print(
+            f"Created [bold]{len(items)}[/bold] directories/files. "
+            "Run [bold]vaultspec-core sync[/bold] to sync."
+        )
+        console.print("[bold green]Installation complete.[/bold green]")
 
 
 @app.command("uninstall")
@@ -213,6 +271,7 @@ def cmd_uninstall(
       vaultspec-core uninstall --dry-run          # preview what would be removed\n
     """
     from vaultspec_core.core.commands import uninstall_run
+    from vaultspec_core.core.exceptions import VaultSpecError
 
     path: Path = ctx.obj["target"]
 
@@ -220,13 +279,49 @@ def cmd_uninstall(
         typer.echo(f"Error: Target directory does not exist: {path}", err=True)
         raise typer.Exit(code=1)
 
-    uninstall_run(
-        path=path,
-        provider=provider,
-        keep_vault=not remove_vault,
-        dry_run=dry_run,
-        force=force,
-    )
+    try:
+        result = uninstall_run(
+            path=path,
+            provider=provider,
+            keep_vault=not remove_vault,
+            dry_run=dry_run,
+            force=force,
+        )
+    except VaultSpecError as exc:
+        _handle_error(exc)
+        return
+
+    # Render result
+    from vaultspec_core.console import get_console
+
+    console = get_console()
+    removed = result.get("removed", [])
+
+    if result["action"] == "dry_run":
+        from vaultspec_core.cli.rendering import render_dry_run_tree
+        from vaultspec_core.core.dry_run import (
+            DryRunItem,
+            DryRunStatus,
+        )
+
+        dry_items = [
+            DryRunItem(path=item_path, status=DryRunStatus.DELETE, label=label)
+            for item_path, label in removed
+        ]
+        render_dry_run_tree(dry_items, title=f"Uninstall preview → {path}")
+    elif removed:
+        console.print("[bold]Removed vaultspec framework:[/bold]")
+        for item_path, _label in removed:
+            console.print(f"  {item_path}")
+        console.print(f"Removed [bold]{len(removed)}[/bold] items.")
+        if result.get("keep_vault"):
+            console.print(
+                "[dim].vault/ preserved"
+                " (pass --remove-vault to also remove"
+                " documentation)[/dim]"
+            )
+    else:
+        console.print("Nothing to remove — vaultspec is not installed at this path.")
 
 
 @app.command("sync")
@@ -257,8 +352,104 @@ def cmd_sync(
         raise typer.Exit(code=1)
 
     from vaultspec_core.core.commands import sync_provider
+    from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.sync import format_summary
 
-    sync_provider(provider, prune=prune, dry_run=dry_run, force=force)
+    try:
+        results = sync_provider(provider, prune=prune, dry_run=dry_run, force=force)
+    except VaultSpecError as exc:
+        _handle_error(exc)
+        return
+
+    from vaultspec_core.console import get_console
+
+    console = get_console()
+
+    if dry_run:
+        from vaultspec_core.cli.rendering import render_dry_run_tree
+        from vaultspec_core.core import types as _t
+        from vaultspec_core.core.dry_run import (
+            DryRunItem,
+            DryRunStatus,
+        )
+
+        action_map = {
+            "[ADD]": DryRunStatus.NEW,
+            "[UPDATE]": DryRunStatus.UPDATE,
+            "[DELETE]": DryRunStatus.DELETE,
+        }
+        all_items = []
+        for r in results:
+            for item_path, action in r.items:
+                status = action_map.get(action, DryRunStatus.UPDATE)
+                all_items.append(
+                    DryRunItem(
+                        path=item_path,
+                        status=status,
+                        label=_infer_label(item_path),
+                    )
+                )
+        if all_items:
+            title = f"Sync preview → {_t.TARGET_DIR}"
+            if provider != "all":
+                title = f"Sync preview ({provider}) → {_t.TARGET_DIR}"
+            render_dry_run_tree(all_items, title=title)
+        else:
+            console.print("[dim]Sync preview: no changes[/dim]")
+    else:
+        # Print sync summaries
+        labels = ["Rules", "Skills", "Agents", "System", "Config"]
+        for label, r in zip(labels, results, strict=True):
+            console.print(f"  [bold]{format_summary(label, r)}[/bold]")
+
+        # Warn if sync produced 0 files
+        total_changes = sum(r.added + r.updated for r in results)
+        total_skipped = sum(r.skipped for r in results)
+        if total_changes == 0 and total_skipped == 0:
+            console.print(
+                "[bold yellow]Warning:[/bold yellow] Sync produced 0 files. "
+                "The .vaultspec/rules/ source directories may be empty.\n"
+                "  Run [bold]vaultspec-core install . --upgrade[/bold] "
+                "to re-seed builtin content."
+            )
+
+
+def _infer_label(item_path: str) -> str:
+    """Infer a human-readable label from a sync output path."""
+    p = item_path.replace("\\", "/")
+
+    provider_map = {
+        "/.claude/": "claude",
+        "/.gemini/": "gemini",
+        "/.agents/": "antigravity",
+        "/.codex/": "codex",
+    }
+    provider_name = ""
+    for segment, name in provider_map.items():
+        if segment in p:
+            provider_name = name
+            break
+
+    config_map = {
+        "/CLAUDE.md": "claude (config)",
+        "/GEMINI.md": "gemini (config)",
+        "/AGENTS.md": "codex (config)",
+        "/config.toml": "codex (config)",
+    }
+    for suffix, lbl in config_map.items():
+        if p.endswith(suffix):
+            return lbl
+
+    if "/rules/" in p:
+        return f"{provider_name} (rules)" if provider_name else "rules"
+    if "/skills/" in p:
+        return f"{provider_name} (skills)" if provider_name else "skills"
+    if "/agents/" in p:
+        return f"{provider_name} (agents)" if provider_name else "agents"
+    if "SYSTEM.md" in p or "system" in p.lower():
+        return f"{provider_name} (system)" if provider_name else "system"
+
+    return provider_name or ""
 
 
 # ---- Entry point -------------------------------------------------------------

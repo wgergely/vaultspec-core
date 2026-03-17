@@ -258,16 +258,30 @@ class VaultGraph:
     # -- Construction --------------------------------------------------------
 
     def _build_graph(self) -> None:
-        """Scan the vault and populate nodes + networkx DiGraph."""
+        """Scan the vault and populate nodes + networkx DiGraph.
+
+        Uses a two-pass strategy:
+
+        1. **Pass 1** — create :class:`DocNode` instances, detecting stem
+           collisions.  When two files share the same stem (e.g.
+           ``adr/my-doc.md`` and ``reference/my-doc.md``), all colliding
+           nodes are re-keyed as ``type/stem`` so that no data is silently
+           dropped.
+        2. **Pass 2** — extract links and create directed edges.  Bare
+           wiki-link stems that match multiple qualified keys fan-out to
+           all variants (with a logged warning).
+        """
         logger.info("Building vault graph from %s", self.root_dir)
 
-        # Pass 1: create DocNodes with full metadata and body
+        # Pass 1a: collect all DocNodes keyed by stem, detecting collisions
+        by_stem: dict[str, list[DocNode]] = {}
+
         for path in scan_vault(self.root_dir):
             logger.debug("Graph pass 1: reading %s", path)
-            name = path.stem
+            stem = path.stem
             doc_type = get_doc_type(path, self.root_dir)
 
-            node = DocNode(path=path, name=name, doc_type=doc_type)
+            node = DocNode(path=path, name=stem, doc_type=doc_type)
 
             try:
                 content = path.read_text(encoding="utf-8")
@@ -288,14 +302,44 @@ class VaultGraph:
                     e,
                 )
 
-            self.nodes[name] = node
-            # Store JSON-friendly attrs on the nx node for
-            # node_link_data serialisation.
-            self._digraph.add_node(name, **node.to_nx_attrs())
+            by_stem.setdefault(stem, []).append(node)
+
+        # Pass 1b: assign unique keys — qualify colliding stems with
+        # their doc-type prefix, build a stem-to-keys index for link
+        # resolution in pass 2.
+        self._stem_index: dict[str, list[str]] = {}
+
+        for stem, node_list in by_stem.items():
+            if len(node_list) == 1:
+                # Unique stem — use it directly as the key.
+                node = node_list[0]
+                self.nodes[stem] = node
+                self._digraph.add_node(stem, **node.to_nx_attrs())
+                self._stem_index[stem] = [stem]
+            else:
+                # Collision — qualify each with its doc-type directory.
+                keys: list[str] = []
+                for node in node_list:
+                    dt = node.doc_type.value if node.doc_type else "unknown"
+                    qualified = f"{dt}/{stem}"
+                    node.name = qualified
+                    self.nodes[qualified] = node
+                    self._digraph.add_node(
+                        qualified,
+                        **node.to_nx_attrs(),
+                    )
+                    keys.append(qualified)
+                self._stem_index[stem] = keys
+                logger.warning(
+                    "Stem collision for '%s': qualified as %s",
+                    stem,
+                    keys,
+                )
 
         logger.info(
-            "Graph pass 1: created %d nodes",
+            "Graph pass 1: created %d nodes (%d stem collisions)",
             len(self.nodes),
+            sum(1 for v in self._stem_index.values() if len(v) > 1),
         )
 
         # Pass 2: extract links -> edges
@@ -307,15 +351,20 @@ class VaultGraph:
                 links = extract_wiki_links(body)
                 links.update(extract_related_links(metadata.related))
 
-                node.out_links = links
-
+                resolved_targets: set[str] = set()
                 for target in links:
-                    if target in self.nodes:
-                        self.nodes[target].in_links.add(name)
-                        self._digraph.add_edge(name, target)
+                    resolved = self._resolve_link(target)
+                    resolved_targets.update(resolved)
+
+                node.out_links = resolved_targets
+
+                for target_key in resolved_targets:
+                    if target_key in self.nodes:
+                        self.nodes[target_key].in_links.add(name)
+                        self._digraph.add_edge(name, target_key)
                     else:
                         self._invalid_links.append(
-                            (name, target),
+                            (name, target_key),
                         )
             except (OSError, UnicodeDecodeError) as e:
                 logger.warning(
@@ -324,11 +373,51 @@ class VaultGraph:
                     e,
                 )
 
+        # Pass 3: sync nx node attrs with updated in_links/out_links
+        for name, node in self.nodes.items():
+            self._digraph.nodes[name]["out_links"] = sorted(
+                node.out_links,
+            )
+            self._digraph.nodes[name]["in_links"] = sorted(
+                node.in_links,
+            )
+
         logger.info(
             "Graph build complete: %d nodes, %d edges",
             self._digraph.number_of_nodes(),
             self._digraph.number_of_edges(),
         )
+
+    def _resolve_link(self, target: str) -> list[str]:
+        """Resolve a wiki-link target to one or more node keys.
+
+        Resolution order:
+
+        1. Exact match against an existing node key (handles both bare
+           stems and already-qualified ``type/stem`` references).
+        2. Stem index lookup — if the bare stem maps to multiple
+           qualified keys, all are returned and a warning is logged.
+        3. No match — returns the original target so it is recorded as
+           an invalid (broken) link.
+        """
+        # Exact key match (unique stem or qualified reference)
+        if target in self.nodes:
+            return [target]
+
+        # Stem index lookup (handles collisions)
+        keys = self._stem_index.get(target, [])
+        if keys:
+            if len(keys) > 1:
+                logger.debug(
+                    "Ambiguous wiki-link [[%s]] resolved to %d nodes: %s",
+                    target,
+                    len(keys),
+                    keys,
+                )
+            return keys
+
+        # No match — treat as broken link
+        return [target]
 
     # -- Direct networkx access ----------------------------------------------
 

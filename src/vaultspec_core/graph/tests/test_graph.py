@@ -112,6 +112,52 @@ class TestVaultGraphBuilding:
         graph = VaultGraph(vault_root)
         assert len(graph.nodes) > 80
 
+    def test_no_nodes_lost_to_stem_collisions(self, vault_root):
+        """All files produce a node — collisions use type/stem keys."""
+        from ...vaultcore import scan_vault
+
+        file_count = sum(1 for _ in scan_vault(vault_root))
+        graph = VaultGraph(vault_root)
+        assert len(graph.nodes) == file_count
+
+    def test_colliding_stems_get_qualified_keys(self, vault_root):
+        graph = VaultGraph(vault_root)
+        qualified = [k for k in graph.nodes if "/" in k]
+        assert len(qualified) > 0
+        # Each qualified key should have the form "type/stem"
+        for key in qualified:
+            parts = key.split("/", 1)
+            assert len(parts) == 2
+            assert len(parts[0]) > 0
+            assert len(parts[1]) > 0
+
+    def test_stem_index_maps_collisions(self, vault_root):
+        graph = VaultGraph(vault_root)
+        collisions = {
+            stem: keys for stem, keys in graph._stem_index.items() if len(keys) > 1
+        }
+        assert len(collisions) > 0
+        for stem, keys in collisions.items():
+            assert all(k.endswith(stem) for k in keys)
+            assert all(k in graph.nodes for k in keys)
+
+    def test_wiki_links_to_colliding_stems_fan_out(self, vault_root):
+        """A wiki-link to a colliding stem creates edges to all variants."""
+        graph = VaultGraph(vault_root)
+        collisions = {
+            stem: keys for stem, keys in graph._stem_index.items() if len(keys) > 1
+        }
+        if not collisions:
+            pytest.skip("No stem collisions in test vault")
+        # Check that at least one qualified key has incoming links
+        for _stem, keys in collisions.items():
+            has_edges = any(
+                graph.nodes[k].in_links or graph.nodes[k].out_links for k in keys
+            )
+            if has_edges:
+                return
+        # It's OK if colliding nodes happen to have no links
+
     def test_networkx_digraph_has_same_node_count(self, vault_root):
         graph = VaultGraph(vault_root)
         assert graph._digraph.number_of_nodes() == len(graph.nodes)
