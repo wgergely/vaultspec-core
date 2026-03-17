@@ -71,7 +71,7 @@ class TestVaultSummaryEdgeCases:
 
     def test_features_deduplicated(self, vault_root):
         """Same feature across multiple docs counted once."""
-        from ...verification import list_features
+        from ...vaultcore.scanner import list_features
 
         features = list_features(vault_root)
         # list_features returns a set, so features are inherently unique

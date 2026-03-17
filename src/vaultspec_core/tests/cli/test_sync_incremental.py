@@ -133,73 +133,77 @@ class TestIncrementalSystem:
 
 
 class TestIncrementalConfig:
-    def test_framework_content_change_propagates(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "v1 framework", encoding="utf-8"
-        )
+    def test_rule_ref_change_propagates(self, test_project):
+        # Config body now generates @rules/... references from synced rule files.
+        rules_dest = test_project / ".claude" / "rules"
+        (rules_dest / "alpha.md").write_text("rule alpha", encoding="utf-8")
         config_sync(force=True)
         claude_cfg = test_project / "CLAUDE.md"
-        assert "v1 framework" in claude_cfg.read_text(encoding="utf-8")
+        assert "@" in claude_cfg.read_text(encoding="utf-8")
+        assert "alpha.md" in claude_cfg.read_text(encoding="utf-8")
 
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "v2 framework", encoding="utf-8"
-        )
+        # Add a second rule — references should update.
+        (rules_dest / "beta.md").write_text("rule beta", encoding="utf-8")
         config_sync(force=True)
-        assert "v2 framework" in claude_cfg.read_text(encoding="utf-8")
+        content = claude_cfg.read_text(encoding="utf-8")
+        assert "alpha.md" in content
+        assert "beta.md" in content
 
-    def test_project_content_change_propagates(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "framework", encoding="utf-8"
-        )
-        (test_project / ".vaultspec" / "rules" / "system" / "project.md").write_text(
-            "project v1", encoding="utf-8"
-        )
+    def test_rule_removal_updates_config(self, test_project):
+        # Config body reflects which rule files exist in the destination.
+        rules_dest = test_project / ".claude" / "rules"
+        (rules_dest / "keep.md").write_text("keep rule", encoding="utf-8")
+        (rules_dest / "drop.md").write_text("drop rule", encoding="utf-8")
         config_sync(force=True)
         claude_cfg = test_project / "CLAUDE.md"
-        assert "project v1" in claude_cfg.read_text(encoding="utf-8")
+        content_v1 = claude_cfg.read_text(encoding="utf-8")
+        assert "keep.md" in content_v1
+        assert "drop.md" in content_v1
 
-        (test_project / ".vaultspec" / "rules" / "system" / "project.md").write_text(
-            "project v2", encoding="utf-8"
-        )
+        # Remove one rule — config should update.
+        (rules_dest / "drop.md").unlink()
         config_sync(force=True)
-        assert "project v2" in claude_cfg.read_text(encoding="utf-8")
+        content_v2 = claude_cfg.read_text(encoding="utf-8")
+        assert "keep.md" in content_v2
+        assert "drop.md" not in content_v2
 
-    def test_codex_agents_md_tracks_framework_changes(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "v1 framework", encoding="utf-8"
-        )
+    def test_codex_config_body_none_without_rule_refs(self, test_project):
+        # Codex has rule_ref_dir=None, so config body should be None.
         config_sync(force=True)
         codex_cfg = test_project / "AGENTS.md"
-        assert "v1 framework" in codex_cfg.read_text(encoding="utf-8")
-
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "v2 framework", encoding="utf-8"
-        )
-        config_sync(force=True)
-        assert "v2 framework" in codex_cfg.read_text(encoding="utf-8")
+        # AGENTS.md should not be created since no config body is generated
+        assert not codex_cfg.exists()
 
     def test_codex_native_config_tracks_frontmatter_changes(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "---\ncodex_approval_policy: on-request\n---\n\nv1 framework",
+        sys_dir = test_project / ".vaultspec" / "rules" / "system"
+        (sys_dir / "codex-settings.md").write_text(
+            "---\n"
+            "pipeline: config\n"
+            "codex_approval_policy: on-request\n"
+            "---\n\nv1 config",
             encoding="utf-8",
         )
         config_sync(force=True)
         codex_cfg = test_project / ".codex" / "config.toml"
-        assert 'approval_policy = "on-request"' in codex_cfg.read_text(encoding="utf-8")
+        content = codex_cfg.read_text(encoding="utf-8")
+        assert 'approval_policy = "on-request"' in content
 
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "---\ncodex_approval_policy: never\n---\n\nv2 framework",
+        (sys_dir / "codex-settings.md").write_text(
+            "---\npipeline: config\ncodex_approval_policy: never\n---\n\nv2 config",
             encoding="utf-8",
         )
         config_sync(force=True)
-        assert 'approval_policy = "never"' in codex_cfg.read_text(encoding="utf-8")
+        content = codex_cfg.read_text(encoding="utf-8")
+        assert 'approval_policy = "never"' in content
 
-    def test_codex_reasoning_settings_track_frontmatter_changes(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
+    def test_codex_reasoning_settings_track_changes(self, test_project):
+        sys_dir = test_project / ".vaultspec" / "rules" / "system"
+        (sys_dir / "codex-reasoning.md").write_text(
             "---\n"
+            "pipeline: config\n"
             "codex_model_reasoning_effort: low\n"
             "codex_model_supports_reasoning_summaries: false\n"
-            "---\n\nv1 framework",
+            "---\n\nv1 config",
             encoding="utf-8",
         )
         config_sync(force=True)
@@ -208,11 +212,12 @@ class TestIncrementalConfig:
         assert 'model_reasoning_effort = "low"' in content_v1
         assert "model_supports_reasoning_summaries = false" in content_v1
 
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
+        (sys_dir / "codex-reasoning.md").write_text(
             "---\n"
+            "pipeline: config\n"
             "codex_model_reasoning_effort: high\n"
             "codex_model_supports_reasoning_summaries: true\n"
-            "---\n\nv2 framework",
+            "---\n\nv2 config",
             encoding="utf-8",
         )
         config_sync(force=True)

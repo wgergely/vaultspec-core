@@ -6,6 +6,7 @@ categorized tree of filesystem changes.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -39,10 +40,15 @@ class DryRunItem:
 
     path: str
     status: DryRunStatus
+    label: str = ""
+    """Category label (e.g. 'claude/rules', 'core', 'config')."""
 
 
 def render_dry_run_tree(items: list[DryRunItem], *, title: str = "Preview") -> None:
     """Render a coloured tree of dry-run items to the console.
+
+    Items with a ``label`` are grouped under that label as a sub-tree.
+    Items without a label appear at the root level.
 
     Colour coding:
     - green (+) = new
@@ -55,10 +61,19 @@ def render_dry_run_tree(items: list[DryRunItem], *, title: str = "Preview") -> N
     tree = Tree(f"[bold]{title}[/bold]")
 
     by_status: dict[DryRunStatus, int] = {}
+
+    # Group items by label, preserving insertion order
+    groups: dict[str, list[DryRunItem]] = defaultdict(list)
     for item in items:
-        prefix, colour = _STATUS_STYLE[item.status]
-        tree.add(f"[{colour}]{prefix} {item.path}[/{colour}]")
-        by_status[item.status] = by_status.get(item.status, 0) + 1
+        groups[item.label].append(item)
+
+    for label, group in groups.items():
+        branch = tree.add(f"[bold dim]{label}[/bold dim]") if label else tree
+
+        for item in group:
+            prefix, colour = _STATUS_STYLE[item.status]
+            branch.add(f"[{colour}]{prefix} {item.path}[/{colour}]")
+            by_status[item.status] = by_status.get(item.status, 0) + 1
 
     console.print(tree)
 

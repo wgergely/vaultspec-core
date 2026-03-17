@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import typer
 
@@ -19,6 +19,9 @@ from . import types as _t
 from .enums import FileName, Tool
 from .helpers import _launch_editor, build_file, ensure_dir
 from .sync import sync_to_all_tools
+
+if TYPE_CHECKING:
+    from .types import SyncResult
 
 logger = logging.getLogger(__name__)
 
@@ -168,14 +171,14 @@ def skills_add(
         logger.info("Created skill: %s", file_path)
 
 
-def skills_sync(dry_run: bool = False, prune: bool = False) -> None:
+def skills_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
     """Sync all skill definitions to every configured tool destination.
 
     Args:
         dry_run: If ``True``, log planned actions without writing.
         prune: If ``True``, remove stale skill files.
     """
-    sync_to_all_tools(
+    return sync_to_all_tools(
         sources=collect_skills(),
         dir_attr="skills_dir",
         transform_fn=transform_skill,

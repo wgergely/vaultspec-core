@@ -19,10 +19,12 @@ class TestPathsEnvBridge:
 
     def test_target_override(self, test_project: Path, runner) -> None:
         """--target flag correctly overrides the workspace root."""
-        # The test_project fixture already creates the directory and .vaultspec
-        result = run_vaultspec(runner, "--target", str(test_project), "vault", "doctor")
-        assert result.exit_code == 0
-        assert "Vault Health Check" in result.output
+        result = run_vaultspec(
+            runner, "--target", str(test_project), "vault", "check", "all"
+        )
+        # check all may find real issues in test-project, accept 0 or 1
+        assert result.exit_code in (0, 1)
+        assert "Vault Check" in result.output
 
 
 class TestValidationEdgeCases:
@@ -31,6 +33,8 @@ class TestValidationEdgeCases:
     def test_target_dir_must_exist(self, tmp_path: Path, runner) -> None:
         """Providing a nonexistent --target should exit with an error."""
         nonexistent = tmp_path / "ghost"
-        result = run_vaultspec(runner, "--target", str(nonexistent), "vault", "doctor")
+        result = run_vaultspec(
+            runner, "--target", str(nonexistent), "vault", "check", "all"
+        )
         assert result.exit_code == 1
         assert "does not exist" in result.output

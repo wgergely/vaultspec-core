@@ -86,6 +86,8 @@ class SyncResult:
     skipped: int = 0
     pruned: int = 0
     errors: list[str] = field(default_factory=list)
+    items: list[tuple[str, str]] = field(default_factory=list)
+    """Per-file action log: list of (path, action) tuples for dry-run rendering."""
 
 
 # Module-level globals initialised by init_paths()
@@ -96,8 +98,6 @@ SKILLS_SRC_DIR: Path = Path()
 AGENTS_SRC_DIR: Path = Path()
 SYSTEM_SRC_DIR: Path = Path()
 TEMPLATES_DIR: Path = Path()
-FRAMEWORK_CONFIG_SRC: Path = Path()
-PROJECT_CONFIG_SRC: Path = Path()
 HOOKS_DIR: Path = Path()
 TOOL_CONFIGS: dict[Tool, ToolConfig] = {}
 
@@ -140,7 +140,6 @@ def init_paths(layout: Any) -> None:
     """
     global ROOT_DIR, TARGET_DIR, RULES_SRC_DIR
     global SKILLS_SRC_DIR, AGENTS_SRC_DIR, SYSTEM_SRC_DIR, TEMPLATES_DIR
-    global FRAMEWORK_CONFIG_SRC, PROJECT_CONFIG_SRC
     global HOOKS_DIR, TOOL_CONFIGS
 
     from ..config import get_config, resolve_workspace
@@ -161,8 +160,6 @@ def init_paths(layout: Any) -> None:
     AGENTS_SRC_DIR = vaultspec / Resource.RULES.value / Resource.AGENTS.value
     SYSTEM_SRC_DIR = vaultspec / Resource.RULES.value / Resource.SYSTEM.value
     TEMPLATES_DIR = vaultspec / Resource.RULES.value / Resource.TEMPLATES.value
-    FRAMEWORK_CONFIG_SRC = SYSTEM_SRC_DIR / FileName.FRAMEWORK.value
-    PROJECT_CONFIG_SRC = SYSTEM_SRC_DIR / FileName.PROJECT.value
     HOOKS_DIR = vaultspec / Resource.RULES.value / Resource.HOOKS.value
     shared_agents_root = target / DirName.ANTIGRAVITY.value
 

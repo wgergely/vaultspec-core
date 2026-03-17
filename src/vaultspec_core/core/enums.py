@@ -93,8 +93,6 @@ class Resource(StrEnum):
 class FileName(StrEnum):
     """Canonical filenames for framework documentation and configuration."""
 
-    FRAMEWORK = "framework.md"
-    PROJECT = "project.md"
     CONFIG_TOML = "config.toml"
     CLAUDE = "CLAUDE.md"
     GEMINI = "GEMINI.md"

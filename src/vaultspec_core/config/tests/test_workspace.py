@@ -6,13 +6,16 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-if TYPE_CHECKING:
-    from pathlib import Path
 from ..workspace import (
     LayoutMode,
     discover_git,
     resolve_workspace,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+pytestmark = [pytest.mark.unit]
 
 
 def _make_framework(root: Path, fw_name: str = ".vaultspec") -> Path:

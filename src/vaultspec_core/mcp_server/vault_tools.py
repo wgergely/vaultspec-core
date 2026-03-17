@@ -12,10 +12,7 @@ Usage:
 
 from __future__ import annotations
 
-import contextlib
 import datetime
-import io
-import json
 import logging
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -415,44 +412,40 @@ def register_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     async def workspace_status(
         ctx: Context,
-        check: Literal["all", "readiness", "health"] = "all",
     ) -> dict[str, Any]:
-        """Get structured workspace status via readiness assessment and health check.
+        """Run vault health checks and return structured results.
 
         Args:
             ctx: MCP context for logging.
-            check: Which checks to run ("readiness", "health", or "all").
 
         Returns:
-            Structured status with readiness scores and/or health issues.
+            Health check results with pass/fail status and issue details.
         """
-        from ..core.commands import doctor_run, readiness_run
+        from ..vaultcore.checks import Severity, run_all_checks
 
-        await ctx.info(f"Running workspace status check: {check}")
-        result: dict[str, Any] = {}
+        await ctx.info("Running workspace health checks")
 
-        if check in ("readiness", "all"):
-            buf = io.StringIO()
-            try:
-                with contextlib.redirect_stdout(buf):
-                    readiness_run(json_output=True)
-                raw = buf.getvalue().strip()
-                result["readiness"] = json.loads(raw) if raw else {}
-            except Exception as e:
-                await ctx.error(f"Readiness check failed: {e}")
-                result["readiness"] = {"error": str(e)}
-
-        if check in ("health", "all"):
-            buf = io.StringIO()
-            try:
-                with contextlib.redirect_stdout(buf):
-                    doctor_run()
-                result["health"] = {"output": buf.getvalue().strip()}
-            except Exception as e:
-                await ctx.error(f"Health check failed: {e}")
-                result["health"] = {"error": str(e)}
-
-        return result
+        try:
+            check_results = run_all_checks(_t.TARGET_DIR)
+            diags = []
+            for cr in check_results:
+                for d in cr.diagnostics:
+                    if d.severity != Severity.INFO:
+                        diags.append(
+                            {
+                                "check": cr.check_name,
+                                "path": str(d.path) if d.path else None,
+                                "message": d.message,
+                                "severity": d.severity.value,
+                            }
+                        )
+            return {
+                "passed": len(diags) == 0,
+                "issues": diags,
+            }
+        except Exception as e:
+            await ctx.error(f"Health check failed: {e}")
+            return {"error": str(e)}
 
     @mcp.tool()
     async def audit_vault(
@@ -472,17 +465,14 @@ def register_tools(mcp: FastMCP) -> None:
         Returns:
             Audit results including metrics and any discovered errors or fixes.
         """
-        from ..metrics import get_vault_metrics
-        from ..verification import (
-            fix_violations,
-            get_malformed,
-            verify_vertical_integrity,
-        )
+        from ..vaultcore.checks import Severity, run_all_checks
 
         await ctx.info("Running vault audit...")
-        results = {}
+        results: dict[str, Any] = {}
 
         if summary:
+            from ..metrics import get_vault_metrics
+
             metrics = get_vault_metrics(_t.TARGET_DIR)
             results["summary"] = {
                 "total_docs": metrics.total_docs,
@@ -493,29 +483,29 @@ def register_tools(mcp: FastMCP) -> None:
             }
 
         if verify or fix:
-            errors = get_malformed(_t.TARGET_DIR)
-            errors.extend(verify_vertical_integrity(_t.TARGET_DIR))
+            check_results = run_all_checks(_t.TARGET_DIR, fix=fix)
+
+            all_diags = []
+            total_fixed = 0
+            for cr in check_results:
+                total_fixed += cr.fixed_count
+                for d in cr.diagnostics:
+                    if d.severity != Severity.INFO:
+                        all_diags.append(
+                            {
+                                "check": cr.check_name,
+                                "path": str(d.path) if d.path else None,
+                                "message": d.message,
+                                "severity": d.severity.value,
+                            }
+                        )
+
             results["verification"] = {
-                "passed": len(errors) == 0,
-                "errors": [
-                    {
-                        "path": str(e.path.relative_to(_t.TARGET_DIR)),
-                        "message": e.message,
-                    }
-                    for e in errors
-                ],
+                "passed": len(all_diags) == 0,
+                "errors": all_diags,
             }
 
-            if fix and errors:
-                await ctx.info("Attempting auto-repair of violations...")
-                fixes = fix_violations(_t.TARGET_DIR)
-                results["fixes"] = [
-                    {
-                        "path": str(f.path.relative_to(_t.TARGET_DIR)),
-                        "action": f.action,
-                        "detail": f.detail,
-                    }
-                    for f in fixes
-                ]
+            if fix and total_fixed:
+                results["fixed_count"] = total_fixed
 
         return results

@@ -7,9 +7,15 @@ Delegates to the vaultcore query engine and hydration module for backend logic.
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
+
+if TYPE_CHECKING:
+    from rich.console import Console
+
+    from vaultspec_core.graph.api import VaultGraph
+    from vaultspec_core.vaultcore.checks._base import CheckResult
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +29,18 @@ feature_app = typer.Typer(
     no_args_is_help=True,
 )
 vault_app.add_typer(feature_app, name="feature")
+
+graph_app = typer.Typer(
+    help="Visualise and export the vault document graph.",
+    invoke_without_command=True,
+)
+vault_app.add_typer(graph_app, name="graph")
+
+check_app = typer.Typer(
+    help="Run vault health checks with optional auto-fix.",
+    no_args_is_help=True,
+)
+vault_app.add_typer(check_app, name="check")
 
 
 # ---- vault add ---------------------------------------------------------------
@@ -38,11 +56,12 @@ def cmd_add(
         str | None, typer.Option("--date", help="Override date (YYYY-MM-DD)")
     ] = None,
     title: Annotated[str | None, typer.Option("--title", help="Document title")] = None,
-    content: Annotated[
-        str | None, typer.Option("--content", help="Initial content")
-    ] = None,
 ) -> None:
-    """Create a new .vault/ document from a template."""
+    """Create a new .vault/ document from a template.
+
+    Supported types: adr, audit, exec, plan, reference, research.
+    """
+    import re
     from datetime import datetime
 
     from vaultspec_core.console import get_console
@@ -62,6 +81,18 @@ def cmd_add(
         )
         raise typer.Exit(code=1) from None
 
+    # Validate feature tag
+    feat = feature.lstrip("#").strip()
+    if not feat:
+        console.print("[red]--feature / -f is required (e.g. -f my-feature)[/red]")
+        raise typer.Exit(code=1)
+    if not re.match(r"^[a-z0-9][a-z0-9-]*$", feat):
+        console.print(
+            f"[red]Invalid feature tag '{feat}'. "
+            "Must be kebab-case (lowercase, digits, hyphens).[/red]"
+        )
+        raise typer.Exit(code=1)
+
     # Default date to today
     date_str = date or datetime.now().strftime("%Y-%m-%d")
 
@@ -69,7 +100,7 @@ def cmd_add(
         path = create_vault_doc(
             root_dir=_t.TARGET_DIR,
             doc_type=dt,
-            feature=feature.lstrip("#"),
+            feature=feat,
             date_str=date_str,
             title=title,
         )
@@ -159,38 +190,402 @@ def cmd_list(
         console.print("  ".join(parts))
 
 
-# ---- vault doctor ------------------------------------------------------------
+# ---- vault graph ------------------------------------------------------------
+
+
+@graph_app.callback(invoke_without_command=True)
+def cmd_graph(
+    ctx: typer.Context,
+    feature: Annotated[
+        str | None,
+        typer.Option(
+            "--feature",
+            "-f",
+            help="Scope to a single feature",
+        ),
+    ] = None,
+    as_json: Annotated[
+        bool,
+        typer.Option("--json", help="Output graph as JSON"),
+    ] = False,
+    metrics: Annotated[
+        bool,
+        typer.Option("--metrics", "-m", help="Show metrics"),
+    ] = False,
+    ascii_graph: Annotated[
+        bool,
+        typer.Option(
+            "--ascii",
+            help="Render graph topology via phart",
+        ),
+    ] = False,
+    include_body: Annotated[
+        bool,
+        typer.Option("--body", help="Include body in JSON"),
+    ] = False,
+) -> None:
+    """Render the vault document graph.
+
+    Default output is a Rich hierarchical tree grouped by feature and
+    type.  Use --ascii for a phart ASCII topology rendering, --json
+    for networkx node-link JSON export, or --metrics for aggregate
+    statistics computed by networkx algorithms.
+    """
+    if ctx.invoked_subcommand is not None:
+        return
+
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core import types as _t
+    from vaultspec_core.graph import VaultGraph
+
+    console = get_console()
+    graph = VaultGraph(_t.TARGET_DIR)
+
+    if not graph.nodes:
+        console.print("[dim]No vault documents found.[/dim]")
+        raise typer.Exit(code=0)
+
+    if as_json:
+        console.print_json(
+            graph.to_json(
+                feature=feature,
+                include_body=include_body,
+            ),
+        )
+        return
+
+    if metrics:
+        _print_metrics(console, graph, feature=feature)
+        return
+
+    if ascii_graph:
+        console.print(graph.render_ascii(feature=feature))
+        return
+
+    # Default: Rich hierarchical tree
+    tree = graph.render_tree(feature=feature)
+    console.print(tree)
+
+
+def _print_metrics(
+    console: Console,
+    graph: VaultGraph,
+    feature: str | None = None,
+) -> None:
+    """Render graph metrics as Rich tables."""
+    from rich.table import Table
+
+    m = graph.metrics(feature=feature)
+
+    title = f"Graph Metrics - #{feature}" if feature else "Graph Metrics"
+    console.print(f"\n[bold]{title}[/bold]\n")
+
+    table = Table(
+        show_header=False,
+        box=None,
+        padding=(0, 2),
+    )
+    table.add_column("Metric", style="bold")
+    table.add_column("Value", justify="right")
+
+    table.add_row("Documents", str(m.total_nodes))
+    table.add_row("Edges", str(m.total_edges))
+    table.add_row("Features", str(m.total_features))
+    table.add_row("Total words", f"{m.total_words:,}")
+    table.add_row("Density", f"{m.density:.4f}")
+    table.add_row("Avg in-degree", f"{m.avg_in_degree:.2f}")
+    table.add_row("Avg out-degree", f"{m.avg_out_degree:.2f}")
+    if m.max_in_degree[1]:
+        n, c = m.max_in_degree
+        table.add_row("Max in-degree", f"{c}  ({n})")
+    if m.max_out_degree[1]:
+        n, c = m.max_out_degree
+        table.add_row("Max out-degree", f"{c}  ({n})")
+    table.add_row("Orphans", str(m.orphan_count))
+    table.add_row("Invalid links", str(m.invalid_link_count))
+    table.add_row("Components", str(m.connected_components))
+
+    console.print(table)
+
+    if m.nodes_by_type:
+        console.print("\n[bold]By type[/bold]")
+        for dt, count in m.nodes_by_type.items():
+            console.print(f"  {dt}: {count}")
+
+    if m.nodes_by_feature and not feature:
+        console.print("\n[bold]By feature[/bold]")
+        for feat, count in m.nodes_by_feature.items():
+            console.print(f"  #{feat}: {count}")
+
+    if m.in_degree_centrality:
+        console.print("\n[bold]In-degree centrality (top 10)[/bold]")
+        for name, score in m.in_degree_centrality.items():
+            console.print(f"  {name}: {score:.4f}")
+
+    if m.betweenness_centrality:
+        console.print("\n[bold]Betweenness centrality (top 10)[/bold]")
+        for name, score in m.betweenness_centrality.items():
+            console.print(f"  {name}: {score:.4f}")
+
+
+# ---- vault check subcommands ------------------------------------------------
+
+
+def _reject_fix(check_name: str, fix: bool) -> None:
+    """Error and exit if --fix is used on a check that doesn't support it."""
+    if fix:
+        from vaultspec_core.console import get_console
+
+        console = get_console()
+        console.print(
+            f"[red]Error: 'vault check {check_name}'"
+            " has no auto-fix capabilities.[/red]"
+        )
+        raise typer.Exit(code=1)
+
+
+def _render_and_exit(result: CheckResult, verbose: bool) -> None:
+    """Render a CheckResult and exit with appropriate code."""
+    from vaultspec_core.console import get_console
+    from vaultspec_core.vaultcore.checks import render_check_result
+
+    console = get_console()
+    render_check_result(console, result, verbose=verbose)
+    if result.error_count:
+        raise typer.Exit(code=1)
+
+
+@check_app.command("all")
+def cmd_check_all(
+    fix: Annotated[
+        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+    ] = False,
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+) -> None:
+    """Run all vault health checks."""
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core import types as _t
+    from vaultspec_core.vaultcore.checks import render_check_result, run_all_checks
+
+    console = get_console()
+    results = run_all_checks(_t.TARGET_DIR, feature=feature, fix=fix)
+
+    console.print("[bold]Vault Check — All[/bold]")
+    for r in results:
+        render_check_result(console, r, verbose=verbose)
+
+    total_errors = sum(r.error_count for r in results)
+    total_warnings = sum(r.warning_count for r in results)
+    total_fixed = sum(r.fixed_count for r in results)
+
+    console.print()
+    parts = []
+    if total_errors:
+        parts.append(
+            f"[red]{total_errors} error{'s' if total_errors != 1 else ''}[/red]"
+        )
+    if total_warnings:
+        sfx = "s" if total_warnings != 1 else ""
+        parts.append(f"[yellow]{total_warnings} warning{sfx}[/yellow]")
+    if total_fixed:
+        parts.append(f"[green]{total_fixed} fixed[/green]")
+    if parts:
+        console.print(f"  Total: {', '.join(parts)}")
+    else:
+        console.print("  [green]All checks passed.[/green]")
+
+    if total_errors:
+        raise typer.Exit(code=1)
+
+
+@check_app.command("orphans")
+def cmd_check_orphans(
+    fix: Annotated[
+        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+    ] = False,
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+) -> None:
+    """Find documents with no incoming wiki-links."""
+    _reject_fix("orphans", fix)
+    from vaultspec_core.core import types as _t
+    from vaultspec_core.vaultcore.checks import check_orphans
+
+    result = check_orphans(_t.TARGET_DIR, feature=feature)
+    _render_and_exit(result, verbose)
+
+
+@check_app.command("frontmatter")
+def cmd_check_frontmatter(
+    fix: Annotated[
+        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+    ] = False,
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+) -> None:
+    """Validate document frontmatter against vault schema."""
+    from vaultspec_core.core import types as _t
+    from vaultspec_core.vaultcore.checks import check_frontmatter
+
+    result = check_frontmatter(_t.TARGET_DIR, feature=feature, fix=fix)
+    _render_and_exit(result, verbose)
+
+
+@check_app.command("links")
+def cmd_check_links(
+    fix: Annotated[
+        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+    ] = False,
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+) -> None:
+    """Check wiki-links follow Obsidian convention (no .md extension)."""
+    from vaultspec_core.core import types as _t
+    from vaultspec_core.vaultcore.checks import check_links
+
+    result = check_links(_t.TARGET_DIR, feature=feature, fix=fix)
+    _render_and_exit(result, verbose)
+
+
+@check_app.command("features")
+def cmd_check_features(
+    fix: Annotated[
+        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+    ] = False,
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+) -> None:
+    """Check feature tag completeness — missing doc types."""
+    _reject_fix("features", fix)
+    from vaultspec_core.core import types as _t
+    from vaultspec_core.vaultcore.checks import check_features
+
+    result = check_features(_t.TARGET_DIR, feature=feature)
+    _render_and_exit(result, verbose)
+
+
+@check_app.command("references")
+def cmd_check_references(
+    fix: Annotated[
+        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+    ] = False,
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+) -> None:
+    """Check for missing cross-references within features."""
+    from vaultspec_core.core import types as _t
+    from vaultspec_core.vaultcore.checks import check_references
+
+    result = check_references(_t.TARGET_DIR, feature=feature, fix=fix)
+    _render_and_exit(result, verbose)
+
+
+@check_app.command("schema")
+def cmd_check_schema(
+    fix: Annotated[
+        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+    ] = False,
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+) -> None:
+    """Enforce schema rules: ADRs must ref research, plans must ref ADRs."""
+    from vaultspec_core.core import types as _t
+    from vaultspec_core.vaultcore.checks import check_schema
+
+    result = check_schema(_t.TARGET_DIR, feature=feature, fix=fix)
+    _render_and_exit(result, verbose)
+
+
+@check_app.command("structure")
+def cmd_check_structure(
+    fix: Annotated[
+        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+    ] = False,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+) -> None:
+    """Check vault directory structure and filename conventions."""
+    from vaultspec_core.core import types as _t
+    from vaultspec_core.vaultcore.checks import check_structure
+
+    result = check_structure(_t.TARGET_DIR, fix=fix)
+    _render_and_exit(result, verbose)
+
+
+# ---- vault doctor -----------------------------------------------------------
 
 
 @vault_app.command("doctor")
-def cmd_doctor() -> None:
-    """Check vault health and integrity."""
+def cmd_doctor(
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show full diagnostics")
+    ] = False,
+) -> None:
+    """Run all vault health checks and show a compact summary."""
     from vaultspec_core.console import get_console
     from vaultspec_core.core import types as _t
-    from vaultspec_core.vaultcore.query import get_stats
+    from vaultspec_core.vaultcore.checks import render_check_result, run_all_checks
 
     console = get_console()
-    stats = get_stats(_t.TARGET_DIR)
+    results = run_all_checks(_t.TARGET_DIR, feature=feature)
+
     console.print("[bold]Vault Health Check[/bold]")
-    console.print(f"  Documents: {stats['total_docs']}")
-    console.print(f"  Features:  {stats['total_features']}")
+    for r in results:
+        render_check_result(console, r, verbose=verbose, summary_only=not verbose)
 
-    issues = []
-    if stats["orphaned_count"] > 0:
-        issues.append(
-            f"{stats['orphaned_count']} orphaned documents (no incoming links)"
-        )
-    if stats["invalid_link_count"] > 0:
-        issues.append(
-            f"{stats['invalid_link_count']} invalid links (broken references)"
-        )
+    total_errors = sum(r.error_count for r in results)
+    total_warnings = sum(r.warning_count for r in results)
 
-    if issues:
-        console.print("[yellow]Issues found:[/yellow]")
-        for issue in issues:
-            console.print(f"  [yellow]![/yellow] {issue}")
+    console.print()
+    parts = []
+    if total_errors:
+        parts.append(
+            f"[red]{total_errors} error{'s' if total_errors != 1 else ''}[/red]"
+        )
+    if total_warnings:
+        sfx = "s" if total_warnings != 1 else ""
+        parts.append(f"[yellow]{total_warnings} warning{sfx}[/yellow]")
+    if parts:
+        console.print(f"  Total: {', '.join(parts)}")
+        console.print("  Run [dim]vault check <name>[/dim] for details.")
     else:
-        console.print("[green]No issues found.[/green]")
+        console.print("  [green]All checks passed.[/green]")
+
+    if total_errors:
+        raise typer.Exit(code=1)
 
 
 # ---- vault feature list ------------------------------------------------------

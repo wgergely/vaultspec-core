@@ -17,7 +17,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from . import types as _t
 from .helpers import atomic_write, ensure_dir
 from .types import SyncResult
 
@@ -58,7 +57,8 @@ def sync_files(
         errored files.
     """
     result = SyncResult()
-    ensure_dir(dest_dir)
+    if not dry_run:
+        ensure_dir(dest_dir)
 
     logger.info("  Syncing %s...", label)
 
@@ -83,9 +83,9 @@ def sync_files(
                     action = "[UPDATE]"
 
             if action != "[SKIP]":
+                abs_path = str(dest_path).replace("\\", "/")
                 if dry_run:
-                    rel = dest_path.relative_to(_t.TARGET_DIR)
-                    logger.info("    %s %s", action, rel)
+                    result.items.append((abs_path, action))
                 else:
                     ensure_dir(dest_path.parent)
                     atomic_write(dest_path, content)
@@ -116,22 +116,24 @@ def sync_files(
                         and item.name.startswith("vaultspec-")
                         and item.name not in source_names
                     ):
-                        rel = item.relative_to(_t.TARGET_DIR)
+                        abs_path = str(item).replace("\\", "/")
                         if dry_run:
-                            logger.info("    [PRUNE] %s", rel)
+                            result.items.append((abs_path, "[DELETE]"))
                         else:
                             shutil.rmtree(item)
                         result.pruned += 1
                 else:
                     # Default pruning: .md files not in sources
+                    # Protect system-generated rule files from being pruned
                     if (
                         item.is_file()
                         and item.suffix == ".md"
                         and item.name not in source_names
+                        and not item.name.endswith("-system.builtin.md")
                     ):
-                        rel = item.relative_to(_t.TARGET_DIR)
+                        abs_path = str(item).replace("\\", "/")
                         if dry_run:
-                            logger.info("    [PRUNE] %s", rel)
+                            result.items.append((abs_path, "[DELETE]"))
                         else:
                             item.unlink()
                         result.pruned += 1
@@ -199,16 +201,10 @@ def sync_to_all_tools(
     if dest_path_fn is None:
         dest_path_fn = lambda dest_dir, name: dest_dir / name  # noqa: E731
 
-    # Read manifest to determine which providers to sync
-    from .manifest import read_manifest
-
-    installed = read_manifest(_t.TARGET_DIR)
+    from .manifest import installed_tool_configs
 
     total = SyncResult()
-    for tool_type, cfg in _t.TOOL_CONFIGS.items():
-        # Skip providers not in manifest (when manifest exists)
-        if installed and cfg.name not in installed:
-            continue
+    for tool_type, cfg in installed_tool_configs().items():
         dest_dir = getattr(cfg, dir_attr)
         if dest_dir is None:
             continue
@@ -229,6 +225,7 @@ def sync_to_all_tools(
         total.pruned += result.pruned
         total.skipped += result.skipped
         total.errors.extend(result.errors)
+        total.items.extend(result.items)
 
     print_summary(label, total)
     return total

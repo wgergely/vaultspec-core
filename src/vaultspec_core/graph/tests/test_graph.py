@@ -1,51 +1,197 @@
-"""Tests for graph defaults and fixture-backed relationship queries.
+"""Tests for the vault document graph API.
 
-Covers node defaults and graph analysis over the bundled vaultcore fixture
-vault, including hotspots, document types, link edges, invalid links, and
-feature rankings.
+Covers node construction, graph building from the fixture vault, query
+methods, metrics computation (via networkx algorithms), tree rendering
+(Rich), ASCII rendering (phart), and JSON serialisation (node_link_data).
 """
+
+import json
+from pathlib import Path
 
 import pytest
 
-from ...graph import DocNode, VaultGraph
+from ...graph import DocNode, GraphMetrics, VaultGraph
 from ...vaultcore import DocType
 
-pytestmark = [pytest.mark.api]
+pytestmark = [pytest.mark.unit]
+
+
+# ---------------------------------------------------------------------------
+# DocNode
+# ---------------------------------------------------------------------------
 
 
 class TestDocNode:
     def test_defaults(self):
-        from pathlib import Path
-
         node = DocNode(path=Path("test.md"), name="test")
         assert node.doc_type is None
         assert node.tags == set()
         assert node.out_links == set()
         assert node.in_links == set()
+        assert node.feature is None
+        assert node.date is None
+        assert node.title is None
+        assert node.body == ""
+        assert node.word_count == 0
+        assert node.frontmatter == {}
+
+    def test_to_nx_attrs_serialises_sets_as_sorted_lists(self):
+        node = DocNode(
+            path=Path("/a/b.md"),
+            name="b",
+            tags={"#z", "#a"},
+            out_links={"c", "a"},
+            in_links={"d"},
+        )
+        d = node.to_nx_attrs()
+        assert d["tags"] == ["#a", "#z"]
+        assert d["out_links"] == ["a", "c"]
+        assert d["in_links"] == ["d"]
+        assert d["path"] == str(Path("/a/b.md"))
+
+    def test_to_nx_attrs_includes_all_fields(self):
+        node = DocNode(
+            path=Path("x.md"),
+            name="x",
+            doc_type=DocType.ADR,
+            feature="my-feat",
+            date="2026-01-15",
+            title="My Title",
+            tags={"#adr", "#my-feat"},
+            frontmatter={
+                "tags": ["#adr", "#my-feat"],
+                "date": "2026-01-15",
+            },
+            body="some body",
+            word_count=2,
+            out_links=set(),
+            in_links=set(),
+        )
+        d = node.to_nx_attrs()
+        assert d["doc_type"] == "adr"
+        assert d["feature"] == "my-feat"
+        assert d["date"] == "2026-01-15"
+        assert d["title"] == "My Title"
+        assert d["word_count"] == 2
 
 
-class TestVaultGraph:
+# ---------------------------------------------------------------------------
+# GraphMetrics
+# ---------------------------------------------------------------------------
+
+
+class TestGraphMetrics:
+    def test_defaults(self):
+        m = GraphMetrics()
+        assert m.total_nodes == 0
+        assert m.density == 0.0
+        assert m.nodes_by_type == {}
+        assert m.in_degree_centrality == {}
+        assert m.betweenness_centrality == {}
+
+    def test_to_dict_restructures_degree_tuples(self):
+        m = GraphMetrics(
+            max_in_degree=("hub", 5),
+            max_out_degree=("spoke", 3),
+        )
+        d = m.to_dict()
+        assert d["max_in_degree"] == {"node": "hub", "count": 5}
+        assert d["max_out_degree"] == {
+            "node": "spoke",
+            "count": 3,
+        }
+
+
+# ---------------------------------------------------------------------------
+# VaultGraph — building
+# ---------------------------------------------------------------------------
+
+
+class TestVaultGraphBuilding:
     def test_builds_many_nodes(self, vault_root):
         graph = VaultGraph(vault_root)
         assert len(graph.nodes) > 80
 
-    def test_node_doc_types(self, vault_root):
+    def test_networkx_digraph_has_same_node_count(self, vault_root):
+        graph = VaultGraph(vault_root)
+        assert graph._digraph.number_of_nodes() == len(graph.nodes)
+
+    def test_networkx_digraph_has_edges(self, vault_root):
+        graph = VaultGraph(vault_root)
+        assert graph._digraph.number_of_edges() > 0
+
+    def test_digraph_property_exposes_nx_graph(self, vault_root):
+        import networkx as nx
+
+        graph = VaultGraph(vault_root)
+        assert isinstance(graph.digraph, nx.DiGraph)
+        assert graph.digraph is graph._digraph
+
+    def test_nx_node_attrs_are_json_friendly(self, vault_root):
+        graph = VaultGraph(vault_root)
+        name = "2026-02-05-editor-demo-architecture-adr"
+        attrs = graph.digraph.nodes[name]
+        assert isinstance(attrs["tags"], list)
+        assert isinstance(attrs["path"], str)
+        assert attrs["doc_type"] == "adr"
+
+    def test_node_has_doc_type(self, vault_root):
         graph = VaultGraph(vault_root)
         node = graph.nodes["2026-02-05-editor-demo-architecture-adr"]
         assert node.doc_type == DocType.ADR
 
+    def test_node_has_feature(self, vault_root):
+        graph = VaultGraph(vault_root)
+        node = graph.nodes["2026-02-05-editor-demo-architecture-adr"]
+        assert node.feature == "editor-demo"
+
+    def test_node_has_date(self, vault_root):
+        graph = VaultGraph(vault_root)
+        node = graph.nodes["2026-02-05-editor-demo-architecture-adr"]
+        assert node.date is not None
+        assert node.date.startswith("2026")
+
+    def test_node_has_body_and_word_count(self, vault_root):
+        graph = VaultGraph(vault_root)
+        node = graph.nodes["2026-02-05-editor-demo-architecture-adr"]
+        assert len(node.body) > 0
+        assert node.word_count > 0
+
+    def test_node_has_frontmatter_dict(self, vault_root):
+        graph = VaultGraph(vault_root)
+        node = graph.nodes["2026-02-05-editor-demo-architecture-adr"]
+        assert isinstance(node.frontmatter, dict)
+        assert "tags" in node.frontmatter
+
     def test_out_links_populated(self, vault_root):
         graph = VaultGraph(vault_root)
-        # This ADR has related: links to research and reference docs
         node = graph.nodes["2026-02-05-editor-demo-architecture-adr"]
         assert len(node.out_links) > 0
 
     def test_in_links_populated(self, vault_root):
         graph = VaultGraph(vault_root)
-        # Research doc linked from the architecture ADR
         node = graph.nodes.get("2026-02-05-editor-demo-research")
         assert node is not None
         assert len(node.in_links) > 0
+
+
+# ---------------------------------------------------------------------------
+# VaultGraph — queries
+# ---------------------------------------------------------------------------
+
+
+class TestVaultGraphQueries:
+    def test_get_node_existing(self, vault_root):
+        graph = VaultGraph(vault_root)
+        node = graph.get_node(
+            "2026-02-05-editor-demo-architecture-adr",
+        )
+        assert node is not None
+        assert node.doc_type == DocType.ADR
+
+    def test_get_node_missing(self, vault_root):
+        graph = VaultGraph(vault_root)
+        assert graph.get_node("nonexistent") is None
 
     def test_get_hotspots(self, vault_root):
         graph = VaultGraph(vault_root)
@@ -60,10 +206,17 @@ class TestVaultGraph:
         for name, _count in adr_only:
             assert graph.nodes[name].doc_type == DocType.ADR
 
+    def test_get_hotspots_filter_by_feature(self, vault_root):
+        graph = VaultGraph(vault_root)
+        results = graph.get_hotspots(feature="editor-demo")
+        for name, _count in results:
+            assert "#editor-demo" in graph.nodes[name].tags
+
     def test_get_orphaned(self, vault_root):
         graph = VaultGraph(vault_root)
         orphans = graph.get_orphaned()
         assert isinstance(orphans, list)
+        assert orphans == sorted(orphans)
 
     def test_get_invalid_links(self, vault_root):
         graph = VaultGraph(vault_root)
@@ -76,3 +229,215 @@ class TestVaultGraph:
         assert isinstance(rankings, list)
         feature_names = [name for name, _score in rankings]
         assert "editor-demo" in feature_names
+
+    def test_get_feature_nodes(self, vault_root):
+        graph = VaultGraph(vault_root)
+        nodes = graph.get_feature_nodes("editor-demo")
+        assert len(nodes) > 0
+        for node in nodes:
+            assert "#editor-demo" in node.tags
+
+    def test_get_feature_nodes_sorted_by_date(self, vault_root):
+        graph = VaultGraph(vault_root)
+        nodes = graph.get_feature_nodes("editor-demo")
+        dates = [n.date for n in nodes if n.date]
+        assert dates == sorted(dates)
+
+    def test_get_features(self, vault_root):
+        graph = VaultGraph(vault_root)
+        features = graph.get_features()
+        assert "editor-demo" in features
+        assert features == sorted(features)
+
+    def test_subgraph_returns_nx_digraph(self, vault_root):
+        import networkx as nx
+
+        graph = VaultGraph(vault_root)
+        sg = graph.subgraph(feature="editor-demo")
+        assert isinstance(sg, nx.DiGraph)
+        assert sg.number_of_nodes() > 0
+        assert sg.number_of_nodes() < len(graph.nodes)
+
+    def test_subgraph_none_returns_full(self, vault_root):
+        graph = VaultGraph(vault_root)
+        sg = graph.subgraph(feature=None)
+        assert sg is graph._digraph
+
+    def test_neighbors_out(self, vault_root):
+        graph = VaultGraph(vault_root)
+        node = graph.nodes["2026-02-05-editor-demo-architecture-adr"]
+        if node.out_links:
+            out_neighbors = graph.neighbors(
+                node.name,
+                direction="out",
+            )
+            assert len(out_neighbors) > 0
+
+    def test_neighbors_in(self, vault_root):
+        graph = VaultGraph(vault_root)
+        for node in graph.nodes.values():
+            if node.in_links:
+                in_neighbors = graph.neighbors(
+                    node.name,
+                    direction="in",
+                )
+                assert len(in_neighbors) > 0
+                break
+
+    def test_neighbors_missing_node(self, vault_root):
+        graph = VaultGraph(vault_root)
+        assert graph.neighbors("nonexistent") == []
+
+
+# ---------------------------------------------------------------------------
+# VaultGraph — metrics (networkx algorithms)
+# ---------------------------------------------------------------------------
+
+
+class TestVaultGraphMetrics:
+    def test_global_metrics(self, vault_root):
+        graph = VaultGraph(vault_root)
+        m = graph.metrics()
+        assert m.total_nodes > 80
+        assert m.total_edges > 0
+        assert m.total_features > 0
+        assert m.total_words > 0
+        assert 0.0 <= m.density <= 1.0
+        assert m.avg_in_degree > 0
+        assert m.connected_components >= 1
+        assert len(m.nodes_by_type) > 0
+
+    def test_centrality_populated(self, vault_root):
+        graph = VaultGraph(vault_root)
+        m = graph.metrics()
+        assert len(m.in_degree_centrality) > 0
+        assert len(m.betweenness_centrality) > 0
+        # Values are normalised floats
+        for v in m.in_degree_centrality.values():
+            assert 0.0 <= v <= 1.0
+        for v in m.betweenness_centrality.values():
+            assert 0.0 <= v <= 1.0
+
+    def test_feature_scoped_metrics(self, vault_root):
+        graph = VaultGraph(vault_root)
+        m = graph.metrics(feature="editor-demo")
+        assert m.total_nodes > 0
+        assert m.total_features == 1
+        assert m.nodes_by_feature == {
+            "editor-demo": m.total_nodes,
+        }
+
+    def test_metrics_to_dict(self, vault_root):
+        graph = VaultGraph(vault_root)
+        m = graph.metrics()
+        d = m.to_dict()
+        assert "total_nodes" in d
+        assert "max_in_degree" in d
+        assert isinstance(d["max_in_degree"], dict)
+        assert "in_degree_centrality" in d
+        assert "betweenness_centrality" in d
+
+
+# ---------------------------------------------------------------------------
+# VaultGraph — ASCII rendering (phart)
+# ---------------------------------------------------------------------------
+
+
+class TestVaultGraphASCII:
+    def test_render_ascii_returns_string(self, vault_root):
+        graph = VaultGraph(vault_root)
+        result = graph.render_ascii()
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_render_ascii_feature_scoped(self, vault_root):
+        graph = VaultGraph(vault_root)
+        result = graph.render_ascii(feature="editor-demo")
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+
+# ---------------------------------------------------------------------------
+# VaultGraph — tree rendering (Rich)
+# ---------------------------------------------------------------------------
+
+
+class TestVaultGraphRendering:
+    def test_render_tree_full_vault(self, vault_root):
+        from rich.tree import Tree
+
+        graph = VaultGraph(vault_root)
+        tree = graph.render_tree()
+        assert isinstance(tree, Tree)
+
+    def test_render_tree_feature_scoped(self, vault_root):
+        from rich.tree import Tree
+
+        graph = VaultGraph(vault_root)
+        tree = graph.render_tree(feature="editor-demo")
+        assert isinstance(tree, Tree)
+
+
+# ---------------------------------------------------------------------------
+# VaultGraph — JSON serialisation (networkx node_link_data)
+# ---------------------------------------------------------------------------
+
+
+class TestVaultGraphJSON:
+    def test_to_dict_uses_node_link_format(self, vault_root):
+        graph = VaultGraph(vault_root)
+        d = graph.to_dict()
+        # networkx node_link_data keys
+        assert "directed" in d
+        assert "multigraph" in d
+        assert "nodes" in d
+        assert "edges" in d
+        # vault enrichments
+        assert "metrics" in d
+        assert "root" in d
+        assert d["directed"] is True
+
+    def test_to_dict_nodes_have_id(self, vault_root):
+        graph = VaultGraph(vault_root)
+        d = graph.to_dict()
+        for node_dict in d["nodes"]:
+            assert "id" in node_dict
+
+    def test_to_dict_body_excluded_by_default(self, vault_root):
+        graph = VaultGraph(vault_root)
+        d = graph.to_dict()
+        for node_dict in d["nodes"]:
+            assert "body" not in node_dict
+
+    def test_to_dict_with_body(self, vault_root):
+        graph = VaultGraph(vault_root)
+        d = graph.to_dict(include_body=True)
+        has_body = any("body" in n for n in d["nodes"])
+        assert has_body
+
+    def test_to_dict_feature_scoped(self, vault_root):
+        graph = VaultGraph(vault_root)
+        d = graph.to_dict(feature="editor-demo")
+        assert d["feature"] == "editor-demo"
+        for node_dict in d["nodes"]:
+            assert "#editor-demo" in node_dict.get("tags", [])
+
+    def test_to_json_is_valid_json(self, vault_root):
+        graph = VaultGraph(vault_root)
+        s = graph.to_json()
+        parsed = json.loads(s)
+        assert "nodes" in parsed
+        assert "metrics" in parsed
+
+    def test_to_json_feature_scoped(self, vault_root):
+        graph = VaultGraph(vault_root)
+        s = graph.to_json(feature="editor-demo")
+        parsed = json.loads(s)
+        assert parsed["feature"] == "editor-demo"
+
+    def test_edges_have_source_and_target(self, vault_root):
+        graph = VaultGraph(vault_root)
+        d = graph.to_dict()
+        for edge in d["edges"]:
+            assert "source" in edge
+            assert "target" in edge

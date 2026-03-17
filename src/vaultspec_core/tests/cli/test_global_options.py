@@ -20,9 +20,9 @@ class TestGlobalOptions:
         assert "no such option" in result.output.lower()
 
     def test_target_help_text(self, runner):
-        """--target help must describe destination folder."""
+        """--target help must describe target directory."""
         result = runner.invoke(app, ["--help"])
-        assert "Select installation destination folder" in result.output
+        assert "target directory" in result.output.lower()
 
     def test_debug_flag_exists(self, runner):
         """--debug must still exist."""

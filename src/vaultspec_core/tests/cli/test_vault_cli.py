@@ -1,6 +1,6 @@
 """Unit tests for the vault command group.
 
-Covers vault add, vault stats, vault doctor, etc.
+Covers vault add, vault stats, vault check, etc.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ class TestHelpText:
         result = run_vault(runner, "--help", target=test_project)
         assert result.exit_code == 0
         assert "add" in result.output
-        assert "doctor" in result.output
+        assert "check" in result.output
         assert "stats" in result.output
 
     def test_add_help(self, runner, test_project):

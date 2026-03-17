@@ -14,24 +14,26 @@ def runner():
 
 
 class TestSyncCoreError:
-    def test_sync_core_fails(self, runner):
+    def test_sync_core_fails(self, runner, test_project):
         """sync core must fail with clear error."""
-        result = runner.invoke(app, ["sync", "core"])
+        result = runner.invoke(app, ["--target", str(test_project), "sync", "core"])
         assert result.exit_code != 0
         assert "core" in result.output.lower()
 
-    def test_sync_core_error_mentions_source(self, runner):
+    def test_sync_core_error_mentions_source(self, runner, test_project):
         """Error should explain that core is the sync source."""
-        result = runner.invoke(app, ["sync", "core"])
+        result = runner.invoke(app, ["--target", str(test_project), "sync", "core"])
         assert (
             "source" in result.output.lower() or ".vaultspec" in result.output.lower()
         )
 
 
 class TestSyncValidation:
-    def test_sync_unknown_provider_fails(self, runner):
+    def test_sync_unknown_provider_fails(self, runner, test_project):
         """Unknown provider name must fail."""
-        result = runner.invoke(app, ["sync", "nonexistent"])
+        result = runner.invoke(
+            app, ["--target", str(test_project), "sync", "nonexistent"]
+        )
         assert result.exit_code != 0
 
     def test_sync_help_shows_providers(self, runner):

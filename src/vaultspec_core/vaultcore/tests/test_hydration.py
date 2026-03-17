@@ -2,7 +2,11 @@
 
 import logging
 
+import pytest
+
 from vaultspec_core.vaultcore import hydrate_template
+
+pytestmark = [pytest.mark.unit]
 
 
 def test_hydrate_template_basic():

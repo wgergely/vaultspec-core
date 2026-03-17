@@ -50,6 +50,11 @@ def test_project(tmp_path):
     (project / ".claude" / "skills").mkdir(parents=True)
     (project / ".gemini" / "rules").mkdir(parents=True)
 
+    # Write provider manifest with all providers installed
+    from vaultspec_core.core.manifest import write_manifest
+
+    write_manifest(project, {"claude", "gemini", "antigravity", "codex"})
+
     # Mock init_paths to point to this temp project
     from vaultspec_core.config.workspace import resolve_workspace
 

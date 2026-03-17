@@ -156,6 +156,8 @@ def _sync_codex_agents(
     existing = path.read_text(encoding="utf-8") if existed else ""
     body = _build_codex_agents_body(sources)
 
+    abs_path = str(path).replace("\\", "/")
+
     if not body:
         # No agents to sync. If pruning, strip any existing block.
         if prune and existed and has_block(existing, "agents"):
@@ -165,7 +167,9 @@ def _sync_codex_agents(
                 logger.warning("Cannot prune agents from %s: %s", path, e)
                 result.errors.append(str(e))
                 return result
-            if not dry_run:
+            if dry_run:
+                result.items.append((abs_path, "[DELETE]"))
+            else:
                 atomic_write(path, new_content)
             result.pruned = 1
         else:
@@ -183,8 +187,9 @@ def _sync_codex_agents(
         result.skipped = len(sources) if sources else 1
         return result
 
+    action = "[UPDATE]" if existed else "[ADD]"
     if dry_run:
-        logger.info("  [CODEX] would sync %s", path)
+        result.items.append((abs_path, action))
     else:
         ensure_dir(path.parent)
         atomic_write(path, new_content)
@@ -260,7 +265,7 @@ def agents_add(
     logger.info("Created agent: %s", file_path)
 
 
-def agents_sync(dry_run: bool = False, prune: bool = False) -> None:
+def agents_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
     """Sync all agent definitions to every configured tool destination.
 
     Args:
@@ -269,7 +274,19 @@ def agents_sync(dry_run: bool = False, prune: bool = False) -> None:
     """
     sources = collect_agents()
     total = SyncResult()
-    for tool_type, cfg in _t.TOOL_CONFIGS.items():
+
+    def _merge(result: SyncResult) -> None:
+        total.added += result.added
+        total.updated += result.updated
+        total.pruned += result.pruned
+        total.skipped += result.skipped
+        total.errors.extend(result.errors)
+        total.items.extend(result.items)
+
+    from .manifest import installed_tool_configs
+
+    active_configs = installed_tool_configs()
+    for tool_type, cfg in active_configs.items():
         if tool_type is Tool.CODEX or cfg.agents_dir is None:
             continue
         result = sync_files(
@@ -283,16 +300,10 @@ def agents_sync(dry_run: bool = False, prune: bool = False) -> None:
             dry_run=dry_run,
             label=f"Agents -> {tool_type.value}",
         )
-        total.added += result.added
-        total.updated += result.updated
-        total.pruned += result.pruned
-        total.skipped += result.skipped
-        total.errors.extend(result.errors)
+        _merge(result)
 
-    codex_result = _sync_codex_agents(sources, prune=prune, dry_run=dry_run)
-    total.added += codex_result.added
-    total.updated += codex_result.updated
-    total.pruned += codex_result.pruned
-    total.skipped += codex_result.skipped
-    total.errors.extend(codex_result.errors)
+    if Tool.CODEX in active_configs:
+        codex_result = _sync_codex_agents(sources, prune=prune, dry_run=dry_run)
+        _merge(codex_result)
     print_summary("Agents", total)
+    return total

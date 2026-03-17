@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import typer
 
@@ -18,6 +18,9 @@ from . import types as _t
 from .enums import Tool
 from .helpers import _launch_editor, build_file, collect_md_resources, ensure_dir
 from .sync import sync_to_all_tools
+
+if TYPE_CHECKING:
+    from .types import SyncResult
 
 logger = logging.getLogger(__name__)
 
@@ -127,14 +130,14 @@ def rules_add(
     logger.info("Created custom rule: %s", file_path)
 
 
-def rules_sync(dry_run: bool = False, prune: bool = False) -> None:
+def rules_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
     """Sync all rule definitions to every configured tool destination.
 
     Args:
         dry_run: If ``True``, log planned actions without writing.
         prune: If ``True``, remove stale rule files.
     """
-    sync_to_all_tools(
+    return sync_to_all_tools(
         sources=collect_rules(),
         dir_attr="rules_dir",
         transform_fn=transform_rule,

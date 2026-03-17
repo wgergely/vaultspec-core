@@ -71,35 +71,28 @@ def _toml_quote(value: str) -> str:
     return f'"{escaped}"'
 
 
-def _read_framework_project_parts() -> tuple[
-    dict[str, object], str, dict[str, object], str
-]:
+def _read_codex_config_meta() -> dict[str, object]:
+    """Read Codex-relevant settings from system parts that have pipeline: config."""
     from ..vaultcore import parse_frontmatter
 
-    internal_meta: dict[str, object] = {}
-    internal_body = ""
-    if _t.FRAMEWORK_CONFIG_SRC.exists():
-        internal_meta, internal_body = parse_frontmatter(
-            _t.FRAMEWORK_CONFIG_SRC.read_text(encoding="utf-8")
-        )
-        internal_body = internal_body.strip()
-
-    project_meta: dict[str, object] = {}
-    custom_body = ""
-    if _t.PROJECT_CONFIG_SRC.exists():
-        project_meta, custom_body = parse_frontmatter(
-            _t.PROJECT_CONFIG_SRC.read_text(encoding="utf-8")
-        )
-        custom_body = custom_body.strip()
-
-    return internal_meta, internal_body, project_meta, custom_body
-
-
-def _merge_codex_config_meta(
-    internal_meta: dict[str, object],
-    project_meta: dict[str, object],
-) -> dict[str, object]:
     merged: dict[str, object] = {}
+    if not _t.SYSTEM_SRC_DIR.exists():
+        return merged
+    for f in sorted(_t.SYSTEM_SRC_DIR.glob("*.md")):
+        try:
+            content = f.read_text(encoding="utf-8")
+            meta, _body = parse_frontmatter(content)
+            if meta.get("pipeline") == "config":
+                merged.update(meta)
+        except Exception:
+            continue
+    return merged
+
+
+def _filter_codex_config_meta(
+    meta: dict[str, object],
+) -> dict[str, object]:
+    filtered: dict[str, object] = {}
     supported_keys = [
         "codex_model",
         "codex_model_provider",
@@ -115,10 +108,10 @@ def _merge_codex_config_meta(
         "codex_project_root_markers",
     ]
     for key in supported_keys:
-        value = project_meta.get(key, internal_meta.get(key))
+        value = meta.get(key)
         if value is not None:
-            merged[key] = value
-    return merged
+            filtered[key] = value
+    return filtered
 
 
 def _render_codex_config_lines(meta: dict[str, object]) -> list[str]:
@@ -173,31 +166,22 @@ def _render_codex_config_lines(meta: dict[str, object]) -> list[str]:
 
 def _generate_config_body(cfg: ToolConfig) -> str | None:
     """Assemble the managed block body for a tool's root config file."""
-    if cfg.config_file is None or not _t.FRAMEWORK_CONFIG_SRC.exists():
+    if cfg.config_file is None:
         return None
 
-    (
-        _internal_meta,
-        internal_body,
-        _project_meta,
-        custom_body,
-    ) = _read_framework_project_parts()
-
-    body_parts = [internal_body]
-
-    if custom_body:
-        body_parts.append("")
-        body_parts.append(custom_body)
+    body_parts: list[str] = []
 
     refs = _collect_rule_refs(cfg)
     if refs:
-        body_parts.append("")
         body_parts.append("## Rules")
         body_parts.append("")
         body_parts.append("You MUST respect these rules at all times:")
         body_parts.append("")
         for ref in refs:
             body_parts.append(f"@{ref}")
+
+    if not body_parts:
+        return None
 
     return "\n".join(body_parts)
 
@@ -225,14 +209,9 @@ def _generate_rule_ref_body(cfg: ToolConfig) -> str | None:
 
 def _generate_codex_native_config_body() -> str | None:
     """Generate body for Codex config.toml managed settings block."""
-    (
-        internal_meta,
-        _internal_body,
-        project_meta,
-        _custom_body,
-    ) = _read_framework_project_parts()
-    merged = _merge_codex_config_meta(internal_meta, project_meta)
-    lines = _render_codex_config_lines(merged)
+    raw_meta = _read_codex_config_meta()
+    filtered = _filter_codex_config_meta(raw_meta)
+    lines = _render_codex_config_lines(filtered)
     if not lines:
         return None
     return "\n".join(lines)
@@ -278,15 +257,19 @@ def _sync_managed_md(
     if path.exists():
         existing = path.read_text(encoding="utf-8")
         if has_block(existing, block_type):
-            # Block exists — always safe to update our own content.
+            # Block exists — check if content actually changed.
+            updated = upsert_block(existing, block_type, body)
+            if updated == existing:
+                return "[SKIP]"
             if not dry_run:
-                updated = upsert_block(existing, block_type, body)
                 atomic_write(path, updated)
             return "[UPDT]"
         if _is_cli_managed(existing) or force:
             # File is ours or force — upsert (append block).
+            updated = upsert_block(existing, block_type, body)
+            if updated == existing:
+                return "[SKIP]"
             if not dry_run:
-                updated = upsert_block(existing, block_type, body)
                 atomic_write(path, updated)
             return "[UPDT]"
         # File exists with user content, no managed block, no force.
@@ -315,7 +298,8 @@ def _sync_managed_toml(
 
     Returns the action taken.
     """
-    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    existed = path.exists()
+    existing = path.read_text(encoding="utf-8") if existed else ""
 
     try:
         updated = upsert_block(existing, block_type, body, comment_prefix="# ")
@@ -330,7 +314,7 @@ def _sync_managed_toml(
         ensure_dir(path.parent)
         atomic_write(path, updated)
 
-    return "[ADD]" if not path.exists() else "[UPDT]"
+    return "[UPDT]" if existed else "[ADD]"
 
 
 # ---------------------------------------------------------------------------
@@ -352,7 +336,7 @@ def config_show() -> None:
         typer.echo()
 
 
-def config_sync(dry_run: bool = False, force: bool = False) -> None:
+def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
     """Sync tool configuration files using ``<vaultspec>`` managed blocks.
 
     For markdown files (CLAUDE.md, GEMINI.md, AGENTS.md), inserts or
@@ -362,16 +346,59 @@ def config_sync(dry_run: bool = False, force: bool = False) -> None:
     For TOML files (.codex/config.toml), inserts or updates
     ``# <vaultspec type="...">`` blocks.
     """
+    from .manifest import installed_tool_configs
+
     result = SyncResult()
+    active_configs = installed_tool_configs()
+
+    def _record(path: Path, action: str) -> None:
+        abs_path = str(path).replace("\\", "/")
+        if action == "[ADD]":
+            result.added += 1
+            if dry_run:
+                result.items.append((abs_path, "[ADD]"))
+        elif action == "[UPDT]":
+            result.updated += 1
+            if dry_run:
+                result.items.append((abs_path, "[UPDATE]"))
 
     # --- Markdown root config files ---
-    for _tool_type, cfg in _t.TOOL_CONFIGS.items():
+    # Aggregate rule refs from all providers sharing the same config_file
+    # to avoid last-writer-wins conflicts (e.g. gemini + antigravity → GEMINI.md).
+    config_refs: dict[Path, list[str]] = {}
+    for _tool_type, cfg in active_configs.items():
         if not cfg.config_file:
             continue
+        refs = _collect_rule_refs(cfg)
+        config_refs.setdefault(cfg.config_file, []).extend(refs)
 
-        body = _generate_config_body(cfg)
-        if not body:
+    seen_config_files: set[Path] = set()
+    for _tool_type, cfg in active_configs.items():
+        if not cfg.config_file or cfg.config_file in seen_config_files:
             continue
+        seen_config_files.add(cfg.config_file)
+
+        all_refs = config_refs.get(cfg.config_file, [])
+        if not all_refs:
+            continue
+
+        # Deduplicate while preserving order
+        seen_refs: list[str] = []
+        seen_ref_set: set[str] = set()
+        for ref in all_refs:
+            if ref not in seen_ref_set:
+                seen_ref_set.add(ref)
+                seen_refs.append(ref)
+
+        body_parts = [
+            "## Rules",
+            "",
+            "You MUST respect these rules at all times:",
+            "",
+        ]
+        for ref in seen_refs:
+            body_parts.append(f"@{ref}")
+        body = "\n".join(body_parts)
 
         action = _sync_managed_md(
             cfg.config_file,
@@ -381,14 +408,10 @@ def config_sync(dry_run: bool = False, force: bool = False) -> None:
             force=force,
         )
         logger.info("%s %s", action, cfg.config_file)
-
-        if action == "[ADD]":
-            result.added += 1
-        elif action == "[UPDT]":
-            result.updated += 1
+        _record(cfg.config_file, action)
 
     # --- Secondary rule-reference config files (.gemini/GEMINI.md) ---
-    for _tool_type, cfg in _t.TOOL_CONFIGS.items():
+    for _tool_type, cfg in active_configs.items():
         ref_body = _generate_rule_ref_body(cfg)
         if not ref_body or cfg.rule_ref_config_file is None:
             continue
@@ -401,14 +424,11 @@ def config_sync(dry_run: bool = False, force: bool = False) -> None:
             force=force,
         )
         logger.info("%s %s", action, cfg.rule_ref_config_file)
-
-        if action == "[ADD]":
-            result.added += 1
-        elif action == "[UPDT]":
-            result.updated += 1
+        _record(cfg.rule_ref_config_file, action)
 
     # --- Codex native config (TOML) ---
-    codex_native_path = _t.TOOL_CONFIGS[Tool.CODEX].native_config_file
+    codex_cfg = active_configs.get(Tool.CODEX)
+    codex_native_path = codex_cfg.native_config_file if codex_cfg else None
     if codex_native_path is not None:
         config_body = _generate_codex_native_config_body()
         if config_body:
@@ -420,24 +440,10 @@ def config_sync(dry_run: bool = False, force: bool = False) -> None:
             )
             if action != "[SKIP]":
                 logger.info("%s %s", action, codex_native_path)
-            if action == "[ADD]":
-                result.added += 1
-            elif action == "[UPDT]":
-                result.updated += 1
+            _record(codex_native_path, action)
 
-        agents_body = _generate_codex_agents_body()
-        if agents_body:
-            action = _sync_managed_toml(
-                codex_native_path,
-                "agents",
-                agents_body,
-                dry_run=dry_run,
-            )
-            if action != "[SKIP]":
-                logger.info("%s %s", action, codex_native_path)
-            if action == "[ADD]":
-                result.added += 1
-            elif action == "[UPDT]":
-                result.updated += 1
+        # NOTE: Codex agents block is managed by agents_sync/_sync_codex_agents,
+        # not here, to avoid conflicting writes to the same TOML block.
 
     print_summary("Config", result)
+    return result

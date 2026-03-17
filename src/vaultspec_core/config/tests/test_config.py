@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import pytest
+
 from vaultspec_core.config import (
     CONFIG_REGISTRY,
     VaultSpecConfig,
@@ -14,6 +16,8 @@ from vaultspec_core.config import (
     parse_int_or_none,
     reset_config,
 )
+
+pytestmark = [pytest.mark.unit]
 
 
 class TestConfigParsing:

@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 
 spec_app = typer.Typer(
     help=(
-        "Manage framework resources: rules, skills, agents,"
-        " system prompts, and hooks."
+        "Manage framework resources: rules, skills, agents, system prompts, and hooks."
     ),
     no_args_is_help=True,
 )
@@ -120,11 +119,14 @@ def cmd_rules_revert(
     from vaultspec_core.core.revert import revert_resource
 
     vaultspec_dir = _t.TARGET_DIR / ".vaultspec"
+    if not filename.endswith(".md"):
+        filename = f"{filename}.md"
     result = revert_resource(vaultspec_dir, "rules", filename)
     if result.get("reverted"):
         typer.echo(f"Reverted rule: {filename}")
     else:
-        typer.echo(f"No snapshot found for rule: {filename}", err=True)
+        msg = result.get("reason", f"No snapshot found for rule: {filename}")
+        typer.echo(msg, err=True)
         raise typer.Exit(code=1)
 
 
@@ -170,7 +172,7 @@ def cmd_skills_show(name: Annotated[str, typer.Argument(help="Skill name")]) -> 
     from vaultspec_core.core import resource_show
     from vaultspec_core.core import types as _t
 
-    resource_show(name=name, base_dir=_t.SKILLS_SRC_DIR, label="Skill")
+    resource_show(name=name, base_dir=_t.SKILLS_SRC_DIR, label="Skill", is_dir=True)
 
 
 @skills_app.command("edit")
@@ -179,7 +181,7 @@ def cmd_skills_edit(name: Annotated[str, typer.Argument(help="Skill name")]) -> 
     from vaultspec_core.core import resource_edit
     from vaultspec_core.core import types as _t
 
-    resource_edit(name=name, base_dir=_t.SKILLS_SRC_DIR, label="Skill")
+    resource_edit(name=name, base_dir=_t.SKILLS_SRC_DIR, label="Skill", is_dir=True)
 
 
 @skills_app.command("remove")
@@ -191,7 +193,9 @@ def cmd_skills_remove(
     from vaultspec_core.core import resource_remove
     from vaultspec_core.core import types as _t
 
-    resource_remove(name=name, base_dir=_t.SKILLS_SRC_DIR, label="Skill", force=force)
+    resource_remove(
+        name=name, base_dir=_t.SKILLS_SRC_DIR, label="Skill", force=force, is_dir=True
+    )
 
 
 @skills_app.command("rename")
@@ -204,7 +208,11 @@ def cmd_skills_rename(
     from vaultspec_core.core import types as _t
 
     resource_rename(
-        old_name=old_name, new_name=new_name, base_dir=_t.SKILLS_SRC_DIR, label="Skill"
+        old_name=old_name,
+        new_name=new_name,
+        base_dir=_t.SKILLS_SRC_DIR,
+        label="Skill",
+        is_dir=True,
     )
 
 
@@ -228,11 +236,14 @@ def cmd_skills_revert(
     from vaultspec_core.core.revert import revert_resource
 
     vaultspec_dir = _t.TARGET_DIR / ".vaultspec"
+    if not filename.endswith(".md"):
+        filename = f"{filename}.md"
     result = revert_resource(vaultspec_dir, "skills", filename)
     if result.get("reverted"):
         typer.echo(f"Reverted skill: {filename}")
     else:
-        typer.echo(f"No snapshot found for skill: {filename}", err=True)
+        msg = result.get("reason", f"No snapshot found for skill: {filename}")
+        typer.echo(msg, err=True)
         raise typer.Exit(code=1)
 
 
@@ -333,11 +344,14 @@ def cmd_agents_revert(
     from vaultspec_core.core.revert import revert_resource
 
     vaultspec_dir = _t.TARGET_DIR / ".vaultspec"
+    if not filename.endswith(".md"):
+        filename = f"{filename}.md"
     result = revert_resource(vaultspec_dir, "agents", filename)
     if result.get("reverted"):
         typer.echo(f"Reverted agent: {filename}")
     else:
-        typer.echo(f"No snapshot found for agent: {filename}", err=True)
+        msg = result.get("reason", f"No snapshot found for agent: {filename}")
+        typer.echo(msg, err=True)
         raise typer.Exit(code=1)
 
 

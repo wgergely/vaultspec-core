@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from .enums import Tool
 
@@ -94,6 +95,19 @@ def providers_sharing_dir(
                 sharing.add(tool.value)
                 break
     return sharing
+
+
+def installed_tool_configs() -> dict[Tool, Any]:
+    """Return TOOL_CONFIGS filtered to only installed providers.
+
+    Returns an empty dict when no manifest exists (framework not installed).
+    """
+    from . import types as _t
+
+    installed = read_manifest(_t.TARGET_DIR)
+    if not installed:
+        return {}
+    return {k: v for k, v in _t.TOOL_CONFIGS.items() if v.name in installed}
 
 
 def _is_parent(parent: Path, child: Path) -> bool:

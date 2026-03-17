@@ -71,16 +71,18 @@ class TestManifestAwareSync:
         assert not (sync_workspace / ".antigravity" / "rules" / "test.md").exists()
         assert not (sync_workspace / ".codex" / "rules" / "test.md").exists()
 
-    def test_sync_all_when_no_manifest(self, sync_workspace):
-        """When no manifest exists, sync to all tools (backward compat)."""
+    def test_sync_skips_all_when_no_manifest(self, sync_workspace):
+        """When no manifest exists, sync skips all tools (not installed)."""
         sources: dict[str, tuple[Path, dict, str]] = {
             "test.md": (Path(), {}, "Test content.\n"),
         }
         sync_to_all_tools(sources, "rules_dir", _noop_transform, "Rules")
 
-        # All tools should have the file
+        # No tools should have the file — no manifest means not installed
         for tool in Tool:
-            assert (sync_workspace / f".{tool.value}" / "rules" / "test.md").exists()
+            assert not (
+                sync_workspace / f".{tool.value}" / "rules" / "test.md"
+            ).exists()
 
     def test_sync_multiple_providers(self, sync_workspace):
         """When manifest has multiple providers, all get synced."""

@@ -1,16 +1,14 @@
 """Implement the top-level operational commands mounted into the root CLI.
 
 This module contains the business logic behind workspace initialization,
-readiness and health checks, and test execution. It sits above the lower-level
-resource-management modules and provides the user-facing command behaviors that
-do not belong to a dedicated nested Typer namespace.
+install, uninstall, and sync. It sits above the lower-level resource-management
+modules and provides the user-facing command behaviors that do not belong
+to a dedicated nested Typer namespace.
 """
 
 from __future__ import annotations
 
 import logging
-import subprocess
-import sys
 from pathlib import Path
 
 import typer
@@ -34,132 +32,20 @@ _PROVIDER_TO_TOOLS: dict[str, list[Tool]] = {
     "core": [],
 }
 
-VALID_CATEGORIES = {"all", "unit", "api", "quality"}
-
-# Paths relative to the vaultspec-core package dir (dev src-layout + installed)
-MODULE_PATHS = {
-    "cli": ["tests/cli"],
-    "vault": ["vaultcore/tests"],
-    "protocol": [
-        "protocol/tests",
-    ],
-    "core": ["core/tests"],
-}
-
-
-def _get_package_dir() -> Path:
-    """Return the vaultspec-core package directory, whether src-layout or installed."""
-    src_dir = _t.TARGET_DIR / "src" / "vaultspec_core"
-    if src_dir.is_dir():
-        return src_dir
-    import vaultspec_core
-
-    return Path(vaultspec_core.__file__).parent
-
-
-def test_run(
-    category: str = "all",
-    module: str | None = None,
-    extra_args: list[str] | None = None,
-) -> None:
-    """Run the pytest test suite, optionally filtered by category and module."""
-    category = category or "all"
-    extra = extra_args or []
-
-    cmd = ["uv", "run", "pytest"]
-
-    if category != "all":
-        cmd.extend(["-m", category])
-
-    pkg_dir = _get_package_dir()
-
-    if module:
-        if module not in MODULE_PATHS:
-            valid = ", ".join(sorted(MODULE_PATHS))
-            logger.error("Error: Unknown module '%s'. Valid: %s", module, valid)
-            raise typer.Exit(code=1)
-        for p in MODULE_PATHS[module]:
-            cmd.append(str(pkg_dir / p))
-    else:
-        cmd.append(str(pkg_dir))
-        tests_dir = _t.TARGET_DIR / "tests"
-        if tests_dir.is_dir():
-            cmd.append(str(tests_dir))
-
-    cmd.extend(extra)
-
-    logger.info("Running: %s", " ".join(cmd))
-    result = subprocess.run(cmd, cwd=str(_t.TARGET_DIR))
-
-    # Explicitly cast to int to satisfy ty type checker
-    raw_code = getattr(result, "exit_code", None)
-    if raw_code is None:
-        raw_code = result.returncode
-
-    exit_code: int = int(raw_code)
-    raise typer.Exit(code=exit_code)
-
-
-def doctor_run() -> None:
-    """Check prerequisites and overall system health."""
-    import importlib
-
-    from vaultspec_core.console import get_console
-
-    console = get_console()
-    issues = []
-
-    console.print(f"Workspace Root: {_t.TARGET_DIR}")
-
-    # Python version
-    ver = sys.version_info
-    ver_str = f"{ver.major}.{ver.minor}.{ver.micro}"
-    if ver >= (3, 13):
-        console.print(f"Python: {ver_str}  [bold green]✓ OK[/bold green]")
-    else:
-        console.print(
-            f"Python: {ver_str}  [bold yellow]⚠ WARN[/bold yellow] 3.13+ recommended"
-        )
-        logger.warning("Python 3.13+ recommended")
-        issues.append("Python 3.13+ recommended")
-
-    # Optional deps
-    for pkg, group in [
-        ("pytest", "dev"),
-        ("ruff", "dev"),
-    ]:
-        try:
-            importlib.import_module(pkg)
-            console.print(f"{pkg}: installed  [bold green]✓ OK[/bold green]")
-        except ImportError:
-            console.print(
-                f"{pkg}: not installed  [bold yellow]⚠ WARN[/bold yellow]"
-                f" (uv sync --extra {group})"
-            )
-            logger.warning("%s not installed", pkg)
-            issues.append(f"{pkg} not installed")
-
-    # Summary
-    if issues:
-        console.print(f"\n[bold]{len(issues)} issue(s) found:[/bold]")
-        for issue in issues:
-            console.print(f"  [dim]-[/dim] {issue}")
-    else:
-        console.print("\n[bold green]All checks passed.[/bold green]")
-
 
 def _rel(target: Path, p: Path) -> str:
     return str(p.relative_to(target)).replace("\\", "/")
 
 
-def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[str]:
+def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, str]]:
     """Scaffold the .vaultspec/ and .vault/ directory structures.
 
+    Returns a list of ``(relative_path, label)`` tuples.
     When *dry_run* is True, returns the manifest without writing anything.
     """
     fw_dir = target / ".vaultspec"
     vault_dir = target / ".vault"
-    created: list[str] = []
+    created: list[tuple[str, str]] = []
 
     for subdir in [
         "rules/rules",
@@ -171,91 +57,77 @@ def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[str]:
         d = fw_dir / subdir
         if not dry_run:
             ensure_dir(d)
-        created.append(_rel(target, d))
+        created.append((_rel(target, d), "core (.vaultspec)"))
 
     for subdir in ["adr", "audit", "exec", "plan", "reference", "research"]:
         d = vault_dir / subdir
         if not dry_run:
             ensure_dir(d)
-        created.append(_rel(target, d))
-
-    sys_dir = fw_dir / "rules" / "system"
-    fw_md = sys_dir / "framework.md"
-    if not fw_md.exists():
-        if not dry_run:
-            ensure_dir(sys_dir)
-            fw_md.write_text(
-                "# Framework Configuration\n\nAdd framework bootstrap content here.\n",
-                encoding="utf-8",
-            )
-        created.append(_rel(target, fw_md))
-
-    proj_md = sys_dir / "project.md"
-    if not proj_md.exists():
-        if not dry_run:
-            proj_md.write_text(
-                "# Project Configuration\n\nAdd project-specific content here.\n",
-                encoding="utf-8",
-            )
-        created.append(_rel(target, proj_md))
+        created.append((_rel(target, d), "vault (.vault)"))
 
     return created
 
 
-def _scaffold_provider(target: Path, tool: Tool, *, dry_run: bool = False) -> list[str]:
+def _scaffold_provider(
+    target: Path, tool: Tool, *, dry_run: bool = False
+) -> list[tuple[str, str]]:
     """Scaffold directories for a single provider based on its ToolConfig.
 
+    Returns a list of ``(relative_path, label)`` tuples.
     When *dry_run* is True, returns the manifest without writing anything.
     """
     cfg = _t.TOOL_CONFIGS.get(tool)
     if cfg is None:
         return []
 
-    created: list[str] = []
+    created: list[tuple[str, str]] = []
     caps = cfg.capabilities
+    label = tool.value
+    seen_rels: set[str] = set()
+
+    def _add(rel: str, sublabel: str) -> None:
+        if rel not in seen_rels:
+            seen_rels.add(rel)
+            created.append((rel, f"{label} ({sublabel})"))
 
     if ProviderCapability.RULES in caps and cfg.rules_dir:
         if not dry_run:
             ensure_dir(cfg.rules_dir)
-        created.append(_rel(target, cfg.rules_dir))
+        _add(_rel(target, cfg.rules_dir), "rules")
 
     if ProviderCapability.SKILLS in caps and cfg.skills_dir:
         if not dry_run:
             ensure_dir(cfg.skills_dir)
-        rel = _rel(target, cfg.skills_dir)
-        if rel not in created:
-            created.append(rel)
+        _add(_rel(target, cfg.skills_dir), "skills")
 
     if ProviderCapability.AGENTS in caps and cfg.agents_dir:
         if not dry_run:
             ensure_dir(cfg.agents_dir)
-        created.append(_rel(target, cfg.agents_dir))
+        _add(_rel(target, cfg.agents_dir), "agents")
 
     if ProviderCapability.WORKFLOWS in caps:
         wf_dir = target / ".agents" / "workflows"
         if not dry_run:
             ensure_dir(wf_dir)
-        rel = _rel(target, wf_dir)
-        if rel not in created:
-            created.append(rel)
+        _add(_rel(target, wf_dir), "workflows")
 
     if cfg.config_file:
-        created.append(_rel(target, cfg.config_file))
+        _add(_rel(target, cfg.config_file), "config")
 
     if cfg.rule_ref_config_file:
-        created.append(_rel(target, cfg.rule_ref_config_file))
+        _add(_rel(target, cfg.rule_ref_config_file), "config")
 
     if cfg.native_config_file:
         if not dry_run:
             ensure_dir(cfg.native_config_file.parent)
             if not cfg.native_config_file.exists():
                 cfg.native_config_file.write_text("", encoding="utf-8")
-        created.append(_rel(target, cfg.native_config_file))
+        _add(_rel(target, cfg.native_config_file), "config")
 
     return created
 
 
-def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[str]:
+def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[tuple[str, str]]:
     """Scaffold .mcp.json for MCP server integration."""
     import json
 
@@ -267,14 +139,14 @@ def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[str]:
         mcp_config = {
             "mcpServers": {
                 "vaultspec-core": {
-                    "command": "vaultspec-mcp",
-                    "args": [],
-                    "env": {"VAULTSPEC_TARGET_DIR": str(target.resolve())},
+                    "command": "uv",
+                    "args": ["run", "vaultspec-mcp"],
+                    "env": {"VAULTSPEC_TARGET_DIR": "."},
                 }
             }
         }
         mcp_json.write_text(json.dumps(mcp_config, indent=2) + "\n", encoding="utf-8")
-    return [".mcp.json"]
+    return [(".mcp.json", "mcp")]
 
 
 def init_run(force: bool = False, provider: str = "all") -> None:
@@ -292,7 +164,20 @@ def init_run(force: bool = False, provider: str = "all") -> None:
 
     created = _scaffold_core(_t.TARGET_DIR)
 
-    # Re-resolve workspace after writing framework.md stubs
+    # Seed builtin content into .vaultspec/rules/
+    from vaultspec_core.builtins import seed_builtins
+
+    rules_dir = fw_dir / "rules"
+    seeded = seed_builtins(rules_dir, force=force)
+    for rel in seeded:
+        created.append((f".vaultspec/rules/{rel}", "builtin"))
+
+    # Snapshot builtins for revert support
+    from .revert import snapshot_builtins
+
+    snapshot_builtins(fw_dir)
+
+    # Re-resolve workspace after scaffolding
     reset_config()
     layout = resolve_workspace(target_override=_t.TARGET_DIR)
     init_paths(layout)
@@ -315,10 +200,14 @@ def init_run(force: bool = False, provider: str = "all") -> None:
 
     console = get_console()
     console.print("[bold]Initialized vaultspec-core structure:[/bold]")
-    for path in dict.fromkeys(created):
-        console.print(f"  {path}")
+    # Deduplicate by relative path, preserving order
+    seen: dict[str, str] = {}
+    for rel, label in created:
+        seen.setdefault(rel, label)
+    for rel in seen:
+        console.print(f"  {rel}")
     console.print(
-        f"Created [bold]{len(created)}[/bold] directories/files. "
+        f"Created [bold]{len(seen)}[/bold] directories/files. "
         "Run [bold]vaultspec-core sync[/bold] to sync."
     )
 
@@ -328,8 +217,8 @@ def _ensure_tool_configs(path: Path) -> None:
 
     On a fresh project where ``.vaultspec/`` doesn't exist yet, temporarily
     creates the minimal structure so ``init_paths()`` can resolve the
-    workspace layout and populate TOOL_CONFIGS.  The temporary files are
-    cleaned up afterward.
+    workspace layout and populate TOOL_CONFIGS.  All temporary artifacts
+    (including the target directory itself if it was created) are cleaned up.
     """
     from vaultspec_core.config import reset_config
     from vaultspec_core.config.workspace import resolve_workspace
@@ -340,11 +229,11 @@ def _ensure_tool_configs(path: Path) -> None:
 
     fw_dir = path / ".vaultspec"
     temp_scaffold = not fw_dir.exists()
-    fw_md = fw_dir / "rules" / "system" / "framework.md"
+    # Track whether we created the target dir itself (for non-existent paths)
+    created_target = not path.exists()
 
     if temp_scaffold:
-        fw_md.parent.mkdir(parents=True, exist_ok=True)
-        fw_md.write_text("# placeholder", encoding="utf-8")
+        fw_dir.mkdir(parents=True, exist_ok=True)
 
     try:
         reset_config()
@@ -355,6 +244,12 @@ def _ensure_tool_configs(path: Path) -> None:
             import shutil
 
             shutil.rmtree(fw_dir, ignore_errors=True)
+            # If we created the target dir just for bootstrapping, remove it
+            if created_target and path.exists():
+                import contextlib
+
+                with contextlib.suppress(OSError):
+                    path.rmdir()  # only removes if empty
 
 
 def install_run(
@@ -393,26 +288,36 @@ def install_run(
         _ensure_tool_configs(path)
 
         manifest = _scaffold_core(path, dry_run=True)
+
+        # Include builtin files that would be seeded
+        from vaultspec_core.builtins import list_builtins
+
+        for builtin_rel in list_builtins():
+            manifest.append((f".vaultspec/rules/{builtin_rel}", "builtin"))
+
         tools = _PROVIDER_TO_TOOLS.get(provider, [])
         for tool in tools:
             manifest.extend(_scaffold_provider(path, tool, dry_run=True))
         manifest.extend(_scaffold_mcp_json(path, dry_run=True))
 
-        # Deduplicate preserving order
-        seen: dict[str, None] = {}
-        for item in manifest:
-            seen.setdefault(item, None)
+        # Deduplicate preserving order (by relative path)
+        seen: dict[str, str] = {}
+        for rel, label in manifest:
+            seen.setdefault(rel, label)
 
         from .dry_run import DryRunItem, DryRunStatus, render_dry_run_tree
 
         dry_items = [
             DryRunItem(
-                path=item,
-                status=DryRunStatus.EXISTS if Path(item).exists() else DryRunStatus.NEW,
+                path=str(path / rel).replace("\\", "/"),
+                status=(
+                    DryRunStatus.EXISTS if (path / rel).exists() else DryRunStatus.NEW
+                ),
+                label=label,
             )
-            for item in seen
+            for rel, label in seen.items()
         ]
-        render_dry_run_tree(dry_items, title="Install preview")
+        render_dry_run_tree(dry_items, title=f"Install preview → {path}")
         return
 
     if upgrade:
@@ -425,6 +330,19 @@ def install_run(
             raise typer.Exit(code=1) from e
 
         console.print(f"[bold]Upgrading vaultspec framework at {path}[/bold]")
+
+        # Re-seed builtins (force=True overwrites existing)
+        from vaultspec_core.builtins import seed_builtins
+
+        fw_dir = path / ".vaultspec"
+        seeded = seed_builtins(fw_dir / "rules", force=True)
+        if seeded:
+            console.print(f"  Re-seeded [bold]{len(seeded)}[/bold] builtin files.")
+
+        # Re-snapshot builtins for revert support
+        from .revert import snapshot_builtins
+
+        snapshot_builtins(fw_dir)
 
         sync_target = provider if provider not in ("all", "core") else "all"
         sync_provider(sync_target, force=True)
@@ -442,7 +360,7 @@ def install_run(
             raise typer.Exit(code=1)
 
         console.print(f"[bold]Installing vaultspec framework to {path}[/bold]")
-        init_run(force=False, provider=provider)
+        init_run(force=force, provider=provider)
 
         reset_config()
         layout = resolve_workspace(target_override=path)
@@ -528,7 +446,23 @@ def uninstall_run(
         provider = "all"
 
     console = get_console()
-    removed: list[str] = []
+    removed: list[tuple[str, str]] = []  # (path, label)
+
+    # Label mapping for well-known directories and files
+    dir_labels: dict[str, str] = {
+        ".vaultspec": "core",
+        ".vault": "vault",
+        ".claude": "claude",
+        ".gemini": "gemini",
+        ".agents": "antigravity",
+        ".codex": "codex",
+    }
+    file_labels: dict[str, str] = {
+        "CLAUDE.md": "claude (config)",
+        "GEMINI.md": "gemini (config)",
+        "AGENTS.md": "codex (config)",
+        ".mcp.json": "mcp",
+    }
 
     if provider == "all":
         # Remove everything
@@ -551,21 +485,17 @@ def uninstall_run(
 
         for d in managed_dirs:
             if d.exists():
-                rel = str(d.relative_to(path))
-                if dry_run:
-                    console.print(f"  [dim]would remove[/dim] {rel}/")
-                else:
+                if not dry_run:
                     shutil.rmtree(d)
-                removed.append(f"{rel}/")
+                label = dir_labels.get(d.name, "")
+                removed.append((str(d).replace("\\", "/") + "/", label))
 
         for f in managed_files:
             if f.exists():
-                rel = str(f.relative_to(path))
-                if dry_run:
-                    console.print(f"  [dim]would remove[/dim] {rel}")
-                else:
+                if not dry_run:
                     f.unlink()
-                removed.append(rel)
+                label = file_labels.get(f.name, "")
+                removed.append((str(f).replace("\\", "/"), label))
 
     else:
         # Per-provider uninstall with shared directory protection
@@ -586,22 +516,16 @@ def uninstall_run(
                     )
                     continue
 
-                rel = str(d.relative_to(path))
-                if dry_run:
-                    console.print(f"  [dim]would remove[/dim] {rel}/")
-                else:
+                if not dry_run:
                     shutil.rmtree(d)
-                removed.append(f"{rel}/")
+                removed.append((str(d).replace("\\", "/") + "/", tool.value))
 
             for f in files:
                 if not f.exists():
                     continue
-                rel = str(f.relative_to(path))
-                if dry_run:
-                    console.print(f"  [dim]would remove[/dim] {rel}")
-                else:
+                if not dry_run:
                     f.unlink()
-                removed.append(rel)
+                removed.append((str(f).replace("\\", "/"), f"{tool.value} (config)"))
 
         # Update manifest
         if not dry_run:
@@ -609,284 +533,26 @@ def uninstall_run(
                 remove_provider(path, tool.value)
 
     if dry_run:
-        console.print(f"\n[bold]Dry run:[/bold] would remove {len(removed)} items")
+        from .dry_run import DryRunItem, DryRunStatus, render_dry_run_tree
+
+        dry_items = [
+            DryRunItem(path=item_path, status=DryRunStatus.DELETE, label=label)
+            for item_path, label in removed
+        ]
+        render_dry_run_tree(dry_items, title=f"Uninstall preview → {path}")
     elif removed:
         console.print("[bold]Removed vaultspec framework:[/bold]")
-        for item in removed:
-            console.print(f"  {item}")
+        for item_path, _label in removed:
+            console.print(f"  {item_path}")
         console.print(f"Removed [bold]{len(removed)}[/bold] items.")
         if keep_vault:
             console.print(
-                "[dim].vault/ preserved (use without --keep-vault to remove)[/dim]"
+                "[dim].vault/ preserved"
+                " (pass --remove-vault to also remove"
+                " documentation)[/dim]"
             )
     else:
         console.print("Nothing to remove — vaultspec is not installed at this path.")
-
-
-def readiness_run(json_output: bool = False) -> None:
-    """Assess codebase governance readiness.
-
-    Scores documentation, framework structure, rules and governance,
-    and test infrastructure on a 1-5 scale each.
-    """
-
-    from vaultspec_core.config import get_config
-
-    cfg = get_config()
-    fw_dir = _t.TARGET_DIR / cfg.framework_dir
-    vault_dir = _t.TARGET_DIR / ".vault"
-
-    # Dimension 1: Documentation (.vault/ health)
-    doc_score = 1
-    doc_detail = "No .vault/ directory"
-    if vault_dir.exists():
-        doc_types = ["adr", "plan", "research", "reference", "exec"]
-        all_docs = list(vault_dir.rglob("*.md"))
-        doc_count = len(all_docs)
-        present_types = {
-            dt
-            for dt in doc_types
-            if (vault_dir / dt).exists() and any((vault_dir / dt).glob("*.md"))
-        }
-
-        if doc_count < 5:
-            doc_score = 2
-            doc_detail = f"{doc_count} docs, needs more coverage"
-        elif doc_count < 20:
-            doc_score = 3
-            missing = set(doc_types) - present_types
-            if missing:
-                doc_detail = f"{doc_count} docs, missing: {', '.join(missing)}"
-            else:
-                doc_detail = f"{doc_count} docs, all types present"
-        elif doc_count < 50:
-            doc_score = 4
-            doc_detail = f"{doc_count} docs, all types present"
-        else:
-            doc_score = 5
-            doc_detail = f"{doc_count} docs, comprehensive coverage"
-
-    # Dimension 2: Framework (.vaultspec/ structure)
-    fw_score = 1
-    fw_detail = "No .vaultspec/ directory"
-    if fw_dir.exists():
-        has_skills = (fw_dir / "rules" / "skills").exists() and any(
-            (fw_dir / "rules" / "skills").glob("*.md")
-        )
-        has_rules = (fw_dir / "rules" / "rules").exists() and any(
-            (fw_dir / "rules" / "rules").glob("*.md")
-        )
-        has_system = (fw_dir / "rules" / "system").exists()
-        has_templates = (fw_dir / "rules" / "templates").exists()
-
-        if any([has_skills, has_rules]):
-            fw_score = 3
-            parts = []
-            if has_skills:
-                parts.append("skills")
-            if has_rules:
-                parts.append("rules")
-            fw_detail = f"Has {', '.join(parts)}"
-        else:
-            fw_score = 2
-            fw_detail = ".vaultspec/ exists but minimal content"
-
-        if has_skills and has_rules and has_system:
-            fw_score = 4
-            fw_detail = "Complete structure with system/"
-
-        if fw_score == 4 and has_templates:
-            custom_count = 0
-            for d in [
-                fw_dir / "rules" / "skills",
-                fw_dir / "rules" / "rules",
-            ]:
-                if d.exists():
-                    custom_count += len(
-                        [
-                            f
-                            for f in d.glob("*.md")
-                            if not f.name.endswith(".builtin.md")
-                        ]
-                    )
-            if custom_count > 0:
-                fw_score = 5
-                fw_detail = f"Complete + {custom_count} custom resources"
-
-    # Dimension 3: Rules & Governance
-    rules_score = 1
-    rules_detail = "No rules defined"
-    if (fw_dir / "rules" / "rules").exists():
-        all_rules = list((fw_dir / "rules" / "rules").glob("*.md"))
-        builtin = [r for r in all_rules if r.name.endswith(".builtin.md")]
-        custom = [r for r in all_rules if not r.name.endswith(".builtin.md")]
-        total_rules = len(all_rules)
-
-        if total_rules == 0:
-            rules_score = 1
-            rules_detail = "No rules defined"
-        elif total_rules <= 2:
-            rules_score = 2
-            rules_detail = f"{total_rules} rule(s)"
-        elif len(custom) == 0:
-            rules_score = 3
-            rules_detail = f"{total_rules} builtin rules"
-        elif len(custom) > 0:
-            rules_score = 4
-            rules_detail = f"{len(builtin)} builtin + {len(custom)} custom"
-
-        if rules_score >= 4:
-            synced_count = 0
-            for cfg_item in _t.TOOL_CONFIGS.values():
-                if (
-                    cfg_item.rules_dir
-                    and cfg_item.rules_dir.exists()
-                    and any(cfg_item.rules_dir.glob("*.md"))
-                ):
-                    synced_count += 1
-            if synced_count >= 2:
-                rules_score = 5
-                rules_detail += ", synced to all tools"
-
-    # Dimension 4: Test Infrastructure
-    test_score = 1
-    test_detail = "No test files found"
-    test_dirs = [
-        _t.TARGET_DIR / "tests",
-        _t.TARGET_DIR / "src",
-    ]
-    test_files = []
-    for test_dir in test_dirs:
-        if test_dir.exists():
-            test_files.extend(list(test_dir.rglob("test_*.py")))
-
-    if test_files:
-        test_score = 2
-        test_detail = f"{len(test_files)} test files"
-
-        has_markers = False
-        for tf in test_files[:10]:
-            content = tf.read_text(encoding="utf-8")
-            if "@pytest.mark." in content:
-                has_markers = True
-                break
-
-        if has_markers:
-            test_score = 3
-            test_detail = f"{len(test_files)} tests with pytest markers"
-
-        conftest_files = []
-        for test_dir in test_dirs:
-            if test_dir.exists():
-                conftest_files.extend(list(test_dir.rglob("conftest.py")))
-        if conftest_files:
-            test_score = 4
-            test_detail = f"{len(test_files)} tests, {len(conftest_files)} fixtures"
-
-        ci_files = [
-            _t.TARGET_DIR / ".github" / "workflows",
-        ]
-        has_ci = any(d.exists() for d in ci_files)
-        if has_ci:
-            test_score = 5
-            test_detail = f"{len(test_files)} tests + CI"
-
-    # Build results
-    dimensions: dict[str, dict[str, int | str]] = {
-        "documentation": {"score": doc_score, "max": 5, "detail": doc_detail},
-        "framework": {"score": fw_score, "max": 5, "detail": fw_detail},
-        "rules_governance": {
-            "score": rules_score,
-            "max": 5,
-            "detail": rules_detail,
-        },
-        "test_infrastructure": {
-            "score": test_score,
-            "max": 5,
-            "detail": test_detail,
-        },
-    }
-
-    total_score = sum(int(d["score"]) for d in dimensions.values())
-    max_total = sum(int(d["max"]) for d in dimensions.values())
-    overall = total_score / max_total * 5 if max_total > 0 else 0
-
-    recommendations = []
-    if doc_score < 4:
-        recommendations.append(
-            "Add more documentation across ADRs, plans, research, references"
-        )
-    if fw_score < 4:
-        recommendations.append("Complete .vaultspec/ structure with rules/system/")
-    if rules_score < 4:
-        recommendations.append("Create custom rules for project conventions")
-    if rules_score == 4:
-        recommendations.append("Run 'vaultspec-core sync' to sync rules to all tools")
-    if test_score < 5:
-        recommendations.append("Add CI pipeline for automated testing")
-
-    if json_output:
-        import json
-
-        result = {
-            "dimensions": dimensions,
-            "overall": round(overall, 1),
-            "total": total_score,
-            "max_total": max_total,
-            "recommendations": recommendations,
-        }
-        typer.echo(json.dumps(result))
-    else:
-        from rich.rule import Rule
-        from rich.table import Table
-
-        from vaultspec_core.console import get_console
-
-        console = get_console()
-
-        def _bar(score: int, max_score: int = 5) -> str:
-            return (
-                "[green]"
-                + "█" * score
-                + "[/green]"
-                + "[dim]"
-                + "░" * (max_score - score)
-                + "[/dim]"
-            )
-
-        console.print("[bold]vaultspec-core Readiness Assessment[/bold]")
-        console.print(Rule())
-        console.print()
-
-        dim_table = Table(box=None, show_header=False, show_edge=False, padding=(0, 1))
-        dim_table.add_column("Label", width=22)
-        dim_table.add_column("Bar")
-        dim_table.add_column("Score", justify="right", width=5)
-        dim_table.add_column("Detail", style="dim")
-
-        labels = [
-            ("Documentation", "documentation"),
-            ("Framework", "framework"),
-            ("Rules & Governance", "rules_governance"),
-            ("Test Infrastructure", "test_infrastructure"),
-        ]
-        for label, key in labels:
-            dim = dimensions[key]
-            bar = _bar(int(dim["score"]), int(dim["max"]))
-            score_str = f"{dim['score']}/{dim['max']}"
-            dim_table.add_row(label, bar, score_str, str(dim["detail"]))
-
-        console.print(dim_table)
-        console.print()
-        console.print(
-            f"[bold]Overall:[/bold] {overall:.1f}/5 ({total_score}/{max_total})"
-        )
-
-        if recommendations:
-            console.print()
-            console.print("[bold]Recommendations:[/bold]")
-            for rec in recommendations:
-                console.print(f"  [dim]-[/dim] {rec}")
 
 
 def hooks_list() -> None:
@@ -978,6 +644,14 @@ def sync_provider(
     ``provider`` must be one of :data:`SYNC_PROVIDERS`.  The special value
     ``"all"`` syncs every provider and fires post-sync hooks.
     """
+    if provider not in SYNC_PROVIDERS:
+        logger.error(
+            "Unknown sync target '%s'. Valid: %s",
+            provider,
+            ", ".join(sorted(SYNC_PROVIDERS)),
+        )
+        raise typer.Exit(code=1)
+
     from .agents import agents_sync
     from .config_gen import config_sync
     from .enums import Tool
@@ -985,20 +659,121 @@ def sync_provider(
     from .skills import skills_sync
     from .system import system_sync
 
+    def _run_all_syncs() -> list[_t.SyncResult]:
+        return [
+            rules_sync(prune=prune, dry_run=dry_run),
+            skills_sync(prune=prune, dry_run=dry_run),
+            agents_sync(prune=prune, dry_run=dry_run),
+            system_sync(dry_run=dry_run, force=force),
+            config_sync(dry_run=dry_run, force=force),
+        ]
+
+    def _infer_label(item_path: str) -> str:
+        """Infer a human-readable label from a sync output path."""
+        # Normalise to forward slashes for matching
+        p = item_path.replace("\\", "/")
+
+        # Provider detection from path segments
+        provider_map = {
+            "/.claude/": "claude",
+            "/.gemini/": "gemini",
+            "/.agents/": "antigravity",
+            "/.codex/": "codex",
+        }
+        provider_name = ""
+        for segment, name in provider_map.items():
+            if segment in p:
+                provider_name = name
+                break
+
+        # Config files at root level
+        config_map = {
+            "/CLAUDE.md": "claude (config)",
+            "/GEMINI.md": "gemini (config)",
+            "/AGENTS.md": "codex (config)",
+            "/config.toml": "codex (config)",
+        }
+        for suffix, lbl in config_map.items():
+            if p.endswith(suffix):
+                return lbl
+
+        # Resource type detection
+        if "/rules/" in p:
+            return f"{provider_name} (rules)" if provider_name else "rules"
+        if "/skills/" in p:
+            return f"{provider_name} (skills)" if provider_name else "skills"
+        if "/agents/" in p:
+            return f"{provider_name} (agents)" if provider_name else "agents"
+        if "SYSTEM.md" in p or "system" in p.lower():
+            return f"{provider_name} (system)" if provider_name else "system"
+
+        return provider_name or ""
+
+    def _render_dry_tree(results: list[_t.SyncResult], title: str) -> None:
+        from .dry_run import DryRunItem, DryRunStatus, render_dry_run_tree
+
+        action_map = {
+            "[ADD]": DryRunStatus.NEW,
+            "[UPDATE]": DryRunStatus.UPDATE,
+            "[DELETE]": DryRunStatus.DELETE,
+        }
+        all_items = []
+        for r in results:
+            for item_path, action in r.items:
+                status = action_map.get(action, DryRunStatus.UPDATE)
+                all_items.append(
+                    DryRunItem(
+                        path=item_path,
+                        status=status,
+                        label=_infer_label(item_path),
+                    )
+                )
+        if all_items:
+            render_dry_run_tree(all_items, title=title)
+        else:
+            from vaultspec_core.console import get_console
+
+            get_console().print(f"[dim]{title}: no changes[/dim]")
+
+    # Guard: refuse to sync if vaultspec isn't installed at the target
+    vaultspec_dir = _t.TARGET_DIR / ".vaultspec"
+    if not vaultspec_dir.exists():
+        logger.error(
+            "No .vaultspec/ found at %s. Run 'vaultspec-core install %s' first.",
+            _t.TARGET_DIR,
+            _t.TARGET_DIR,
+        )
+        raise typer.Exit(code=1)
+
+    def _warn_if_empty(results: list[_t.SyncResult]) -> None:
+        total_changes = sum(r.added + r.updated for r in results)
+        total_skipped = sum(r.skipped for r in results)
+        if total_changes == 0 and total_skipped == 0:
+            from vaultspec_core.console import get_console
+
+            console = get_console()
+            console.print(
+                "[bold yellow]Warning:[/bold yellow] Sync produced 0 files. "
+                "The .vaultspec/rules/ source directories may be empty.\n"
+                "  Run [bold]vaultspec-core install . --upgrade[/bold] "
+                "to re-seed builtin content."
+            )
+
     if provider == "all":
         logger.info("Syncing all resources...")
-        rules_sync(prune=prune, dry_run=dry_run)
-        skills_sync(prune=prune, dry_run=dry_run)
-        agents_sync(prune=prune, dry_run=dry_run)
-        system_sync(dry_run=dry_run, force=force)
-        config_sync(dry_run=dry_run, force=force)
+        results = _run_all_syncs()
 
-        from vaultspec_core.hooks import fire_hooks
+        if dry_run:
+            _render_dry_tree(results, f"Sync preview → {_t.TARGET_DIR}")
+        else:
+            _warn_if_empty(results)
+            from vaultspec_core.hooks import fire_hooks
 
-        fire_hooks(
-            "config.synced", {"root": str(_t.TARGET_DIR), "event": "config.synced"}
-        )
-        logger.info("Done.")
+            fire_hooks(
+                "config.synced",
+                {"root": str(_t.TARGET_DIR), "event": "config.synced"},
+            )
+            logger.info("Done.")
         return
 
     # Validate provider is installed (skip if .vaultspec/ doesn't exist yet,
@@ -1029,11 +804,11 @@ def sync_provider(
     try:
         _t.TOOL_CONFIGS = {k: v for k, v in original.items() if k in requested}
         logger.info("Syncing provider: %s ...", provider)
-        rules_sync(prune=prune, dry_run=dry_run)
-        skills_sync(prune=prune, dry_run=dry_run)
-        agents_sync(prune=prune, dry_run=dry_run)
-        system_sync(dry_run=dry_run, force=force)
-        config_sync(dry_run=dry_run, force=force)
-        logger.info("Done.")
+        results = _run_all_syncs()
+
+        if dry_run:
+            _render_dry_tree(results, f"Sync preview ({provider}) → {_t.TARGET_DIR}")
+        else:
+            logger.info("Done.")
     finally:
         _t.TOOL_CONFIGS = original

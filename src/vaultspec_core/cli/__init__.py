@@ -2,9 +2,8 @@
 
 Organized into domain groups:
 - root: install, uninstall, sync (top-level commands + global options)
-- vault_cmd: vault stats, vault list, vault add, vault feature, vault doctor
+- vault_cmd: vault stats, vault list, vault add, vault feature, vault check
 - spec_cmd: spec rules, spec skills, spec agents, spec system, spec hooks
-- dev_cmd: dev test
 """
 
 from .root import app, run

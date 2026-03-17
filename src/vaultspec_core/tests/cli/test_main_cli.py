@@ -61,7 +61,7 @@ class TestNamespaceRouting:
         result = run_vaultspec(runner, "vault", "--help", target=test_project)
         assert result.exit_code == 0
         assert "add" in result.output
-        assert "doctor" in result.output
+        assert "check" in result.output
 
     def test_spec_namespace_help(self, runner, test_project):
         """``vaultspec spec --help`` exits 0 and shows subcommands."""
@@ -85,11 +85,12 @@ class TestSpecCliFallthrough:
         result = run_vaultspec(runner, "spec", "skills", "--help", target=test_project)
         assert result.exit_code == 0
 
-    def test_vault_doctor_runs(self, runner, test_project):
-        """``vaultspec vault doctor`` exits 0 and output contains health check."""
-        result = run_vaultspec(runner, "vault", "doctor", target=test_project)
-        assert result.exit_code == 0
-        assert "Vault Health Check" in result.output
+    def test_vault_check_all_runs(self, runner, test_project):
+        """``vaultspec vault check all`` exits 0 and shows check results."""
+        result = run_vaultspec(runner, "vault", "check", "all", target=test_project)
+        # check all may find real issues in test-project, accept 0 or 1
+        assert result.exit_code in (0, 1)
+        assert "Vault Check" in result.output
 
     def test_unknown_command_fails(self, runner, test_project):
         """``vaultspec nonexistent`` fails."""

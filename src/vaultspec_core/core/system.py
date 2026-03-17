@@ -26,7 +26,7 @@ def collect_system_parts() -> dict[str, tuple[Path, dict[str, Any], str]]:
     """Collect system prompt parts from .vaultspec/rules/system/.
 
     Returns:
-        A mapping of file stem (e.g. ``"base"``) to a three-tuple of
+        A mapping of file stem (e.g. ``"01-core"``) to a three-tuple of
         ``(source_path, frontmatter_dict, body_text)``.
     """
     from ..vaultcore import parse_frontmatter
@@ -71,9 +71,8 @@ def _collect_skill_listing() -> str:
 def _generate_system_prompt(cfg: ToolConfig) -> str | None:
     """Assemble a complete system prompt for a tool with a dedicated system_file.
 
-    Combines the ``base.md`` body, tool-specific parts, auto-generated skill
-    listings, and remaining shared parts (ordered by ``order``
-    frontmatter key).
+    Combines tool-specific parts, auto-generated skill listings, and shared
+    system parts (ordered by ``order`` frontmatter key).
 
     Args:
         cfg: Tool configuration; must have ``system_file`` set.
@@ -92,32 +91,23 @@ def _generate_system_prompt(cfg: ToolConfig) -> str | None:
 
     assembled: list[str] = [_t.CONFIG_HEADER]
 
-    # 1. base.md body first
-    if "base" in parts:
-        _path, _meta, body = parts["base"]
-        assembled.append(body)
-
-    # 2. Tool-specific parts (where meta "tool" matches cfg.name)
-    for name, (_path, meta, body) in sorted(parts.items()):
-        if name == "base":
-            continue
+    # 1. Tool-specific parts (where meta "tool" matches cfg.name)
+    for _name, (_path, meta, body) in sorted(parts.items()):
         tool_filter = meta.get("tool")
         if tool_filter is not None and tool_filter == cfg.name:
             assembled.append(body)
 
-    # 3. Auto-generated skill listing
+    # 2. Auto-generated skill listing
     skill_listing = _collect_skill_listing()
     if skill_listing:
         assembled.append(skill_listing)
 
-    # 4. Remaining shared parts (no "tool" key, not "base", not config-only)
+    # 3. Shared parts (no "tool" key, not config-pipeline)
     #    Sorted by order frontmatter (default 50), then by name.
     shared = [
         (name, _path, meta, body)
         for name, (_path, meta, body) in parts.items()
-        if name != "base"
-        and meta.get("tool") is None
-        and meta.get("pipeline") != "config"
+        if meta.get("tool") is None and meta.get("pipeline") != "config"
     ]
     shared.sort(key=lambda t: (t[2].get("order", 50), t[0]))
     for _name, _path, _meta, body in shared:
@@ -129,7 +119,7 @@ def _generate_system_prompt(cfg: ToolConfig) -> str | None:
 def _generate_system_rules(cfg: ToolConfig) -> str | None:
     """Assemble shared behavioral content as a rule file for tools without system_file.
 
-    Combines the ``base.md`` body and all shared system parts into a single
+    Combines all shared system parts into a single
     ``vaultspec-system.builtin.md`` rule file, formatted with YAML frontmatter
     and the auto-generated header sentinel.
 
@@ -149,19 +139,12 @@ def _generate_system_rules(cfg: ToolConfig) -> str | None:
 
     assembled: list[str] = []
 
-    # 1. base.md body first
-    if "base" in parts:
-        _path, _meta, body = parts["base"]
-        assembled.append(body)
-
-    # 2. Shared parts only (no "tool" key, not "base", not config-only)
-    #    Sorted by order frontmatter (default 50), then by name.
+    # Shared parts only (no "tool" key, not config-pipeline)
+    # Sorted by order frontmatter (default 50), then by name.
     shared = [
         (name, _path, meta, body)
         for name, (_path, meta, body) in parts.items()
-        if name != "base"
-        and meta.get("tool") is None
-        and meta.get("pipeline") != "config"
+        if meta.get("tool") is None and meta.get("pipeline") != "config"
     ]
     shared.sort(key=lambda t: (t[2].get("order", 50), t[0]))
     for _name, _path, _meta, body in shared:
@@ -225,16 +208,18 @@ def system_show() -> None:
         console.print(targets_table)
 
 
-def system_sync(dry_run: bool = False, force: bool = False) -> None:
+def system_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
     """Sync assembled system prompts and behavioral rules to tool destinations.
 
     Args:
         dry_run: If ``True``, log planned actions without writing.
         force: If ``True``, overwrite non-managed files.
     """
+    from .manifest import installed_tool_configs
+
     result = SyncResult()
 
-    for _tool_type, cfg in _t.TOOL_CONFIGS.items():
+    for _tool_type, cfg in installed_tool_configs().items():
         # Path A: Tool has a system_file -> generate assembled SYSTEM.md
         system_file = cfg.system_file
         if system_file is not None:
@@ -263,8 +248,9 @@ def system_sync(dry_run: bool = False, force: bool = False) -> None:
                     action = "[UPDATE]"
 
             if action != "[SKIP]":
+                abs_path = str(system_file).replace("\\", "/")
                 if dry_run:
-                    logger.info("    %s %s", action, rel)
+                    result.items.append((abs_path, action))
                 else:
                     ensure_dir(system_file.parent)
                     atomic_write(system_file, content)
@@ -283,7 +269,6 @@ def system_sync(dry_run: bool = False, force: bool = False) -> None:
                 continue
 
             rule_path = cfg.rules_dir / "vaultspec-system.builtin.md"
-            rel = rule_path.relative_to(_t.TARGET_DIR)
 
             action = "[SKIP]"
             if not rule_path.exists():
@@ -296,8 +281,9 @@ def system_sync(dry_run: bool = False, force: bool = False) -> None:
                     action = "[UPDATE]"
 
             if action != "[SKIP]":
+                abs_path = str(rule_path).replace("\\", "/")
                 if dry_run:
-                    logger.info("    %s %s", action, rel)
+                    result.items.append((abs_path, action))
                 else:
                     ensure_dir(cfg.rules_dir)
                     atomic_write(rule_path, content)
@@ -310,3 +296,4 @@ def system_sync(dry_run: bool = False, force: bool = False) -> None:
                 result.skipped += 1
 
     print_summary("System", result)
+    return result
