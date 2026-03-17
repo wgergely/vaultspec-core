@@ -34,6 +34,7 @@ MANIFEST
 
 # Auto-generated temp files
 .vaultspec/.tmp/
+tmp/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
