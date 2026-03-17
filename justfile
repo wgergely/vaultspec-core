@@ -32,7 +32,7 @@ prod *args='':
 #  Verbs:
 #    deps      dependency management (sync, upgrade, lock)
 #    lint      read-only static analysis (ruff, ty, taplo, markdownlint, ...)
-#    format    auto-fix formatting (ruff format, ruff --fix, taplo fmt, ...)
+#    fix       auto-fix everything fixable (python, toml, markdown, vault)
 #    audit     supply-chain / security checks (pip-audit)
 #    test      pytest, docker smoke
 #    build     uv build, docker build
@@ -43,8 +43,9 @@ prod *args='':
 #    just dev deps sync
 #    just dev lint
 #    just dev lint type
-#    just dev format
-#    just dev format markdown
+#    just dev fix
+#    just dev fix python
+#    just dev fix vault
 #    just dev audit deps
 #    just dev test python
 #    just dev build docker
@@ -56,8 +57,8 @@ dev target *args='':
       just _dev-deps {{args}} ;; \
     lint) \
       just _dev-lint {{args}} ;; \
-    format) \
-      just _dev-format {{args}} ;; \
+    fix) \
+      just _dev-fix {{args}} ;; \
     audit) \
       just _dev-audit {{args}} ;; \
     test) \
@@ -70,7 +71,7 @@ dev target *args='':
       just _dev-precommit {{args}} ;; \
     *) \
       echo "unknown dev target: {{target}}" >&2; \
-      echo "  targets: deps lint format audit test build publish precommit" >&2; \
+      echo "  targets: deps lint fix audit test build publish precommit" >&2; \
       exit 1 ;; \
   esac
 
@@ -152,7 +153,7 @@ _dev-lint target='all':
       exit 1 ;; \
   esac
 
-_dev-format target='all':
+_dev-fix target='all':
   case "{{target}}" in \
     python) \
       uv run ruff format src tests && \
@@ -163,13 +164,16 @@ _dev-format target='all':
       npx --yes markdownlint-cli \
         --config .markdownlint.json --fix \
         .vaultspec/ .vault/ README.md ;; \
+    vault) \
+      uv run vaultspec-core vault check all --fix ;; \
     all) \
-      just _dev-format python && \
-      just _dev-format toml && \
-      just _dev-format markdown ;; \
+      just _dev-fix python && \
+      just _dev-fix toml && \
+      just _dev-fix markdown && \
+      just _dev-fix vault ;; \
     *) \
-      echo "unknown dev format target: {{target}}" >&2; \
-      echo "  targets: python toml markdown all" >&2; \
+      echo "unknown dev fix target: {{target}}" >&2; \
+      echo "  targets: python toml markdown vault all" >&2; \
       exit 1 ;; \
   esac
 

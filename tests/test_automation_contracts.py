@@ -29,7 +29,7 @@ def test_justfile_contains_required_recipes() -> None:
         "ci",
         "_dev-deps",
         "_dev-lint",
-        "_dev-format",
+        "_dev-fix",
         "_dev-audit",
         "_dev-test",
         "_dev-build",
@@ -49,7 +49,7 @@ def test_justfile_exposes_approved_targets() -> None:
     # Internal dev recipes with default targets
     assert "_dev-deps target='sync':" in justfile
     assert "_dev-lint target='all':" in justfile
-    assert "_dev-format target='all':" in justfile
+    assert "_dev-fix target='all':" in justfile
     assert "_dev-audit target:" in justfile
     assert "_dev-test target='all':" in justfile
     assert "_dev-build target:" in justfile
@@ -59,7 +59,7 @@ def test_justfile_exposes_approved_targets() -> None:
     for verb in (
         "deps",
         "lint",
-        "format",
+        "fix",
         "audit",
         "test",
         "build",
@@ -102,14 +102,15 @@ def test_test_all_runs_python_and_docker() -> None:
     assert "just _dev-build python" in justfile
 
 
-def test_format_surface_includes_python_toml_and_markdown() -> None:
+def test_fix_surface_covers_all_autofixable_targets() -> None:
     justfile = _read("justfile")
-    assert "_dev-format target='all':" in justfile
+    assert "_dev-fix target='all':" in justfile
     assert "uv run ruff format src tests" in justfile
     assert "uv run ruff check --fix src tests" in justfile
     assert '@taplo/cli fmt "$(pwd)"/*.toml' in justfile
     assert "markdownlint-cli" in justfile
     assert "--config .markdownlint.json --fix" in justfile
+    assert "vault check all --fix" in justfile
 
 
 def test_markdown_lint_uses_markdownlint() -> None:
