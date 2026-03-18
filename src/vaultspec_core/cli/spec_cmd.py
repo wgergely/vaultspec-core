@@ -1,8 +1,10 @@
-"""Spec command group -- manage framework resources.
+"""Spec command group — manage framework resources in ``.vaultspec/``.
 
-Covers rules, skills, agents, system prompts, and hooks. Delegates to
-existing core backend functions via lazy imports to avoid circular
-import issues.
+Sub-groups: ``spec rules`` (:data:`rules_app`), ``spec skills`` (:data:`skills_app`),
+``spec agents`` (:data:`agents_app`), ``spec system`` (:data:`system_app`),
+``spec hooks`` (:data:`hooks_app`). Delegates to :mod:`vaultspec_core.core`
+CRUD functions via lazy imports to avoid circular-import issues. Mounted onto
+:data:`.root.app` as the ``spec`` sub-group.
 """
 
 from __future__ import annotations
@@ -11,6 +13,8 @@ import logging
 from typing import Annotated
 
 import typer
+
+from vaultspec_core.cli._target import TargetOption, apply_target
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +50,9 @@ spec_app.add_typer(rules_app, name="rules")
 
 
 @rules_app.command("list")
-def cmd_rules_list() -> None:
+def cmd_rules_list(target: TargetOption = None) -> None:
     """List all available rules."""
+    apply_target(target)
     from rich import box
     from rich.table import Table
 
@@ -71,8 +76,10 @@ def cmd_rules_add(
         str | None, typer.Option("--content", help="Rule content")
     ] = None,
     force: Annotated[bool, typer.Option("--force", help="Overwrite existing")] = False,
+    target: TargetOption = None,
 ) -> None:
     """Add a new custom rule."""
+    apply_target(target)
     from vaultspec_core.core import rules_add
     from vaultspec_core.core.exceptions import VaultSpecError
 
@@ -83,8 +90,12 @@ def cmd_rules_add(
 
 
 @rules_app.command("show")
-def cmd_rules_show(name: Annotated[str, typer.Argument(help="Rule name")]) -> None:
+def cmd_rules_show(
+    name: Annotated[str, typer.Argument(help="Rule name")],
+    target: TargetOption = None,
+) -> None:
     """Display a rule's content."""
+    apply_target(target)
     from vaultspec_core.core import resource_show
     from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -97,8 +108,12 @@ def cmd_rules_show(name: Annotated[str, typer.Argument(help="Rule name")]) -> No
 
 
 @rules_app.command("edit")
-def cmd_rules_edit(name: Annotated[str, typer.Argument(help="Rule name")]) -> None:
+def cmd_rules_edit(
+    name: Annotated[str, typer.Argument(help="Rule name")],
+    target: TargetOption = None,
+) -> None:
     """Open a rule in the configured editor."""
+    apply_target(target)
     from vaultspec_core.core import resource_edit
     from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -113,8 +128,10 @@ def cmd_rules_edit(name: Annotated[str, typer.Argument(help="Rule name")]) -> No
 def cmd_rules_remove(
     name: Annotated[str, typer.Argument(help="Rule name")],
     force: Annotated[bool, typer.Option("--force", help="Skip confirmation")] = False,
+    target: TargetOption = None,
 ) -> None:
     """Delete a rule."""
+    apply_target(target)
     from vaultspec_core.core import resource_remove
     from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -135,8 +152,10 @@ def cmd_rules_remove(
 def cmd_rules_rename(
     old_name: Annotated[str, typer.Argument(help="Current rule name")],
     new_name: Annotated[str, typer.Argument(help="New rule name")],
+    target: TargetOption = None,
 ) -> None:
     """Rename an existing rule."""
+    apply_target(target)
     from vaultspec_core.core import resource_rename
     from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -156,8 +175,10 @@ def cmd_rules_rename(
 def cmd_rules_sync(
     prune: Annotated[bool, typer.Option("--prune", help="Remove stale files")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
+    target: TargetOption = None,
 ) -> None:
     """Sync rules to tool destinations."""
+    apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import rules_sync
     from vaultspec_core.core.sync import format_summary
@@ -169,8 +190,10 @@ def cmd_rules_sync(
 @rules_app.command("revert")
 def cmd_rules_revert(
     filename: Annotated[str, typer.Argument(help="Rule filename to revert")],
+    target: TargetOption = None,
 ) -> None:
     """Revert a rule to its snapshotted original."""
+    apply_target(target)
     from vaultspec_core.core import types as _t
     from vaultspec_core.core.revert import revert_resource
 
@@ -198,8 +221,9 @@ spec_app.add_typer(skills_app, name="skills")
 
 
 @skills_app.command("list")
-def cmd_skills_list() -> None:
+def cmd_skills_list(target: TargetOption = None) -> None:
     """List all available skills."""
+    apply_target(target)
     from rich import box
     from rich.table import Table
 
@@ -232,8 +256,10 @@ def cmd_skills_add(
     template: Annotated[
         str | None, typer.Option("--template", help="Template to use")
     ] = None,
+    target: TargetOption = None,
 ) -> None:
     """Add a new skill."""
+    apply_target(target)
     from vaultspec_core.core import skills_add
     from vaultspec_core.core.exceptions import VaultSpecError
 
@@ -244,8 +270,12 @@ def cmd_skills_add(
 
 
 @skills_app.command("show")
-def cmd_skills_show(name: Annotated[str, typer.Argument(help="Skill name")]) -> None:
+def cmd_skills_show(
+    name: Annotated[str, typer.Argument(help="Skill name")],
+    target: TargetOption = None,
+) -> None:
     """Display a skill's content."""
+    apply_target(target)
     from vaultspec_core.core import resource_show
     from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -260,8 +290,12 @@ def cmd_skills_show(name: Annotated[str, typer.Argument(help="Skill name")]) -> 
 
 
 @skills_app.command("edit")
-def cmd_skills_edit(name: Annotated[str, typer.Argument(help="Skill name")]) -> None:
+def cmd_skills_edit(
+    name: Annotated[str, typer.Argument(help="Skill name")],
+    target: TargetOption = None,
+) -> None:
     """Open a skill in the configured editor."""
+    apply_target(target)
     from vaultspec_core.core import resource_edit
     from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -276,8 +310,10 @@ def cmd_skills_edit(name: Annotated[str, typer.Argument(help="Skill name")]) -> 
 def cmd_skills_remove(
     name: Annotated[str, typer.Argument(help="Skill name")],
     force: Annotated[bool, typer.Option("--force", help="Skip confirmation")] = False,
+    target: TargetOption = None,
 ) -> None:
     """Delete a skill."""
+    apply_target(target)
     from vaultspec_core.core import resource_remove
     from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -299,8 +335,10 @@ def cmd_skills_remove(
 def cmd_skills_rename(
     old_name: Annotated[str, typer.Argument(help="Current skill name")],
     new_name: Annotated[str, typer.Argument(help="New skill name")],
+    target: TargetOption = None,
 ) -> None:
     """Rename an existing skill."""
+    apply_target(target)
     from vaultspec_core.core import resource_rename
     from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -321,8 +359,10 @@ def cmd_skills_rename(
 def cmd_skills_sync(
     prune: Annotated[bool, typer.Option("--prune", help="Remove stale files")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
+    target: TargetOption = None,
 ) -> None:
     """Sync skills to tool destinations."""
+    apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import skills_sync
     from vaultspec_core.core.sync import format_summary
@@ -334,8 +374,10 @@ def cmd_skills_sync(
 @skills_app.command("revert")
 def cmd_skills_revert(
     filename: Annotated[str, typer.Argument(help="Skill filename to revert")],
+    target: TargetOption = None,
 ) -> None:
     """Revert a skill to its snapshotted original."""
+    apply_target(target)
     from vaultspec_core.core import types as _t
     from vaultspec_core.core.revert import revert_resource
 
@@ -363,8 +405,9 @@ spec_app.add_typer(agents_app, name="agents")
 
 
 @agents_app.command("list")
-def cmd_agents_list() -> None:
+def cmd_agents_list(target: TargetOption = None) -> None:
     """List all available agents."""
+    apply_target(target)
     from rich import box
     from rich.table import Table
 
@@ -394,8 +437,10 @@ def cmd_agents_add(
         str, typer.Option("--description", help="Agent description")
     ] = "",
     force: Annotated[bool, typer.Option("--force", help="Overwrite existing")] = False,
+    target: TargetOption = None,
 ) -> None:
     """Add a new agent definition."""
+    apply_target(target)
     from vaultspec_core.core import agents_add
     from vaultspec_core.core.exceptions import VaultSpecError
 
@@ -406,8 +451,12 @@ def cmd_agents_add(
 
 
 @agents_app.command("show")
-def cmd_agents_show(name: Annotated[str, typer.Argument(help="Agent name")]) -> None:
+def cmd_agents_show(
+    name: Annotated[str, typer.Argument(help="Agent name")],
+    target: TargetOption = None,
+) -> None:
     """Display an agent's content."""
+    apply_target(target)
     from vaultspec_core.core import resource_show
     from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -420,8 +469,12 @@ def cmd_agents_show(name: Annotated[str, typer.Argument(help="Agent name")]) -> 
 
 
 @agents_app.command("edit")
-def cmd_agents_edit(name: Annotated[str, typer.Argument(help="Agent name")]) -> None:
+def cmd_agents_edit(
+    name: Annotated[str, typer.Argument(help="Agent name")],
+    target: TargetOption = None,
+) -> None:
     """Open an agent in the configured editor."""
+    apply_target(target)
     from vaultspec_core.core import resource_edit
     from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -436,8 +489,10 @@ def cmd_agents_edit(name: Annotated[str, typer.Argument(help="Agent name")]) -> 
 def cmd_agents_remove(
     name: Annotated[str, typer.Argument(help="Agent name")],
     force: Annotated[bool, typer.Option("--force", help="Skip confirmation")] = False,
+    target: TargetOption = None,
 ) -> None:
     """Delete an agent definition."""
+    apply_target(target)
     from vaultspec_core.core import resource_remove
     from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -458,8 +513,10 @@ def cmd_agents_remove(
 def cmd_agents_rename(
     old_name: Annotated[str, typer.Argument(help="Current agent name")],
     new_name: Annotated[str, typer.Argument(help="New agent name")],
+    target: TargetOption = None,
 ) -> None:
     """Rename an existing agent definition."""
+    apply_target(target)
     from vaultspec_core.core import resource_rename
     from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -479,8 +536,10 @@ def cmd_agents_rename(
 def cmd_agents_sync(
     prune: Annotated[bool, typer.Option("--prune", help="Remove stale files")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
+    target: TargetOption = None,
 ) -> None:
     """Sync agents to tool destinations."""
+    apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import agents_sync
     from vaultspec_core.core.sync import format_summary
@@ -492,8 +551,10 @@ def cmd_agents_sync(
 @agents_app.command("revert")
 def cmd_agents_revert(
     filename: Annotated[str, typer.Argument(help="Agent filename to revert")],
+    target: TargetOption = None,
 ) -> None:
     """Revert an agent to its snapshotted original."""
+    apply_target(target)
     from vaultspec_core.core import types as _t
     from vaultspec_core.core.revert import revert_resource
 
@@ -521,8 +582,9 @@ spec_app.add_typer(system_app, name="system")
 
 
 @system_app.command("show")
-def cmd_system_show() -> None:
+def cmd_system_show(target: TargetOption = None) -> None:
     """Display system prompt parts and targets."""
+    apply_target(target)
     from rich import box
     from rich.table import Table
 
@@ -568,8 +630,10 @@ def cmd_system_sync(
     force: Annotated[
         bool, typer.Option("--force", help="Overwrite non-managed files")
     ] = False,
+    target: TargetOption = None,
 ) -> None:
     """Sync system prompts to tool destinations."""
+    apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import system_sync
     from vaultspec_core.core.sync import format_summary
@@ -590,8 +654,9 @@ spec_app.add_typer(hooks_app, name="hooks")
 
 
 @hooks_app.command("list")
-def cmd_hooks_list() -> None:
+def cmd_hooks_list(target: TargetOption = None) -> None:
     """List all defined hooks."""
+    apply_target(target)
     from rich import box
     from rich.table import Table
 
@@ -634,8 +699,10 @@ def cmd_hooks_run(
     path: Annotated[
         str | None, typer.Option("--path", help="Context path variable")
     ] = None,
+    target: TargetOption = None,
 ) -> None:
     """Trigger hooks for a specific event."""
+    apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core.commands import hooks_run
     from vaultspec_core.core.exceptions import VaultSpecError

@@ -1,22 +1,46 @@
-"""Shared fixtures and helpers for CLI tests."""
+"""Shared fixtures for the CLI test suite.
+
+Provides the session-scoped ``runner``, the ``test_project`` workspace
+fixture backed by the real ``test-project/`` corpus, and autouse isolation
+that saves/restores module-level globals between tests.  Color output is
+disabled globally via ``NO_COLOR=1``.
+"""
 
 from __future__ import annotations
 
 import os
+import shutil
+from pathlib import Path
 
 import pytest
 import typer.rich_utils
 from typer.testing import CliRunner
 
-from vaultspec_core.cli import app as cli_app
+import vaultspec_core.core.types as _t
+from vaultspec_core.cli import app
+from vaultspec_core.config.workspace import resolve_workspace
 from vaultspec_core.core.types import init_paths
 
-# Disable Rich/Typer color output in tests.  NO_COLOR is the standard
-# mechanism (https://no-color.org/) and Rich respects it.  We also force
-# Typer's COLOR_SYSTEM to None to prevent ANSI on CI where pseudo-TTY
-# detection can override NO_COLOR.
+# Disable Rich/Typer color output in tests.
 os.environ["NO_COLOR"] = "1"
 typer.rich_utils.COLOR_SYSTEM = None
+
+# Path to the real test-project/ corpus at the repository root.
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_TEST_PROJECT_SRC = _REPO_ROOT / "test-project"
+
+# Names of the module-level globals that init_paths() sets.
+_TYPES_GLOBALS = [
+    "ROOT_DIR",
+    "TARGET_DIR",
+    "RULES_SRC_DIR",
+    "SKILLS_SRC_DIR",
+    "AGENTS_SRC_DIR",
+    "SYSTEM_SRC_DIR",
+    "TEMPLATES_DIR",
+    "HOOKS_DIR",
+    "TOOL_CONFIGS",
+]
 
 
 def setup_rules_dir(root):
@@ -31,78 +55,84 @@ def runner():
 
 @pytest.fixture
 def test_project(tmp_path):
-    """Provide an isolated test project directory with full structure."""
-    project = tmp_path / "project"
-    project.mkdir()
+    """Copy the real test-project/ corpus and install vaultspec.
 
-    # Create .vaultspec structure
-    (project / ".vaultspec" / "rules" / "rules").mkdir(parents=True)
-    (project / ".vaultspec" / "rules" / "skills").mkdir(parents=True)
-    (project / ".vaultspec" / "rules" / "templates").mkdir(parents=True)
-    (project / ".vaultspec" / "rules" / "system").mkdir(parents=True)
+    Each test gets a fresh copy of the full test-project/ tree including
+    .vault/ documentation.  ``install_run`` is called to scaffold
+    ``.vaultspec/`` and provider destinations so that all commands work.
+    The original test-project/ is never modified.  Cleanup is automatic
+    via pytest's ``tmp_path``.
 
-    # Create .vault structure
-    for subdir in ["adr", "audit", "exec", "plan", "reference", "research"]:
-        (project / ".vault" / subdir).mkdir(parents=True)
+    Module globals are initialised via ``init_paths`` so that unit tests
+    calling internal functions (``collect_rules``, ``rules_sync``, etc.)
+    have the paths they rely on.
+    """
+    dest = tmp_path / "project"
+    shutil.copytree(
+        _TEST_PROJECT_SRC,
+        dest,
+        ignore_dangling_symlinks=True,
+        ignore=shutil.ignore_patterns("*.log"),
+    )
 
-    # Create tool directories (needed for sync tests)
-    (project / ".claude" / "rules").mkdir(parents=True)
-    (project / ".claude" / "skills").mkdir(parents=True)
-    (project / ".gemini" / "rules").mkdir(parents=True)
+    # Install vaultspec framework so .vaultspec/ exists
+    from vaultspec_core.core.commands import install_run
 
-    # Write provider manifest with all providers installed
-    from vaultspec_core.core.manifest import write_manifest
+    _t.TARGET_DIR = dest
+    install_run(path=dest, provider="all", upgrade=False, dry_run=False, force=False)
 
-    write_manifest(project, {"claude", "gemini", "antigravity", "codex"})
-
-    # Mock init_paths to point to this temp project
-    from vaultspec_core.config.workspace import resolve_workspace
-
-    layout = resolve_workspace(target_override=project)
+    layout = resolve_workspace(target_override=dest)
     init_paths(layout)
 
-    return project
+    return dest
 
 
 def run_vaultspec(runner, *args, target=None):
+    """Invoke the CLI with optional --target."""
     args_list = list(args)
     if target and "--target" not in args_list and "-t" not in args_list:
-        args_list = ["--target", str(target), *args_list]
-    return runner.invoke(cli_app, args_list)
+        args_list = [*args_list, "--target", str(target)]
+    return runner.invoke(app, args_list)
 
 
 def run_vault(runner, *args, target=None):
+    """Invoke the CLI with ``vault`` prefix and optional --target."""
     args_list = list(args)
     if target and "--target" not in args_list and "-t" not in args_list:
-        args_list = ["--target", str(target), *args_list]
-
-    # Ensure 'vault' is in args_list
+        args_list = [*args_list, "--target", str(target)]
     if "vault" not in args_list:
-        # Insert 'vault' after global options if any
-        inserted = False
-        for i in range(len(args_list)):
-            if args_list[i] in ("--target", "-t"):
-                args_list.insert(i + 2, "vault")
-                inserted = True
-                break
-        if not inserted:
-            args_list.insert(0, "vault")
-
-    return runner.invoke(cli_app, args_list)
+        args_list.insert(0, "vault")
+    return runner.invoke(app, args_list)
 
 
 def run_spec(runner, *args, target=None):
+    """Invoke the CLI with optional --target (spec commands)."""
     args_list = list(args)
     if target and "--target" not in args_list and "-t" not in args_list:
-        args_list = ["--target", str(target), *args_list]
-    return runner.invoke(cli_app, args_list)
+        args_list = [*args_list, "--target", str(target)]
+    return runner.invoke(app, args_list)
 
 
 @pytest.fixture(autouse=True)
-def _isolate_cli(test_project):
-    """Ensure every test has its own isolated project state and console."""
+def _isolate_state():
+    """Save and restore module-level globals and console between tests.
+
+    This prevents state leakage when one test's CLI invocation sets
+    ``_t.TARGET_DIR`` / ``_t.TOOL_CONFIGS`` and the next test inherits
+    stale values pointing at the wrong tmp_path.
+    """
+    from vaultspec_core.cli._target import reset as reset_target
     from vaultspec_core.console import reset_console
 
+    # Snapshot current state.
+    saved = {name: getattr(_t, name) for name in _TYPES_GLOBALS}
     reset_console()
+    reset_target()
+
     yield
+
+    # Restore original state.
+    for name, value in saved.items():
+        setattr(_t, name, value)
     reset_console()
+    reset_target()

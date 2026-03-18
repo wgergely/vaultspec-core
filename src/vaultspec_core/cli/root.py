@@ -1,16 +1,27 @@
-"""Root Typer application with global options and top-level commands.
+"""Root Typer application: global callback, options, and top-level commands.
 
-Mounts vault/spec sub-groups and defines install, uninstall, sync as
-top-level commands that delegate to existing backend functions.
+Mounts :mod:`.vault_cmd` and :mod:`.spec_cmd` sub-groups and defines
+``install``, ``uninstall``, and ``sync`` commands that delegate to
+:mod:`vaultspec_core.core.commands`. Exposes :func:`run` as the console-script
+entry point. Depends on :mod:`vaultspec_core.config.workspace` for workspace
+resolution and :mod:`vaultspec_core.core.types` for global path initialization.
 """
 
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+from vaultspec_core.cli._target import (
+    TargetOption,
+    apply_target,
+    apply_target_install,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +32,8 @@ app = typer.Typer(
         "to operate on a different directory.\n\n"
         "Examples:\n"
         "  vaultspec-core install\n"
-        "  vaultspec-core -t ./my-project install claude\n"
-        "  vaultspec-core sync\n"
+        "  vaultspec-core install --target ./my-project claude\n"
+        "  vaultspec-core sync --target ./my-project\n"
         "  vaultspec-core spec rules list\n"
     ),
     no_args_is_help=True,
@@ -78,6 +89,7 @@ def main(
     ] = False,
 ) -> None:
     """Initialize workspace and logging."""
+    from vaultspec_core.cli._target import reset, set_root_target
     from vaultspec_core.logging_config import configure_logging
 
     log_level = logging.DEBUG if debug else logging.WARNING
@@ -87,27 +99,12 @@ def main(
         typer.echo(ctx.get_help())
         raise typer.Exit(0)
 
-    # For install/uninstall the target path is the final destination —
-    # workspace resolution may not be possible yet (no .vaultspec/).
-    if ctx.invoked_subcommand in ("install", "uninstall"):
-        target_path = target or Path.cwd()
-        from vaultspec_core.core import types as _t
-
-        _t.TARGET_DIR = target_path
-        ctx.obj = {"target": target_path}
-        return
-
-    # Resolve workspace for all other commands
-    from vaultspec_core.config.workspace import WorkspaceError, resolve_workspace
-    from vaultspec_core.core.types import init_paths
-
-    try:
-        layout = resolve_workspace(target_override=target)
-        init_paths(layout)
-        ctx.obj = {"target": layout.target_dir, "layout": layout}
-    except WorkspaceError as e:
-        typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(code=1) from e
+    # Store root-level target for subcommands; no workspace init here.
+    # Each subcommand calls apply_target() / apply_target_install() which
+    # merges root-level and subcommand-level --target with clear precedence.
+    reset()
+    set_root_target(target)
+    ctx.obj = {}
 
 
 # ---- Top-level commands ------------------------------------------------------
@@ -127,13 +124,13 @@ def _handle_error(exc: Exception) -> None:
 
 @app.command("install")
 def cmd_install(
-    ctx: typer.Context,
     provider: Annotated[
         str,
         typer.Argument(
             help="Provider to install (all, core, claude, gemini, antigravity, codex)"
         ),
     ] = "all",
+    target: TargetOption = None,
     upgrade: Annotated[
         bool,
         typer.Option("--upgrade", help="Re-sync builtin rules and firmware"),
@@ -151,7 +148,6 @@ def cmd_install(
 ) -> None:
     """Deploy the vaultspec framework to the target directory.
 
-    Uses the global --target / -t option (defaults to current directory).
     Scaffolds the workspace structure and syncs all managed resources.
     Use --upgrade to update builtin rules without re-scaffolding.
 
@@ -159,14 +155,14 @@ def cmd_install(
       vaultspec-core install                       # install all providers in cwd\n
       vaultspec-core install core                  # framework only, no providers\n
       vaultspec-core install claude                # framework + claude\n
-      vaultspec-core -t ./my-project install       # install in specific directory\n
+      vaultspec-core install --target ./my-project # install in specific directory\n
       vaultspec-core install --upgrade             # update firmware + re-sync\n
       vaultspec-core install claude --dry-run      # preview what would be created\n
     """
     from vaultspec_core.core.commands import install_run
     from vaultspec_core.core.exceptions import VaultSpecError
 
-    path: Path = ctx.obj["target"]
+    path: Path = apply_target_install(target)
 
     # Guard: refuse to create deeply nested paths — only allow creating the
     # final directory component.  This prevents accidental scaffolding of
@@ -234,13 +230,13 @@ def cmd_install(
 
 @app.command("uninstall")
 def cmd_uninstall(
-    ctx: typer.Context,
     provider: Annotated[
         str,
         typer.Argument(
             help="Provider to uninstall (all, core, claude, gemini, antigravity, codex)"
         ),
     ] = "all",
+    target: TargetOption = None,
     remove_vault: Annotated[
         bool,
         typer.Option(
@@ -258,7 +254,6 @@ def cmd_uninstall(
 ) -> None:
     """Remove the vaultspec framework from the target directory.
 
-    Uses the global --target / -t option (defaults to current directory).
     Removes all managed artifacts (.vaultspec/, provider dirs, generated configs).
     The .vault/ documentation corpus is preserved by default.
     Use a provider name to remove only that provider's artifacts.
@@ -266,14 +261,14 @@ def cmd_uninstall(
     Examples:\n
       vaultspec-core uninstall                    # remove framework, keep .vault/\n
       vaultspec-core uninstall claude             # remove only claude\n
-      vaultspec-core -t ./proj uninstall          # remove from specific directory\n
+      vaultspec-core uninstall --target ./proj    # remove from specific directory\n
       vaultspec-core uninstall --remove-vault     # also remove .vault/ docs\n
       vaultspec-core uninstall --dry-run          # preview what would be removed\n
     """
     from vaultspec_core.core.commands import uninstall_run
     from vaultspec_core.core.exceptions import VaultSpecError
 
-    path: Path = ctx.obj["target"]
+    path: Path = apply_target_install(target)
 
     if not path.exists():
         typer.echo(f"Error: Target directory does not exist: {path}", err=True)
@@ -332,6 +327,7 @@ def cmd_sync(
             help="Provider to sync (all, claude, gemini, antigravity, codex)"
         ),
     ] = "all",
+    target: TargetOption = None,
     prune: Annotated[bool, typer.Option("--prune", help="Remove stale files")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
     force: Annotated[
@@ -343,6 +339,7 @@ def cmd_sync(
     Defaults to syncing all providers. Pass a provider name to sync only
     that provider (e.g. 'vaultspec-core sync claude').
     """
+    apply_target(target)
     if provider == "core":
         typer.echo(
             "Error: 'core' is not a valid sync target. "

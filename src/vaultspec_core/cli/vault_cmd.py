@@ -1,7 +1,10 @@
-"""Vault command group -- manage .vault/ documentation records.
+"""Vault command group — create, query, graph, check, and audit ``.vault/`` records.
 
-Provides commands for creating, querying, and auditing vault documents.
-Delegates to the vaultcore query engine and hydration module for backend logic.
+Sub-groups: ``vault feature`` (:data:`feature_app`), ``vault graph``
+(:data:`graph_app`), ``vault check`` (:data:`check_app`). Delegates to
+:mod:`vaultspec_core.vaultcore.query`, :mod:`vaultspec_core.vaultcore.hydration`,
+:mod:`vaultspec_core.vaultcore.checks`, and :mod:`vaultspec_core.graph` for
+all backend logic. Mounted onto :data:`.root.app` as the ``vault`` sub-group.
 """
 
 from __future__ import annotations
@@ -10,6 +13,8 @@ import logging
 from typing import TYPE_CHECKING, Annotated
 
 import typer
+
+from vaultspec_core.cli._target import TargetOption, apply_target
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -56,11 +61,13 @@ def cmd_add(
         str | None, typer.Option("--date", help="Override date (YYYY-MM-DD)")
     ] = None,
     title: Annotated[str | None, typer.Option("--title", help="Document title")] = None,
+    target: TargetOption = None,
 ) -> None:
     """Create a new .vault/ document from a template.
 
     Supported types: adr, audit, exec, plan, reference, research.
     """
+    apply_target(target)
     import re
     from datetime import datetime
 
@@ -133,8 +140,10 @@ def cmd_stats(
     orphaned: Annotated[
         bool, typer.Option("--orphaned", help="Show only orphaned documents")
     ] = False,
+    target: TargetOption = None,
 ) -> None:
     """Show vault statistics and metrics."""
+    apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import types as _t
     from vaultspec_core.vaultcore.query import get_stats
@@ -169,8 +178,10 @@ def cmd_list(
     feature: Annotated[
         str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
     ] = None,
+    target: TargetOption = None,
 ) -> None:
     """List vault documents, optionally filtered by type."""
+    apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import types as _t
     from vaultspec_core.vaultcore.query import list_documents
@@ -223,6 +234,7 @@ def cmd_graph(
         bool,
         typer.Option("--body", help="Include body in JSON"),
     ] = False,
+    target: TargetOption = None,
 ) -> None:
     """Render the vault document graph.
 
@@ -234,6 +246,7 @@ def cmd_graph(
     if ctx.invoked_subcommand is not None:
         return
 
+    apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import types as _t
     from vaultspec_core.graph import VaultGraph
@@ -366,8 +379,10 @@ def cmd_check_all(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    target: TargetOption = None,
 ) -> None:
     """Run all vault health checks."""
+    apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import types as _t
     from vaultspec_core.vaultcore.checks import render_check_result, run_all_checks
@@ -414,8 +429,10 @@ def cmd_check_orphans(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    target: TargetOption = None,
 ) -> None:
     """Find documents with no incoming wiki-links."""
+    apply_target(target)
     _reject_fix("orphans", fix)
     from vaultspec_core.core import types as _t
     from vaultspec_core.vaultcore.checks import check_orphans
@@ -435,8 +452,10 @@ def cmd_check_frontmatter(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    target: TargetOption = None,
 ) -> None:
     """Validate document frontmatter against vault schema."""
+    apply_target(target)
     from vaultspec_core.core import types as _t
     from vaultspec_core.vaultcore.checks import check_frontmatter
 
@@ -455,8 +474,10 @@ def cmd_check_links(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    target: TargetOption = None,
 ) -> None:
     """Check wiki-links follow Obsidian convention (no .md extension)."""
+    apply_target(target)
     from vaultspec_core.core import types as _t
     from vaultspec_core.vaultcore.checks import check_links
 
@@ -475,8 +496,10 @@ def cmd_check_features(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    target: TargetOption = None,
 ) -> None:
     """Check feature tag completeness — missing doc types."""
+    apply_target(target)
     _reject_fix("features", fix)
     from vaultspec_core.core import types as _t
     from vaultspec_core.vaultcore.checks import check_features
@@ -496,8 +519,10 @@ def cmd_check_references(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    target: TargetOption = None,
 ) -> None:
     """Check for missing cross-references within features."""
+    apply_target(target)
     from vaultspec_core.core import types as _t
     from vaultspec_core.vaultcore.checks import check_references
 
@@ -516,8 +541,10 @@ def cmd_check_schema(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    target: TargetOption = None,
 ) -> None:
     """Enforce schema rules: ADRs must ref research, plans must ref ADRs."""
+    apply_target(target)
     from vaultspec_core.core import types as _t
     from vaultspec_core.vaultcore.checks import check_schema
 
@@ -533,59 +560,15 @@ def cmd_check_structure(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    target: TargetOption = None,
 ) -> None:
     """Check vault directory structure and filename conventions."""
+    apply_target(target)
     from vaultspec_core.core import types as _t
     from vaultspec_core.vaultcore.checks import check_structure
 
     result = check_structure(_t.TARGET_DIR, fix=fix)
     _render_and_exit(result, verbose)
-
-
-# ---- vault doctor -----------------------------------------------------------
-
-
-@vault_app.command("doctor")
-def cmd_doctor(
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
-    verbose: Annotated[
-        bool, typer.Option("--verbose", "-v", help="Show full diagnostics")
-    ] = False,
-) -> None:
-    """Run all vault health checks and show a compact summary."""
-    from vaultspec_core.console import get_console
-    from vaultspec_core.core import types as _t
-    from vaultspec_core.vaultcore.checks import render_check_result, run_all_checks
-
-    console = get_console()
-    results = run_all_checks(_t.TARGET_DIR, feature=feature)
-
-    console.print("[bold]Vault Health Check[/bold]")
-    for r in results:
-        render_check_result(console, r, verbose=verbose, summary_only=not verbose)
-
-    total_errors = sum(r.error_count for r in results)
-    total_warnings = sum(r.warning_count for r in results)
-
-    console.print()
-    parts = []
-    if total_errors:
-        parts.append(
-            f"[red]{total_errors} error{'s' if total_errors != 1 else ''}[/red]"
-        )
-    if total_warnings:
-        sfx = "s" if total_warnings != 1 else ""
-        parts.append(f"[yellow]{total_warnings} warning{sfx}[/yellow]")
-    if parts:
-        console.print(f"  Total: {', '.join(parts)}")
-        console.print("  Run [dim]vault check <name>[/dim] for details.")
-    else:
-        console.print("  [green]All checks passed.[/green]")
-
-    if total_errors:
-        raise typer.Exit(code=1)
 
 
 # ---- vault feature list ------------------------------------------------------
@@ -600,8 +583,10 @@ def cmd_feature_list(
     type_filter: Annotated[
         str | None, typer.Option("--type", help="Filter by document type")
     ] = None,
+    target: TargetOption = None,
 ) -> None:
     """List all feature tags in the vault."""
+    apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import types as _t
     from vaultspec_core.vaultcore.query import list_feature_details
@@ -629,8 +614,10 @@ def cmd_feature_list(
 @feature_app.command("archive")
 def cmd_feature_archive(
     feature_tag: Annotated[str, typer.Argument(help="Feature tag to archive")],
+    target: TargetOption = None,
 ) -> None:
     """Archive all documents for a feature tag."""
+    apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core import types as _t
     from vaultspec_core.vaultcore.query import archive_feature
