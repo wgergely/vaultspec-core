@@ -7,15 +7,11 @@ entry point. Depends on :mod:`vaultspec_core.config.workspace` for workspace
 resolution and :mod:`vaultspec_core.core.types` for global path initialization.
 """
 
-from __future__ import annotations
-
 import logging
-from typing import TYPE_CHECKING, Annotated
+from pathlib import Path
+from typing import Annotated
 
 import typer
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 from vaultspec_core.cli._target import (
     TargetOption,

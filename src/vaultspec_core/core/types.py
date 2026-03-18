@@ -44,9 +44,9 @@ class ToolConfig:
         rule_ref_dir: Directory whose markdown files should be referenced from
             ``config_file``. Defaults to ``rules_dir`` when omitted.
         rule_ref_config_file: Optional secondary config file that carries
-            ``@rules/...`` references, separate from ``config_file``.  Used
-            by Gemini where ``.gemini/GEMINI.md`` holds rule references while
-            the root ``GEMINI.md`` holds shared framework content.
+            ``@rules/...`` references, separate from ``config_file``.
+            Currently unused; retained for future providers that need a
+            secondary config file distinct from their root config.
         system_file: Path to the tool's system prompt file, or ``None`` if the
             tool does not have a dedicated system file.
         emit_system_rule: Whether shared system content should be materialized
@@ -79,6 +79,10 @@ class SyncResult:
             (e.g. transform returned ``None``, or safety guard triggered).
         pruned: Number of stale destination files that were deleted.
         errors: List of error message strings for files that failed to sync.
+        items: Per-file action log — list of ``(path, action)`` tuples for
+            dry-run rendering.
+        warnings: Advisories about what ``--force`` would change beyond the
+            default sync.
     """
 
     added: int = 0
@@ -87,7 +91,7 @@ class SyncResult:
     pruned: int = 0
     errors: list[str] = field(default_factory=list)
     items: list[tuple[str, str]] = field(default_factory=list)
-    """Per-file action log: list of (path, action) tuples for dry-run rendering."""
+    warnings: list[str] = field(default_factory=list)
 
 
 # Module-level globals initialised by init_paths()
@@ -194,7 +198,6 @@ def init_paths(layout: Any) -> None:
             agents_dir=gemini_dir / Resource.AGENTS.value,
             config_file=target / FileName.GEMINI.value,
             rule_ref_dir=gemini_dir / Resource.RULES.value,
-            rule_ref_config_file=gemini_dir / FileName.GEMINI.value,
             system_file=gemini_dir / FileName.SYSTEM.value,
             capabilities=frozenset(
                 {

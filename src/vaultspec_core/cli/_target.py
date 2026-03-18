@@ -14,8 +14,6 @@ If the subcommand target is ``None``, the root target is used as
 fallback.  If both are ``None``, the current working directory is used.
 """
 
-from __future__ import annotations
-
 import logging
 from pathlib import Path
 from typing import Annotated

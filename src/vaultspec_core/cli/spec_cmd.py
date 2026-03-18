@@ -7,8 +7,6 @@ CRUD functions via lazy imports to avoid circular-import issues. Mounted onto
 :data:`.root.app` as the ``spec`` sub-group.
 """
 
-from __future__ import annotations
-
 import logging
 from typing import Annotated
 
@@ -173,8 +171,11 @@ def cmd_rules_rename(
 
 @rules_app.command("sync")
 def cmd_rules_sync(
-    prune: Annotated[bool, typer.Option("--prune", help="Remove stale files")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Prune stale files and overwrite user content"),
+    ] = False,
     target: TargetOption = None,
 ) -> None:
     """Sync rules to tool destinations."""
@@ -183,8 +184,11 @@ def cmd_rules_sync(
     from vaultspec_core.core import rules_sync
     from vaultspec_core.core.sync import format_summary
 
-    result = rules_sync(prune=prune, dry_run=dry_run)
-    get_console().print(f"  [bold]{format_summary('Rules', result)}[/bold]")
+    result = rules_sync(prune=force, dry_run=dry_run)
+    console = get_console()
+    console.print(f"  [bold]{format_summary('Rules', result)}[/bold]")
+    for warning in result.warnings:
+        console.print(f"  [yellow]•[/yellow] {warning}")
 
 
 @rules_app.command("revert")
@@ -357,8 +361,11 @@ def cmd_skills_rename(
 
 @skills_app.command("sync")
 def cmd_skills_sync(
-    prune: Annotated[bool, typer.Option("--prune", help="Remove stale files")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Prune stale files and overwrite user content"),
+    ] = False,
     target: TargetOption = None,
 ) -> None:
     """Sync skills to tool destinations."""
@@ -367,8 +374,11 @@ def cmd_skills_sync(
     from vaultspec_core.core import skills_sync
     from vaultspec_core.core.sync import format_summary
 
-    result = skills_sync(prune=prune, dry_run=dry_run)
-    get_console().print(f"  [bold]{format_summary('Skills', result)}[/bold]")
+    result = skills_sync(prune=force, dry_run=dry_run)
+    console = get_console()
+    console.print(f"  [bold]{format_summary('Skills', result)}[/bold]")
+    for warning in result.warnings:
+        console.print(f"  [yellow]•[/yellow] {warning}")
 
 
 @skills_app.command("revert")
@@ -534,8 +544,11 @@ def cmd_agents_rename(
 
 @agents_app.command("sync")
 def cmd_agents_sync(
-    prune: Annotated[bool, typer.Option("--prune", help="Remove stale files")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Prune stale files and overwrite user content"),
+    ] = False,
     target: TargetOption = None,
 ) -> None:
     """Sync agents to tool destinations."""
@@ -544,8 +557,11 @@ def cmd_agents_sync(
     from vaultspec_core.core import agents_sync
     from vaultspec_core.core.sync import format_summary
 
-    result = agents_sync(prune=prune, dry_run=dry_run)
-    get_console().print(f"  [bold]{format_summary('Agents', result)}[/bold]")
+    result = agents_sync(prune=force, dry_run=dry_run)
+    console = get_console()
+    console.print(f"  [bold]{format_summary('Agents', result)}[/bold]")
+    for warning in result.warnings:
+        console.print(f"  [yellow]•[/yellow] {warning}")
 
 
 @agents_app.command("revert")

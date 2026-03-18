@@ -1,152 +1,143 @@
 # vaultspec-core
 
-_Provisional headline: governed workflows for AI-assisted engineering._
+<p align="center">
+  <img src="rsc/svg/vaultspec-agent-ok.svg" alt="vaultspec-core" width="180" />
+</p>
+
+<p align="center">
 
 [![Python](https://img.shields.io/badge/python-3.13%2B-blue.svg)](./pyproject.toml)
-[![Tests](https://github.com/wgergely/vaultspec-core/actions/workflows/ci.yml/badge.svg)](https://github.com/wgergely/vaultspec-core/actions/workflows/ci.yml)
+[![CI](https://github.com/wgergely/vaultspec-core/actions/workflows/ci.yml/badge.svg)](https://github.com/wgergely/vaultspec-core/actions/workflows/ci.yml)
 [![Docker](https://github.com/wgergely/vaultspec-core/actions/workflows/docker.yml/badge.svg)](https://github.com/wgergely/vaultspec-core/actions/workflows/docker.yml)
-![Docker Requirement](https://img.shields.io/badge/docker-optional-lightgrey.svg)
-[![MCP](https://img.shields.io/badge/MCP-vaultspec--mcp-informational)](./.vaultspec/docs/vault-query-guide.md)
+[![MCP](https://img.shields.io/badge/MCP-vaultspec--mcp-informational)](./.vaultspec/MCP.md)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
-`vaultspec-core` is a Python package for spec-driven workspace management.
+</p>
 
-It operates a workspace around structured `.vaultspec/` and `.vault/`
-artifacts: initialize the workspace, sync framework resources, create and audit
-vault records, inspect hooks, assess readiness, and expose the same workspace
-through a local MCP server.
 
-> [!IMPORTANT]
-> CI is enforced on both push and pull requests. Every change is gated by lint,
-> type checks, tests, vault audit verification, dependency vulnerability
-> checks, and Docker build/publish validation.
-> Local Docker builds are developer smoke checks. GitHub Actions rebuilds from
-> source and publishes images to GHCR on `main` and version tags.
 
-## Headline Options
 
-Pick one as the final project strapline:
 
-1. `vaultspec-core: governed workflows for AI-assisted engineering`
-2. `Ship AI-assisted changes with auditable specs, plans, and execution records`
-3. `A spec-driven runtime for disciplined AI engineering in local workspaces`
-4. `From idea to verified delivery: research, decisions, plans, execution`
-5. `Make AI coding accountable: structured workflows, durable records, real audits`
 
-## What It Ships
 
-Installing the package gives you two executables:
 
-- `vaultspec-core` for workspace setup, vault operations, framework resource sync,
-  hooks, and readiness/doctoring
-- `vaultspec-mcp` for a local stdio MCP server over the same workspace
+***Give your AI a structured process and a paper trail - so every decision gets made once, recorded, and built on.***
 
-## Requirements
+---
 
-- Python `3.13+`
-- Docker is **not required** for local development or CI
+## What is vaultspec-core
 
-## Install
+vaultspec-core is a Python framework that wraps a structured pipeline around AI-assisted development. Research, decide, plan, execute, review - each stage produces a durable artifact in your repository. `.vaultspec/` holds the rules, templates, and agent personas that shape how AI tools behave. `.vault/` is where the work lands: research notes, decision records, plans, and execution logs.
 
-Verified source install:
+Two entry points ship with the framework: the `vaultspec-core` CLI for managing your workspace, and `vaultspec-mcp`, an MCP (Model Context Protocol) server that exposes your workspace directly to AI tools like Claude Desktop and Cursor.
+
+For the full directory structure and resource reference, see the [framework reference](./.vaultspec/README.md).
+
+---
+
+## Getting started
+
+### Prerequisites
+
+- Python 3.13 or later
+- [uv](https://github.com/astral-sh/uv) - a fast Python package manager
+
+### Install
 
 ```bash
-python -m pip install .
+uv pip install .
+vaultspec-core --version
 ```
 
-Optional build step, if you need distributable artifacts:
+### Initialize a workspace
 
 ```bash
-python -m build
+vaultspec-core install --target ./my-project
 ```
 
-## Quick Start
-
-Create or enter a workspace, then initialize it:
+To target a specific tool:
 
 ```bash
-vaultspec-core init
+vaultspec-core install claude --target ./my-project
 ```
 
-Sync framework resources into the workspace:
+After editing any framework files, re-sync:
 
 ```bash
-vaultspec-core sync-all
+vaultspec-core sync
 ```
 
-Create a vault artifact:
+---
+
+## The development workflow
+
+Every feature flows through five stages. The AI does the analytical work; you make the call at each checkpoint before work proceeds.
+
+| Stage | You | The AI |
+|---|---|---|
+| **Research** | Review and approve the findings | Explores the problem, documents options |
+| **Decide** | Approve the decision record | Drafts the decision based on research |
+| **Plan** | Review and approve the implementation plan | Breaks the decision into concrete steps |
+| **Execute** | Stay available if it gets stuck | Works through each step autonomously |
+| **Review** | Read the report and decide if the work is ready | Audits the result, flags any issues |
+
+Everything produced - findings, decisions, plans, execution records, and review reports - is saved in `.vault/`.
+
+---
+
+## Working with the vault
+
+### Creating documents
 
 ```bash
-vaultspec-core vault add --type research --feature example-feature --title "Initial research"
+vaultspec-core vault add research --feature search-api
 ```
 
-Audit the vault:
+Valid types: `adr`, `audit`, `exec`, `plan`, `reference`, `research`. The command writes a pre-populated template into the right `.vault/` subfolder with required frontmatter filled in.
+
+### Listing and browsing
 
 ```bash
-vaultspec-core vault audit --summary
+vaultspec-core vault list --feature search-api
+vaultspec-core vault stats --feature search-api
 ```
 
-Inspect available hooks:
+### Running checks
 
 ```bash
-vaultspec-core hooks list
+vaultspec-core vault check all
 ```
 
-Check workspace health when needed:
+Checks frontmatter validity, wiki-link resolution, feature document trails, and cross-references. Add `--fix` to auto-repair malformed frontmatter, wrong link format, and missing required fields:
 
 ```bash
-vaultspec-core readiness
-vaultspec-core doctor
+vaultspec-core vault check all --fix
 ```
 
-## Operating Model
+### Visualizing relationships
 
-`vaultspec-core` is workspace-bound: run it inside a workspace that already contains
-`.vaultspec/`, or create one with `vaultspec-core init`.
-
-At a high level, the live CLI covers:
-
-- workspace setup and health: `init`, `readiness`, `doctor`
-- framework resource sync: `sync-all`
-- vault artifacts: `vault add`, `vault audit`
-- workspace surfaces and configuration: `rules`, `skills`, `agents`, `config`,
-  `system`, `hooks`
-- test surface: `test`
-
-Use the CLI reference for the full command tree and option details.
-
-## MCP Server
-
-`vaultspec-core` includes `vaultspec-mcp`, a local stdio MCP server for
-vault-centric workspace access. The client launches it as a subprocess and
-communicates over stdin/stdout, so protocol output must stay on stdout and logs
-should go to stderr.
-
-Minimal MCP client configuration example:
-
-```json
-{
-  "mcpServers": {
-    "vaultspec-core": {
-      "command": "vaultspec-mcp",
-      "args": [],
-      "env": {
-        "VAULTSPEC_TARGET_DIR": "/absolute/path/to/workspace"
-      }
-    }
-  }
-}
+```bash
+vaultspec-core vault graph --feature search-api
 ```
 
-The live MCP server is separate from the CLI. There is no live
-`vaultspec-core mcp` subcommand.
+---
 
-## Documentation
+## Read more
 
-- [CLI Reference](./.vaultspec/docs/cli-reference.md) for commands, options, and environment variables
-- [Vault Query Guide](./.vaultspec/docs/vault-query-guide.md) for MCP retrieval workflows
-- [Hooks Guide](./.vaultspec/docs/hooks-guide.md) for hook events and shell actions
-- [Concepts](./.vaultspec/docs/concepts.md) for the workspace and artifact model
-- [Documentation Workflow](./.vaultspec/docs/documentation-workflow.md) for bounded research, authoring, and editorial review
-- [GitHub Workflows](./.vaultspec/docs/github-workflows.md) for CI/CD gates and publishing flow
-- [Release & Deploy Runbook](./.vaultspec/docs/release-deploy-runbook.md) for local-to-cloud release steps and required GitHub settings
-- [Framework Manual](./.vaultspec/README.md) for `.vaultspec/` structure and framework resources
+| Guide | What it covers |
+|---|---|
+| [Framework reference](./.vaultspec/README.md) | Directory structure, resource tree, and sync model |
+| [User guide](./.vaultspec/USERGUIDE.md) | End-to-end workflows, provider setup, hooks, and the MCP server |
+| [CLI reference](./.vaultspec/CLI.md) | All commands, flags, and options for `vaultspec-core` |
+| [MCP reference](./.vaultspec/MCP.md) | MCP server tools, configuration, and environment variables |
+
+**Getting help:** Open an issue on [GitHub](https://github.com/wgergely/vaultspec-core/issues).
+
+---
+
+## Contributing and license
+
+Contributions are welcome - bug reports, feature ideas, or pull requests. Browse what's in progress on [GitHub Issues](https://github.com/wgergely/vaultspec-core/issues).
+
+vaultspec-core is released under the [MIT License](./LICENSE).
