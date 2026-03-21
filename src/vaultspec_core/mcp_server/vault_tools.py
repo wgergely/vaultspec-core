@@ -46,7 +46,18 @@ def _infer_status(types: set[str]) -> str:
 
 
 def register_tools(mcp: FastMCP) -> None:
-    """Register vault tools on the given FastMCP instance."""
+    """Register the ``find`` and ``create`` vault tools on *mcp*.
+
+    ``find``  - read-only, idempotent tool for feature listing and document
+    search with graph-weight scoring via :class:`~vaultspec_core.graph.VaultGraph`.
+
+    ``create``  - idempotent, non-destructive tool that scaffolds a new vault
+    document from a type template, replacing ``{feature}``, ``{yyyy-mm-dd}``,
+    and ``{title}`` placeholders.
+
+    Args:
+        mcp: :class:`~mcp.server.fastmcp.FastMCP` instance to decorate.
+    """
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -153,19 +164,43 @@ def register_tools(mcp: FastMCP) -> None:
         date: str | None = None,
         title: str | None = None,
         content: str | None = None,
+        related: list[str] | None = None,
+        tags: list[str] | None = None,
     ) -> dict[str, Any]:
         """Create a new vault document from a template.
 
         ``feature`` is required.  ``type`` defaults to ``research``.
         ``date`` defaults to today.
+
+        ``related`` accepts document references in any format (absolute path,
+        relative path, filename, stem, or ``[[wiki-link]]``) and resolves
+        them to valid ``[[wiki-link]]`` entries in the ``related:``
+        frontmatter field.
+
+        ``tags`` adds additional freeform tags beyond the required directory
+        and feature tags.
+
+        Feature lifecycle dependencies are validated before creation:
+        exec requires plan and ADR, plan warns without ADR, etc.
         """
+        import re
+
+        from ..vaultcore.hydration import hydrate_template
+        from ..vaultcore.parser import parse_vault_metadata
+        from ..vaultcore.resolve import (
+            RelatedResolutionError,
+            resolve_related_inputs,
+            validate_feature_dependencies,
+        )
+
         doc_type_str = type or "research"
         today = date or datetime.date.today().isoformat()
         title_clean = (title or feature).strip().lower().replace(" ", "-")
 
         await ctx.info(
             f"create: feature={feature!r} type={doc_type_str!r} "
-            f"date={today!r} title={title_clean!r}"
+            f"date={today!r} title={title_clean!r} "
+            f"related={related!r} tags={tags!r}"
         )
 
         try:
@@ -175,6 +210,52 @@ def register_tools(mcp: FastMCP) -> None:
                 "success": False,
                 "message": f"Invalid document type: {doc_type_str}",
             }
+
+        # Clean feature
+        feature_clean = feature.lstrip("#").strip().lower()
+
+        # Validate extra tags
+        extra_tags: list[str] | None = None
+        if tags:
+            extra_tags = []
+            for tag in tags:
+                normalized = tag.lstrip("#").strip()
+                if not re.match(r"^[a-z0-9][a-z0-9-]*$", normalized):
+                    return {
+                        "success": False,
+                        "message": (
+                            f"Invalid tag '{tag}'. "
+                            "Must be kebab-case (lowercase, digits, hyphens)."
+                        ),
+                    }
+                extra_tags.append(f"#{normalized}")
+
+        # Resolve related paths to wiki-links
+        resolved_related: list[str] | None = None
+        if related:
+            try:
+                resolved_related = resolve_related_inputs(related, _t.TARGET_DIR)
+            except RelatedResolutionError as exc:
+                return {
+                    "success": False,
+                    "message": (
+                        "Cannot resolve related document(s): "
+                        + ", ".join(exc.failures)
+                        + ". Accepted formats: absolute path, relative path, "
+                        "filename, stem, or [[wiki-link]]."
+                    ),
+                }
+
+        # Validate feature dependencies (lifecycle rules)
+        dep_diagnostics = validate_feature_dependencies(
+            _t.TARGET_DIR, doc_type, feature_clean
+        )
+        warnings: list[str] = []
+        for diag in dep_diagnostics:
+            if diag.startswith("ERROR:"):
+                return {"success": False, "message": diag}
+            elif diag.startswith("WARNING:"):
+                warnings.append(diag)
 
         # Load template
         template_path = _t.TEMPLATES_DIR / f"{doc_type_str}.md"
@@ -186,14 +267,15 @@ def register_tools(mcp: FastMCP) -> None:
 
         template = template_path.read_text(encoding="utf-8")
 
-        # Clean feature
-        feature_clean = feature.lstrip("#").strip().lower()
-
-        # Replace placeholders
-        rendered = template.replace("{feature}", feature_clean)
-        rendered = rendered.replace("{yyyy-mm-dd}", today)
-        rendered = rendered.replace("{topic}", title_clean)
-        rendered = rendered.replace("{title}", title_clean)
+        # Hydrate template with all parameters
+        rendered = hydrate_template(
+            template,
+            feature_clean,
+            today,
+            title_clean,
+            related=resolved_related if resolved_related is not None else [],
+            extra_tags=extra_tags,
+        )
 
         if content:
             rendered += f"\n\n## Context\n\n{content}\n"
@@ -223,10 +305,27 @@ def register_tools(mcp: FastMCP) -> None:
         try:
             atomic_write(out_path, rendered)
             await ctx.info(f"Created: {out_path.name}")
+
+            # Post-creation self-validation
+            validation_warnings: list[str] = []
+            try:
+                doc_content = out_path.read_text(encoding="utf-8")
+                metadata, _ = parse_vault_metadata(doc_content)
+                validation_warnings = metadata.validate()
+            except (OSError, UnicodeDecodeError):
+                pass
+
+            parts = ["Document created successfully."]
+            if warnings:
+                parts.append(" ".join(warnings))
+            if validation_warnings:
+                parts.append(f"Validation: {'; '.join(validation_warnings)}")
+            message = " ".join(parts)
+
             return {
                 "success": True,
                 "path": str(out_path.relative_to(_t.TARGET_DIR)),
-                "message": "Document created successfully.",
+                "message": message,
             }
         except Exception as e:
             await ctx.error(f"Failed to write document: {e}")

@@ -58,7 +58,7 @@ changes pass project-specific build and test suites.
 
 ## Testing Mandate (Critical)
 
-**YOUR PRIMARY GOAL IS HIGH-QUALITY IMPLEMENTATION — NOT PASSING TESTS.**
+**YOUR PRIMARY GOAL IS HIGH-QUALITY IMPLEMENTATION  - NOT PASSING TESTS.**
 
 Do NOT trust tests as absolute proof that the code is functional. Success on
 tests often masks critical issues if they are not exercising proper service

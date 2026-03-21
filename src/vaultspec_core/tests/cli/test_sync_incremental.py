@@ -142,7 +142,7 @@ class TestIncrementalConfig:
         assert "@" in claude_cfg.read_text(encoding="utf-8")
         assert "alpha.md" in claude_cfg.read_text(encoding="utf-8")
 
-        # Add a second rule — references should update.
+        # Add a second rule  - references should update.
         (rules_dest / "beta.md").write_text("rule beta", encoding="utf-8")
         config_sync(force=True)
         content = claude_cfg.read_text(encoding="utf-8")
@@ -160,19 +160,19 @@ class TestIncrementalConfig:
         assert "keep.md" in content_v1
         assert "drop.md" in content_v1
 
-        # Remove one rule — config should update.
+        # Remove one rule  - config should update.
         (rules_dest / "drop.md").unlink()
         config_sync(force=True)
         content_v2 = claude_cfg.read_text(encoding="utf-8")
         assert "keep.md" in content_v2
         assert "drop.md" not in content_v2
 
-    def test_codex_config_body_none_without_rule_refs(self, test_project):
-        # Codex has rule_ref_dir=None, so config body should be None.
+    def test_codex_config_file_exists_after_install(self, test_project):
+        # AGENTS.md is created during scaffold (like CLAUDE.md / GEMINI.md).
+        # config_sync with no rule refs should not destroy it.
         config_sync(force=True)
         codex_cfg = test_project / "AGENTS.md"
-        # AGENTS.md should not be created since no config body is generated
-        assert not codex_cfg.exists()
+        assert codex_cfg.exists()
 
     def test_codex_native_config_tracks_frontmatter_changes(self, test_project):
         sys_dir = test_project / ".vaultspec" / "rules" / "system"

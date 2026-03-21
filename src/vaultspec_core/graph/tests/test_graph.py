@@ -103,7 +103,7 @@ class TestGraphMetrics:
 
 
 # ---------------------------------------------------------------------------
-# VaultGraph — building
+# VaultGraph  - building
 # ---------------------------------------------------------------------------
 
 
@@ -113,7 +113,7 @@ class TestVaultGraphBuilding:
         assert len(graph.nodes) > 80
 
     def test_no_nodes_lost_to_stem_collisions(self, vault_root):
-        """All files produce a node — collisions use type/stem keys."""
+        """All files produce a node  - collisions use type/stem keys."""
         from ...vaultcore import scan_vault
 
         file_count = sum(1 for _ in scan_vault(vault_root))
@@ -222,7 +222,7 @@ class TestVaultGraphBuilding:
 
 
 # ---------------------------------------------------------------------------
-# VaultGraph — queries
+# VaultGraph  - queries
 # ---------------------------------------------------------------------------
 
 
@@ -336,7 +336,7 @@ class TestVaultGraphQueries:
 
 
 # ---------------------------------------------------------------------------
-# VaultGraph — metrics (networkx algorithms)
+# VaultGraph  - metrics (networkx algorithms)
 # ---------------------------------------------------------------------------
 
 
@@ -385,7 +385,7 @@ class TestVaultGraphMetrics:
 
 
 # ---------------------------------------------------------------------------
-# VaultGraph — ASCII rendering (phart)
+# VaultGraph  - ASCII rendering (phart)
 # ---------------------------------------------------------------------------
 
 
@@ -404,7 +404,7 @@ class TestVaultGraphASCII:
 
 
 # ---------------------------------------------------------------------------
-# VaultGraph — tree rendering (Rich)
+# VaultGraph  - tree rendering (Rich)
 # ---------------------------------------------------------------------------
 
 
@@ -425,7 +425,7 @@ class TestVaultGraphRendering:
 
 
 # ---------------------------------------------------------------------------
-# VaultGraph — JSON serialisation (networkx node_link_data)
+# VaultGraph  - JSON serialisation (networkx node_link_data)
 # ---------------------------------------------------------------------------
 
 

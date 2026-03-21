@@ -1,4 +1,4 @@
-"""Check feature tag completeness — detect features missing required doc types."""
+"""Check feature tag completeness  - detect features missing required doc types."""
 
 from __future__ import annotations
 

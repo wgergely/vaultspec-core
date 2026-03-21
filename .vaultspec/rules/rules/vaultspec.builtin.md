@@ -108,13 +108,13 @@ The directory tag is determined by the file's location in `.vault/`:
 
 ### Tag Format
 
-All documents use YAML list syntax with exactly 2 tags (never single string,
-never 3+ tags):
+All documents use YAML list syntax with at least 2 tags (one directory tag,
+one feature tag; additional tags are allowed):
 
 ```yaml
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
+# REQUIRED TAGS (minimum 2): one directory tag + one feature tag
+# DIRECTORY TAGS: #adr #audit #exec #plan #reference #research
 tags:
   - "#plan"           # directory tag (based on file location)
   - "#feature-name"   # feature tag (kebab-case)

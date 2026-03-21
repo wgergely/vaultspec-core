@@ -53,7 +53,10 @@ class TestCollectRules:
         assert "b.md" in sources
 
     def test_empty_dirs(self, test_project):
-        # dirs exist but are empty
+        # Clear any pre-existing rules so dirs exist but are empty
+        rules_dir = test_project / ".vaultspec" / "rules" / "rules"
+        for f in rules_dir.glob("*.md"):
+            f.unlink()
         sources = collect_rules()
         assert sources == {}
 
@@ -76,7 +79,8 @@ class TestCollectRules:
 
 
 class TestCollectSkills:
-    def test_filters_task_prefix(self, test_project):
+    def test_collects_all_skill_directories(self, test_project):
+        """Any directory with a SKILL.md is collected, regardless of naming."""
         deploy_dir = (
             test_project / ".vaultspec" / "rules" / "skills" / "vaultspec-deploy"
         )
@@ -91,9 +95,16 @@ class TestCollectSkills:
         )
         skills = collect_skills()
         assert "vaultspec-deploy" in skills
-        assert "utility-helper" not in skills
+        assert "utility-helper" in skills
 
     def test_empty_skills_dir(self, test_project):
+        # Clear any pre-existing skills so the dir is empty
+        import shutil as _shutil
+
+        skills_dir = test_project / ".vaultspec" / "rules" / "skills"
+        if skills_dir.exists():
+            _shutil.rmtree(skills_dir)
+            skills_dir.mkdir()
         assert collect_skills() == {}
 
 
@@ -159,6 +170,13 @@ class TestListings:
         assert "Deploy things" in listing
 
     def test_skill_listing_empty(self, test_project):
+        # Clear any pre-existing skills so listing is empty
+        import shutil as _shutil
+
+        skills_dir = test_project / ".vaultspec" / "rules" / "skills"
+        if skills_dir.exists():
+            _shutil.rmtree(skills_dir)
+            skills_dir.mkdir()
         listing = _collect_skill_listing()
         assert listing == ""
 
@@ -166,6 +184,11 @@ class TestListings:
 class TestGenerateConfig:
     def test_returns_none_without_rules(self, test_project):
         """Config body is None when no synced rules exist."""
+        # Clear any pre-existing synced rules from the real corpus
+        rules_dir = test_project / ".claude" / "rules"
+        if rules_dir.exists():
+            for f in rules_dir.glob("*.md"):
+                f.unlink()
         content = _generate_config_body(_cfg(Tool.CLAUDE))
         assert content is None
 

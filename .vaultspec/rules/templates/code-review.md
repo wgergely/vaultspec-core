@@ -1,8 +1,9 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #{feature} #adr #audit #plan #reference #research
+# REQUIRED TAGS (minimum 2): one directory tag + one feature tag
+# DIRECTORY TAGS: #adr #audit #exec #plan #reference #research
 # Directory tag (hardcoded - DO NOT CHANGE - based on .vault/audit/ location)
 # Feature tag (replace {feature} with your feature name, e.g., #editor-demo)
+# Additional tags may be appended below the required pair
 tags:
   - "#audit"
   - "#{feature}"

@@ -16,8 +16,8 @@ All significant work must follow this pipeline:
 
 | Phase       | Skill               | Artifact              | Requires          |
 |-------------|---------------------|-----------------------|-------------------|
-| 1 Research  | vaultspec-research  | .vault/research/...   | —                 |
-| 1 Reference | vaultspec-code-reference | .vault/reference/...  | —                 |
+| 1 Research  | vaultspec-research  | .vault/research/...   |  -                 |
+| 1 Reference | vaultspec-code-reference | .vault/reference/...  |  -                 |
 | 2 Specify   | vaultspec-adr       | .vault/adr/...        | Research artifact |
 | 3 Plan      | vaultspec-write-plan     | .vault/plan/...       | ADR artifact      |
 | 4 Execute   | vaultspec-execute   | .vault/exec/.../steps | Approved plan     |
@@ -25,7 +25,7 @@ All significant work must follow this pipeline:
 
 Supporting skills, invoke when appropriate:
 
-| Curate        | vaultspec-curate        | Maintain .vault/ hygiene — links, tags |
+| Curate        | vaultspec-curate        | Maintain .vault/ hygiene  - links, tags |
 | Documentation | vaultspec-documentation | Write project documentation            |
 
 - **Utilize vaultspec- skills** to interpret user intent:

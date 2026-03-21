@@ -141,11 +141,19 @@ def cmd_install(
             "--force", help="Override contents if installation already exists"
         ),
     ] = False,
+    skip: Annotated[
+        list[str],
+        typer.Option(
+            "--skip",
+            help="Skip a component (core or provider name). Repeatable.",
+        ),
+    ] = [],
 ) -> None:
     """Deploy the vaultspec framework to the target directory.
 
     Scaffolds the workspace structure and syncs all managed resources.
     Use --upgrade to update builtin rules without re-scaffolding.
+    Use --skip to exclude components on retry (e.g. --skip core --skip claude).
 
     Examples:\n
       vaultspec-core install                       # install all providers in cwd\n
@@ -154,13 +162,14 @@ def cmd_install(
       vaultspec-core install --target ./my-project # install in specific directory\n
       vaultspec-core install --upgrade             # update firmware + re-sync\n
       vaultspec-core install claude --dry-run      # preview what would be created\n
+      vaultspec-core install --skip claude         # install all except claude\n
     """
     from vaultspec_core.core.commands import install_run
     from vaultspec_core.core.exceptions import VaultSpecError
 
     path: Path = apply_target_install(target)
 
-    # Guard: refuse to create deeply nested paths — only allow creating the
+    # Guard: refuse to create deeply nested paths  - only allow creating the
     # final directory component.  This prevents accidental scaffolding of
     # arbitrary directory trees from typos or path traversal.
     if not path.exists():
@@ -176,7 +185,12 @@ def cmd_install(
 
     try:
         result = install_run(
-            path=path, provider=provider, upgrade=upgrade, dry_run=dry_run, force=force
+            path=path,
+            provider=provider,
+            upgrade=upgrade,
+            dry_run=dry_run,
+            force=force,
+            skip=set(skip),
         )
     except VaultSpecError as exc:
         _handle_error(exc)
@@ -213,15 +227,14 @@ def cmd_install(
             console.print(f"  Re-seeded [bold]{seeded}[/bold] builtin files.")
         console.print("[bold green]Upgrade complete.[/bold green]")
     else:
-        console.print(f"[bold]Installed vaultspec framework to {path}[/bold]")
-        items = result.get("items", [])
-        for rel, _label in items:
-            console.print(f"  {rel}")
-        console.print(
-            f"Created [bold]{len(items)}[/bold] directories/files. "
-            "Run [bold]vaultspec-core sync[/bold] to sync."
+        from vaultspec_core.cli.rendering import render_install_summary
+
+        render_install_summary(
+            result.get("source_counts", {}),
+            path=str(path),
+            providers=result.get("providers", []),
+            has_mcp=result.get("has_mcp", False),
         )
-        console.print("[bold green]Installation complete.[/bold green]")
 
 
 @app.command("uninstall")
@@ -247,12 +260,20 @@ def cmd_uninstall(
         bool,
         typer.Option("--force", help="Required to execute. Uninstall is destructive."),
     ] = False,
+    skip: Annotated[
+        list[str],
+        typer.Option(
+            "--skip",
+            help="Skip a component (core or provider name). Repeatable.",
+        ),
+    ] = [],
 ) -> None:
     """Remove the vaultspec framework from the target directory.
 
     Removes all managed artifacts (.vaultspec/, provider dirs, generated configs).
     The .vault/ documentation corpus is preserved by default.
     Use a provider name to remove only that provider's artifacts.
+    Use --skip to exclude components (e.g. --skip claude --skip codex).
 
     Examples:\n
       vaultspec-core uninstall                    # remove framework, keep .vault/\n
@@ -260,6 +281,7 @@ def cmd_uninstall(
       vaultspec-core uninstall --target ./proj    # remove from specific directory\n
       vaultspec-core uninstall --remove-vault     # also remove .vault/ docs\n
       vaultspec-core uninstall --dry-run          # preview what would be removed\n
+      vaultspec-core uninstall --skip codex       # remove all except codex\n
     """
     from vaultspec_core.core.commands import uninstall_run
     from vaultspec_core.core.exceptions import VaultSpecError
@@ -277,6 +299,7 @@ def cmd_uninstall(
             keep_vault=not remove_vault,
             dry_run=dry_run,
             force=force,
+            skip=set(skip),
         )
     except VaultSpecError as exc:
         _handle_error(exc)
@@ -301,18 +324,13 @@ def cmd_uninstall(
         ]
         render_dry_run_tree(dry_items, title=f"Uninstall preview → {path}")
     elif removed:
-        console.print("[bold]Removed vaultspec framework:[/bold]")
-        for item_path, _label in removed:
-            console.print(f"  {item_path}")
-        console.print(f"Removed [bold]{len(removed)}[/bold] items.")
-        if result.get("keep_vault"):
-            console.print(
-                "[dim].vault/ preserved"
-                " (pass --remove-vault to also remove"
-                " documentation)[/dim]"
-            )
+        from vaultspec_core.cli.rendering import render_uninstall_summary
+
+        render_uninstall_summary(
+            removed, path=str(path), keep_vault=result.get("keep_vault", True)
+        )
     else:
-        console.print("Nothing to remove — vaultspec is not installed at this path.")
+        console.print("Nothing to remove  - vaultspec is not installed at this path.")
 
 
 @app.command("sync")
@@ -324,18 +342,36 @@ def cmd_sync(
         ),
     ] = "all",
     target: TargetOption = None,
-    prune: Annotated[bool, typer.Option("--prune", help="Remove stale files")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
     force: Annotated[
-        bool, typer.Option("--force", help="Overwrite non-managed files")
+        bool,
+        typer.Option(
+            "--force",
+            help="Complete sync: prune stale files and overwrite user-authored content",
+        ),
     ] = False,
+    skip: Annotated[
+        list[str],
+        typer.Option(
+            "--skip",
+            help="Skip a component (core or provider name). Repeatable.",
+        ),
+    ] = [],
 ) -> None:
     """Sync rules, skills, agents, configs, and system prompts.
 
+    By default sync is non-destructive: missing files are added and changed
+    files are updated, but stale destination files and user-authored
+    system/config files are left untouched (with warnings).
+
+    Use --force for a complete sync that prunes stale files and overwrites
+    user-authored content to match the .vaultspec/ source exactly.
+
     Defaults to syncing all providers. Pass a provider name to sync only
     that provider (e.g. 'vaultspec-core sync claude').
+    Use --skip to exclude providers (e.g. --skip claude --skip codex).
     """
-    apply_target(target)
+    apply_target(target, split_source=True)
     if provider == "core":
         typer.echo(
             "Error: 'core' is not a valid sync target. "
@@ -349,7 +385,7 @@ def cmd_sync(
     from vaultspec_core.core.sync import format_summary
 
     try:
-        results = sync_provider(provider, prune=prune, dry_run=dry_run, force=force)
+        results = sync_provider(provider, dry_run=dry_run, force=force, skip=set(skip))
     except VaultSpecError as exc:
         _handle_error(exc)
         return
@@ -395,10 +431,22 @@ def cmd_sync(
         for label, r in zip(labels, results, strict=True):
             console.print(f"  [bold]{format_summary(label, r)}[/bold]")
 
+        # Collect and display warnings from all sync passes
+        all_warnings = [w for r in results for w in r.warnings]
+        if all_warnings:
+            console.print()
+            console.print(
+                f"[bold yellow]Warning:[/bold yellow] "
+                f"{len(all_warnings)} item(s) differ from .vaultspec/ source. "
+                f"Use [bold]--force[/bold] to resolve:"
+            )
+            for warning in all_warnings:
+                console.print(f"  [yellow]•[/yellow] {warning}")
+
         # Warn if sync produced 0 files
         total_changes = sum(r.added + r.updated for r in results)
         total_skipped = sum(r.skipped for r in results)
-        if total_changes == 0 and total_skipped == 0:
+        if total_changes == 0 and total_skipped == 0 and not all_warnings:
             console.print(
                 "[bold yellow]Warning:[/bold yellow] Sync produced 0 files. "
                 "The .vaultspec/rules/ source directories may be empty.\n"

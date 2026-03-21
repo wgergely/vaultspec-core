@@ -2,7 +2,7 @@
 
 Builtin resources (files ending in .builtin.md) are snapshotted during install.
 Revert restores the original snapshot content, discarding local edits.
-Custom resources cannot be reverted — they have no canonical original.
+Custom resources cannot be reverted  - they have no canonical original.
 """
 
 from __future__ import annotations
@@ -121,7 +121,7 @@ def list_modified_builtins(vaultspec_dir: Path) -> list[dict]:
 
     Returns:
         List of dicts with keys ``"category"`` (str), ``"filename"`` (str),
-        ``"path"`` (str), and ``"status"`` — one of ``"modified"``,
+        ``"path"`` (str), and ``"status"``  - one of ``"modified"``,
         ``"missing"``, or ``"ok"``.  Returns an empty list when no snapshots
         exist.
     """

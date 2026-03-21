@@ -6,20 +6,20 @@ repos:
   #
   # Why: pre-commit stashes unstaged changes before running hooks, then
   # restores them afterward.  If any hook modifies files AND the restore
-  # conflicts, pre-commit rolls back ALL fixes — even from unrelated
+  # conflicts, pre-commit rolls back ALL fixes  - even from unrelated
   # hooks that succeeded.  Keeping hooks read-only avoids this entirely.
   - repo: local
     hooks:
       - id: ruff-check
         name: Lint Python code (Ruff)
-        entry: uv run ruff check
+        entry: uv run --no-sync ruff check
         language: system
         types: [python]
         pass_filenames: true
 
       - id: ruff-format-check
         name: Check Python formatting (Ruff)
-        entry: uv run ruff format --check
+        entry: uv run --no-sync ruff format --check
         language: system
         types: [python]
         pass_filenames: true
@@ -34,14 +34,14 @@ repos:
 
       - id: ty
         name: Type-check Python codebase (Ty)
-        entry: uv run python -m ty check src/vaultspec_core
+        entry: uv run --no-sync python -m ty check src/vaultspec_core
         language: system
         types: [python]
         pass_filenames: false
 
       - id: check-naming
         name: Verify vault document naming and integrity
-        entry: uv run vaultspec-core vault check structure
+        entry: uv run --no-sync python -c "from vaultspec_core.cli import app; app()" vault check structure
         language: system
         types: [markdown]
         pass_filenames: false

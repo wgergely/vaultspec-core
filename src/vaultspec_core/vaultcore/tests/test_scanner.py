@@ -1,5 +1,9 @@
-"""Tests fixture vault scanning and document type classification across the
-filesystem boundary, including ``.obsidian`` exclusion."""
+"""Tests for vault scanning and document type classification.
+
+Covers :func:`~vaultspec_core.vaultcore.scanner.scan_vault` (file discovery,
+``.obsidian`` exclusion) and :func:`~vaultspec_core.vaultcore.scanner.get_doc_type`
+(directory-based classification) against the bundled test-project fixture.
+"""
 
 import pytest
 

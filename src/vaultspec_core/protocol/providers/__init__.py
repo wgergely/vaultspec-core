@@ -1,10 +1,14 @@
-"""Provider implementations and shared execution-provider exports.
+"""Execution-provider implementations and shared exports.
 
-This package re-exports the common provider abstractions, model registries, and
-concrete integrations used by the execution protocol. ``base`` defines the
-shared provider contract and prompt-loading helpers, while ``claude`` and
-``gemini`` implement provider-specific workspace file conventions within that
-common interface.
+Re-exports :class:`~vaultspec_core.protocol.providers.base.ExecutionProvider`,
+:func:`~vaultspec_core.protocol.providers.base.resolve_includes`,
+:func:`~vaultspec_core.protocol.providers.base.resolve_executable`,
+:class:`~vaultspec_core.protocol.providers.claude.ClaudeProvider`,
+:class:`~vaultspec_core.protocol.providers.gemini.GeminiProvider`, and the
+model registries (:class:`~vaultspec_core.core.enums.ClaudeModels`,
+:class:`~vaultspec_core.core.enums.GeminiModels`,
+:class:`~vaultspec_core.core.enums.CapabilityLevel`) from
+:mod:`vaultspec_core.core.enums`. Consumed by :mod:`vaultspec_core.protocol`.
 """
 
 from ...core.enums import CapabilityLevel as CapabilityLevel

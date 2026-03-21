@@ -23,6 +23,45 @@ from .types import SyncResult
 logger = logging.getLogger(__name__)
 
 
+def _sync_supporting_files(
+    src_dir: Path, dest_dir: Path, *, dry_run: bool = False
+) -> None:
+    """Copy non-entrypoint files from a source skill directory to its destination.
+
+    Recursively mirrors every file in *src_dir* (except ``SKILL.md``, which
+    is handled by the main sync loop) into *dest_dir*, preserving the
+    relative directory structure.  Files are only overwritten when their
+    content differs from the destination.
+
+    Args:
+        src_dir: Source skill directory (e.g.
+            ``.vaultspec/rules/skills/vaultspec-documentation``).
+        dest_dir: Destination skill directory (e.g.
+            ``.claude/skills/vaultspec-documentation``).
+        dry_run: When ``True``, skip all writes.
+    """
+    for src_file in sorted(src_dir.rglob("*")):
+        if not src_file.is_file():
+            continue
+        # SKILL.md is already handled by the main sync loop.
+        if src_file.name == "SKILL.md" and src_file.parent == src_dir:
+            continue
+
+        rel = src_file.relative_to(src_dir)
+        dest_file = dest_dir / rel
+
+        if dest_file.exists():
+            try:
+                if dest_file.read_bytes() == src_file.read_bytes():
+                    continue
+            except Exception:
+                pass
+
+        if not dry_run:
+            ensure_dir(dest_file.parent)
+            dest_file.write_bytes(src_file.read_bytes())
+
+
 def sync_files(
     sources: dict[str, tuple[Path, dict[str, Any], str]],
     dest_dir: Path,
@@ -97,46 +136,56 @@ def sync_files(
             else:
                 result.skipped += 1
 
+            # For directory-shaped resources (skills), sync supporting files
+            # alongside the main entrypoint (e.g. agents/, references/).
+            if is_skill:
+                src_skill_dir = _src_path.parent
+                dest_skill_dir = dest_path.parent
+                _sync_supporting_files(src_skill_dir, dest_skill_dir, dry_run=dry_run)
+
         except Exception as e:
             result.errors.append(f"{name}: {e}")
             logger.error("    [ERROR] %s: %s", name, e, exc_info=True)
 
-    # Prune
-    if prune:
-        source_names = set(sources.keys())
-        if dest_dir.exists():
-            # If it's a skill, we iterate over directories. Otherwise, over .md files.
-            # We also skip 'protected' skills (those without the vaultspec- prefix)
-            items = list(dest_dir.iterdir())
-            for item in items:
-                # Skill pruning logic: only prune vaultspec-* dirs not in sources
-                if is_skill:
-                    if (
-                        item.is_dir()
-                        and item.name.startswith("vaultspec-")
-                        and item.name not in source_names
-                    ):
-                        abs_path = str(item).replace("\\", "/")
-                        if dry_run:
-                            result.items.append((abs_path, "[DELETE]"))
-                        else:
-                            shutil.rmtree(item)
-                        result.pruned += 1
+    # Detect stale destination items and either prune or warn.
+    source_names = set(sources.keys())
+    if dest_dir.exists():
+        items = list(dest_dir.iterdir())
+        for item in items:
+            is_stale = False
+            if is_skill:
+                is_stale = (
+                    item.is_dir()
+                    and (item / "SKILL.md").exists()
+                    and item.name not in source_names
+                )
+            else:
+                is_stale = (
+                    item.is_file()
+                    and item.suffix == ".md"
+                    and item.name not in source_names
+                    and not item.name.endswith("-system.builtin.md")
+                )
+
+            if not is_stale:
+                continue
+
+            abs_path = str(item).replace("\\", "/")
+            if prune:
+                if dry_run:
+                    result.items.append((abs_path, "[DELETE]"))
                 else:
-                    # Default pruning: .md files not in sources
-                    # Protect system-generated rule files from being pruned
-                    if (
-                        item.is_file()
-                        and item.suffix == ".md"
-                        and item.name not in source_names
-                        and not item.name.endswith("-system.builtin.md")
-                    ):
-                        abs_path = str(item).replace("\\", "/")
-                        if dry_run:
-                            result.items.append((abs_path, "[DELETE]"))
-                        else:
-                            item.unlink()
-                        result.pruned += 1
+                    if is_skill:
+                        shutil.rmtree(item)
+                    else:
+                        item.unlink()
+                result.pruned += 1
+            else:
+                # Not pruning  - emit a warning so the user knows.
+                result.warnings.append(
+                    f"Stale {label} file: {abs_path} "
+                    f"(not in .vaultspec source, use --force to remove)"
+                )
 
     return result
 
@@ -154,7 +203,24 @@ def sync_skills(
     dry_run: bool = False,
     label: str = "",
 ) -> SyncResult:
-    """Synchronize a collection of skill definitions to a destination directory."""
+    """Synchronize skill definitions to a destination skills directory.
+
+    Thin wrapper around :func:`sync_files` with ``is_skill=True``, which
+    routes each skill's content to ``skill_name/SKILL.md`` and scopes
+    pruning to ``vaultspec-*`` subdirectories.
+
+    Args:
+        sources: Skill resource map (directory name → path/meta/body tuple).
+        skills_dir: Root skills destination directory.
+        transform_fn: Content transform callback
+            ``(tool, name, meta, body) → str | None``.
+        prune: Remove ``vaultspec-*`` skill directories not in *sources*.
+        dry_run: Log planned actions without writing.
+        label: Human-readable label used in log messages.
+
+    Returns:
+        A :class:`SyncResult` tallying the sync outcome.
+    """
     return sync_files(
         sources=sources,
         dest_dir=skills_dir,
@@ -226,6 +292,7 @@ def sync_to_all_tools(
         total.skipped += result.skipped
         total.errors.extend(result.errors)
         total.items.extend(result.items)
+        total.warnings.extend(result.warnings)
 
     return total
 

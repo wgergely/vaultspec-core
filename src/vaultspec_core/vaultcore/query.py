@@ -1,7 +1,9 @@
 """Unified query engine for .vault/ document operations.
 
-Composes scanner, parser, graph, and metrics into a single query surface
-used by CLI commands (vault stats, vault list, vault feature list).
+Composes :mod:`.scanner` and :mod:`.parser` into a single query surface
+used by CLI commands (``vault stats``, ``vault list``, ``vault feature list``).
+Exports :class:`VaultDocument`, :func:`list_documents`, :func:`get_stats`,
+:func:`list_feature_details`, and :func:`archive_feature`.
 """
 
 from __future__ import annotations
@@ -40,13 +42,28 @@ class VaultDocument:
 
 
 def _parse_date_from_filename(name: str) -> str | None:
-    """Extract YYYY-MM-DD prefix from filename."""
+    """Extract the ``YYYY-MM-DD`` prefix from a vault filename.
+
+    Args:
+        name: Filename stem (no directory component).
+
+    Returns:
+        Date string such as ``"2026-02-07"``, or ``None`` if absent.
+    """
     m = re.match(r"(\d{4}-\d{2}-\d{2})", name)
     return m.group(1) if m else None
 
 
 def _parse_feature_from_tags(tags: list[str], doc_type_tag: str | None) -> str | None:
-    """Extract feature name from tags (the non-type tag)."""
+    """Return the first tag that is not a :class:`~vaultspec_core.vaultcore.models.DocType` value.
+
+    Args:
+        tags: Raw tag list from frontmatter (e.g. ``["#adr", "#editor-demo"]``).
+        doc_type_tag: Bare doc-type value to skip (e.g. ``"adr"``), or ``None``.
+
+    Returns:
+        Feature name string without the leading ``#``, or ``None`` if not found.
+    """
     for tag in tags:
         cleaned = tag.lstrip("#")
         if doc_type_tag and cleaned == doc_type_tag:
@@ -58,7 +75,17 @@ def _parse_feature_from_tags(tags: list[str], doc_type_tag: str | None) -> str |
 
 
 def _scan_all(root_dir: Path) -> list[VaultDocument]:
-    """Scan vault and parse all documents into VaultDocument objects."""
+    """Scan the vault and parse every document into a :class:`VaultDocument`.
+
+    Used internally by :func:`list_documents`, :func:`get_stats`,
+    :func:`list_feature_details`, and :mod:`vaultspec_core.vaultcore.checks.features`.
+
+    Args:
+        root_dir: Project root directory.
+
+    Returns:
+        List of :class:`VaultDocument` instances for all readable vault files.
+    """
     docs = []
     for doc_path in scan_vault(root_dir):
         try:

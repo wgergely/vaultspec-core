@@ -1,4 +1,4 @@
-"""Vault command group — create, query, graph, check, and audit ``.vault/`` records.
+"""Vault command group  - create, query, graph, check, and audit ``.vault/`` records.
 
 Sub-groups: ``vault feature`` (:data:`feature_app`), ``vault graph``
 (:data:`graph_app`), ``vault check`` (:data:`check_app`). Delegates to
@@ -56,6 +56,24 @@ def cmd_add(
         str | None, typer.Option("--date", help="Override date (YYYY-MM-DD)")
     ] = None,
     title: Annotated[str | None, typer.Option("--title", help="Document title")] = None,
+    related: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--related",
+            "-r",
+            help=(
+                "Related document(s). Accepts absolute path, relative path, "
+                "filename, or stem. Resolved to [[wiki-link]] format."
+            ),
+        ),
+    ] = None,
+    tags: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--tags",
+            help="Additional tags beyond the required directory and feature tags.",
+        ),
+    ] = None,
     target: TargetOption = None,
 ) -> None:
     """Create a new .vault/ document from a template.
@@ -70,6 +88,11 @@ def cmd_add(
     from vaultspec_core.core import types as _t
     from vaultspec_core.vaultcore.hydration import create_vault_doc
     from vaultspec_core.vaultcore.models import DocType
+    from vaultspec_core.vaultcore.resolve import (
+        RelatedResolutionError,
+        resolve_related_inputs,
+        validate_feature_dependencies,
+    )
 
     console = get_console()
 
@@ -98,6 +121,48 @@ def cmd_add(
     # Default date to today
     date_str = date or datetime.now().strftime("%Y-%m-%d")
 
+    # Validate extra tags format
+    extra_tags: list[str] | None = None
+    if tags:
+        extra_tags = []
+        for tag in tags:
+            normalized = tag.lstrip("#").strip()
+            if not re.match(r"^[a-z0-9][a-z0-9-]*$", normalized):
+                console.print(
+                    f"[red]Invalid tag '{tag}'. "
+                    "Must be kebab-case (lowercase, digits, hyphens).[/red]"
+                )
+                raise typer.Exit(code=1)
+            extra_tags.append(f"#{normalized}")
+
+    # Resolve related paths to wiki-links
+    resolved_related: list[str] | None = None
+    if related:
+        try:
+            resolved_related = resolve_related_inputs(related, _t.TARGET_DIR)
+        except RelatedResolutionError as exc:
+            for failure in exc.failures:
+                console.print(
+                    f"[red]Cannot resolve related document: '{failure}'[/red]"
+                )
+            console.print(
+                "[dim]Accepted formats: absolute path, relative path, "
+                "filename, stem, or [[wiki-link]][/dim]"
+            )
+            raise typer.Exit(code=1) from None
+
+    # Validate feature dependencies (lifecycle rules)
+    dep_diagnostics = validate_feature_dependencies(_t.TARGET_DIR, dt, feat)
+    has_errors = False
+    for diag in dep_diagnostics:
+        if diag.startswith("ERROR:"):
+            console.print(f"[red]{diag}[/red]")
+            has_errors = True
+        elif diag.startswith("WARNING:"):
+            console.print(f"[yellow]{diag}[/yellow]")
+    if has_errors:
+        raise typer.Exit(code=1)
+
     try:
         path = create_vault_doc(
             root_dir=_t.TARGET_DIR,
@@ -105,14 +170,40 @@ def cmd_add(
             feature=feat,
             date_str=date_str,
             title=title,
+            related=resolved_related,
+            extra_tags=extra_tags,
         )
-        console.print(f"[green]Created:[/green] {path}")
     except FileNotFoundError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from None
     except FileExistsError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from None
+
+    # Post-creation self-validation
+    _validate_created_doc(console, path, _t.TARGET_DIR)
+    console.print(f"[green]Created:[/green] {path}")
+
+
+def _validate_created_doc(console: Console, doc_path, root_dir) -> None:
+    """Run frontmatter validation on a newly created document.
+
+    Prints warnings if the created document fails the project's own
+    linting standards but does not block creation.
+    """
+    from vaultspec_core.vaultcore.parser import parse_vault_metadata
+
+    try:
+        content = doc_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return
+
+    metadata, _ = parse_vault_metadata(content)
+    errors = metadata.validate()
+    if errors:
+        console.print("[yellow]Post-creation validation warnings:[/yellow]")
+        for err in errors:
+            console.print(f"  [yellow]{err}[/yellow]")
 
 
 # ---- vault stats -------------------------------------------------------------
@@ -385,7 +476,7 @@ def cmd_check_all(
     console = get_console()
     results = run_all_checks(_t.TARGET_DIR, feature=feature, fix=fix)
 
-    console.print("[bold]Vault Check — All[/bold]")
+    console.print("[bold]Vault Check  - All[/bold]")
     for r in results:
         render_check_result(console, r, verbose=verbose)
 
@@ -493,7 +584,7 @@ def cmd_check_features(
     ] = False,
     target: TargetOption = None,
 ) -> None:
-    """Check feature tag completeness — missing doc types."""
+    """Check feature tag completeness  - missing doc types."""
     apply_target(target)
     _reject_fix("features", fix)
     from vaultspec_core.core import types as _t

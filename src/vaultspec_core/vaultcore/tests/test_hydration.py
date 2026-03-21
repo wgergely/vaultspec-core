@@ -49,24 +49,24 @@ class TestCreateVaultDocStemCollision:
 
     @pytest.fixture()
     def vault_project(self, tmp_path):
-        """Scaffold a minimal vault with one existing doc and a template."""
-        # Create .vaultspec/rules/templates/adr.md
-        tpl_dir = tmp_path / ".vaultspec" / "rules" / "templates"
-        tpl_dir.mkdir(parents=True)
-        (tpl_dir / "adr.md").write_text(
-            "---\ntags: ['#adr', '#{feature}']\ndate: {date}\n---\n# {title}\n",
-            encoding="utf-8",
-        )
-        (tpl_dir / "research.md").write_text(
-            "---\ntags: ['#research', '#{feature}']\ndate: {date}\n---\n# {title}\n",
-            encoding="utf-8",
-        )
+        """Scaffold a minimal vault with one existing doc and real templates.
+
+        Uses seed_builtins to copy real templates - never shadows them.
+        """
+        from vaultspec_core.builtins import seed_builtins
+
+        rules_dir = tmp_path / ".vaultspec" / "rules"
+        rules_dir.mkdir(parents=True)
+        seed_builtins(rules_dir, force=True)
+
+        # Create vault type directories
+        for dt in DocType:
+            (tmp_path / ".vault" / dt.value).mkdir(parents=True, exist_ok=True)
 
         # Create an existing vault document with a known stem
-        adr_dir = tmp_path / ".vault" / "adr"
-        adr_dir.mkdir(parents=True)
-        (adr_dir / "2026-03-17-my-feat-adr.md").write_text(
-            "---\ntags: ['#adr', '#my-feat']\ndate: 2026-03-17\n---\n# Existing\n",
+        (tmp_path / ".vault" / "adr" / "2026-03-17-my-feat-adr.md").write_text(
+            "---\ntags:\n  - '#adr'\n  - '#my-feat'\n"
+            "date: '2026-03-17'\nrelated: []\n---\n# Existing\n",
             encoding="utf-8",
         )
         return tmp_path
@@ -87,7 +87,7 @@ class TestCreateVaultDocStemCollision:
         # Manually place a file in research/ with the same stem as
         # the ADR we're about to create
         research_dir = vault_project / ".vault" / "research"
-        research_dir.mkdir(parents=True)
+        research_dir.mkdir(parents=True, exist_ok=True)
         (research_dir / "2026-03-18-new-feat-research.md").write_text(
             "---\ntags: ['#research', '#new-feat']\n---\n",
             encoding="utf-8",

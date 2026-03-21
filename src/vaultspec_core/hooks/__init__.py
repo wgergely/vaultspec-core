@@ -1,17 +1,10 @@
-"""Declarative lifecycle hooks for vault/spec-core events.
+"""Declarative lifecycle hooks for vaultspec-core events.
 
-Loads YAML hook definitions from ``.vaultspec/hooks/``, validates them against
-:data:`SUPPORTED_EVENTS`, and executes their shell actions with re-entrancy
-protection and a 60-second timeout per action.
-
-Exports:
-    :func:`load_hooks`: Parse hook YAML files into :class:`Hook` instances.
-    :func:`trigger`: Execute all enabled hooks matching a given event.
-    :func:`fire_hooks`: Convenience wrapper; silently swallows errors.
-    :class:`Hook`: Hook definition loaded from YAML.
-    :class:`HookAction`: A single action within a hook.
-    :class:`HookResult`: Result of executing a single hook action.
-    :data:`SUPPORTED_EVENTS`: Frozenset of valid event names.
+Loads YAML definitions from ``.vaultspec/hooks/``, validates against
+:data:`SUPPORTED_EVENTS`, and executes shell actions with re-entrancy protection
+and a 60-second timeout. Key exports: :func:`load_hooks`, :func:`trigger`,
+:func:`fire_hooks`; data classes :class:`Hook`, :class:`HookAction`,
+:class:`HookResult`. Invoked by :mod:`vaultspec_core.cli.root` after install/sync.
 """
 
 from .engine import SUPPORTED_EVENTS as SUPPORTED_EVENTS

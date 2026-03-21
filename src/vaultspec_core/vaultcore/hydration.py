@@ -25,12 +25,23 @@ if TYPE_CHECKING:
 
 
 def hydrate_template(
-    template_content: str, feature: str, date: str, title: str | None = None
+    template_content: str,
+    feature: str,
+    date: str,
+    title: str | None = None,
+    *,
+    related: list[str] | None = None,
+    extra_tags: list[str] | None = None,
 ) -> str:
     """Replace placeholders in a template string with actual values.
 
     Supports both ``{key}`` and ``<key>`` placeholder styles.  Logs a
     warning for any placeholder that remains unresolved after substitution.
+
+    When *related* is provided, the template's placeholder ``related:``
+    entries are replaced with the resolved wiki-link list. When
+    *extra_tags* is provided, those tags are appended to the ``tags:``
+    block in frontmatter.
 
     Args:
         template_content: Raw template text containing placeholder tokens.
@@ -38,6 +49,10 @@ def hydrate_template(
         date: ISO 8601 date string (e.g. ``2026-02-06``).
         title: Optional title that maps to the ``{title}`` and ``{topic}``
             placeholders.
+        related: Pre-resolved ``[[wiki-link]]`` strings to inject into
+            the ``related:`` frontmatter field.
+        extra_tags: Additional ``#tag`` strings to append to the ``tags:``
+            frontmatter field (beyond the directory and feature tags).
 
     Returns:
         The fully-hydrated document string.
@@ -63,6 +78,14 @@ def hydrate_template(
                 logger.debug("Replacing '%s' with '%s'", pattern, value)
                 hydrated = hydrated.replace(pattern, value)
 
+    # Inject resolved related links into frontmatter
+    if related is not None:
+        hydrated = _inject_related(hydrated, related)
+
+    # Inject extra tags into frontmatter
+    if extra_tags:
+        hydrated = _inject_extra_tags(hydrated, extra_tags)
+
     # Check for remaining placeholders that might have been missed
     import re
 
@@ -87,6 +110,73 @@ def hydrate_template(
     return hydrated
 
 
+def _inject_related(content: str, related: list[str]) -> str:
+    """Replace the ``related:`` block in YAML frontmatter with resolved links.
+
+    Args:
+        content: Full document text with YAML frontmatter.
+        related: List of ``[[wiki-link]]`` strings.
+
+    Returns:
+        Document text with the ``related:`` field updated.
+    """
+    import re
+
+    if not related:
+        # Empty list - set related to empty
+        new_block = "related: []"
+    else:
+        lines = ["related:"]
+        for link in related:
+            lines.append(f'  - "{link}"')
+        new_block = "\n".join(lines)
+
+    # Match the related: field and all its list items until next field or ---
+    pattern = re.compile(
+        r"^related:.*?(?=\n[a-zA-Z#-]|\n---|\Z)",
+        re.MULTILINE | re.DOTALL,
+    )
+    result = pattern.sub(new_block, content, count=1)
+    return result
+
+
+def _inject_extra_tags(content: str, extra_tags: list[str]) -> str:
+    """Append additional tags to the ``tags:`` block in YAML frontmatter.
+
+    Args:
+        content: Full document text with YAML frontmatter.
+        extra_tags: List of ``#tag`` strings to append.
+
+    Returns:
+        Document text with extra tags appended to the ``tags:`` field.
+    """
+    import re
+
+    # Find the last tag entry line in the tags block
+    # Tags block looks like:
+    #   tags:
+    #     - "#adr"
+    #     - "#feature"
+    # We want to insert after the last - "..." line in the tags block
+    tag_lines = []
+    for tag in extra_tags:
+        normalized = tag if tag.startswith("#") else f"#{tag}"
+        tag_lines.append(f'  - "{normalized}"')
+
+    insertion = "\n".join(tag_lines)
+
+    # Find the tags block and append after the last entry
+    pattern = re.compile(
+        r"(tags:\s*\n(?:\s+-\s+.*\n)*\s+-\s+.*)",
+        re.MULTILINE,
+    )
+    match = pattern.search(content)
+    if match:
+        return content[: match.end()] + "\n" + insertion + content[match.end() :]
+
+    return content
+
+
 def create_vault_doc(
     root_dir: pathlib.Path,
     doc_type: DocType,
@@ -94,6 +184,8 @@ def create_vault_doc(
     date_str: str,
     title: str | None = None,
     *,
+    related: list[str] | None = None,
+    extra_tags: list[str] | None = None,
     content_root: pathlib.Path | None = None,
 ) -> pathlib.Path:
     """Scaffold a new vault document from the appropriate template.
@@ -104,6 +196,9 @@ def create_vault_doc(
         feature: Feature name in kebab-case (leading ``#`` stripped).
         date_str: ISO 8601 date string (e.g. ``2026-02-06``).
         title: Optional document title.
+        related: Pre-resolved ``[[wiki-link]]`` strings for the
+            ``related:`` frontmatter field.
+        extra_tags: Additional ``#tag`` strings to append to ``tags:``.
         content_root: Explicit content root for template lookup.
 
     Returns:
@@ -120,7 +215,19 @@ def create_vault_doc(
         raise FileNotFoundError(f"No template found for type '{doc_type.value}'")
 
     content = template_path.read_text(encoding="utf-8")
-    hydrated = hydrate_template(content, feature, date_str, title)
+
+    # Default to empty related list so created documents pass validation
+    # instead of keeping template placeholder entries like [[{yyyy-mm-dd-*}]]
+    effective_related = related if related is not None else []
+
+    hydrated = hydrate_template(
+        content,
+        feature,
+        date_str,
+        title,
+        related=effective_related,
+        extra_tags=extra_tags,
+    )
 
     filename = f"{date_str}-{feature}-{doc_type.value}.md"
     target_dir = root_dir / get_config().docs_dir / doc_type.value
@@ -129,7 +236,7 @@ def create_vault_doc(
     if target_path.exists():
         raise FileExistsError(f"File already exists at {target_path}")
 
-    # Guard against stem collisions — a file with the same stem in a
+    # Guard against stem collisions  - a file with the same stem in a
     # different type directory would cause silent overwrites in the
     # graph (nodes are keyed by stem).
     stem = target_path.stem

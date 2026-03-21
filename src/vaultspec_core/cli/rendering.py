@@ -1,6 +1,9 @@
 """CLI-layer rendering helpers for dry-run previews and sync summaries.
 
-All Rich/console output lives here, not in core/.
+All Rich/console output for structured previews lives here, not in core.
+Key export: :func:`render_dry_run_tree`. Depends on
+:mod:`vaultspec_core.core.dry_run` for :class:`~vaultspec_core.core.dry_run.DryRunItem`
+and status styles; consumed by :mod:`.root` and indirectly by :mod:`.vault_cmd`.
 """
 
 from __future__ import annotations
@@ -59,3 +62,107 @@ def render_dry_run_tree(items: Sequence[DryRunItem], *, title: str = "Preview") 
             parts.append(f"[{colour}]{prefix} {count} {status.value}[/{colour}]")
     if parts:
         console.print("  ".join(parts))
+
+
+def render_install_summary(
+    source_counts: dict[str, int],
+    *,
+    path: str,
+    providers: Sequence[str],
+    has_mcp: bool = False,
+) -> None:
+    """Render a concise post-install summary.
+
+    Shows what was found in the vaultspec source (the actual number of
+    rules, skills, and agents the user authored) and which providers
+    they were synced to.
+
+    Args:
+        source_counts: Mapping of resource type to count, e.g.
+            ``{"rules": 1, "skills": 2, "agents": 9}``.
+        path: Display path of the installation target.
+        providers: Provider names that were enabled (e.g. ``["claude"]``).
+        has_mcp: Whether the MCP server configuration was installed.
+    """
+    from rich.panel import Panel
+
+    console = get_console()
+
+    # --- Header ---
+    console.print()
+    console.print(
+        Panel(
+            f"[bold green]Installed[/bold green]  vaultspec\n"
+            f"[dim]Target[/dim]     {path}",
+            expand=False,
+            border_style="green",
+        )
+    )
+
+    # --- Source resource counts ---
+    category_order = ["rules", "skills", "agents"]
+    summary_parts: list[str] = []
+    for cat in category_order:
+        n = source_counts.get(cat, 0)
+        if n:
+            label = cat if n != 1 else cat.rstrip("s")
+            summary_parts.append(f"[bold]{n}[/bold] {label}")
+
+    if summary_parts:
+        console.print(f"  Synced {', '.join(summary_parts)}")
+
+    # --- Providers ---
+    if providers:
+        provider_list = ", ".join(f"[cyan]{p}[/cyan]" for p in providers)
+        console.print(f"  Enabled {provider_list}")
+
+    # --- MCP ---
+    if has_mcp:
+        console.print("  Installed [cyan]MCP server[/cyan]")
+
+    console.print()
+
+
+def render_uninstall_summary(
+    removed: Sequence[tuple[str, str]], *, path: str, keep_vault: bool = True
+) -> None:
+    """Render a concise post-uninstall summary.
+
+    Args:
+        removed: ``(path, label)`` tuples for removed items.
+        path: Display path of the uninstall target.
+        keep_vault: Whether ``.vault/`` was preserved.
+    """
+    from rich.panel import Panel
+
+    console = get_console()
+
+    # Extract provider names from labels
+    known_providers = {"claude", "gemini", "antigravity", "codex"}
+    providers: list[str] = []
+    seen: set[str] = set()
+    for _, label in removed:
+        name = label.split("(")[0].strip().lower() if "(" in label else label.lower()
+        if name in known_providers and name not in seen:
+            seen.add(name)
+            providers.append(name)
+
+    console.print()
+    console.print(
+        Panel(
+            f"[bold red]Uninstalled[/bold red]  vaultspec\n"
+            f"[dim]Target[/dim]       {path}",
+            expand=False,
+            border_style="red",
+        )
+    )
+
+    if providers:
+        provider_list = ", ".join(f"[cyan]{p}[/cyan]" for p in providers)
+        console.print(f"  Disabled {provider_list}")
+
+    if keep_vault:
+        console.print(
+            "  [dim].vault/ preserved"
+            "  - pass --remove-vault to also remove documentation[/dim]"
+        )

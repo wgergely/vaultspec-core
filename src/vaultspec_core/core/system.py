@@ -151,7 +151,21 @@ def system_show() -> dict[str, Any]:
 
 
 def system_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
-    """Sync assembled system prompts and behavioral rules to tool destinations."""
+    """Sync assembled system prompts and behavioral rules to tool destinations.
+
+    For tools with a dedicated ``system_file`` (e.g. Gemini's
+    ``.gemini/SYSTEM.md``), writes the assembled prompt.  For tools with
+    ``emit_system_rule=True`` (e.g. Claude), emits a
+    ``vaultspec-system.builtin.md`` rule file in the rules directory.
+    Skips files with user-authored content unless *force* is set.
+
+    Args:
+        dry_run: Log planned actions without writing any files.
+        force: Overwrite user-authored system files.
+
+    Returns:
+        A :class:`SyncResult` tallying added, updated, and skipped files.
+    """
     from .manifest import installed_tool_configs
 
     result = SyncResult()
@@ -168,7 +182,9 @@ def system_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
 
             if system_file.exists() and not _is_cli_managed(system_file) and not force:
                 logger.warning("    [SKIP] %s - file exists with custom content.", rel)
-                logger.warning("           Use --force to overwrite.")
+                result.warnings.append(
+                    f"Skipped {rel} (user-authored content, use --force to overwrite)"
+                )
                 result.skipped += 1
                 continue
 

@@ -59,7 +59,7 @@ def check_orphans(
         result.diagnostics.append(
             CheckDiagnostic(
                 path=rel_path,
-                message=f"Orphaned {doc_type_str} document — no incoming links",
+                message=f"Orphaned {doc_type_str} document  - no incoming links",
                 severity=Severity.WARNING,
                 fix_description=suggestion or None,
             )

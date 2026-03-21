@@ -42,22 +42,31 @@ def _rel(target: Path, p: Path) -> str:
 
 
 def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, str]]:
-    """Scaffold the .vaultspec/ and .vault/ directory structures.
+    """Scaffold the ``.vaultspec/`` and ``.vault/`` directory structures.
 
-    Returns a list of ``(relative_path, label)`` tuples.
-    When *dry_run* is True, returns the manifest without writing anything.
+    Args:
+        target: Workspace root directory.
+        dry_run: When ``True``, returns the manifest without creating anything.
+
+    Returns:
+        List of ``(relative_path, label)`` tuples for all directories created
+        or that would be created.
     """
     fw_dir = target / ".vaultspec"
     vault_dir = target / ".vault"
     created: list[tuple[str, str]] = []
 
-    for subdir in [
-        "rules/rules",
-        "rules/skills",
-        "rules/agents",
-        "rules/templates",
-        "rules/system",
-    ]:
+    # Dynamically discover resource categories from the builtins package
+    # so that new categories (e.g. hooks) are scaffolded automatically.
+    from vaultspec_core.builtins import _builtins_root
+
+    builtins_root = _builtins_root()
+    subdirs = sorted(
+        f"rules/{d.name}"
+        for d in builtins_root.iterdir()
+        if d.is_dir() and d.name not in ("__pycache__",)
+    )
+    for subdir in subdirs:
         d = fw_dir / subdir
         if not dry_run:
             ensure_dir(d)
@@ -75,10 +84,16 @@ def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, st
 def _scaffold_provider(
     target: Path, tool: Tool, *, dry_run: bool = False
 ) -> list[tuple[str, str]]:
-    """Scaffold directories for a single provider based on its ToolConfig.
+    """Scaffold directories for a single provider based on its :class:`~vaultspec_core.core.types.ToolConfig`.
 
-    Returns a list of ``(relative_path, label)`` tuples.
-    When *dry_run* is True, returns the manifest without writing anything.
+    Args:
+        target: Workspace root directory.
+        tool: :class:`~vaultspec_core.core.enums.Tool` to scaffold.
+        dry_run: When ``True``, returns the manifest without creating anything.
+
+    Returns:
+        Deduplicated list of ``(relative_path, label)`` tuples, one per
+        directory or file created (or that would be created).
     """
     cfg = _t.TOOL_CONFIGS.get(tool)
     if cfg is None:
@@ -116,6 +131,9 @@ def _scaffold_provider(
         _add(_rel(target, wf_dir), "workflows")
 
     if cfg.config_file:
+        if not dry_run and not cfg.config_file.exists():
+            ensure_dir(cfg.config_file.parent)
+            cfg.config_file.write_text("", encoding="utf-8")
         _add(_rel(target, cfg.config_file), "config")
 
     if cfg.rule_ref_config_file:
@@ -132,7 +150,18 @@ def _scaffold_provider(
 
 
 def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[tuple[str, str]]:
-    """Scaffold .mcp.json for MCP server integration."""
+    """Scaffold ``.mcp.json`` for MCP server integration.
+
+    Creates ``.mcp.json`` only if it does not already exist.
+
+    Args:
+        target: Workspace root directory.
+        dry_run: When ``True``, returns the manifest without writing anything.
+
+    Returns:
+        List with a single ``(".mcp.json", "mcp")`` tuple, or empty if the
+        file already exists.
+    """
     import json
 
     mcp_json = target / ".mcp.json"
@@ -145,7 +174,6 @@ def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[tuple[str
                 "vaultspec-core": {
                     "command": "uv",
                     "args": ["run", "vaultspec-mcp"],
-                    "env": {"VAULTSPEC_TARGET_DIR": "."},
                 }
             }
         }
@@ -166,8 +194,41 @@ def _validate_provider(provider: str) -> None:
         )
 
 
-def init_run(force: bool = False, provider: str = "all") -> list[tuple[str, str]]:
+def _validate_skip(skip: set[str] | None) -> set[str]:
+    """Validate and normalise a *skip* set.
+
+    Raises:
+        ProviderError: If any value in *skip* is not a valid component name.
+    """
+    if not skip:
+        return set()
+    # "all" is not a valid skip target  - you'd just not run the command.
+    allowed = VALID_PROVIDERS - {"all"}
+    bad = skip - allowed
+    if bad:
+        raise ProviderError(
+            f"Invalid --skip value(s): {', '.join(sorted(bad))}. "
+            f"Valid: {', '.join(sorted(allowed))}"
+        )
+    return skip
+
+
+def _filter_tools(tools: list[Tool], skip: set[str]) -> list[Tool]:
+    """Remove tools whose provider name is in *skip*."""
+    if not skip:
+        return tools
+    return [t for t in tools if t.value not in skip]
+
+
+def init_run(
+    force: bool = False, provider: str = "all", skip: set[str] | None = None
+) -> list[tuple[str, str]]:
     """Scaffold the .vaultspec/ and .vault/ directory structure.
+
+    Args:
+        force: Override contents if already exists.
+        provider: Provider to install.
+        skip: Set of component names to skip (``core`` and/or provider names).
 
     Returns:
         A deduplicated list of ``(relative_path, label)`` tuples for all
@@ -179,26 +240,34 @@ def init_run(force: bool = False, provider: str = "all") -> list[tuple[str, str]
 
     from .exceptions import ResourceExistsError
 
+    skip = skip or set()
+    skip_core = "core" in skip
+
     cfg = get_config()
     fw_dir = _t.TARGET_DIR / cfg.framework_dir
 
-    if fw_dir.exists() and not force:
-        raise ResourceExistsError(f"{fw_dir} already exists. Use --force to overwrite.")
+    created: list[tuple[str, str]] = []
 
-    created = _scaffold_core(_t.TARGET_DIR)
+    if not skip_core:
+        if fw_dir.exists() and not force:
+            raise ResourceExistsError(
+                f"{fw_dir} already exists. Use --force to overwrite."
+            )
 
-    # Seed builtin content into .vaultspec/rules/
-    from vaultspec_core.builtins import seed_builtins
+        created = _scaffold_core(_t.TARGET_DIR)
 
-    rules_dir = fw_dir / "rules"
-    seeded = seed_builtins(rules_dir, force=force)
-    for rel in seeded:
-        created.append((f".vaultspec/rules/{rel}", "builtin"))
+        # Seed builtin content into .vaultspec/rules/
+        from vaultspec_core.builtins import seed_builtins
 
-    # Snapshot builtins for revert support
-    from .revert import snapshot_builtins
+        rules_dir = fw_dir / "rules"
+        seeded = seed_builtins(rules_dir, force=force)
+        for rel in seeded:
+            created.append((f".vaultspec/rules/{rel}", "builtin"))
 
-    snapshot_builtins(fw_dir)
+        # Snapshot builtins for revert support
+        from .revert import snapshot_builtins
+
+        snapshot_builtins(fw_dir)
 
     # Re-resolve workspace after scaffolding
     reset_config()
@@ -206,7 +275,7 @@ def init_run(force: bool = False, provider: str = "all") -> list[tuple[str, str]
     init_paths(layout)
 
     # Scaffold provider directories
-    tools = _PROVIDER_TO_TOOLS.get(provider, [])
+    tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
     for tool in tools:
         created.extend(_scaffold_provider(_t.TARGET_DIR, tool))
 
@@ -273,6 +342,7 @@ def install_run(
     upgrade: bool = False,
     dry_run: bool = False,
     force: bool = False,
+    skip: set[str] | None = None,
 ) -> dict[str, Any]:
     """Deploy the vaultspec framework to a project directory.
 
@@ -282,6 +352,7 @@ def install_run(
         upgrade: Re-sync builtin rules without re-scaffolding.
         dry_run: Preview the manifest of files that would be created.
         force: Override contents if installation already exists.
+        skip: Set of component names to skip (``core`` and/or provider names).
 
     Returns:
         A dict describing the result:
@@ -298,23 +369,32 @@ def install_run(
     from vaultspec_core.core.types import init_paths
 
     from .exceptions import ResourceExistsError
+    from .guards import guard_dev_repo
 
     _validate_provider(provider)
+    skip = _validate_skip(skip)
+
+    guard_dev_repo(path)
 
     _t.TARGET_DIR = path
+
+    skip_core = "core" in skip
 
     if dry_run:
         _ensure_tool_configs(path)
 
-        manifest = _scaffold_core(path, dry_run=True)
+        manifest: list[tuple[str, str]] = []
 
-        # Include builtin files that would be seeded
-        from vaultspec_core.builtins import list_builtins
+        if not skip_core:
+            manifest = _scaffold_core(path, dry_run=True)
 
-        for builtin_rel in list_builtins():
-            manifest.append((f".vaultspec/rules/{builtin_rel}", "builtin"))
+            # Include builtin files that would be seeded
+            from vaultspec_core.builtins import list_builtins
 
-        tools = _PROVIDER_TO_TOOLS.get(provider, [])
+            for builtin_rel in list_builtins():
+                manifest.append((f".vaultspec/rules/{builtin_rel}", "builtin"))
+
+        tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
         for tool in tools:
             manifest.extend(_scaffold_provider(path, tool, dry_run=True))
         manifest.extend(_scaffold_mcp_json(path, dry_run=True))
@@ -336,30 +416,32 @@ def install_run(
                 hint=f"Run 'vaultspec-core install {path}' first.",
             ) from e
 
-        # Re-seed builtins (force=True overwrites existing)
-        from vaultspec_core.builtins import seed_builtins
+        seeded: list[str] = []
+        if not skip_core:
+            # Re-seed builtins (force=True overwrites existing)
+            from vaultspec_core.builtins import seed_builtins
 
-        fw_dir = path / ".vaultspec"
-        seeded = seed_builtins(fw_dir / "rules", force=True)
+            fw_dir = path / ".vaultspec"
+            seeded = seed_builtins(fw_dir / "rules", force=True)
 
-        # Re-snapshot builtins for revert support
-        from .revert import snapshot_builtins
+            # Re-snapshot builtins for revert support
+            from .revert import snapshot_builtins
 
-        snapshot_builtins(fw_dir)
+            snapshot_builtins(fw_dir)
 
         sync_target = provider if provider not in ("all", "core") else "all"
         sync_provider(sync_target, force=True)
         return {"action": "upgrade", "seeded_count": len(seeded), "path": path}
 
     fw_dir = path / ".vaultspec"
-    if fw_dir.exists() and not force:
+    if fw_dir.exists() and not force and not skip_core:
         raise ResourceExistsError(
             f"vaultspec is already installed at {path}. "
             "Use --upgrade to update, --force to override, or remove it "
             f"first with 'vaultspec-core uninstall {path}'."
         )
 
-    created = init_run(force=force, provider=provider)
+    created = init_run(force=force, provider=provider, skip=skip)
 
     reset_config()
     layout = resolve_workspace(target_override=path)
@@ -367,13 +449,44 @@ def install_run(
 
     sync_target = provider if provider not in ("all", "core") else "all"
     sync_provider(sync_target)
-    return {"action": "install", "items": created, "path": path}
+
+    # Count actual source resources (what the user authored)
+    from .agents import collect_agents
+    from .rules import collect_rules
+    from .skills import collect_skills
+
+    source_counts = {
+        "rules": len(collect_rules()),
+        "skills": len(collect_skills()),
+        "agents": len(collect_agents()),
+    }
+
+    tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
+    provider_names = [t.value for t in tools]
+    has_mcp = (path / ".mcp.json").exists()
+
+    return {
+        "action": "install",
+        "items": created,
+        "source_counts": source_counts,
+        "providers": provider_names,
+        "has_mcp": has_mcp,
+        "path": path,
+    }
 
 
 def _collect_provider_artifacts(
     path: Path, tool: Tool
 ) -> tuple[list[Path], list[Path]]:
-    """Return (directories, files) managed by a single provider."""
+    """Return ``(directories, files)`` managed by a single provider.
+
+    Args:
+        path: Workspace root directory.
+        tool: :class:`~vaultspec_core.core.enums.Tool` to inspect.
+
+    Returns:
+        A two-tuple of ``(directory_paths, file_paths)`` owned by *tool*.
+    """
     from .enums import DirName, FileName
 
     cfg = _t.TOOL_CONFIGS.get(tool)
@@ -385,7 +498,7 @@ def _collect_provider_artifacts(
         files.append(path / FileName.CLAUDE.value)
     elif tool == Tool.GEMINI:
         dirs.append(path / DirName.GEMINI.value)
-        # Root GEMINI.md is shared with Antigravity — handled below
+        # Root GEMINI.md is shared with Antigravity  - handled below
     elif tool == Tool.ANTIGRAVITY:
         dirs.append(path / DirName.ANTIGRAVITY.value)
         files.append(path / FileName.GEMINI.value)
@@ -405,6 +518,7 @@ def uninstall_run(
     keep_vault: bool = False,
     dry_run: bool = False,
     force: bool = False,
+    skip: set[str] | None = None,
 ) -> dict[str, Any]:
     """Remove the vaultspec framework from a project directory.
 
@@ -414,6 +528,7 @@ def uninstall_run(
         keep_vault: Preserve ``.vault/`` documentation directory.
         dry_run: Preview what would be removed without deleting.
         force: Required to execute. Uninstall is destructive.
+        skip: Set of component names to skip (``core`` and/or provider names).
 
     Returns:
         A dict describing the result:
@@ -425,7 +540,10 @@ def uninstall_run(
     """
     import shutil
 
+    from .guards import guard_dev_repo
     from .manifest import providers_sharing_dir, remove_provider
+
+    guard_dev_repo(path)
 
     # Safety gate: require --force for destructive operations
     if not force and not dry_run:
@@ -438,13 +556,14 @@ def uninstall_run(
     _ensure_tool_configs(path)
 
     _validate_provider(provider)
+    skip = _validate_skip(skip)
 
     # Uninstalling "core" cascades to all providers
     effective_provider = "all" if provider == "core" else provider
 
     removed: list[tuple[str, str]] = []  # (path, label)
 
-    # Label mapping for well-known directories and files
+    # Map directory names → component owner (for skip filtering)
     dir_labels: dict[str, str] = {
         ".vaultspec": "core",
         ".vault": "vault",
@@ -459,9 +578,15 @@ def uninstall_run(
         "AGENTS.md": "codex (config)",
         ".mcp.json": "mcp",
     }
+    # Map file names → owning component for skip checks
+    _file_owner: dict[str, str] = {
+        "CLAUDE.md": "claude",
+        "GEMINI.md": "gemini",
+        "AGENTS.md": "codex",
+    }
 
     if effective_provider == "all":
-        # Remove everything
+        # Remove everything (respecting skip)
         managed_dirs = [
             path / ".vaultspec",
             path / ".claude",
@@ -480,13 +605,20 @@ def uninstall_run(
         ]
 
         for d in managed_dirs:
+            owner = dir_labels.get(d.name, "")
+            if owner in skip:
+                logger.info("Skipping %s (--skip %s)", d.name, owner)
+                continue
             if d.exists():
                 if not dry_run:
                     shutil.rmtree(d)
-                label = dir_labels.get(d.name, "")
-                removed.append((str(d).replace("\\", "/") + "/", label))
+                removed.append((str(d).replace("\\", "/") + "/", owner))
 
         for f in managed_files:
+            owner = _file_owner.get(f.name, "")
+            if owner in skip:
+                logger.info("Skipping %s (--skip %s)", f.name, owner)
+                continue
             if f.exists():
                 if not dry_run:
                     f.unlink()
@@ -495,7 +627,7 @@ def uninstall_run(
 
     else:
         # Per-provider uninstall with shared directory protection
-        tools = _PROVIDER_TO_TOOLS.get(effective_provider, [])
+        tools = _filter_tools(_PROVIDER_TO_TOOLS.get(effective_provider, []), skip)
         for tool in tools:
             dirs, files = _collect_provider_artifacts(path, tool)
 
@@ -562,7 +694,12 @@ def hooks_list_data() -> dict[str, Any]:
             }
         )
 
-    rel = str(_t.HOOKS_DIR.relative_to(_t.TARGET_DIR))
+    try:
+        rel = str(_t.HOOKS_DIR.relative_to(_t.TARGET_DIR))
+    except ValueError:
+        # HOOKS_DIR may live in the CWD workspace, not under TARGET_DIR,
+        # when --target points to a separate directory.
+        rel = str(_t.HOOKS_DIR)
     return {
         "hooks": hooks_data,
         "supported_events": sorted(SUPPORTED_EVENTS),
@@ -618,14 +755,25 @@ SYNC_PROVIDERS = {"all", "claude", "gemini", "antigravity", "codex"}
 def sync_provider(
     provider: str,
     *,
-    prune: bool = False,
     dry_run: bool = False,
     force: bool = False,
+    skip: set[str] | None = None,
 ) -> list[_t.SyncResult]:
     """Sync resources for a single provider target.
 
     ``provider`` must be one of :data:`SYNC_PROVIDERS`.  The special value
     ``"all"`` syncs every provider and fires post-sync hooks.
+
+    When *force* is ``True``, stale destination files are pruned and
+    user-authored system/config files are overwritten.  When ``False``
+    (the default), the sync is additive-only and any divergences are
+    reported as warnings on the returned :class:`SyncResult` objects.
+
+    Args:
+        provider: Provider target to sync.
+        dry_run: Preview changes without writing.
+        force: Prune stale files and overwrite user-authored content.
+        skip: Set of provider names to exclude from the sync.
 
     Returns:
         A list of :class:`SyncResult` objects from each sync pass.
@@ -641,17 +789,22 @@ def sync_provider(
             f"Valid: {', '.join(sorted(SYNC_PROVIDERS))}"
         )
 
+    skip = _validate_skip(skip)
+
     from .agents import agents_sync
     from .config_gen import config_sync
+    from .guards import guard_dev_repo
     from .rules import rules_sync
     from .skills import skills_sync
     from .system import system_sync
 
+    guard_dev_repo(_t.TARGET_DIR)
+
     def _run_all_syncs() -> list[_t.SyncResult]:
         return [
-            rules_sync(prune=prune, dry_run=dry_run),
-            skills_sync(prune=prune, dry_run=dry_run),
-            agents_sync(prune=prune, dry_run=dry_run),
+            rules_sync(prune=force, dry_run=dry_run),
+            skills_sync(prune=force, dry_run=dry_run),
+            agents_sync(prune=force, dry_run=dry_run),
             system_sync(dry_run=dry_run, force=force),
             config_sync(dry_run=dry_run, force=force),
         ]
@@ -665,18 +818,30 @@ def sync_provider(
         )
 
     if provider == "all":
-        logger.info("Syncing all resources...")
-        results = _run_all_syncs()
+        # When skipping providers, narrow TOOL_CONFIGS for the sync pass
+        skipped_tools = {Tool(name) for name in skip if name in {t.value for t in Tool}}
+        original = dict(_t.TOOL_CONFIGS) if skipped_tools else None
+        if skipped_tools:
+            _t.TOOL_CONFIGS = {
+                k: v for k, v in _t.TOOL_CONFIGS.items() if k not in skipped_tools
+            }
 
-        if not dry_run:
-            from vaultspec_core.hooks import fire_hooks
+        try:
+            logger.info("Syncing all resources...")
+            results = _run_all_syncs()
 
-            fire_hooks(
-                "config.synced",
-                {"root": str(_t.TARGET_DIR), "event": "config.synced"},
-            )
-            logger.info("Done.")
-        return results
+            if not dry_run:
+                from vaultspec_core.hooks import fire_hooks
+
+                fire_hooks(
+                    "config.synced",
+                    {"root": str(_t.TARGET_DIR), "event": "config.synced"},
+                )
+                logger.info("Done.")
+            return results
+        finally:
+            if original is not None:
+                _t.TOOL_CONFIGS = original
 
     # Validate provider is installed
     from .manifest import read_manifest

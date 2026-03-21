@@ -6,18 +6,18 @@
 # To activate: set `enabled: true` below.
 #
 # Supported events:
-#   vault.document.created   — after `vaultspec-core vault create`
-#   config.synced            — after config sync operations
-#   audit.completed          — after `vaultspec-core vault audit`
+#   vault.document.created    - after `vaultspec-core vault create`
+#   config.synced             - after config sync operations
+#   audit.completed           - after `vaultspec-core vault audit`
 #
 # Action types:
-#   shell  — run a shell command (60s timeout, no shell=True)
+#   shell   - run a shell command (60s timeout, no shell=True)
 #
 # Context variables (usable as {placeholders} in command strings):
-#   {path}   — path to the affected document (set by --path on manual runs,
+#   {path}    - path to the affected document (set by --path on manual runs,
 #               or by the lifecycle trigger for vault.document.created)
-#   {root}   — workspace root directory
-#   {event}  — the event name that fired this hook
+#   {root}    - workspace root directory
+#   {event}   - the event name that fired this hook
 
 event: vault.document.created
 enabled: false  # set to true to activate

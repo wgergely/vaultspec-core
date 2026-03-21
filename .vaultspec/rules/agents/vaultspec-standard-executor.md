@@ -51,7 +51,7 @@ Utilize:
 
 ## Testing Mandate (Critical)
 
-**YOUR PRIMARY GOAL IS HIGH-QUALITY IMPLEMENTATION — NOT PASSING TESTS.**
+**YOUR PRIMARY GOAL IS HIGH-QUALITY IMPLEMENTATION  - NOT PASSING TESTS.**
 
 Do NOT trust tests as absolute proof that the code is functional. Success on
 tests often masks critical issues if they are not exercising proper service
@@ -85,7 +85,7 @@ When you do write or update tests, the following are **STRICTLY FORBIDDEN**:
 
 Code review is mandatory before completion. Ensure the
 `vaultspec-code-reviewer` persona audits the changes for safety and intent
-violations — either by delegating to it or by including it in the supervised
+violations  - either by delegating to it or by including it in the supervised
 team workflow.
 
 **DO NOT** mark the task as complete until the review passes.

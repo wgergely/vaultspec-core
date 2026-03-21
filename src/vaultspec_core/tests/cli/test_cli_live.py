@@ -60,7 +60,7 @@ def cli():
 # ── helpers ─────────────────────────────────────────────────────────
 
 
-def _run(cli, project, *args):
+def _run(cli, project, *args, input=None):
     """Invoke CLI with ``--target`` on the **subcommand**, not the root.
 
     This proves that every command accepts ``--target`` directly.
@@ -68,7 +68,7 @@ def _run(cli, project, *args):
     trailing options to surface ordering bugs.
     """
     cmd_args = [*list(args), "--target", str(project)]
-    return cli.invoke(app, cmd_args)
+    return cli.invoke(app, cmd_args, input=input)
 
 
 def _run_root_target(cli, project, *args):
@@ -85,7 +85,7 @@ _COMMANDS_EXIT_0: list[tuple[str, list[str]]] = [
     # sync
     ("sync-all", ["sync"]),
     ("sync-dry-run", ["sync", "--dry-run"]),
-    ("sync-prune", ["sync", "--prune"]),
+    ("sync-force", ["sync", "--force"]),
     ("sync-claude", ["sync", "claude"]),
     ("sync-gemini", ["sync", "gemini"]),
     ("sync-antigravity", ["sync", "antigravity"]),
@@ -172,7 +172,7 @@ def test_root_target_exit_0(cli, project, cmd_id, args):
 def test_check_subcommand_target(cli, project, cmd_id, args):
     """Check commands accept --target on the subcommand and produce output.
 
-    These commands exit 1 when they find issues in the corpus — that's
+    These commands exit 1 when they find issues in the corpus  - that's
     correct diagnostic behavior.  The test verifies the command accepted
     ``--target``, ran against the correct directory, and produced output.
     An exit code of 2+ would indicate a crash, not a diagnostic finding.
@@ -344,16 +344,20 @@ class TestSync:
         result = _run(cli, project, "sync", provider)
         assert result.exit_code == 0, f"exit={result.exit_code}\n{result.output}"
 
-    def test_sync_writes_to_target_not_cwd(self, cli, project):
+    def test_sync_writes_to_target_not_cwd(self, cli, project, monkeypatch):
         """Remove a synced file, re-sync, confirm it reappears at --target."""
         synced = project / ".claude" / "rules" / "vaultspec.builtin.md"
         if synced.exists():
             synced.unlink()
+        # Set CWD to the project so that split_source sees CWD == target
+        # (no framework-root override) and sync reads from the project's
+        # own .vaultspec/ source  - the real-world single-workspace case.
+        monkeypatch.chdir(project)
         result = _run(cli, project, "sync")
         assert result.exit_code == 0
         assert synced.exists(), "sync did not regenerate file at --target"
 
-    @pytest.mark.parametrize("flag", ["--dry-run", "--prune", "--force"])
+    @pytest.mark.parametrize("flag", ["--dry-run", "--force"])
     def test_sync_flags(self, cli, project, flag):
         result = _run(cli, project, "sync", flag)
         assert result.exit_code == 0
@@ -427,8 +431,7 @@ class TestSpecRules:
             "add",
             "--name",
             "live-test",
-            "--content",
-            "Live rule body",
+            input="Live rule body",
         )
         assert result.exit_code == 0
         rule_path = project / ".vaultspec" / "rules" / "rules" / "live-test.md"
@@ -777,11 +780,14 @@ class TestTargetPropagation:
         assert (target / ".claude" / "rules").is_dir()
         assert any((target / ".claude" / "rules").iterdir())
 
-    def test_sync_regenerates_at_target(self, cli, project):
+    def test_sync_regenerates_at_target(self, cli, project, monkeypatch):
         """Remove a synced file, re-sync, verify it reappears at target."""
         synced = project / ".claude" / "rules" / "vaultspec.builtin.md"
         if synced.exists():
             synced.unlink()
+        # CWD must be the project so split_source sees CWD == target
+        # (single-workspace mode) and uses the project's own .vaultspec/.
+        monkeypatch.chdir(project)
         r = cli.invoke(app, ["sync", "--target", str(project)])
         assert r.exit_code == 0
         assert synced.exists(), "sync did not write to --target"

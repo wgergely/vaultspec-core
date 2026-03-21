@@ -63,7 +63,7 @@ Every document MUST strictly adhere to the following schema:
 
 ### Class B: Tag Hygiene (Strict Enforcement)
 
-- **The "Rule of Two":** Every document MUST have **EXACTLY TWO** tags.
+- **Tag Minimum:** Every document MUST have **at least TWO** tags (one directory, one feature). Additional tags are allowed.
 - **Invalid Tags:** Flag structural tags (`#step`, `#phase1`) or malformed tags
   (CamelCase, spaces).
 - **Syntax Violations:** Flag unquoted tags, single-string tags, or non-list

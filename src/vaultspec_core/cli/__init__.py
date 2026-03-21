@@ -1,9 +1,10 @@
-"""CLI package -- the user-facing command surface for vaultspec-core.
+"""User-facing CLI surface for vaultspec-core, built on Typer.
 
-Organized into domain groups:
-- root: install, uninstall, sync (top-level commands + global options)
-- vault_cmd: vault stats, vault list, vault add, vault feature, vault check
-- spec_cmd: spec rules, spec skills, spec agents, spec system, spec hooks
+Exports :func:`app` (the root :class:`typer.Typer` instance) and :func:`run`
+(the ``__main__`` entry point). Subgroups: ``root`` (install/uninstall/sync),
+``vault_cmd`` (vault stats/list/add/feature/check), and ``spec_cmd``
+(spec rules/skills/agents/system/hooks). Depends on :mod:`vaultspec_core.config`
+and :mod:`vaultspec_core.hooks`.
 """
 
 from .root import app, run

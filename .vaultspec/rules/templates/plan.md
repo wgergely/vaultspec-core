@@ -1,8 +1,9 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
+# REQUIRED TAGS (minimum 2): one directory tag + one feature tag
+# DIRECTORY TAGS: #adr #audit #exec #plan #reference #research
 # Directory tag (hardcoded - DO NOT CHANGE - based on .vault/plan/ location)
 # Feature tag (replace {feature} with your feature name, e.g., #editor-demo)
+# Additional tags may be appended below the required pair
 tags:
   - "#plan"
   - "#{feature}"
@@ -61,4 +62,4 @@ fulfilled our mission.
 
 Example: "Run unit and integration tests (all pass). However, could not
 visually confirm that the feature was functional. Further work is required to
-implement features to enable better testing." Be honest — tests can be cheated!
+implement features to enable better testing." Be honest  - tests can be cheated!

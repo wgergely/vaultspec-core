@@ -79,7 +79,7 @@ class SyncResult:
             (e.g. transform returned ``None``, or safety guard triggered).
         pruned: Number of stale destination files that were deleted.
         errors: List of error message strings for files that failed to sync.
-        items: Per-file action log — list of ``(path, action)`` tuples for
+        items: Per-file action log  - list of ``(path, action)`` tuples for
             dry-run rendering.
         warnings: Advisories about what ``--force`` would change beyond the
             default sync.

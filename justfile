@@ -7,7 +7,7 @@ default:
   @just --list
 
 # ===========================================================================
-#  prod — pure 1:1 mirror of the vaultspec-core Python CLI
+#  prod  - pure 1:1 mirror of the vaultspec-core Python CLI
 #
 #  just prod [args...]  →  uv run vaultspec-core [args...]
 #
@@ -15,7 +15,7 @@ default:
 #    just prod install . claude --force
 #    just prod sync claude --dry-run
 #    just prod vault check all --fix
-#    just prod vault doctor -v
+#    just prod vault check all -v
 #    just prod vault graph --metrics
 #    just prod vault add adr -f my-feature
 #    just prod spec rules list
@@ -25,7 +25,7 @@ prod *args='':
   uv run vaultspec-core {{args}}
 
 # ===========================================================================
-#  dev — development toolchain (linters, formatters, tests, builds)
+#  dev  - development toolchain (linters, formatters, tests, builds)
 #
 #  Nothing here exists in the shipped CLI.
 #
@@ -76,7 +76,7 @@ dev target *args='':
   esac
 
 # ===========================================================================
-#  ci — full pipeline: lint → audit → vault check → test
+#  ci  - full pipeline: lint → audit → vault check → test
 # ===========================================================================
 
 ci:
@@ -239,11 +239,11 @@ _dev-publish target tag:
 _dev-precommit target='run':
   case "{{target}}" in \
     install) \
-      uv run pre-commit install ;; \
+      uv run prek install ;; \
     upgrade) \
-      uv run pre-commit autoupdate ;; \
+      uv run prek auto-update ;; \
     run) \
-      uv run pre-commit run --all-files ;; \
+      uv run prek run --all-files ;; \
     *) \
       echo "unknown dev precommit target: {{target}}" >&2; \
       echo "  targets: install upgrade run" >&2; \

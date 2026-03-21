@@ -1,7 +1,7 @@
 """Check and optionally fix vault document frontmatter.
 
 Validates every document against DocumentMetadata.validate() rules:
-- Exactly 2 tags (one directory tag, one feature tag)
+- At least 2 tags (one directory tag, one feature tag; extra tags allowed)
 - Valid date format (YYYY-MM-DD)
 - Valid related link format ([[wiki-link]])
 """
@@ -57,7 +57,7 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
     if not metadata.tags:
         feature_match = re.search(r"^feature:\s*(.+)$", yaml_block, re.MULTILINE)
         if feature_match and doc_type:
-            feature_val = feature_match.group(1).strip().strip("\"\'")
+            feature_val = feature_match.group(1).strip().strip("\"'")
             if not feature_val.startswith("#"):
                 feature_val = f"#{feature_val}"
             new_tags = [doc_type.tag, feature_val]
@@ -130,8 +130,8 @@ def check_frontmatter(
     """Validate frontmatter of all vault documents.
 
     Enforces :meth:`~vaultspec_core.vaultcore.models.DocumentMetadata.validate`
-    rules: exactly two tags (one directory, one feature), valid ISO 8601 date,
-    and ``[[wiki-link]]`` format for ``related`` entries.
+    rules: at least two tags (one directory, one feature; extras allowed),
+    valid ISO 8601 date, and ``[[wiki-link]]`` format for ``related`` entries.
 
     Args:
         root_dir: Project root directory.

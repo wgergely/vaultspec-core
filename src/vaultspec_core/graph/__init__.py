@@ -1,13 +1,12 @@
 """Vault document relationship graph backed by ``networkx.DiGraph``.
 
-Scans ``.vault/`` content, resolves wiki-links and ``related:`` fields into
-directed edges, and exposes query, render (ASCII via ``phart``, Rich tree), and
-JSON-serialisation (``networkx`` node-link format) operations.
-
-Exports:
-    :class:`VaultGraph`: Main entry point; instantiate with a vault root.
-    :class:`DocNode`: Per-document node carrying frontmatter, body, and link metadata.
-    :class:`GraphMetrics`: Aggregate statistics computed by ``networkx`` algorithms.
+Scans ``.vault/`` content, resolves wiki-links and ``related:`` frontmatter
+fields into directed edges; exposes query, ASCII/Rich render (``phart``), and
+JSON-serialisation (node-link format) operations.
+Key exports: :class:`VaultGraph` (main entry point, instantiate with vault
+root), :class:`DocNode` (per-document node with frontmatter and link
+metadata), :class:`GraphMetrics` (aggregate ``networkx`` statistics).
+Consumed by :mod:`vaultspec_core.cli` graph sub-commands.
 """
 
 from .api import DocNode as DocNode

@@ -1,12 +1,11 @@
 """Load, validate, and execute declarative vaultspec hooks.
 
-Runtime for hook definitions stored as YAML files under ``.vaultspec/hooks/``.
-Parses hook documents into typed models, filters them by supported event, and
-executes their shell actions while guarding against re-entrant event loops.
-
-Usage centers on :func:`load_hooks` to read hook definitions and
-:func:`trigger` or :func:`fire_hooks` to execute hooks bound to a specific
-event.
+Runtime for YAML hook definitions under ``.vaultspec/hooks/``. Parses files
+into :class:`Hook` / :class:`HookAction` models, filters by :data:`SUPPORTED_EVENTS`,
+and executes shell actions with re-entrancy guard and 60-second timeout.
+Key exports: :func:`load_hooks`, :func:`trigger`, :func:`fire_hooks`.
+Re-exported via :mod:`vaultspec_core.hooks`; depends on
+:func:`vaultspec_core.core.helpers.kill_process_tree` for subprocess cleanup.
 """
 
 from __future__ import annotations
@@ -49,7 +48,7 @@ class HookAction:
     """A single action within a hook.
 
     Attributes:
-        action_type: Kind of action — currently only ``"shell"`` is supported.
+        action_type: Kind of action  - currently only ``"shell"`` is supported.
         command: Shell command string; used only when ``action_type`` is
             ``"shell"``.
     """

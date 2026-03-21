@@ -1,9 +1,10 @@
-"""Execution protocol surface for vault/spec-core.
+"""Public surface for the vaultspec-core execution protocol.
 
-The protocol package defines the runtime abstraction used to execute prompts
-against supported model providers. It sits above the canonical model and
-capability vocabulary in ``vaultspec_core.core.enums`` and exposes the shared
-provider contract and concrete provider implementations.
+Exports the shared provider contract (:class:`~vaultspec_core.protocol.providers.base.ExecutionProvider`),
+model registries (:class:`~vaultspec_core.protocol.providers.ClaudeModels`,
+:class:`~vaultspec_core.protocol.providers.GeminiModels`), and
+:class:`~vaultspec_core.protocol.providers.CapabilityLevel` from :mod:`.providers`.
+Sits above :mod:`vaultspec_core.core.enums`; consumed by :mod:`vaultspec_core.cli`.
 """
 
 from .providers import CapabilityLevel as CapabilityLevel

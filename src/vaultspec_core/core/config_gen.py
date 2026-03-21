@@ -10,7 +10,7 @@ AGENTS.md.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from . import types as _t
 from .enums import Tool
@@ -22,10 +22,16 @@ logger = logging.getLogger(__name__)
 
 
 def _is_cli_managed(path_or_content: str | Path) -> bool:
-    """Return True if the content contains a vaultspec managed block.
+    """Return ``True`` if a file or string contains a vaultspec managed block.
 
     Detects both old-style ``AUTO-GENERATED`` headers and new-style
     ``<vaultspec>`` tags for backward compatibility.
+
+    Args:
+        path_or_content: A :class:`~pathlib.Path` to read or a content string.
+
+    Returns:
+        ``True`` if the content contains a vaultspec tag or header marker.
     """
     if isinstance(path_or_content, Path):
         if not path_or_content.exists():
@@ -41,11 +47,18 @@ def _is_cli_managed(path_or_content: str | Path) -> bool:
 
 
 def _collect_rule_refs(cfg: ToolConfig) -> list[str]:
-    """Scan the configured rule-reference directory for markdown rule files.
+    """Scan the rule-reference directory for markdown rule files.
+
+    Resolves each file path relative to the config file's parent directory
+    so that generated ``@rules/...`` include strings are correct.
+
+    Args:
+        cfg: :class:`~vaultspec_core.core.types.ToolConfig` whose
+            ``rule_ref_dir`` and ``config_file`` are used.
 
     Returns:
-        List of include strings (e.g. ``"@rules/my-rule.md"``) for every file
-        found in the rule-reference directory.
+        Sorted list of relative include strings (e.g. ``"rules/my-rule.md"``),
+        or an empty list when no rules directory or config file is configured.
     """
     rule_ref_dir = cfg.rule_ref_dir or cfg.rules_dir
     if rule_ref_dir is None or cfg.config_file is None:
@@ -159,7 +172,7 @@ def _render_codex_config_lines(meta: dict[str, object]) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Content generators — produce the managed block body (without tags).
+# Content generators  - produce the managed block body (without tags).
 # ---------------------------------------------------------------------------
 
 
@@ -237,7 +250,7 @@ def _generate_codex_agents_body() -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Sync helpers — write managed blocks into files.
+# Sync helpers  - write managed blocks into files.
 # ---------------------------------------------------------------------------
 
 
@@ -256,7 +269,7 @@ def _sync_managed_md(
     if path.exists():
         existing = path.read_text(encoding="utf-8")
         if has_block(existing, block_type):
-            # Block exists — check if content actually changed.
+            # Block exists  - check if content actually changed.
             updated = upsert_block(existing, block_type, body)
             if updated == existing:
                 return "[SKIP]"
@@ -264,7 +277,7 @@ def _sync_managed_md(
                 atomic_write(path, updated)
             return "[UPDT]"
         if _is_cli_managed(existing) or force:
-            # File is ours or force — upsert (append block).
+            # File is ours or force  - upsert (append block).
             updated = upsert_block(existing, block_type, body)
             if updated == existing:
                 return "[SKIP]"
@@ -278,7 +291,7 @@ def _sync_managed_md(
             atomic_write(path, updated)
         return "[ADD]"
     else:
-        # New file — create with managed block only.
+        # New file  - create with managed block only.
         if not dry_run:
             ensure_dir(path.parent)
             content = upsert_block("", block_type, body)
@@ -343,11 +356,17 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
     """Sync tool configuration files using ``<vaultspec>`` managed blocks.
 
     For markdown files (CLAUDE.md, GEMINI.md, AGENTS.md), inserts or
-    updates a ``<vaultspec type="config">`` block.  User content outside
-    the block is preserved.
+    updates a ``<vaultspec type="config">`` block preserving user content
+    outside the block.  For TOML files (``.codex/config.toml``), inserts
+    or updates ``# <vaultspec type="...">`` TOML comment blocks.
 
-    For TOML files (.codex/config.toml), inserts or updates
-    ``# <vaultspec type="...">`` blocks.
+    Args:
+        dry_run: Log planned actions without writing any files.
+        force: Overwrite files with user content (no managed block).
+
+    Returns:
+        A :class:`SyncResult` accumulating adds and updates across all
+        active provider config files.
     """
     from .manifest import installed_tool_configs
 
@@ -385,13 +404,22 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
         if not all_refs:
             continue
 
-        # Deduplicate while preserving order
+        # Deduplicate by filename  - when multiple providers contribute
+        # the same rule file under different directories (e.g.
+        # .gemini/rules/X.md and .agents/rules/X.md), keep only one ref.
+        # Prefer the shared .agents/ path when it exists.
         seen_refs: list[str] = []
-        seen_ref_set: set[str] = set()
+        seen_basenames: dict[str, int] = {}  # basename → index in seen_refs
         for ref in all_refs:
-            if ref not in seen_ref_set:
-                seen_ref_set.add(ref)
-                seen_refs.append(ref)
+            basename = PurePosixPath(ref).name
+            if basename in seen_basenames:
+                # If this ref is from the shared .agents/ dir, replace the
+                # earlier tool-specific ref.
+                if ".agents/" in ref:
+                    seen_refs[seen_basenames[basename]] = ref
+                continue
+            seen_basenames[basename] = len(seen_refs)
+            seen_refs.append(ref)
 
         body_parts = [
             "## Rules",

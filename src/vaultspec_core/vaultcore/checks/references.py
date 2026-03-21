@@ -24,9 +24,17 @@ logger = logging.getLogger(__name__)
 
 
 def _add_related_link(doc_path: Path, link_name: str) -> bool:
-    """Add a [[wiki-link]] to the related: field in frontmatter.
+    """Append a ``[[wiki-link]]`` to the ``related:`` field in frontmatter.
 
-    Returns True if the file was modified, False otherwise.
+    Creates the ``related:`` field if absent. No-ops when the link is
+    already present anywhere in the file.
+
+    Args:
+        doc_path: Absolute path to the vault document to modify.
+        link_name: Stem of the target document (without ``[[]]`` wrappers).
+
+    Returns:
+        ``True`` if the file was modified, ``False`` otherwise.
     """
     try:
         content = doc_path.read_text(encoding="utf-8")
@@ -181,15 +189,28 @@ def check_schema(
     doc_type_filter: str | None = None,
     fix: bool = False,
 ) -> CheckResult:
-    """Enforce schema rules for document cross-references.
+    """Enforce schema-level cross-reference rules on ADRs and plans.
 
-    Rules:
-    - ADRs must have at least one reference to a research document (ERROR)
-    - Plans must have at least one reference to an ADR (ERROR)
-    - Plans should reference research docs (WARNING if missing)
+    Rules enforced:
 
-    With --fix, adds the first matching document of the required type
-    found in the same feature to the related: field.
+    - ADR must reference at least one research document (ERROR).
+    - Plan must reference at least one ADR (ERROR).
+    - Plan should reference research documents (WARNING).
+
+    With ``fix=True``, adds the first matching document of the required type
+    found within the same feature to the ``related:`` field.
+
+    Args:
+        root_dir: Project root directory.
+        feature: Restrict checks to documents with this feature tag
+            (without ``#``).
+        doc_type_filter: Restrict checks to this document type
+            (e.g. ``"adr"``).
+        fix: When ``True``, attempt to auto-add the missing ``[[wiki-link]]``.
+
+    Returns:
+        :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
+        check name ``"schema"``.
     """
     from ...graph import VaultGraph
     from ..models import DocType

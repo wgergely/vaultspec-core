@@ -126,7 +126,7 @@ class TestSyncSkills:
         skills_dir.mkdir(parents=True, exist_ok=True)
         for name in names:
             d = skills_dir / name
-            d.mkdir()
+            d.mkdir(exist_ok=True)
             content = f"---\ndescription: {name}\n---\n\nbody"
             (d / "SKILL.md").write_text(content, encoding="utf-8")
 
@@ -141,11 +141,14 @@ class TestSyncSkills:
         assert shared_dest.exists()
 
     def test_prune_respects_protected(self, test_project):
-        # Protected skills like 'fd' or 'rg' shouldn't be pruned
+        # Directories without a SKILL.md (e.g. user tooling) shouldn't be pruned.
+        # Directories with a SKILL.md that are no longer in sources ARE pruned.
         skills_dir = test_project / ".claude" / "skills"
         skills_dir.mkdir(parents=True, exist_ok=True)
+        # User-placed directory without SKILL.md  - must survive pruning
         (skills_dir / "fd").mkdir()
-        (skills_dir / "fd" / "SKILL.md").write_text("protected", encoding="utf-8")
+        (skills_dir / "fd" / "README.md").write_text("user tool", encoding="utf-8")
+        # Stale synced skill with SKILL.md  - should be pruned
         (skills_dir / "vaultspec-old").mkdir()
         (skills_dir / "vaultspec-old" / "SKILL.md").write_text(
             "stale", encoding="utf-8"
@@ -153,7 +156,7 @@ class TestSyncSkills:
 
         self._make_skill_sources(test_project, ["vaultspec-deploy"])
         skills_sync(prune=True)
-        assert (skills_dir / "fd" / "SKILL.md").exists()
+        assert (skills_dir / "fd" / "README.md").exists()
         assert not (skills_dir / "vaultspec-old" / "SKILL.md").exists()
 
 
@@ -234,7 +237,7 @@ class TestSyncSkillsCodex:
         skills_dir.mkdir(parents=True, exist_ok=True)
         for name in names:
             d = skills_dir / name
-            d.mkdir()
+            d.mkdir(exist_ok=True)
             content = f"---\ndescription: {name}\n---\n\n# {name}"
             (d / "SKILL.md").write_text(content, encoding="utf-8")
 
@@ -588,13 +591,17 @@ class TestEndToEndAllDestinations:
             "---\n---\n\n# Base", encoding="utf-8"
         )
 
-        # Remove all destination dirs to prove dry-run doesn't create them
+        # Remove all destination dirs and root configs to prove dry-run doesn't create them
         import shutil
 
         for d in [".claude", ".gemini", ".agents", ".codex"]:
             target = test_project / d
             if target.exists():
                 shutil.rmtree(target)
+        for f in ["CLAUDE.md", "GEMINI.md", "AGENTS.md"]:
+            cfg = test_project / f
+            if cfg.exists():
+                cfg.unlink()
 
         rules_sync(dry_run=True)
         skills_sync(dry_run=True)

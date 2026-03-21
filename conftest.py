@@ -1,3 +1,0 @@
-from tests._windows_temp_compat import install_windows_temp_compat
-
-install_windows_temp_compat()

@@ -264,12 +264,12 @@ class VaultGraph:
 
         Uses a two-pass strategy:
 
-        1. **Pass 1** — create :class:`DocNode` instances, detecting stem
+        1. **Pass 1**  - create :class:`DocNode` instances, detecting stem
            collisions.  When two files share the same stem (e.g.
            ``adr/my-doc.md`` and ``reference/my-doc.md``), all colliding
            nodes are re-keyed as ``type/stem`` so that no data is silently
            dropped.
-        2. **Pass 2** — extract links and create directed edges.  Bare
+        2. **Pass 2**  - extract links and create directed edges.  Bare
            wiki-link stems that match multiple qualified keys fan-out to
            all variants (with a logged warning).
         """
@@ -306,20 +306,20 @@ class VaultGraph:
 
             by_stem.setdefault(stem, []).append(node)
 
-        # Pass 1b: assign unique keys — qualify colliding stems with
+        # Pass 1b: assign unique keys  - qualify colliding stems with
         # their doc-type prefix, build a stem-to-keys index for link
         # resolution in pass 2.
         self._stem_index: dict[str, list[str]] = {}
 
         for stem, node_list in by_stem.items():
             if len(node_list) == 1:
-                # Unique stem — use it directly as the key.
+                # Unique stem  - use it directly as the key.
                 node = node_list[0]
                 self.nodes[stem] = node
                 self._digraph.add_node(stem, **node.to_nx_attrs())
                 self._stem_index[stem] = [stem]
             else:
-                # Collision — qualify each with its doc-type directory.
+                # Collision  - qualify each with its doc-type directory.
                 keys: list[str] = []
                 for node in node_list:
                     dt = node.doc_type.value if node.doc_type else "unknown"
@@ -397,9 +397,9 @@ class VaultGraph:
 
         1. Exact match against an existing node key (handles both bare
            stems and already-qualified ``type/stem`` references).
-        2. Stem index lookup — if the bare stem maps to multiple
+        2. Stem index lookup  - if the bare stem maps to multiple
            qualified keys, all are returned and a warning is logged.
-        3. No match — returns the original target so it is recorded as
+        3. No match  - returns the original target so it is recorded as
            an invalid (broken) link.
         """
         # Exact key match (unique stem or qualified reference)
@@ -418,7 +418,7 @@ class VaultGraph:
                 )
             return keys
 
-        # No match — treat as broken link
+        # No match  - treat as broken link
         return [target]
 
     # -- Direct networkx access ----------------------------------------------
@@ -699,7 +699,7 @@ class VaultGraph:
         """Render the graph as an ASCII diagram via ``phart``.
 
         Uses ``phart.ASCIIRenderer`` to produce a native directed-graph
-        layout with box-drawn nodes and edge arrows — the actual graph
+        layout with box-drawn nodes and edge arrows  - the actual graph
         topology, not a hierarchical tree.
 
         Args:

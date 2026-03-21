@@ -1,12 +1,11 @@
-"""Resolve vaultspec workspace topology and validate the resulting layout.
+"""Workspace topology resolution and layout validation for vaultspec.
 
-This module determines how a target directory maps to the active workspace,
-including `.vault/`, `.vaultspec/`, and related roots across standalone,
-explicit, git, worktree, and container modes.
-
-Usage:
-    Call `resolve_workspace(...)` to obtain a validated `WorkspaceLayout`
-    before initializing global paths or exposing CLI and MCP surfaces.
+Determines how a target directory maps to ``.vault/`` and ``.vaultspec/``
+roots across standalone, explicit, git, worktree, and ``.gt/`` container modes.
+Key exports: :func:`resolve_workspace`, :func:`discover_git`, :class:`WorkspaceLayout`,
+:class:`GitInfo`, :class:`LayoutMode`, :class:`WorkspaceError`. Re-exported via
+:mod:`vaultspec_core.config`; consumed by :mod:`vaultspec_core.cli.root` and
+:mod:`vaultspec_core.core.types`.
 """
 
 from __future__ import annotations
@@ -324,7 +323,7 @@ def resolve_workspace(
         framework_dir_name: Name of the framework directory (default ``".vaultspec"``).
         framework_root: Structurally-known location of the ``.vaultspec/``
             directory. Never derived from env vars.
-        cwd: Override for ``Path.cwd()`` — intended for testing.
+        cwd: Override for ``Path.cwd()``  - intended for testing.
 
     Returns:
         A fully resolved and validated ``WorkspaceLayout``.

@@ -86,7 +86,7 @@ def resolve_includes(
 
         if include_path is None:
             logger.warning(
-                "Include resolution failed: %s — path not found",
+                "Include resolution failed: %s  - path not found",
                 include_path_str,
             )
             resolved_lines.append(
@@ -97,7 +97,7 @@ def resolve_includes(
         try:
             if not include_path.is_relative_to(resolved_root):
                 logger.warning(
-                    "Include resolution failed: %s — path outside workspace",
+                    "Include resolution failed: %s  - path outside workspace",
                     include_path_str,
                 )
                 resolved_lines.append(
@@ -115,7 +115,7 @@ def resolve_includes(
             )
             resolved_lines.append(f"\n<!-- End of {display_path} -->\n")
         except Exception as e:
-            logger.warning("Include resolution failed: %s — %s", include_path_str, e)
+            logger.warning("Include resolution failed: %s  - %s", include_path_str, e)
             resolved_lines.append(f"<!-- ERROR: Include failed: {e} -->")
 
     return "\n".join(resolved_lines)
@@ -135,7 +135,7 @@ def resolve_executable(name: str, which_fn=None) -> tuple[str, list[str]]:
             testing).
 
     Returns:
-        (executable, prefix_args) — prepend prefix_args to the command's
+        (executable, prefix_args)  - prepend prefix_args to the command's
         argument list when constructing the subprocess call.
     """
     import shutil
@@ -150,7 +150,13 @@ def resolve_executable(name: str, which_fn=None) -> tuple[str, list[str]]:
 
 
 class ExecutionProvider(abc.ABC):
-    """Abstract base class for execution providers."""
+    """Abstract base class for all vaultspec-core execution providers.
+
+    Subclasses bind a :class:`~vaultspec_core.core.enums.ModelRegistry` and
+    implement workspace-specific system-prompt and rules loading. Shared
+    helpers (:func:`resolve_includes`, :func:`resolve_executable`) and
+    prompt assembly (:meth:`construct_system_prompt`) are provided here.
+    """
 
     @property
     @abc.abstractmethod

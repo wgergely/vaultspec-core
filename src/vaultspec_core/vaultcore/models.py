@@ -59,7 +59,8 @@ class DocumentMetadata:
     """Rigid representation of YAML frontmatter for all .vault/ files.
 
     Attributes:
-        tags: Exactly two tags — one directory tag and one feature tag.
+        tags: At least two tags - one directory tag and one feature tag.
+            Additional freeform tags are allowed beyond the required pair.
         date: ISO 8601 creation date (``YYYY-MM-DD``).
         related: List of Obsidian-style ``[[wiki-link]]`` strings.
     """
@@ -76,9 +77,9 @@ class DocumentMetadata:
         """
         errors = []
 
-        #  The "Rule of Two" for Tags
-        if len(self.tags) != 2:
-            msg = f"Vault violation: Exactly 2 tags required, found {len(self.tags)}"
+        #  Tags: at least one directory tag and one feature tag (minimum 2)
+        if len(self.tags) < 2:
+            msg = f"Vault violation: At least 2 tags required, found {len(self.tags)}"
             errors.append(msg)
 
         #  Directory Tag (Type)
@@ -129,7 +130,12 @@ class DocumentMetadata:
 
 
 class VaultConstants:
-    """Central configuration for the .vault vault structure."""
+    """Static configuration and validation helpers for the ``.vault/`` structure.
+
+    Class-level sets (:data:`SUPPORTED_DIRECTORIES`, :data:`SUPPORTED_TAGS`) enumerate
+    the valid subdirectory names and their corresponding ``#tags``. Class methods
+    validate directory layout, filename conventions, and tag-to-directory mapping.
+    """
 
     @staticmethod
     def _get_docs_dir() -> str:

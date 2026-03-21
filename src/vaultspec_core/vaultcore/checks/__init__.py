@@ -1,7 +1,11 @@
-"""Vault health check suite.
+"""Vault health check suite for ``.vault/`` content.
 
-Each checker returns a CheckResult with per-document diagnostics.
-Use run_all_checks() for a combined pass or call individual checkers.
+Re-exports the result contract (:class:`~vaultspec_core.vaultcore.checks._base.CheckResult`,
+:class:`~vaultspec_core.vaultcore.checks._base.CheckDiagnostic`,
+:class:`~vaultspec_core.vaultcore.checks._base.Severity`) and all seven
+checker functions from their submodules. Use :func:`run_all_checks` for a
+combined pass or call individual checkers. Consumed by
+:mod:`vaultspec_core.cli` and :mod:`vaultspec_core.mcp_server`.
 """
 
 from __future__ import annotations
@@ -41,7 +45,20 @@ def run_all_checks(
     feature: str | None = None,
     fix: bool = False,
 ) -> list[CheckResult]:
-    """Run all vault health checks and return combined results."""
+    """Run all seven vault health checkers and return their results.
+
+    Executes structure, frontmatter, links, orphans, features, references,
+    and schema checks in order.
+
+    Args:
+        root_dir: Project root directory.
+        feature: Restrict per-document checks to this feature tag (without ``#``).
+        fix: When ``True``, pass ``fix=True`` to all supporting checkers.
+
+    Returns:
+        List of :class:`~vaultspec_core.vaultcore.checks._base.CheckResult`,
+        one per checker, in the order above.
+    """
     return [
         check_structure(root_dir, fix=fix),
         check_frontmatter(root_dir, feature=feature, fix=fix),

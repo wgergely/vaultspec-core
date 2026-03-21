@@ -8,13 +8,13 @@ Subpackages:
     :mod:`vaultspec_core.config`: Runtime settings and workspace-layout
         resolution (:class:`~vaultspec_core.config.VaultSpecConfig`,
         :func:`~vaultspec_core.config.resolve_workspace`).
-    :mod:`vaultspec_core.core`: Resource-management and sync engine —
+    :mod:`vaultspec_core.core`: Resource-management and sync engine  -
         agents, rules, skills, system, exceptions, dry-run, and I/O helpers.
-    :mod:`vaultspec_core.vaultcore`: ``.vault/`` document kernel — domain
+    :mod:`vaultspec_core.vaultcore`: ``.vault/`` document kernel  - domain
         models, frontmatter parsing, wiki-link extraction, and query helpers.
     :mod:`vaultspec_core.builtins`: Bundled canonical resources seeded on
         ``vaultspec-core install``.
-    :mod:`vaultspec_core.cli`: Typer CLI — ``install``, ``uninstall``,
+    :mod:`vaultspec_core.cli`: Typer CLI  - ``install``, ``uninstall``,
         ``sync``, ``vault``, and ``spec`` command groups.
     :mod:`vaultspec_core.graph`: Vault document relationship graph backed by
         ``networkx`` (:class:`~vaultspec_core.graph.VaultGraph`).

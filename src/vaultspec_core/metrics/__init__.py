@@ -1,7 +1,9 @@
-"""Expose the vault summary-metrics package facade.
+"""Aggregate vault statistics surface for vaultspec-core.
 
-This package re-exports the `api` surface that computes lightweight aggregate
-statistics over `.vault/` content.
+Re-exports :class:`~vaultspec_core.metrics.api.VaultSummary` and
+:func:`~vaultspec_core.metrics.api.get_vault_metrics` from :mod:`.api`.
+Consumes :mod:`vaultspec_core.vaultcore` scanning and query primitives
+to compute document counts and feature totals over ``.vault/`` content.
 """
 
 from .api import VaultSummary as VaultSummary

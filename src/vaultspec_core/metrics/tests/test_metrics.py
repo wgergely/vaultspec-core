@@ -13,6 +13,8 @@ pytestmark = [pytest.mark.unit]
 
 
 class TestVaultSummary:
+    """Unit tests for :class:`~vaultspec_core.metrics.api.VaultSummary` construction."""
+
     def test_dataclass_creation(self):
         summary = VaultSummary(
             total_docs=10,
@@ -25,6 +27,8 @@ class TestVaultSummary:
 
 
 class TestGetVaultMetrics:
+    """Integration tests for :func:`~vaultspec_core.metrics.api.get_vault_metrics` against the real fixture vault."""
+
     def test_counts_documents(self, vault_root):
         result = get_vault_metrics(vault_root)
         assert result.total_docs > 80

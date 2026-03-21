@@ -1,8 +1,9 @@
 """Bundled builtin resources deployed during ``vaultspec-core install``.
 
-This package contains the canonical source files for rules, skills, agents,
-system prompts, templates, and hooks that are seeded into a fresh
-``.vaultspec/rules/`` directory on install.
+Contains canonical rules, skills, agents, system prompts, templates, and hooks
+seeded into ``.vaultspec/rules/`` on first install. Consumed by
+:mod:`vaultspec_core.cli.root` via :func:`seed_builtins` and :func:`list_builtins`.
+Uses :mod:`importlib.resources` for package-relative file access.
 """
 
 from __future__ import annotations
@@ -13,11 +14,32 @@ from pathlib import Path
 
 
 def _builtins_root() -> Path:
-    """Return the filesystem path to the bundled builtins directory."""
-    ref = resources.files(__package__)
-    # resources.files() returns a Traversable; on real installs this is
-    # already a Path, but we cast to be safe.
-    return Path(str(ref))
+    """Return the filesystem path to the bundled builtins directory.
+
+    For installed (wheel) builds the content lives alongside this module.
+    For editable / development installs the content is not copied into
+    ``src/``; instead we resolve the canonical ``.vaultspec/rules/``
+    directory at the repository root.
+    """
+    pkg_dir = Path(str(resources.files(__package__)))
+
+    # Quick probe: a wheel build will contain at least the 'templates' dir.
+    if (pkg_dir / "templates").is_dir():
+        return pkg_dir
+
+    # Editable install -- walk up to the repo root and use the canonical
+    # source directly.  The repo root is identified by pyproject.toml.
+    candidate = pkg_dir
+    for _ in range(10):
+        candidate = candidate.parent
+        if (candidate / "pyproject.toml").is_file():
+            rules = candidate / ".vaultspec" / "rules"
+            if rules.is_dir():
+                return rules
+            break
+
+    # Fallback: return the package directory regardless.
+    return pkg_dir
 
 
 def seed_builtins(target_rules_dir: Path, *, force: bool = False) -> list[str]:

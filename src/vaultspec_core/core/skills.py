@@ -26,11 +26,15 @@ logger = logging.getLogger(__name__)
 
 
 def collect_skills() -> dict[str, tuple[Path, dict[str, Any], str]]:
-    """Collect vaultspec-* skill definitions from .vaultspec/rules/skills/*/SKILL.md.
+    """Collect skill definitions from .vaultspec/rules/skills/*/SKILL.md.
+
+    Any subdirectory of the skills source directory that contains a
+    ``SKILL.md`` file is treated as a skill  - no naming convention is
+    required.
 
     Returns:
-        A mapping of skill directory name (e.g. ``"vaultspec-execute"``) to a
-        three-tuple of ``(skill_md_path, frontmatter_dict, body_text)``.
+        A mapping of skill directory name to a three-tuple of
+        ``(skill_md_path, frontmatter_dict, body_text)``.
     """
     from ..vaultcore import parse_frontmatter
 
@@ -38,7 +42,7 @@ def collect_skills() -> dict[str, tuple[Path, dict[str, Any], str]]:
     if not _t.SKILLS_SRC_DIR.exists():
         return sources
     for path in sorted(_t.SKILLS_SRC_DIR.iterdir()):
-        if path.is_dir() and path.name.startswith("vaultspec-"):
+        if path.is_dir():
             skill_md = path / "SKILL.md"
             if skill_md.exists():
                 try:
@@ -120,8 +124,6 @@ def skills_add(
     ensure_dir(_t.SKILLS_SRC_DIR)
 
     skill_name = name
-    if not skill_name.startswith("vaultspec-"):
-        skill_name = f"vaultspec-{skill_name}"
 
     skill_dir = _t.SKILLS_SRC_DIR / skill_name
     file_path = skill_dir / "SKILL.md"
@@ -169,7 +171,17 @@ def skills_add(
 
 
 def skills_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
-    """Sync all skill definitions to every configured tool destination."""
+    """Sync all skill definitions to every configured tool destination.
+
+    Args:
+        dry_run: If ``True``, log planned actions without writing files.
+        prune: If ``True``, remove ``vaultspec-*`` skill directories at
+            destinations that are no longer present in sources.
+
+    Returns:
+        Accumulated :class:`~vaultspec_core.core.types.SyncResult` across
+        all active tool destinations.
+    """
     return sync_to_all_tools(
         sources=collect_skills(),
         dir_attr="skills_dir",

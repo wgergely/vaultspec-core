@@ -1,9 +1,10 @@
-"""Expose configuration and workspace-layout primitives for vaultspec_core.
+"""Runtime configuration and workspace-layout primitives for vaultspec_core.
 
-The `config` package has two responsibilities: `config` defines runtime
-settings, environment-variable parsing, and singleton access, while
-`workspace` resolves the filesystem layout for `.vault/` and `.vaultspec/`
-across standalone, explicit, git, worktree, and container contexts.
+Re-exports :class:`VaultSpecConfig`, :func:`get_config`, :data:`CONFIG_REGISTRY`,
+and env-var parsers from :mod:`.config`; and :class:`WorkspaceLayout`,
+:class:`LayoutMode`, :func:`resolve_workspace`, :func:`discover_git`, and
+:class:`WorkspaceError` from :mod:`.workspace`. Consumed by nearly every
+subpackage that needs vault/spec paths or runtime settings.
 """
 
 from .config import CONFIG_REGISTRY as CONFIG_REGISTRY

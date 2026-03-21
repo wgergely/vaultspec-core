@@ -1,4 +1,9 @@
-"""Tests for manifest-aware sync filtering."""
+"""Tests for manifest-aware sync filtering.
+
+Covers :func:`~vaultspec_core.core.sync.sync_to_all_tools` behaviour when a
+provider manifest is present or absent, verifying that only installed providers
+receive synced files.
+"""
 
 from pathlib import Path
 
@@ -55,6 +60,8 @@ def _default_dest_path(dest_dir, name):
 
 
 class TestManifestAwareSync:
+    """Verify that sync targets respect the provider manifest."""
+
     def test_sync_respects_manifest(self, sync_workspace):
         """When manifest exists with only claude, only claude gets synced."""
         write_manifest(sync_workspace, {"claude"})
@@ -78,7 +85,7 @@ class TestManifestAwareSync:
         }
         sync_to_all_tools(sources, "rules_dir", _noop_transform, "Rules")
 
-        # No tools should have the file — no manifest means not installed
+        # No tools should have the file  - no manifest means not installed
         for tool in Tool:
             assert not (
                 sync_workspace / f".{tool.value}" / "rules" / "test.md"

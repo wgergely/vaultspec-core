@@ -1,4 +1,4 @@
-"""Unit tests for core.workspace — layout resolution and git detection."""
+"""Unit tests for core.workspace  - layout resolution and git detection."""
 
 from __future__ import annotations
 

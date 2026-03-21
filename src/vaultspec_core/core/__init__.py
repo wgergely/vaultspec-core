@@ -1,12 +1,13 @@
-"""Expose the core resource-management and sync surface for vaultspec.
+"""Public surface for vaultspec resource management and sync orchestration.
 
-The `core` package owns the full lifecycle of workspace resources: enum
-vocabulary (`enums`), type contracts (`types`), domain exceptions
-(`exceptions`), command orchestration (`commands`), per-resource CRUD
-(`agents`, `rules`, `skills`, `system`, `resources`), sync engine (`sync`),
-config generation (`config_gen`), dry-run preview models (`dry_run`), revert
-support (`revert`), and low-level I/O helpers (`helpers`, `tags`). Provider
-manifest tracking (`manifest`) is internal and not part of the public surface.
+Aggregates per-resource CRUD (:func:`agents_add`, :func:`rules_sync`,
+:func:`skills_list`, :func:`system_sync`), the sync engine
+(:func:`sync_files`, :func:`format_summary`), config generation
+(:func:`config_show`, :func:`config_sync`), I/O helpers
+(:func:`atomic_write`, :func:`build_file`), domain exceptions
+(:class:`VaultSpecError` and subclasses), and path/type contracts
+(:class:`SyncResult`, :class:`ToolConfig`, :data:`ROOT_DIR`).
+Consumed by :mod:`vaultspec_core.cli` and :mod:`vaultspec_core.mcp_server`.
 """
 
 from .agents import agents_add as agents_add

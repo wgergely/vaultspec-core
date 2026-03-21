@@ -15,7 +15,7 @@ For TOML files, tags are wrapped in comments::
 
 Error handling is strict: malformed tag states (orphaned, duplicated,
 nested) produce a :class:`TagError` with line numbers.  The parser
-never auto-fixes and never crashes — callers decide how to surface
+never auto-fixes and never crashes  - callers decide how to surface
 the error.
 """
 
@@ -139,7 +139,7 @@ def find_blocks(content: str) -> list[TagBlock]:
         close_match = _CLOSE_RE.match(stripped)
         if close_match:
             if open_tag is None:
-                # Orphaned closing tag — ignore per contract.
+                # Orphaned closing tag  - ignore per contract.
                 continue
 
             block_type, start = open_tag

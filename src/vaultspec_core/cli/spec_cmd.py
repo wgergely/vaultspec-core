@@ -1,4 +1,4 @@
-"""Spec command group — manage framework resources in ``.vaultspec/``.
+"""Spec command group  - manage framework resources in ``.vaultspec/``.
 
 Sub-groups: ``spec rules`` (:data:`rules_app`), ``spec skills`` (:data:`skills_app`),
 ``spec agents`` (:data:`agents_app`), ``spec system`` (:data:`system_app`),

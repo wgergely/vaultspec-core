@@ -24,6 +24,8 @@ pytestmark = [pytest.mark.unit]
 
 
 class TestSharedResolveIncludes:
+    """Tests for :func:`~vaultspec_core.protocol.providers.base.resolve_includes`."""
+
     def test_basic(self, tmp_path):
         (tmp_path / "included.md").write_text("Included content", encoding="utf-8")
         result = resolve_includes("Before\n@included.md\nAfter", tmp_path, tmp_path)
@@ -41,6 +43,8 @@ class TestSharedResolveIncludes:
 
 
 class TestGeminiProvider:
+    """Tests for :class:`~vaultspec_core.protocol.providers.gemini.GeminiProvider`."""
+
     @pytest.fixture
     def provider(self):
         return GeminiProvider()
@@ -74,6 +78,8 @@ class TestGeminiProvider:
 
 
 class TestClaudeProvider:
+    """Tests for :class:`~vaultspec_core.protocol.providers.claude.ClaudeProvider`."""
+
     @pytest.fixture
     def provider(self):
         return ClaudeProvider()

@@ -38,7 +38,7 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Build and smoke-test Docker image
-        run: just test docker
+        run: just dev test docker
 
   docker-publish:
     name: Docker Publish

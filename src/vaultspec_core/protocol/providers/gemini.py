@@ -26,9 +26,12 @@ __all__ = ["GeminiProvider"]
 
 
 class GeminiProvider(ExecutionProvider):
-    """Provider for Google Gemini models via the Gemini CLI ACP bridge.
+    """Execution provider for Google Gemini models.
 
-    Handles system-prompt and rules loading from the workspace.
+    Loads system prompt from ``.gemini/SYSTEM.md`` and rules from
+    ``.gemini/rules/*.md`` with ``@include`` directives resolved via
+    :func:`~vaultspec_core.protocol.providers.base.resolve_includes`.
+    Registered as ``"gemini"`` in the provider registry.
     """
 
     @property

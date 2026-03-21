@@ -25,9 +25,11 @@ __all__ = ["ClaudeProvider"]
 
 
 class ClaudeProvider(ExecutionProvider):
-    """Provider for Anthropic Claude models via the Python ACP bridge.
+    """Execution provider for Anthropic Claude models.
 
-    Handles system-prompt and rules loading from the workspace.
+    Loads system prompt from ``.claude/CLAUDE.md`` and rules from
+    ``.claude/rules/*.md`` (sorted, concatenated). Registered as
+    ``"claude"`` in the provider registry.
     """
 
     @property

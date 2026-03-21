@@ -60,22 +60,22 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        run: just sync dependencies
+        run: just dev deps sync
 
       - name: Ruff
-        run: just check lint
+        run: just dev lint python
 
       - name: Ty
-        run: just check type
+        run: just dev lint type
 
       - name: Taplo
-        run: just check toml
+        run: just dev lint toml
 
       - name: Lychee
-        run: just check links
+        run: just dev lint links
 
       - name: markdownlint
-        run: just check markdown
+        run: just dev lint markdown
 
   tests:
     name: Tests (${{ matrix.os }})
@@ -104,10 +104,10 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        run: just sync dependencies
+        run: just dev deps sync
 
       - name: Run tests
-        run: just test python
+        run: just dev test python
 
   vault-audit:
     name: Vault Audit
@@ -130,10 +130,10 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        run: just sync dependencies
+        run: just dev deps sync
 
       - name: Verify vault structure and links
-        run: just check vault
+        run: just prod vault check all
 
   dependency-audit:
     name: Dependency Audit (pip-audit)
@@ -156,7 +156,7 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        run: just sync dependencies
+        run: just dev deps sync
 
       - name: Python dependency vulnerability audit
-        run: just check dependencies
+        run: just dev audit deps

@@ -46,35 +46,21 @@ def _data(result) -> Any:
 
 @pytest.fixture
 def vault_root(tmp_path):
-    """Create a minimal vault + vaultspec structure, init global paths."""
+    """Create a minimal vault + vaultspec structure, init global paths.
+
+    Uses real templates from the repo via seed_builtins - never shadows them.
+    """
+    from vaultspec_core.builtins import seed_builtins
+
     reset_config()
 
     vault_dir = tmp_path / ".vault"
     for dt in DocType:
         (vault_dir / dt.value).mkdir(parents=True)
 
-    templates_dir = tmp_path / ".vaultspec" / "rules" / "templates"
-    templates_dir.mkdir(parents=True)
-
-    (templates_dir / "adr.md").write_text(
-        "---\ntags:\n  - '#adr'\n  - '#{feature}'\n"
-        "date: '{yyyy-mm-dd}'\nrelated: []\n---\n# {title}\n\nContent.\n"
-    )
-    (templates_dir / "plan.md").write_text(
-        "---\ntags:\n  - '#plan'\n  - '#{feature}'\n"
-        "date: '{yyyy-mm-dd}'\nrelated: []\n---\n# {title} plan\n\nContent.\n"
-    )
-    (templates_dir / "research.md").write_text(
-        "---\ntags:\n  - '#research'\n  - '#{feature}'\n"
-        "date: '{yyyy-mm-dd}'\nrelated: []\n---\n# {topic}\n\nContent.\n"
-    )
-    (templates_dir / "exec.md").write_text(
-        "---\ntags:\n  - '#exec'\n  - '#{feature}'\n"
-        "date: '{yyyy-mm-dd}'\nrelated: []\n---\n# {title}\n\nContent.\n"
-    )
-
-    for subdir in ("agents", "rules", "skills"):
-        (tmp_path / ".vaultspec" / "rules" / subdir).mkdir(parents=True, exist_ok=True)
+    rules_dir = tmp_path / ".vaultspec" / "rules"
+    rules_dir.mkdir(parents=True)
+    seed_builtins(rules_dir, force=True)
 
     init_paths(tmp_path)
     yield tmp_path

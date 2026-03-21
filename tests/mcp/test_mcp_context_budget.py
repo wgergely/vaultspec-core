@@ -2,7 +2,7 @@
 
 Prevents tool definition bloat from consuming agent working context.
 A FastMCP server's tool definitions are serialized into every LLM
-request — keeping them compact is a hard requirement.
+request  - keeping them compact is a hard requirement.
 """
 
 from __future__ import annotations

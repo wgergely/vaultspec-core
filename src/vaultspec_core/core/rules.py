@@ -138,7 +138,16 @@ def rules_add(
 
 
 def rules_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
-    """Sync all rule definitions to every configured tool destination."""
+    """Sync all rule definitions to every configured tool destination.
+
+    Args:
+        dry_run: If ``True``, log planned actions without writing files.
+        prune: If ``True``, delete destination ``.md`` files not in sources.
+
+    Returns:
+        Accumulated :class:`~vaultspec_core.core.types.SyncResult` across
+        all active tool destinations.
+    """
     return sync_to_all_tools(
         sources=collect_rules(),
         dir_attr="rules_dir",

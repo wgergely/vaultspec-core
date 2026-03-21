@@ -148,7 +148,7 @@ class TestLoadHooks:
             "event: config.synced\nactions:\n  - type: shell\n    command: echo ok\n",
             encoding="utf-8",
         )
-        # Invalid — missing event
+        # Invalid  - missing event
         (tmp_path / "bad.yaml").write_text(
             "actions:\n  - type: shell\n    command: echo bad\n",
             encoding="utf-8",
@@ -300,7 +300,7 @@ class TestReentrantGuard:
     def test_reentrant_trigger_returns_empty(self):
         # Directly mutate the module-level _triggering set to simulate a
         # re-entrant call (as if trigger() is already running for this event).
-        # This avoids mocking — we exercise the real guard path in trigger().
+        # This avoids mocking  - we exercise the real guard path in trigger().
         hook = Hook(
             name="test",
             event="config.synced",
