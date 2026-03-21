@@ -100,7 +100,7 @@ class TestSpecCliDispatchRouting:
             force=False,
         )
 
-        rule_file = _t.RULES_SRC_DIR / "test-rule.md"
+        rule_file = _t.get_context().rules_src_dir / "test-rule.md"
         assert rule_file.exists()
         content = rule_file.read_text(encoding="utf-8")
         assert "test-rule" in content

@@ -11,7 +11,8 @@ date: '2026-03-21'
 # Related documents as quoted wiki-links
 # (e.g., "[[2026-02-04-feature-research]]")
 related:
-  - '[[{yyyy-mm-dd-*}]]'
+  - '[[2026-02-21-packaging-restructure-research]]'
+  - '[[2026-02-21-packaging-restructure-adr]]'
 ---
 
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields

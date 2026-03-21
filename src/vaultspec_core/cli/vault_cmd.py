@@ -87,7 +87,7 @@ def cmd_add(
     from datetime import datetime
 
     from vaultspec_core.console import get_console
-    from vaultspec_core.core import types as _t
+    from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.hydration import create_vault_doc
     from vaultspec_core.vaultcore.models import DocType
     from vaultspec_core.vaultcore.resolve import (
@@ -141,7 +141,7 @@ def cmd_add(
     resolved_related: list[str] | None = None
     if related:
         try:
-            resolved_related = resolve_related_inputs(related, _t.TARGET_DIR)
+            resolved_related = resolve_related_inputs(related, _get_ctx().target_dir)
         except RelatedResolutionError as exc:
             for failure in exc.failures:
                 console.print(
@@ -154,7 +154,7 @@ def cmd_add(
             raise typer.Exit(code=1) from None
 
     # Validate feature dependencies (lifecycle rules)
-    dep_diagnostics = validate_feature_dependencies(_t.TARGET_DIR, dt, feat)
+    dep_diagnostics = validate_feature_dependencies(_get_ctx().target_dir, dt, feat)
     has_errors = False
     for diag in dep_diagnostics:
         if diag.startswith("ERROR:"):
@@ -167,7 +167,7 @@ def cmd_add(
 
     try:
         path = create_vault_doc(
-            root_dir=_t.TARGET_DIR,
+            root_dir=_get_ctx().target_dir,
             doc_type=dt,
             feature=feat,
             date_str=date_str,
@@ -183,7 +183,7 @@ def cmd_add(
         raise typer.Exit(code=1) from None
 
     # Post-creation self-validation
-    _validate_created_doc(console, path, _t.TARGET_DIR)
+    _validate_created_doc(console, path, _get_ctx().target_dir)
     console.print(f"[green]Created:[/green] {path}")
 
 
@@ -233,10 +233,12 @@ def cmd_stats(
     """Show vault statistics and metrics."""
     apply_target(target)
     from vaultspec_core.console import get_console
-    from vaultspec_core.core import types as _t
+    from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.query import get_stats
 
-    stats = get_stats(_t.TARGET_DIR, feature=feature, doc_type=type_filter, date=date)
+    stats = get_stats(
+        _get_ctx().target_dir, feature=feature, doc_type=type_filter, date=date
+    )
     console = get_console()
     console.print("[bold]Vault Statistics[/bold]")
     console.print(f"  Total documents: {stats['total_docs']}")
@@ -271,10 +273,12 @@ def cmd_list(
     """List vault documents, optionally filtered by type."""
     apply_target(target)
     from vaultspec_core.console import get_console
-    from vaultspec_core.core import types as _t
+    from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.query import list_documents
 
-    docs = list_documents(_t.TARGET_DIR, doc_type=doc_type, feature=feature, date=date)
+    docs = list_documents(
+        _get_ctx().target_dir, doc_type=doc_type, feature=feature, date=date
+    )
     console = get_console()
     if not docs:
         console.print("[dim]No documents found.[/dim]")
@@ -336,11 +340,11 @@ def cmd_graph(
 
     apply_target(target)
     from vaultspec_core.console import get_console
-    from vaultspec_core.core import types as _t
+    from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.graph import VaultGraph
 
     console = get_console()
-    graph = VaultGraph(_t.TARGET_DIR)
+    graph = VaultGraph(_get_ctx().target_dir)
 
     if not graph.nodes:
         console.print("[dim]No vault documents found.[/dim]")
@@ -472,11 +476,11 @@ def cmd_check_all(
     """Run all vault health checks."""
     apply_target(target)
     from vaultspec_core.console import get_console
-    from vaultspec_core.core import types as _t
+    from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.checks import render_check_result, run_all_checks
 
     console = get_console()
-    results = run_all_checks(_t.TARGET_DIR, feature=feature, fix=fix)
+    results = run_all_checks(_get_ctx().target_dir, feature=feature, fix=fix)
 
     console.print("[bold]Vault Check  - All[/bold]")
     for r in results:
@@ -522,10 +526,12 @@ def cmd_check_orphans(
     """Find documents with no incoming wiki-links."""
     apply_target(target)
     _reject_fix("orphans", fix)
-    from vaultspec_core.core import types as _t
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
     from vaultspec_core.vaultcore.checks import check_orphans
 
-    result = check_orphans(_t.TARGET_DIR, feature=feature)
+    graph = VaultGraph(_get_ctx().target_dir)
+    result = check_orphans(_get_ctx().target_dir, graph=graph, feature=feature)
     _render_and_exit(result, verbose)
 
 
@@ -544,10 +550,15 @@ def cmd_check_frontmatter(
 ) -> None:
     """Validate document frontmatter against vault schema."""
     apply_target(target)
-    from vaultspec_core.core import types as _t
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
     from vaultspec_core.vaultcore.checks import check_frontmatter
 
-    result = check_frontmatter(_t.TARGET_DIR, feature=feature, fix=fix)
+    graph = VaultGraph(_get_ctx().target_dir)
+    snapshot = graph.to_snapshot()
+    result = check_frontmatter(
+        _get_ctx().target_dir, snapshot=snapshot, feature=feature, fix=fix
+    )
     _render_and_exit(result, verbose)
 
 
@@ -566,10 +577,15 @@ def cmd_check_links(
 ) -> None:
     """Check wiki-links follow Obsidian convention (no .md extension)."""
     apply_target(target)
-    from vaultspec_core.core import types as _t
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
     from vaultspec_core.vaultcore.checks import check_links
 
-    result = check_links(_t.TARGET_DIR, feature=feature, fix=fix)
+    graph = VaultGraph(_get_ctx().target_dir)
+    snapshot = graph.to_snapshot()
+    result = check_links(
+        _get_ctx().target_dir, snapshot=snapshot, feature=feature, fix=fix
+    )
     _render_and_exit(result, verbose)
 
 
@@ -589,10 +605,13 @@ def cmd_check_features(
     """Check feature tag completeness  - missing doc types."""
     apply_target(target)
     _reject_fix("features", fix)
-    from vaultspec_core.core import types as _t
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
     from vaultspec_core.vaultcore.checks import check_features
 
-    result = check_features(_t.TARGET_DIR, feature=feature)
+    graph = VaultGraph(_get_ctx().target_dir)
+    snapshot = graph.to_snapshot()
+    result = check_features(_get_ctx().target_dir, snapshot=snapshot, feature=feature)
     _render_and_exit(result, verbose)
 
 
@@ -611,10 +630,14 @@ def cmd_check_references(
 ) -> None:
     """Check for missing cross-references within features."""
     apply_target(target)
-    from vaultspec_core.core import types as _t
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
     from vaultspec_core.vaultcore.checks import check_references
 
-    result = check_references(_t.TARGET_DIR, feature=feature, fix=fix)
+    graph = VaultGraph(_get_ctx().target_dir)
+    result = check_references(
+        _get_ctx().target_dir, graph=graph, feature=feature, fix=fix
+    )
     _render_and_exit(result, verbose)
 
 
@@ -633,10 +656,12 @@ def cmd_check_schema(
 ) -> None:
     """Enforce schema rules: ADRs must ref research, plans must ref ADRs."""
     apply_target(target)
-    from vaultspec_core.core import types as _t
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
     from vaultspec_core.vaultcore.checks import check_schema
 
-    result = check_schema(_t.TARGET_DIR, feature=feature, fix=fix)
+    graph = VaultGraph(_get_ctx().target_dir)
+    result = check_schema(_get_ctx().target_dir, graph=graph, feature=feature, fix=fix)
     _render_and_exit(result, verbose)
 
 
@@ -652,10 +677,13 @@ def cmd_check_structure(
 ) -> None:
     """Check vault directory structure and filename conventions."""
     apply_target(target)
-    from vaultspec_core.core import types as _t
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
     from vaultspec_core.vaultcore.checks import check_structure
 
-    result = check_structure(_t.TARGET_DIR, fix=fix)
+    graph = VaultGraph(_get_ctx().target_dir)
+    snapshot = graph.to_snapshot()
+    result = check_structure(_get_ctx().target_dir, snapshot=snapshot, fix=fix)
     _render_and_exit(result, verbose)
 
 
@@ -676,11 +704,11 @@ def cmd_feature_list(
     """List all feature tags in the vault."""
     apply_target(target)
     from vaultspec_core.console import get_console
-    from vaultspec_core.core import types as _t
+    from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.query import list_feature_details
 
     features = list_feature_details(
-        _t.TARGET_DIR, date=date, doc_type=type_filter, orphaned_only=orphaned
+        _get_ctx().target_dir, date=date, doc_type=type_filter, orphaned_only=orphaned
     )
     console = get_console()
     if not features:
@@ -707,10 +735,10 @@ def cmd_feature_archive(
     """Archive all documents for a feature tag."""
     apply_target(target)
     from vaultspec_core.console import get_console
-    from vaultspec_core.core import types as _t
+    from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.query import archive_feature
 
-    result = archive_feature(_t.TARGET_DIR, feature_tag)
+    result = archive_feature(_get_ctx().target_dir, feature_tag)
     console = get_console()
     if result["archived_count"] == 0:
         console.print(f"[dim]No documents found for feature '{feature_tag}'.[/dim]")

@@ -156,7 +156,7 @@ def cmd_install(
     from vaultspec_core.core.commands import install_run
     from vaultspec_core.core.exceptions import VaultSpecError
 
-    skip = skip or []
+    skip = list(skip or [])
     path: Path = apply_target_install(target)
 
     # Guard: refuse to create deeply nested paths  - only allow creating the
@@ -276,7 +276,7 @@ def cmd_uninstall(
     from vaultspec_core.core.commands import uninstall_run
     from vaultspec_core.core.exceptions import VaultSpecError
 
-    skip = skip or []
+    skip = list(skip or [])
     path: Path = apply_target_install(target)
 
     if not path.exists():
@@ -362,7 +362,7 @@ def cmd_sync(
     that provider (e.g. 'vaultspec-core sync claude').
     Use --skip to exclude providers (e.g. --skip claude --skip codex).
     """
-    skip = skip or []
+    skip = list(skip or [])
     apply_target(target, split_source=True)
     if provider == "core":
         typer.echo(
@@ -388,11 +388,11 @@ def cmd_sync(
 
     if dry_run:
         from vaultspec_core.cli.rendering import render_dry_run_tree
-        from vaultspec_core.core import types as _t
         from vaultspec_core.core.dry_run import (
             DryRunItem,
             DryRunStatus,
         )
+        from vaultspec_core.core.types import get_context
 
         action_map = {
             "[ADD]": DryRunStatus.NEW,
@@ -411,9 +411,10 @@ def cmd_sync(
                     )
                 )
         if all_items:
-            title = f"Sync preview → {_t.TARGET_DIR}"
+            _target_dir = get_context().target_dir
+            title = f"Sync preview → {_target_dir}"
             if provider != "all":
-                title = f"Sync preview ({provider}) → {_t.TARGET_DIR}"
+                title = f"Sync preview ({provider}) → {_target_dir}"
             render_dry_run_tree(all_items, title=title)
         else:
             console.print("[dim]Sync preview: no changes[/dim]")

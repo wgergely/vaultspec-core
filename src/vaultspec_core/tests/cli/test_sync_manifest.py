@@ -13,6 +13,7 @@ from vaultspec_core.core import types as _t
 from vaultspec_core.core.enums import Tool
 from vaultspec_core.core.manifest import write_manifest
 from vaultspec_core.core.sync import sync_to_all_tools
+from vaultspec_core.core.types import ToolConfig, WorkspaceContext
 
 pytestmark = [pytest.mark.unit]
 
@@ -20,24 +21,15 @@ pytestmark = [pytest.mark.unit]
 @pytest.fixture
 def sync_workspace(tmp_path):
     """Set up a minimal workspace with .vaultspec for sync testing."""
-    # Save and restore TARGET_DIR
-    old_target = _t.TARGET_DIR
-    _t.TARGET_DIR = tmp_path
-
     # Create minimal vaultspec directory
     vaultspec = tmp_path / ".vaultspec"
     vaultspec.mkdir()
 
-    # Create tool destination dirs in TOOL_CONFIGS temporarily
-    old_configs = dict(_t.TOOL_CONFIGS)
-
-    # Set up real tool config dirs pointing to tmp_path
-    from vaultspec_core.core.types import ToolConfig
-
-    _t.TOOL_CONFIGS = {}
+    # Build tool configs pointing to tmp_path
+    tool_configs = {}
     for tool in Tool:
         rules_dir = tmp_path / f".{tool.value}" / "rules"
-        _t.TOOL_CONFIGS[tool] = ToolConfig(
+        tool_configs[tool] = ToolConfig(
             name=tool.value,
             rules_dir=rules_dir,
             skills_dir=tmp_path / f".{tool.value}" / "skills",
@@ -45,10 +37,25 @@ def sync_workspace(tmp_path):
             config_file=None,
         )
 
+    # Create a workspace context with these configs
+    rules_src = tmp_path / ".vaultspec" / "rules" / "rules"
+    rules_src.mkdir(parents=True, exist_ok=True)
+    ctx = WorkspaceContext(
+        root_dir=tmp_path,
+        target_dir=tmp_path,
+        rules_src_dir=rules_src,
+        skills_src_dir=tmp_path / ".vaultspec" / "rules" / "skills",
+        agents_src_dir=tmp_path / ".vaultspec" / "rules" / "agents",
+        system_src_dir=tmp_path / ".vaultspec" / "rules" / "system",
+        templates_dir=tmp_path / ".vaultspec" / "rules" / "templates",
+        hooks_dir=tmp_path / ".vaultspec" / "rules" / "hooks",
+        tool_configs=tool_configs,
+    )
+    token = _t._workspace_ctx.set(ctx)
+
     yield tmp_path
 
-    _t.TARGET_DIR = old_target
-    _t.TOOL_CONFIGS = old_configs
+    _t._workspace_ctx.reset(token)
 
 
 def _noop_transform(_tool, name, meta, body):

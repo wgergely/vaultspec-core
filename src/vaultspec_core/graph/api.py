@@ -39,11 +39,14 @@ from ..vaultcore import (
     parse_vault_metadata,
     scan_vault,
 )
+from ..vaultcore.models import DocumentMetadata
 
 if TYPE_CHECKING:
     import pathlib
 
     from rich.tree import Tree
+
+    from ..vaultcore.checks._base import VaultSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -571,6 +574,33 @@ class VaultGraph:
             if node.feature:
                 features.add(node.feature)
         return sorted(features)
+
+    def to_snapshot(self) -> VaultSnapshot:
+        """Build a :data:`~vaultspec_core.vaultcore.checks._base.VaultSnapshot`
+        from the graph's parsed node data.
+
+        Each node's frontmatter tags, date, and related links are packed into a
+        :class:`~vaultspec_core.vaultcore.models.DocumentMetadata`, paired with
+        the node's body text, and keyed by filesystem path.
+
+        Returns:
+            Dict mapping each document's path to its ``(metadata, body)``
+            tuple.
+        """
+
+        snapshot: VaultSnapshot = {}
+        for node in self.nodes.values():
+            raw_related = node.frontmatter.get("related", [])
+            if not isinstance(raw_related, list):
+                raw_related = []
+            related = [str(r) for r in raw_related if isinstance(r, str)]
+            metadata = DocumentMetadata(
+                tags=sorted(node.tags),
+                date=node.date,
+                related=related,
+            )
+            snapshot[node.path] = (metadata, node.body)
+        return snapshot
 
     def neighbors(
         self,

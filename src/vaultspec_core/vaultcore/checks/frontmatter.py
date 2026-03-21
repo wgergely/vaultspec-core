@@ -11,7 +11,13 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from ._base import CheckDiagnostic, CheckResult, Severity, extract_feature_tags
+from ._base import (
+    CheckDiagnostic,
+    CheckResult,
+    Severity,
+    VaultSnapshot,
+    extract_feature_tags,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -132,6 +138,7 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
 def check_frontmatter(
     root_dir: Path,
     *,
+    snapshot: VaultSnapshot,
     feature: str | None = None,
     doc_type_filter: str | None = None,
     fix: bool = False,
@@ -144,6 +151,7 @@ def check_frontmatter(
 
     Args:
         root_dir: Project root directory.
+        snapshot: Pre-built snapshot mapping document paths to parsed data.
         feature: Restrict checks to documents with this feature tag
             (without ``#``).
         doc_type_filter: Restrict checks to documents of this type
@@ -157,22 +165,15 @@ def check_frontmatter(
         check name ``"frontmatter"``.
     """
     from ..parser import parse_vault_metadata
-    from ..scanner import get_doc_type, scan_vault
+    from ..scanner import get_doc_type
 
     result = CheckResult(check_name="frontmatter", supports_fix=True)
 
-    for doc_path in scan_vault(root_dir):
+    for doc_path, (metadata, _body) in snapshot.items():
         if doc_type_filter:
             dt = get_doc_type(doc_path, root_dir)
             if dt and dt.value != doc_type_filter:
                 continue
-
-        try:
-            content = doc_path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            continue
-
-        metadata, _ = parse_vault_metadata(content)
 
         if feature:
             feat = feature.lstrip("#")

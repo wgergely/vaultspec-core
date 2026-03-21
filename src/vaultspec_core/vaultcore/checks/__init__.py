@@ -13,7 +13,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ._base import CheckDiagnostic, CheckResult, Severity, render_check_result
+from ._base import (
+    CheckDiagnostic,
+    CheckResult,
+    Severity,
+    VaultDocData,
+    VaultSnapshot,
+    render_check_result,
+)
 from .features import check_features
 from .frontmatter import check_frontmatter
 from .links import check_links
@@ -28,6 +35,8 @@ __all__ = [
     "CheckDiagnostic",
     "CheckResult",
     "Severity",
+    "VaultDocData",
+    "VaultSnapshot",
     "check_features",
     "check_frontmatter",
     "check_links",
@@ -49,7 +58,9 @@ def run_all_checks(
     """Run all seven vault health checkers and return their results.
 
     Executes structure, frontmatter, links, orphans, features, references,
-    and schema checks in order.
+    and schema checks in order. Builds a single
+    :class:`~vaultspec_core.graph.VaultGraph` and shares it across
+    graph-consuming checkers to avoid redundant I/O.
 
     Args:
         root_dir: Project root directory.
@@ -60,12 +71,17 @@ def run_all_checks(
         List of :class:`~vaultspec_core.vaultcore.checks._base.CheckResult`,
         one per checker, in the order above.
     """
+    from ...graph import VaultGraph
+
+    graph = VaultGraph(root_dir)
+    snapshot = graph.to_snapshot()
+
     return [
-        check_structure(root_dir, fix=fix),
-        check_frontmatter(root_dir, feature=feature, fix=fix),
-        check_links(root_dir, feature=feature, fix=fix),
-        check_orphans(root_dir, feature=feature),
-        check_features(root_dir, feature=feature),
-        check_references(root_dir, feature=feature, fix=fix),
-        check_schema(root_dir, feature=feature, fix=fix),
+        check_structure(root_dir, snapshot=snapshot, fix=fix),
+        check_frontmatter(root_dir, snapshot=snapshot, feature=feature, fix=fix),
+        check_links(root_dir, snapshot=snapshot, feature=feature, fix=fix),
+        check_orphans(root_dir, graph=graph, feature=feature),
+        check_features(root_dir, snapshot=snapshot, feature=feature),
+        check_references(root_dir, graph=graph, feature=feature, fix=fix),
+        check_schema(root_dir, graph=graph, feature=feature, fix=fix),
     ]

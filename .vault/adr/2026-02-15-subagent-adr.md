@@ -3,6 +3,9 @@ tags:
   - '#adr'
   - '#protocol'
 date: '2026-02-15'
+related:
+  - '[[2026-02-07-protocol-architecture-research]]'
+  - '[[2026-02-07-multi-agent-orchestration-research]]'
 ---
 
 ## ADR: Subagent Architecture Refactor — Protocol Convergence

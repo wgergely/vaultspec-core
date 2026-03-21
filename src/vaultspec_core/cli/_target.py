@@ -148,9 +148,30 @@ def apply_target_install(target: Path | None) -> Path:
 
     Returns the resolved target path.
     """
-    from vaultspec_core.core import types as _t
+    import dataclasses
+
+    from vaultspec_core.core.types import WorkspaceContext, get_context, set_context
 
     effective = target or _root_target or Path.cwd()
     effective = effective.resolve()
-    _t.TARGET_DIR = effective
+
+    # Create or update the context with the resolved target_dir.
+    # install/uninstall operate before full workspace resolution, so we
+    # build a minimal context when none exists yet.
+    try:
+        ctx = get_context()
+        set_context(dataclasses.replace(ctx, target_dir=effective))
+    except LookupError:
+        set_context(
+            WorkspaceContext(
+                root_dir=effective,
+                target_dir=effective,
+                rules_src_dir=effective,
+                skills_src_dir=effective,
+                agents_src_dir=effective,
+                system_src_dir=effective,
+                templates_dir=effective,
+                hooks_dir=effective,
+            )
+        )
     return effective

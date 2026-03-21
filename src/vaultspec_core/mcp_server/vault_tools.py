@@ -12,6 +12,7 @@ before serving the MCP endpoint.
 from __future__ import annotations
 
 import datetime
+import functools
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -19,15 +20,40 @@ from mcp.server.fastmcp import Context
 from mcp.types import ToolAnnotations
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
+
     from mcp.server.fastmcp import FastMCP
 
-from ..core import types as _t
 from ..core.helpers import atomic_write
+from ..core.types import get_context as _get_ctx
 from ..vaultcore.models import DocType, VaultConstants
 
 logger = logging.getLogger(__name__)
 
 __all__ = ["register_tools"]
+
+
+def _isolated_context(
+    fn: Callable[..., Coroutine[Any, Any, Any]],
+) -> Callable[..., Coroutine[Any, Any, Any]]:
+    """Wrap an async tool handler so it snapshots the workspace context.
+
+    Each invocation captures the current :class:`WorkspaceContext` and
+    restores it after completion, preventing mutations from leaking
+    between concurrent MCP requests.
+    """
+    from ..core.types import get_context, set_context
+
+    @functools.wraps(fn)
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        snapshot = get_context()
+        try:
+            return await fn(*args, **kwargs)
+        finally:
+            set_context(snapshot)
+
+    return wrapper
+
 
 _DEFAULT_TYPES = ["adr", "plan", "research", "reference"]
 
@@ -66,6 +92,7 @@ def register_tools(mcp: FastMCP) -> None:
             openWorldHint=False,
         ),
     )
+    @_isolated_context
     async def find(
         ctx: Context,
         feature: str | None = None,
@@ -93,9 +120,9 @@ def register_tools(mcp: FastMCP) -> None:
 
         # --- Feature listing mode (no filters) ---
         if not feature and not type and not date:
-            features = list_feature_details(_t.TARGET_DIR)
+            features = list_feature_details(_get_ctx().target_dir)
             try:
-                graph = VaultGraph(_t.TARGET_DIR)
+                graph = VaultGraph(_get_ctx().target_dir)
                 rankings = dict(graph.get_feature_rankings(limit=100))
             except (OSError, ValueError) as exc:
                 logger.warning("Failed to load vault graph rankings: %s", exc)
@@ -124,7 +151,7 @@ def register_tools(mcp: FastMCP) -> None:
         all_docs = []
         for dt in effective_types:
             docs = list_documents(
-                _t.TARGET_DIR,
+                _get_ctx().target_dir,
                 doc_type=dt,
                 feature=feature,
                 date=date,
@@ -138,7 +165,7 @@ def register_tools(mcp: FastMCP) -> None:
                 "type": doc.doc_type,
                 "feature": doc.feature,
                 "date": doc.date,
-                "path": str(doc.path.relative_to(_t.TARGET_DIR)),
+                "path": str(doc.path.relative_to(_get_ctx().target_dir)),
             }
             if body:
                 try:
@@ -158,6 +185,7 @@ def register_tools(mcp: FastMCP) -> None:
             openWorldHint=False,
         ),
     )
+    @_isolated_context
     async def create(
         ctx: Context,
         feature: str,
@@ -253,7 +281,9 @@ def register_tools(mcp: FastMCP) -> None:
         resolved_related: list[str] | None = None
         if related:
             try:
-                resolved_related = resolve_related_inputs(related, _t.TARGET_DIR)
+                resolved_related = resolve_related_inputs(
+                    related, _get_ctx().target_dir
+                )
             except RelatedResolutionError as exc:
                 return {
                     "success": False,
@@ -267,7 +297,7 @@ def register_tools(mcp: FastMCP) -> None:
 
         # Validate feature dependencies (lifecycle rules)
         dep_diagnostics = validate_feature_dependencies(
-            _t.TARGET_DIR, doc_type, feature_clean
+            _get_ctx().target_dir, doc_type, feature_clean
         )
         warnings: list[str] = []
         for diag in dep_diagnostics:
@@ -277,7 +307,7 @@ def register_tools(mcp: FastMCP) -> None:
                 warnings.append(diag)
 
         # Load template
-        template_path = _t.TEMPLATES_DIR / f"{doc_type.value}.md"
+        template_path = _get_ctx().templates_dir / f"{doc_type.value}.md"
         if not template_path.exists():
             return {
                 "success": False,
@@ -313,7 +343,7 @@ def register_tools(mcp: FastMCP) -> None:
             }
 
         # Write file
-        out_dir = _t.TARGET_DIR / ".vault" / doc_type_str
+        out_dir = _get_ctx().target_dir / ".vault" / doc_type_str
         if not out_dir.exists():
             return {"success": False, "message": f"Directory not found: {out_dir}"}
 
@@ -347,7 +377,7 @@ def register_tools(mcp: FastMCP) -> None:
 
             return {
                 "success": True,
-                "path": str(out_path.relative_to(_t.TARGET_DIR)),
+                "path": str(out_path.relative_to(_get_ctx().target_dir)),
                 "message": message,
             }
         except Exception as e:

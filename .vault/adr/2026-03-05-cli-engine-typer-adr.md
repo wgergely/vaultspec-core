@@ -7,6 +7,7 @@ related:
   - '[[2026-03-05-cli-architecture-audit]]'
   - '[[2026-03-05-cli-path-resolution-adr]]'
   - '[[2026-02-22-cli-ecosystem-factoring-research]]'
+  - '[[2026-02-22-cli-ecosystem-factoring-research]]'
 ---
 
 # ADR: CLI Parsing Engine Migration (Typer + Rich)

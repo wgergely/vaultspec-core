@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ._base import CheckDiagnostic, CheckResult, Severity
+from ._base import (
+    CheckDiagnostic,
+    CheckResult,
+    Severity,
+    VaultSnapshot,
+    extract_feature_tags,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -15,6 +21,7 @@ __all__ = ["check_features"]
 def check_features(
     root_dir: Path,
     *,
+    snapshot: VaultSnapshot,
     feature: str | None = None,
 ) -> CheckResult:
     """Check that features have appropriate document type coverage.
@@ -27,22 +34,25 @@ def check_features(
 
     Args:
         root_dir: Project root directory.
+        snapshot: Pre-built snapshot mapping document paths to parsed data.
         feature: Restrict checks to a single feature (without ``#``).
 
     Returns:
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
         check name ``"features"``. Does not support ``--fix``.
     """
-    from ..query import _scan_all
+    from ..scanner import get_doc_type
 
     result = CheckResult(check_name="features", supports_fix=False)
 
-    docs = _scan_all(root_dir)
-
     by_feature: dict[str, set[str]] = {}
-    for d in docs:
-        if d.feature:
-            by_feature.setdefault(d.feature, set()).add(d.doc_type)
+    for doc_path, (metadata, _body) in snapshot.items():
+        feat_tags = extract_feature_tags(metadata.tags)
+        dt = get_doc_type(doc_path, root_dir)
+        dt_value = dt.value if dt else None
+        for ft in feat_tags:
+            if dt_value:
+                by_feature.setdefault(ft, set()).add(dt_value)
 
     if feature:
         feat = feature.lstrip("#")

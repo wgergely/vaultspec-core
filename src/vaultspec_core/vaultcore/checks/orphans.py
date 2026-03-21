@@ -9,12 +9,16 @@ from ._base import CheckDiagnostic, CheckResult, Severity
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from ...graph import VaultGraph
+
+
 __all__ = ["check_orphans"]
 
 
 def check_orphans(
     root_dir: Path,
     *,
+    graph: VaultGraph,
     feature: str | None = None,
 ) -> CheckResult:
     """Find documents with no incoming wiki-links.
@@ -26,6 +30,7 @@ def check_orphans(
 
     Args:
         root_dir: Project root directory.
+        graph: Pre-built vault graph to query (avoids redundant I/O).
         feature: Restrict results to documents with this feature tag
             (without ``#``).
 
@@ -33,11 +38,7 @@ def check_orphans(
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
         check name ``"orphans"``. Does not support ``--fix``.
     """
-    from ...graph import VaultGraph
-
     result = CheckResult(check_name="orphans", supports_fix=False)
-
-    graph = VaultGraph(root_dir)
     orphan_names = graph.get_orphaned()
 
     for name in sorted(orphan_names):

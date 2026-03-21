@@ -113,7 +113,7 @@ def providers_sharing_dir(
     for tool in Tool:
         if tool.value not in installed:
             continue
-        cfg = _t.TOOL_CONFIGS.get(tool)
+        cfg = _t.get_context().tool_configs.get(tool)
         if cfg is None:
             continue
         for d in (cfg.rules_dir, cfg.skills_dir, cfg.agents_dir):
@@ -130,10 +130,11 @@ def installed_tool_configs() -> dict[Tool, Any]:
     """
     from . import types as _t
 
-    installed = read_manifest(_t.TARGET_DIR)
+    ctx = _t.get_context()
+    installed = read_manifest(ctx.target_dir)
     if not installed:
         return {}
-    return {k: v for k, v in _t.TOOL_CONFIGS.items() if v.name in installed}
+    return {k: v for k, v in ctx.tool_configs.items() if v.name in installed}
 
 
 def _is_parent(parent: Path, child: Path) -> bool:

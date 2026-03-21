@@ -8,7 +8,9 @@ to a dedicated nested Typer namespace.
 
 from __future__ import annotations
 
+import contextvars
 import logging
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -97,7 +99,7 @@ def _scaffold_provider(
         Deduplicated list of ``(relative_path, label)`` tuples, one per
         directory or file created (or that would be created).
     """
-    cfg = _t.TOOL_CONFIGS.get(tool)
+    cfg = _t.get_context().tool_configs.get(tool)
     if cfg is None:
         return []
 
@@ -246,7 +248,8 @@ def init_run(
     skip_core = "core" in skip
 
     cfg = get_config()
-    fw_dir = _t.TARGET_DIR / cfg.framework_dir
+    target = _t.get_context().target_dir
+    fw_dir = target / cfg.framework_dir
 
     created: list[tuple[str, str]] = []
 
@@ -256,7 +259,7 @@ def init_run(
                 f"{fw_dir} already exists. Use --force to overwrite."
             )
 
-        created = _scaffold_core(_t.TARGET_DIR)
+        created = _scaffold_core(target)
 
         # Seed builtin content into .vaultspec/rules/
         from vaultspec_core.builtins import seed_builtins
@@ -273,22 +276,22 @@ def init_run(
 
     # Re-resolve workspace after scaffolding
     reset_config()
-    layout = resolve_workspace(target_override=_t.TARGET_DIR)
+    layout = resolve_workspace(target_override=target)
     init_paths(layout)
 
     # Scaffold provider directories
     tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
     for tool in tools:
-        created.extend(_scaffold_provider(_t.TARGET_DIR, tool))
+        created.extend(_scaffold_provider(target, tool))
 
-    created.extend(_scaffold_mcp_json(_t.TARGET_DIR))
+    created.extend(_scaffold_mcp_json(target))
 
     # Write provider manifest
     from .manifest import add_providers
 
     provider_names = [t.value for t in tools]
     if provider_names:
-        add_providers(_t.TARGET_DIR, provider_names)
+        add_providers(target, provider_names)
 
     # Deduplicate by relative path, preserving order
     seen: dict[str, str] = {}
@@ -301,41 +304,49 @@ def init_run(
 def _ensure_tool_configs(path: Path) -> None:
     """Ensure TOOL_CONFIGS is populated, bootstrapping if needed.
 
-    On a fresh project where ``.vaultspec/`` doesn't exist yet, temporarily
-    creates the minimal structure so ``init_paths()`` can resolve the
-    workspace layout and populate TOOL_CONFIGS.  All temporary artifacts
-    (including the target directory itself if it was created) are cleaned up.
+    On a fresh project where ``.vaultspec/`` doesn't exist yet, uses a
+    temporary directory as the workspace root so ``init_paths()`` can resolve
+    the layout and populate TOOL_CONFIGS without touching the real filesystem.
     """
+    import tempfile
+
     from vaultspec_core.config import reset_config
     from vaultspec_core.config.workspace import resolve_workspace
     from vaultspec_core.core.types import init_paths
 
-    if _t.TOOL_CONFIGS:
-        return
+    try:
+        if _t.get_context().tool_configs:
+            return
+    except LookupError:
+        pass
 
     fw_dir = path / ".vaultspec"
-    temp_scaffold = not fw_dir.exists()
-    # Track whether we created the target dir itself (for non-existent paths)
-    created_target = not path.exists()
-
-    if temp_scaffold:
-        fw_dir.mkdir(parents=True, exist_ok=True)
-
-    try:
+    if fw_dir.exists():
         reset_config()
         layout = resolve_workspace(target_override=path)
         init_paths(layout)
-    finally:
-        if temp_scaffold:
-            import shutil
+        return
 
-            shutil.rmtree(fw_dir, ignore_errors=True)
-            # If we created the target dir just for bootstrapping, remove it
-            if created_target and path.exists():
-                import contextlib
+    # Bootstrap in a temporary directory to avoid TOCTOU on the real path.
+    # Resolve workspace against the temp dir, then re-initialize with the
+    # real target so tool_config paths reference the actual workspace.
+    tmp = Path(tempfile.mkdtemp())
+    tmp_fw = tmp / ".vaultspec"
+    tmp_fw.mkdir(parents=True, exist_ok=True)
 
-                with contextlib.suppress(OSError):
-                    path.rmdir()  # only removes if empty
+    reset_config()
+    layout = resolve_workspace(target_override=tmp)
+    # Replace the temp target with the real path so tool_configs point correctly
+    from vaultspec_core.config.workspace import WorkspaceLayout
+
+    real_layout = WorkspaceLayout(
+        target_dir=path,
+        vault_dir=path / ".vault",
+        vaultspec_dir=path / ".vaultspec",
+        mode=layout.mode,
+        git=layout.git,
+    )
+    init_paths(real_layout)
 
 
 def install_run(
@@ -378,7 +389,19 @@ def install_run(
 
     guard_dev_repo(path)
 
-    _t.TARGET_DIR = path
+    # Bootstrap a minimal context so downstream code can read target_dir
+    _t.set_context(
+        _t.WorkspaceContext(
+            root_dir=path,
+            target_dir=path,
+            rules_src_dir=path,
+            skills_src_dir=path,
+            agents_src_dir=path,
+            system_src_dir=path,
+            templates_dir=path,
+            hooks_dir=path,
+        )
+    )
 
     skip_core = "core" in skip
 
@@ -491,7 +514,7 @@ def _collect_provider_artifacts(
     """
     from .enums import DirName, FileName
 
-    cfg = _t.TOOL_CONFIGS.get(tool)
+    cfg = _t.get_context().tool_configs.get(tool)
     dirs: list[Path] = []
     files: list[Path] = []
 
@@ -547,6 +570,10 @@ def uninstall_run(
 
     guard_dev_repo(path)
 
+    # Validate inputs before any state mutation
+    _validate_provider(provider)
+    skip = _validate_skip(skip)
+
     # Safety gate: require --force for destructive operations
     if not force and not dry_run:
         raise ProviderError(
@@ -554,11 +581,20 @@ def uninstall_run(
             "or use --dry-run to preview."
         )
 
-    _t.TARGET_DIR = path
+    # Bootstrap a minimal context so _ensure_tool_configs can proceed
+    _t.set_context(
+        _t.WorkspaceContext(
+            root_dir=path,
+            target_dir=path,
+            rules_src_dir=path,
+            skills_src_dir=path,
+            agents_src_dir=path,
+            system_src_dir=path,
+            templates_dir=path,
+            hooks_dir=path,
+        )
+    )
     _ensure_tool_configs(path)
-
-    _validate_provider(provider)
-    skip = _validate_skip(skip)
 
     # Uninstalling "core" cascades to all providers
     effective_provider = "all" if provider == "core" else provider
@@ -683,7 +719,8 @@ def hooks_list_data() -> dict[str, Any]:
     """
     from vaultspec_core.hooks import SUPPORTED_EVENTS, load_hooks
 
-    hooks = load_hooks(_t.HOOKS_DIR)
+    ctx = _t.get_context()
+    hooks = load_hooks(ctx.hooks_dir)
     hooks_data = []
     for hook in hooks:
         actions = ", ".join(a.command for a in hook.actions if a.action_type == "shell")
@@ -697,11 +734,11 @@ def hooks_list_data() -> dict[str, Any]:
         )
 
     try:
-        rel = str(_t.HOOKS_DIR.relative_to(_t.TARGET_DIR))
+        rel = str(ctx.hooks_dir.relative_to(ctx.target_dir))
     except ValueError:
         # HOOKS_DIR may live in the CWD workspace, not under TARGET_DIR,
         # when --target points to a separate directory.
-        rel = str(_t.HOOKS_DIR)
+        rel = str(ctx.hooks_dir)
     return {
         "hooks": hooks_data,
         "supported_events": sorted(SUPPORTED_EVENTS),
@@ -726,13 +763,14 @@ def hooks_run(event: str, path: str | None = None) -> list[dict[str, Any]]:
             f"Unknown event: {event}. Supported: {', '.join(sorted(SUPPORTED_EVENTS))}"
         )
 
-    hooks = load_hooks(_t.HOOKS_DIR)
+    ws_ctx = _t.get_context()
+    hooks = load_hooks(ws_ctx.hooks_dir)
     matching = [h for h in hooks if h.event == event and h.enabled]
     if not matching:
         logger.info("No enabled hooks for event: %s", event)
         return []
 
-    ctx = {"root": str(_t.TARGET_DIR), "event": event}
+    ctx = {"root": str(ws_ctx.target_dir), "event": event}
     if path:
         ctx["path"] = path
 
@@ -800,7 +838,8 @@ def sync_provider(
     from .skills import skills_sync
     from .system import system_sync
 
-    guard_dev_repo(_t.TARGET_DIR)
+    ctx = _t.get_context()
+    guard_dev_repo(ctx.target_dir)
 
     def _run_all_syncs() -> list[_t.SyncResult]:
         return [
@@ -812,50 +851,54 @@ def sync_provider(
         ]
 
     # Guard: refuse to sync if vaultspec isn't installed at the target
-    vaultspec_dir = _t.TARGET_DIR / ".vaultspec"
+    vaultspec_dir = ctx.target_dir / ".vaultspec"
     if not vaultspec_dir.exists():
         raise WorkspaceNotInitializedError(
-            f"No .vaultspec/ found at {_t.TARGET_DIR}.",
-            hint=f"Run 'vaultspec-core install {_t.TARGET_DIR}' first.",
+            f"No .vaultspec/ found at {ctx.target_dir}.",
+            hint=f"Run 'vaultspec-core install {ctx.target_dir}' first.",
         )
 
     if provider == "all":
-        # When skipping providers, narrow TOOL_CONFIGS for the sync pass
+        # When skipping providers, narrow tool_configs in a copied context
         skipped_tools = {Tool(name) for name in skip if name in {t.value for t in Tool}}
-        original = dict(_t.TOOL_CONFIGS) if skipped_tools else None
-        if skipped_tools:
-            _t.TOOL_CONFIGS = {
-                k: v for k, v in _t.TOOL_CONFIGS.items() if k not in skipped_tools
-            }
 
-        try:
+        def _sync_all_with_configs(
+            narrowed_configs: dict[Tool, _t.ToolConfig] | None,
+        ) -> list[_t.SyncResult]:
+            if narrowed_configs is not None:
+                _t.set_context(replace(ctx, tool_configs=narrowed_configs))
             logger.info("Syncing all resources...")
             results = _run_all_syncs()
-
             if not dry_run:
                 from vaultspec_core.hooks import fire_hooks
 
                 fire_hooks(
                     "config.synced",
-                    {"root": str(_t.TARGET_DIR), "event": "config.synced"},
+                    {"root": str(ctx.target_dir), "event": "config.synced"},
                 )
                 logger.info("Done.")
             return results
-        finally:
-            if original is not None:
-                _t.TOOL_CONFIGS = original
+
+        narrowed_configs: dict[Tool, _t.ToolConfig] | None = None
+        if skipped_tools:
+            narrowed_configs = {
+                k: v for k, v in ctx.tool_configs.items() if k not in skipped_tools
+            }
+
+        copied = contextvars.copy_context()
+        return copied.run(_sync_all_with_configs, narrowed_configs)
 
     # Validate provider is installed
     from .manifest import read_manifest
 
-    installed = read_manifest(_t.TARGET_DIR)
+    installed = read_manifest(ctx.target_dir)
     if installed and provider not in installed:
         raise ProviderNotInstalledError(
             f"Provider '{provider}' is not installed.",
             hint=f"Run 'vaultspec-core install . {provider}' first.",
         )
 
-    # Per-provider sync: filter TOOL_CONFIGS to only the requested tool.
+    # Per-provider sync: filter tool_configs to only the requested tool.
     requested: set[Tool] = set()
     if provider == "claude":
         requested = {Tool.CLAUDE}
@@ -866,13 +909,16 @@ def sync_provider(
     elif provider == "codex":
         requested = {Tool.CODEX}
 
-    original = dict(_t.TOOL_CONFIGS)
-    try:
-        _t.TOOL_CONFIGS = {k: v for k, v in original.items() if k in requested}
+    def _sync_single_provider(
+        provider_configs: dict[Tool, _t.ToolConfig],
+    ) -> list[_t.SyncResult]:
+        _t.set_context(replace(ctx, tool_configs=provider_configs))
         logger.info("Syncing provider: %s ...", provider)
         results = _run_all_syncs()
         if not dry_run:
             logger.info("Done.")
         return results
-    finally:
-        _t.TOOL_CONFIGS = original
+
+    narrowed = {k: v for k, v in ctx.tool_configs.items() if k in requested}
+    copied = contextvars.copy_context()
+    return copied.run(_sync_single_provider, narrowed)

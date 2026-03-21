@@ -5,6 +5,7 @@ tags:
 date: '2026-02-17'
 related:
   - '[[2026-02-17-audit-summary-audit]]'
+  - '[[2026-02-17-bootstrap-prompt-adr]]'
 ---
 
 # vaultspec Roadmap: Wave-Based Rollout Plan

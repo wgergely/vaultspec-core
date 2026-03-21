@@ -8,6 +8,7 @@ related:
   - '[[2026-02-22-protocol-stack-deep-audit-research]]'
   - '[[2026-02-21-a2a-layer-audit-research]]'
   - '[[2026-02-20-a2a-team-p1-plan]]'
+  - '[[2026-02-20-a2a-team-adr]]'
 ---
 
 # team-hardening phase-1 plan

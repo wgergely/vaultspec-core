@@ -212,11 +212,10 @@ def test_provider_capability_enum_covers_all_tools() -> None:
     from vaultspec_core.core.enums import Tool
     from vaultspec_core.core.types import init_paths
 
-    init_paths(ROOT)
-    from vaultspec_core.core import types as _t
+    ctx = init_paths(ROOT)
 
     for tool in Tool:
-        cfg = _t.TOOL_CONFIGS.get(tool)
+        cfg = ctx.tool_configs.get(tool)
         assert cfg is not None, f"Tool {tool.value} has no ToolConfig"
         assert cfg.capabilities, f"Tool {tool.value} has empty capabilities"
 
@@ -226,11 +225,10 @@ def test_provider_capability_consistency() -> None:
     from vaultspec_core.core.enums import ProviderCapability, Tool
     from vaultspec_core.core.types import init_paths
 
-    init_paths(ROOT)
-    from vaultspec_core.core import types as _t
+    ctx = init_paths(ROOT)
 
     for tool in Tool:
-        cfg = _t.TOOL_CONFIGS.get(tool)
+        cfg = ctx.tool_configs.get(tool)
         if cfg is None:
             continue
         caps = cfg.capabilities
@@ -254,15 +252,14 @@ def test_every_capability_has_at_least_one_provider() -> None:
     from vaultspec_core.core.enums import ProviderCapability, Tool
     from vaultspec_core.core.types import init_paths
 
-    init_paths(ROOT)
-    from vaultspec_core.core import types as _t
+    ctx = init_paths(ROOT)
 
     for cap in ProviderCapability:
         providers = [
             tool.value
             for tool in Tool
             if cap
-            in _t.TOOL_CONFIGS.get(
+            in ctx.tool_configs.get(
                 tool, type("", (), {"capabilities": frozenset()})()
             ).capabilities
         ]

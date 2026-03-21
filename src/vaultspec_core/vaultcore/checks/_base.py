@@ -1,24 +1,34 @@
 """Foundation types for vault health checks.
 
-Defines the result model used by all checkers and a shared rendering
-function for Rich console output.
+Defines the result model used by all checkers, snapshot types for
+shared data passing, and a shared rendering function for Rich console
+output.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from pathlib import Path
+from ..models import DocumentMetadata
 
+if TYPE_CHECKING:
     from rich.console import Console
+
+VaultDocData = tuple[DocumentMetadata, str]
+"""Parsed document payload: ``(metadata, body)``."""
+
+VaultSnapshot = dict[Path, VaultDocData]
+"""Mapping of document paths to their parsed ``(metadata, body)`` tuples."""
 
 __all__ = [
     "CheckDiagnostic",
     "CheckResult",
     "Severity",
+    "VaultDocData",
+    "VaultSnapshot",
     "extract_feature_tags",
     "render_check_result",
 ]

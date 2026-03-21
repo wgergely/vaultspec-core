@@ -43,10 +43,9 @@ def project(tmp_path):
     )
 
     # Install vaultspec framework so .vaultspec/ exists
-    from vaultspec_core.core import types as _t
+    # install_run bootstraps its own context, no need to call init_paths first
     from vaultspec_core.core.commands import install_run
 
-    _t.TARGET_DIR = dest
     install_run(path=dest, provider="all", upgrade=False, dry_run=False, force=False)
 
     return dest

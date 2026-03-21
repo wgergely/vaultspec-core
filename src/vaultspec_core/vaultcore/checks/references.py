@@ -18,6 +18,8 @@ from ._base import CheckDiagnostic, CheckResult, Severity
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from ...graph import VaultGraph
+
 __all__ = ["check_references", "check_schema"]
 
 logger = logging.getLogger(__name__)
@@ -86,6 +88,7 @@ def _add_related_link(doc_path: Path, link_name: str) -> bool:
 def check_references(
     root_dir: Path,
     *,
+    graph: VaultGraph,
     feature: str | None = None,
     fix: bool = False,
 ) -> CheckResult:
@@ -96,6 +99,7 @@ def check_references(
 
     Args:
         root_dir: Project root directory.
+        graph: Pre-built vault graph to query (avoids redundant I/O).
         feature: Restrict checks to a single feature (without ``#``).
         fix: When ``True``, adds the missing ``[[wiki-link]]`` to the
             ``related:`` field of the first available ADR or plan.
@@ -104,12 +108,9 @@ def check_references(
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
         check name ``"references"``.
     """
-    from ...graph import VaultGraph
     from ..models import DocType
 
     result = CheckResult(check_name="references", supports_fix=True)
-
-    graph = VaultGraph(root_dir)
 
     # Group nodes by feature
     by_feature: dict[str, dict[str, list]] = {}
@@ -193,6 +194,7 @@ def check_references(
 def check_schema(
     root_dir: Path,
     *,
+    graph: VaultGraph,
     feature: str | None = None,
     doc_type_filter: str | None = None,
     fix: bool = False,
@@ -210,6 +212,7 @@ def check_schema(
 
     Args:
         root_dir: Project root directory.
+        graph: Pre-built vault graph to query (avoids redundant I/O).
         feature: Restrict checks to documents with this feature tag
             (without ``#``).
         doc_type_filter: Restrict checks to this document type
@@ -220,12 +223,9 @@ def check_schema(
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
         check name ``"schema"``.
     """
-    from ...graph import VaultGraph
     from ..models import DocType
 
     result = CheckResult(check_name="schema", supports_fix=True)
-
-    graph = VaultGraph(root_dir)
 
     # Pre-build feature→type→nodes index for fix lookups
     feat_type_index: dict[str, dict[str, list]] = {}

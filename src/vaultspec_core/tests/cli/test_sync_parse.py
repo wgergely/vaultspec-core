@@ -22,7 +22,7 @@ pytestmark = [pytest.mark.unit]
 def _cfg(tool: Tool):
     from ...core import types as _t
 
-    return _t.TOOL_CONFIGS[tool]
+    return _t.get_context().tool_configs[tool]
 
 
 class TestFrontmatter:
@@ -105,22 +105,24 @@ class TestAtomicWrite:
 
 
 class TestInitPaths:
-    def test_sets_globals(self, test_project):
+    def test_sets_context(self, test_project):
         from ...core import types as _t
 
         init_paths(test_project)
-        assert test_project == _t.ROOT_DIR
-        assert _t.RULES_SRC_DIR.name == "rules"
-        assert _t.SKILLS_SRC_DIR.name == "skills"
+        ctx = _t.get_context()
+        assert test_project == ctx.root_dir
+        assert ctx.rules_src_dir.name == "rules"
+        assert ctx.skills_src_dir.name == "skills"
 
     def test_tool_configs_populated(self, test_project):
         from ...core import types as _t
 
         init_paths(test_project)
-        assert Tool.CLAUDE in _t.TOOL_CONFIGS
-        assert Tool.GEMINI in _t.TOOL_CONFIGS
-        assert Tool.ANTIGRAVITY in _t.TOOL_CONFIGS
-        assert Tool.CODEX in _t.TOOL_CONFIGS
+        ctx = _t.get_context()
+        assert Tool.CLAUDE in ctx.tool_configs
+        assert Tool.GEMINI in ctx.tool_configs
+        assert Tool.ANTIGRAVITY in ctx.tool_configs
+        assert Tool.CODEX in ctx.tool_configs
         assert _cfg(Tool.CLAUDE).name == "claude"
         assert _cfg(Tool.ANTIGRAVITY).config_file == test_project / "GEMINI.md"
         assert _cfg(Tool.ANTIGRAVITY).rules_dir == (test_project / ".agents" / "rules")

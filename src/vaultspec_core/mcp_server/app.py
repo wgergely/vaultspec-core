@@ -39,6 +39,8 @@ def create_server() -> FastMCP:
 
     Instantiates :class:`~mcp.server.fastmcp.FastMCP` and registers the vault
     tool surface via :func:`~vaultspec_core.mcp_server.vault_tools.register_tools`.
+    Each tool handler runs in a copied :class:`contextvars.Context` so that
+    per-request mutations do not leak between concurrent requests.
 
     Returns:
         Configured :class:`~mcp.server.fastmcp.FastMCP` instance ready to serve.

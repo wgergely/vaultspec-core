@@ -329,13 +329,14 @@ def _execute_shell(
         with code 0.  Captures stdout as ``output`` and stderr as ``error``.
     """
     cmd = _interpolate(action.command, ctx)
-    from ..core import types as _t
+    from ..core.types import get_context
 
     env = os.environ.copy()
-    if _t.TARGET_DIR:
-        env["VAULTSPEC_TARGET_DIR"] = str(_t.TARGET_DIR)
-        cwd = str(_t.TARGET_DIR)
-    else:
+    try:
+        target_dir = get_context().target_dir
+        env["VAULTSPEC_TARGET_DIR"] = str(target_dir)
+        cwd: str | None = str(target_dir)
+    except LookupError:
         cwd = None
 
     try:
@@ -386,9 +387,9 @@ def fire_hooks(event: str, context: dict[str, str] | None = None) -> None:
         context: Optional context dict passed through to hook actions.
     """
     try:
-        from ..core import types as _t
+        from ..core.types import get_context
 
-        hooks = load_hooks(_t.HOOKS_DIR)
+        hooks = load_hooks(get_context().hooks_dir)
         trigger(hooks, event, context)
     except Exception:
         logger.debug("Hook trigger failed for %s", event, exc_info=True)

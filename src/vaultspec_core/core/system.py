@@ -31,9 +31,10 @@ def collect_system_parts() -> dict[str, tuple[Path, dict[str, Any], str]]:
     from ..vaultcore import parse_frontmatter
 
     sources: dict[str, tuple[Path, dict[str, Any], str]] = {}
-    if not _t.SYSTEM_SRC_DIR.exists():
+    system_src_dir = _t.get_context().system_src_dir
+    if not system_src_dir.exists():
         return sources
-    for f in sorted(_t.SYSTEM_SRC_DIR.glob("*.md")):
+    for f in sorted(system_src_dir.glob("*.md")):
         try:
             content = f.read_text(encoding="utf-8")
             meta, body = parse_frontmatter(content)
@@ -138,12 +139,13 @@ def system_show() -> dict[str, Any]:
             {"name": name, "tool_filter": tool_filter, "lines": line_count}
         )
 
+    ctx = _t.get_context()
     targets_list = []
-    for tool_type, cfg in _t.TOOL_CONFIGS.items():
+    for tool_type, cfg in ctx.tool_configs.items():
         system_file = cfg.system_file
         if system_file is None:
             continue
-        rel = str(system_file.relative_to(_t.TARGET_DIR))
+        rel = str(system_file.relative_to(ctx.target_dir))
         managed = "CLI-managed" if _is_cli_managed(system_file) else "custom"
         targets_list.append({"tool": tool_type.value, "path": rel, "managed": managed})
 
@@ -178,7 +180,7 @@ def system_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
                 result.skipped += 1
                 continue
 
-            rel = system_file.relative_to(_t.TARGET_DIR)
+            rel = system_file.relative_to(_t.get_context().target_dir)
 
             if system_file.exists() and not _is_cli_managed(system_file) and not force:
                 logger.warning("    [SKIP] %s - file exists with custom content.", rel)

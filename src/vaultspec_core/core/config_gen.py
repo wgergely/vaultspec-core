@@ -73,7 +73,7 @@ def _collect_rule_refs(cfg: ToolConfig) -> list[str]:
             rel = rule_file.relative_to(config_dir)
             refs.append(str(rel).replace("\\", "/"))
         except ValueError:
-            ref = rule_file.relative_to(_t.TARGET_DIR)
+            ref = rule_file.relative_to(_t.get_context().target_dir)
             refs.append(str(ref).replace("\\", "/"))
     return refs
 
@@ -88,9 +88,10 @@ def _read_codex_config_meta() -> dict[str, object]:
     from ..vaultcore import parse_frontmatter
 
     merged: dict[str, object] = {}
-    if not _t.SYSTEM_SRC_DIR.exists():
+    system_src_dir = _t.get_context().system_src_dir
+    if not system_src_dir.exists():
         return merged
-    for f in sorted(_t.SYSTEM_SRC_DIR.glob("*.md")):
+    for f in sorted(system_src_dir.glob("*.md")):
         try:
             content = f.read_text(encoding="utf-8")
             meta, _body = parse_frontmatter(content)
@@ -341,7 +342,7 @@ def config_show() -> list[dict[str, str]]:
         A list of dicts, each with ``"tool"`` and ``"content"`` keys.
     """
     items: list[dict[str, str]] = []
-    for tool_type, cfg in _t.TOOL_CONFIGS.items():
+    for tool_type, cfg in _t.get_context().tool_configs.items():
         content = _generate_config_body(cfg)
         items.append(
             {

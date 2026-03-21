@@ -39,9 +39,10 @@ def collect_skills() -> dict[str, tuple[Path, dict[str, Any], str]]:
     from ..vaultcore import parse_frontmatter
 
     sources: dict[str, tuple[Path, dict[str, Any], str]] = {}
-    if not _t.SKILLS_SRC_DIR.exists():
+    skills_src_dir = _t.get_context().skills_src_dir
+    if not skills_src_dir.exists():
         return sources
-    for path in sorted(_t.SKILLS_SRC_DIR.iterdir()):
+    for path in sorted(skills_src_dir.iterdir()):
         if path.is_dir():
             skill_md = path / "SKILL.md"
             if skill_md.exists():
@@ -121,11 +122,12 @@ def skills_add(
     Raises:
         ResourceExistsError: If the skill exists and *force* is ``False``.
     """
-    ensure_dir(_t.SKILLS_SRC_DIR)
+    ctx = _t.get_context()
+    ensure_dir(ctx.skills_src_dir)
 
     skill_name = name
 
-    skill_dir = _t.SKILLS_SRC_DIR / skill_name
+    skill_dir = ctx.skills_src_dir / skill_name
     file_path = skill_dir / "SKILL.md"
 
     if skill_dir.exists() and not force:
@@ -137,7 +139,7 @@ def skills_add(
 
     body = f"# {skill_name}\n\nDefine your skill instructions here.\n"
     if template:
-        tmpl_path = _t.TEMPLATES_DIR / template
+        tmpl_path = _t.get_context().templates_dir / template
         if not tmpl_path.suffix:
             tmpl_path = tmpl_path.with_suffix(".md")
         if tmpl_path.exists():

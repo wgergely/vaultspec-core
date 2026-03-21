@@ -12,7 +12,7 @@ import re
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from ._base import CheckDiagnostic, CheckResult, Severity
+from ._base import CheckDiagnostic, CheckResult, Severity, VaultSnapshot
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -97,6 +97,7 @@ def _fix_filename(doc_path: Path, root_dir: Path, result: CheckResult) -> None:
 def check_structure(
     root_dir: Path,
     *,
+    snapshot: VaultSnapshot,
     fix: bool = False,
 ) -> CheckResult:
     """Check vault directory structure and filename conventions.
@@ -107,6 +108,7 @@ def check_structure(
 
     Args:
         root_dir: Project root directory.
+        snapshot: Pre-built snapshot mapping document paths to parsed data.
         fix: When ``True``, renames files with wrong type suffixes or
             missing date prefixes.
 
@@ -115,7 +117,7 @@ def check_structure(
         check name ``"structure"``.
     """
     from ..models import VaultConstants
-    from ..scanner import get_doc_type, scan_vault
+    from ..scanner import get_doc_type
 
     result = CheckResult(check_name="structure", supports_fix=True)
 
@@ -128,7 +130,7 @@ def check_structure(
             )
         )
 
-    for doc_path in scan_vault(root_dir):
+    for doc_path in snapshot:
         doc_type = get_doc_type(doc_path, root_dir)
         errors = VaultConstants.validate_filename(doc_path.name, doc_type)
 

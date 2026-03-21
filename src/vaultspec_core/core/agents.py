@@ -36,7 +36,7 @@ def collect_agents() -> dict[str, tuple[Path, dict[str, Any], str]]:
         A mapping of filename to a three-tuple of
         ``(source_path, frontmatter_dict, body_text)``.
     """
-    return collect_md_resources(_t.AGENTS_SRC_DIR)
+    return collect_md_resources(_t.get_context().agents_src_dir)
 
 
 def transform_agent(_tool: Tool, _name: str, meta: dict[str, Any], body: str) -> str:
@@ -143,7 +143,7 @@ def _sync_codex_agents(
     from .tags import TagError, has_block, strip_block, upsert_block
 
     result = SyncResult()
-    codex_cfg = _t.TOOL_CONFIGS.get(Tool.CODEX)
+    codex_cfg = _t.get_context().tool_configs.get(Tool.CODEX)
     if codex_cfg is None or codex_cfg.native_config_file is None:
         return result
 
@@ -229,10 +229,11 @@ def agents_add(
     Raises:
         ResourceExistsError: If the agent exists and *force* is ``False``.
     """
-    ensure_dir(_t.AGENTS_SRC_DIR)
+    agents_src_dir = _t.get_context().agents_src_dir
+    ensure_dir(agents_src_dir)
 
     file_name = name if name.endswith(".md") else f"{name}.md"
-    file_path = _t.AGENTS_SRC_DIR / file_name
+    file_path = agents_src_dir / file_name
 
     if file_path.exists() and not force:
         raise ResourceExistsError(

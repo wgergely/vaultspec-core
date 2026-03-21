@@ -34,7 +34,7 @@ def collect_rules() -> dict[str, tuple[Path, dict[str, Any], str]]:
         A mapping of filename to a three-tuple of
         ``(source_path, frontmatter_dict, body_text)``.
     """
-    return collect_md_resources(_t.RULES_SRC_DIR)
+    return collect_md_resources(_t.get_context().rules_src_dir)
 
 
 def transform_rule(tool: Tool, name: str, _meta: dict[str, Any], body: str) -> str:
@@ -68,8 +68,9 @@ def rules_list() -> list[dict[str, str]]:
     ``"Custom"``).
     """
     items: list[dict[str, str]] = []
-    if _t.RULES_SRC_DIR.exists():
-        for f in sorted(_t.RULES_SRC_DIR.glob("*.md")):
+    rules_src_dir = _t.get_context().rules_src_dir
+    if rules_src_dir.exists():
+        for f in sorted(rules_src_dir.glob("*.md")):
             source = "Built-in" if f.name.endswith(".builtin.md") else "Custom"
             items.append({"name": f.name, "source": source})
     return items
@@ -99,10 +100,11 @@ def rules_add(
     Raises:
         ResourceExistsError: If the rule exists and *force* is ``False``.
     """
-    ensure_dir(_t.RULES_SRC_DIR)
+    rules_src_dir = _t.get_context().rules_src_dir
+    ensure_dir(rules_src_dir)
 
     file_name = name if name.endswith(".md") else f"{name}.md"
-    file_path = _t.RULES_SRC_DIR / file_name
+    file_path = rules_src_dir / file_name
 
     if file_path.exists() and not force:
         raise ResourceExistsError(

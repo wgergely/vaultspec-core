@@ -36,7 +36,7 @@ pytestmark = [pytest.mark.unit]
 
 
 def _cfg(tool: Tool) -> ToolConfig:
-    return _types.TOOL_CONFIGS[tool]
+    return _types.get_context().tool_configs[tool]
 
 
 class TestCollectRules:

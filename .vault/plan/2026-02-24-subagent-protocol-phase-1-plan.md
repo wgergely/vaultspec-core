@@ -6,6 +6,7 @@ date: '2026-02-24'
 related:
   - '[[2026-02-24-subagent-protocol-research]]'
   - '[[2026-02-24-subagent-protocol-adr]]'
+  - '[[2026-02-15-subagent-adr]]'
 ---
 
 # `subagent-protocol` `phase-1` plan

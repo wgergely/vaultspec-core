@@ -2,7 +2,7 @@
 
 Provides the session-scoped ``runner``, the ``test_project`` workspace
 fixture backed by the real ``test-project/`` corpus, and autouse isolation
-that saves/restores module-level globals between tests.  Color output is
+that saves/restores the workspace context between tests.  Color output is
 disabled globally via ``NO_COLOR=1``.
 """
 
@@ -29,19 +29,6 @@ typer.rich_utils.COLOR_SYSTEM = None
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _TEST_PROJECT_SRC = _REPO_ROOT / "test-project"
 
-# Names of the module-level globals that init_paths() sets.
-_TYPES_GLOBALS = [
-    "ROOT_DIR",
-    "TARGET_DIR",
-    "RULES_SRC_DIR",
-    "SKILLS_SRC_DIR",
-    "AGENTS_SRC_DIR",
-    "SYSTEM_SRC_DIR",
-    "TEMPLATES_DIR",
-    "HOOKS_DIR",
-    "TOOL_CONFIGS",
-]
-
 
 def setup_rules_dir(root):
     """Setup rules source directory in the given root."""
@@ -63,9 +50,9 @@ def test_project(tmp_path):
     The original test-project/ is never modified.  Cleanup is automatic
     via pytest's ``tmp_path``.
 
-    Module globals are initialised via ``init_paths`` so that unit tests
-    calling internal functions (``collect_rules``, ``rules_sync``, etc.)
-    have the paths they rely on.
+    The workspace context is initialised via ``init_paths`` so that unit
+    tests calling internal functions (``collect_rules``, ``rules_sync``,
+    etc.) have the paths they rely on.
     """
     dest = tmp_path / "project"
     shutil.copytree(
@@ -76,11 +63,12 @@ def test_project(tmp_path):
     )
 
     # Install vaultspec framework so .vaultspec/ exists
+    # install_run bootstraps its own context, no need to call init_paths first
     from vaultspec_core.core.commands import install_run
 
-    _t.TARGET_DIR = dest
     install_run(path=dest, provider="all", upgrade=False, dry_run=False, force=False)
 
+    # Re-init after install to pick up the full workspace layout
     layout = resolve_workspace(target_override=dest)
     init_paths(layout)
 
@@ -115,24 +103,27 @@ def run_spec(runner, *args, target=None):
 
 @pytest.fixture(autouse=True)
 def _isolate_state():
-    """Save and restore module-level globals and console between tests.
+    """Save and restore workspace context and console between tests.
 
-    This prevents state leakage when one test's CLI invocation sets
-    ``_t.TARGET_DIR`` / ``_t.TOOL_CONFIGS`` and the next test inherits
-    stale values pointing at the wrong tmp_path.
+    This prevents state leakage when one test's CLI invocation sets the
+    workspace context and the next test inherits stale values pointing
+    at the wrong tmp_path.
     """
     from vaultspec_core.cli._target import reset as reset_target
     from vaultspec_core.console import reset_console
 
-    # Snapshot current state.
-    saved = {name: getattr(_t, name) for name in _TYPES_GLOBALS}
+    # Snapshot current context.
+    try:
+        saved_ctx = _t.get_context()
+    except LookupError:
+        saved_ctx = None
     reset_console()
     reset_target()
 
     yield
 
-    # Restore original state.
-    for name, value in saved.items():
-        setattr(_t, name, value)
+    # Restore original context.
+    if saved_ctx is not None:
+        _t.set_context(saved_ctx)
     reset_console()
     reset_target()

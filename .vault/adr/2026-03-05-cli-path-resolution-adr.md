@@ -6,6 +6,7 @@ date: 2026-03-05
 related:
   - '[[2026-03-05-cli-architecture-audit]]'
   - '[[2026-02-22-cli-ecosystem-factoring-research]]'
+  - '[[2026-02-22-cli-ecosystem-factoring-research]]'
 ---
 
 # ADR: CLI Path Resolution & Provider Initialization Overhaul

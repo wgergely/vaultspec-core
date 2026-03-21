@@ -6,7 +6,7 @@ Aggregates per-resource CRUD (:func:`agents_add`, :func:`rules_sync`,
 (:func:`config_show`, :func:`config_sync`), I/O helpers
 (:func:`atomic_write`, :func:`build_file`), domain exceptions
 (:class:`VaultSpecError` and subclasses), and path/type contracts
-(:class:`SyncResult`, :class:`ToolConfig`, :data:`ROOT_DIR`).
+(:class:`SyncResult`, :class:`ToolConfig`, :class:`WorkspaceContext`).
 Consumed by :mod:`vaultspec_core.cli` and :mod:`vaultspec_core.mcp_server`.
 """
 
@@ -44,16 +44,10 @@ from .sync import format_summary as format_summary
 from .sync import sync_files as sync_files
 from .system import system_show as system_show
 from .system import system_sync as system_sync
-from .types import AGENTS_SRC_DIR as AGENTS_SRC_DIR
 from .types import CONFIG_HEADER as CONFIG_HEADER
-from .types import HOOKS_DIR as HOOKS_DIR
-from .types import ROOT_DIR as ROOT_DIR
-from .types import RULES_SRC_DIR as RULES_SRC_DIR
-from .types import SKILLS_SRC_DIR as SKILLS_SRC_DIR
-from .types import SYSTEM_SRC_DIR as SYSTEM_SRC_DIR
-from .types import TARGET_DIR as TARGET_DIR
-from .types import TEMPLATES_DIR as TEMPLATES_DIR
-from .types import TOOL_CONFIGS as TOOL_CONFIGS
 from .types import SyncResult as SyncResult
 from .types import ToolConfig as ToolConfig
+from .types import WorkspaceContext as WorkspaceContext
+from .types import get_context as get_context
 from .types import init_paths as init_paths
+from .types import set_context as set_context

@@ -95,11 +95,13 @@ def cmd_rules_show(
     """Display a rule's content."""
     apply_target(target)
     from vaultspec_core.core import resource_show
-    from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.types import get_context
 
     try:
-        content = resource_show(name=name, base_dir=_t.RULES_SRC_DIR, label="Rule")
+        content = resource_show(
+            name=name, base_dir=get_context().rules_src_dir, label="Rule"
+        )
         typer.echo(content)
     except VaultSpecError as exc:
         _handle_error(exc)
@@ -113,11 +115,11 @@ def cmd_rules_edit(
     """Open a rule in the configured editor."""
     apply_target(target)
     from vaultspec_core.core import resource_edit
-    from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.types import get_context
 
     try:
-        resource_edit(name=name, base_dir=_t.RULES_SRC_DIR, label="Rule")
+        resource_edit(name=name, base_dir=get_context().rules_src_dir, label="Rule")
     except VaultSpecError as exc:
         _handle_error(exc)
 
@@ -131,13 +133,13 @@ def cmd_rules_remove(
     """Delete a rule."""
     apply_target(target)
     from vaultspec_core.core import resource_remove
-    from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.types import get_context
 
     try:
         resource_remove(
             name=name,
-            base_dir=_t.RULES_SRC_DIR,
+            base_dir=get_context().rules_src_dir,
             label="Rule",
             force=force,
             confirm_fn=typer.confirm,
@@ -155,14 +157,14 @@ def cmd_rules_rename(
     """Rename an existing rule."""
     apply_target(target)
     from vaultspec_core.core import resource_rename
-    from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.types import get_context
 
     try:
         resource_rename(
             old_name=old_name,
             new_name=new_name,
-            base_dir=_t.RULES_SRC_DIR,
+            base_dir=get_context().rules_src_dir,
             label="Rule",
         )
     except VaultSpecError as exc:
@@ -198,10 +200,10 @@ def cmd_rules_revert(
 ) -> None:
     """Revert a rule to its snapshotted original."""
     apply_target(target)
-    from vaultspec_core.core import types as _t
     from vaultspec_core.core.revert import revert_resource
+    from vaultspec_core.core.types import get_context
 
-    vaultspec_dir = _t.TARGET_DIR / ".vaultspec"
+    vaultspec_dir = get_context().target_dir / ".vaultspec"
     if not filename.endswith(".md"):
         filename = f"{filename}.md"
     result = revert_resource(vaultspec_dir, "rules", filename)
@@ -281,12 +283,12 @@ def cmd_skills_show(
     """Display a skill's content."""
     apply_target(target)
     from vaultspec_core.core import resource_show
-    from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.types import get_context
 
     try:
         content = resource_show(
-            name=name, base_dir=_t.SKILLS_SRC_DIR, label="Skill", is_dir=True
+            name=name, base_dir=get_context().skills_src_dir, label="Skill", is_dir=True
         )
         typer.echo(content)
     except VaultSpecError as exc:
@@ -301,11 +303,13 @@ def cmd_skills_edit(
     """Open a skill in the configured editor."""
     apply_target(target)
     from vaultspec_core.core import resource_edit
-    from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.types import get_context
 
     try:
-        resource_edit(name=name, base_dir=_t.SKILLS_SRC_DIR, label="Skill", is_dir=True)
+        resource_edit(
+            name=name, base_dir=get_context().skills_src_dir, label="Skill", is_dir=True
+        )
     except VaultSpecError as exc:
         _handle_error(exc)
 
@@ -319,13 +323,13 @@ def cmd_skills_remove(
     """Delete a skill."""
     apply_target(target)
     from vaultspec_core.core import resource_remove
-    from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.types import get_context
 
     try:
         resource_remove(
             name=name,
-            base_dir=_t.SKILLS_SRC_DIR,
+            base_dir=get_context().skills_src_dir,
             label="Skill",
             force=force,
             is_dir=True,
@@ -344,14 +348,14 @@ def cmd_skills_rename(
     """Rename an existing skill."""
     apply_target(target)
     from vaultspec_core.core import resource_rename
-    from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.types import get_context
 
     try:
         resource_rename(
             old_name=old_name,
             new_name=new_name,
-            base_dir=_t.SKILLS_SRC_DIR,
+            base_dir=get_context().skills_src_dir,
             label="Skill",
             is_dir=True,
         )
@@ -388,10 +392,10 @@ def cmd_skills_revert(
 ) -> None:
     """Revert a skill to its snapshotted original."""
     apply_target(target)
-    from vaultspec_core.core import types as _t
     from vaultspec_core.core.revert import revert_resource
+    from vaultspec_core.core.types import get_context
 
-    vaultspec_dir = _t.TARGET_DIR / ".vaultspec"
+    vaultspec_dir = get_context().target_dir / ".vaultspec"
     if not filename.endswith(".md"):
         filename = f"{filename}.md"
     result = revert_resource(vaultspec_dir, "skills", filename)
@@ -468,11 +472,13 @@ def cmd_agents_show(
     """Display an agent's content."""
     apply_target(target)
     from vaultspec_core.core import resource_show
-    from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.types import get_context
 
     try:
-        content = resource_show(name=name, base_dir=_t.AGENTS_SRC_DIR, label="Agent")
+        content = resource_show(
+            name=name, base_dir=get_context().agents_src_dir, label="Agent"
+        )
         typer.echo(content)
     except VaultSpecError as exc:
         _handle_error(exc)
@@ -486,11 +492,11 @@ def cmd_agents_edit(
     """Open an agent in the configured editor."""
     apply_target(target)
     from vaultspec_core.core import resource_edit
-    from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.types import get_context
 
     try:
-        resource_edit(name=name, base_dir=_t.AGENTS_SRC_DIR, label="Agent")
+        resource_edit(name=name, base_dir=get_context().agents_src_dir, label="Agent")
     except VaultSpecError as exc:
         _handle_error(exc)
 
@@ -504,13 +510,13 @@ def cmd_agents_remove(
     """Delete an agent definition."""
     apply_target(target)
     from vaultspec_core.core import resource_remove
-    from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.types import get_context
 
     try:
         resource_remove(
             name=name,
-            base_dir=_t.AGENTS_SRC_DIR,
+            base_dir=get_context().agents_src_dir,
             label="Agent",
             force=force,
             confirm_fn=typer.confirm,
@@ -528,14 +534,14 @@ def cmd_agents_rename(
     """Rename an existing agent definition."""
     apply_target(target)
     from vaultspec_core.core import resource_rename
-    from vaultspec_core.core import types as _t
     from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.types import get_context
 
     try:
         resource_rename(
             old_name=old_name,
             new_name=new_name,
-            base_dir=_t.AGENTS_SRC_DIR,
+            base_dir=get_context().agents_src_dir,
             label="Agent",
         )
     except VaultSpecError as exc:
@@ -571,10 +577,10 @@ def cmd_agents_revert(
 ) -> None:
     """Revert an agent to its snapshotted original."""
     apply_target(target)
-    from vaultspec_core.core import types as _t
     from vaultspec_core.core.revert import revert_resource
+    from vaultspec_core.core.types import get_context
 
-    vaultspec_dir = _t.TARGET_DIR / ".vaultspec"
+    vaultspec_dir = get_context().target_dir / ".vaultspec"
     if not filename.endswith(".md"):
         filename = f"{filename}.md"
     result = revert_resource(vaultspec_dir, "agents", filename)
