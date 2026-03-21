@@ -1,4 +1,0 @@
-# Custom rules (plain *.md) are gitignored.
-# Builtins use *.builtin.md suffix and are tracked.
-*.md
-!*.builtin.md
