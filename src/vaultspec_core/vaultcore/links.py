@@ -54,7 +54,19 @@ def extract_related_links(related: list[str]) -> set[str]:
     """
     links = set()
     malformed_count = 0
-    for link in related:
+
+    if not related:
+        return links
+
+    # Flatten nested lists produced by some YAML parsers
+    flat: list[str] = []
+    for item in related:
+        if isinstance(item, list):
+            flat.extend(str(v) for v in item if v)
+        else:
+            flat.append(item)
+
+    for link in flat:
         # related links are expected to be [[Link Name]]
         match = re.match(r"^\[\[([^\]|]+)(?:\|[^\]]+)?\]\]$", link)
         if match:

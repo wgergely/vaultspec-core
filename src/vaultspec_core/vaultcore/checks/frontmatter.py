@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from ._base import CheckDiagnostic, CheckResult, Severity
+from ._base import CheckDiagnostic, CheckResult, Severity, extract_feature_tags
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -81,11 +81,11 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
 
     # Rebuild frontmatter
     lines = ["---"]
-    if new_tags or tags_changed:
+    if new_tags:
         lines.append("tags:")
-        for tag in new_tags if new_tags else metadata.tags:
+        for tag in new_tags:
             lines.append(f'  - "{tag}"')
-    else:
+    elif not tags_changed:
         for line in yaml_block.split("\n"):
             stripped = line.strip()
             if stripped.startswith("tags") or (
@@ -104,12 +104,21 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
             lines.append(f'  - "{link}"')
 
     known_keys = {"tags", "date", "related", "feature"}
+    in_unknown_key = False
     for line in yaml_block.split("\n"):
         stripped = line.strip()
         if ":" in stripped and not stripped.startswith("-"):
             key = stripped.split(":", 1)[0].strip()
-            if key not in known_keys:
+            in_unknown_key = key not in known_keys
+            if in_unknown_key:
                 lines.append(line)
+        elif stripped.startswith("-"):
+            if in_unknown_key:
+                lines.append(line)
+        else:
+            if in_unknown_key and stripped:
+                lines.append(line)
+            in_unknown_key = False
 
     lines.append("---")
     if body:
@@ -166,14 +175,8 @@ def check_frontmatter(
         metadata, _ = parse_vault_metadata(content)
 
         if feature:
-            from ..models import DocType
-
             feat = feature.lstrip("#")
-            type_values = {d.value for d in DocType}
-            feature_tags = [
-                t.lstrip("#") for t in metadata.tags if t.lstrip("#") not in type_values
-            ]
-            if feat not in feature_tags:
+            if feat not in extract_feature_tags(metadata.tags):
                 continue
 
         errors = metadata.validate()

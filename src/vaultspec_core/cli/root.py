@@ -13,6 +13,7 @@ from typing import Annotated
 
 import typer
 
+from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import (
     TargetOption,
     apply_target,
@@ -106,18 +107,6 @@ def main(
 # ---- Top-level commands ------------------------------------------------------
 
 
-def _handle_error(exc: Exception) -> None:
-    """Convert a domain exception to a CLI error exit."""
-    from vaultspec_core.core.exceptions import VaultSpecError
-
-    if isinstance(exc, VaultSpecError):
-        typer.echo(f"Error: {exc}", err=True)
-        if exc.hint:
-            typer.echo(f"  Hint: {exc.hint}", err=True)
-        raise typer.Exit(code=1) from exc
-    raise exc
-
-
 @app.command("install")
 def cmd_install(
     provider: Annotated[
@@ -142,12 +131,12 @@ def cmd_install(
         ),
     ] = False,
     skip: Annotated[
-        list[str],
+        list[str] | None,
         typer.Option(
             "--skip",
             help="Skip a component (core or provider name). Repeatable.",
         ),
-    ] = [],
+    ] = None,
 ) -> None:
     """Deploy the vaultspec framework to the target directory.
 
@@ -167,6 +156,7 @@ def cmd_install(
     from vaultspec_core.core.commands import install_run
     from vaultspec_core.core.exceptions import VaultSpecError
 
+    skip = skip or []
     path: Path = apply_target_install(target)
 
     # Guard: refuse to create deeply nested paths  - only allow creating the
@@ -261,12 +251,12 @@ def cmd_uninstall(
         typer.Option("--force", help="Required to execute. Uninstall is destructive."),
     ] = False,
     skip: Annotated[
-        list[str],
+        list[str] | None,
         typer.Option(
             "--skip",
             help="Skip a component (core or provider name). Repeatable.",
         ),
-    ] = [],
+    ] = None,
 ) -> None:
     """Remove the vaultspec framework from the target directory.
 
@@ -286,6 +276,7 @@ def cmd_uninstall(
     from vaultspec_core.core.commands import uninstall_run
     from vaultspec_core.core.exceptions import VaultSpecError
 
+    skip = skip or []
     path: Path = apply_target_install(target)
 
     if not path.exists():
@@ -351,12 +342,12 @@ def cmd_sync(
         ),
     ] = False,
     skip: Annotated[
-        list[str],
+        list[str] | None,
         typer.Option(
             "--skip",
             help="Skip a component (core or provider name). Repeatable.",
         ),
-    ] = [],
+    ] = None,
 ) -> None:
     """Sync rules, skills, agents, configs, and system prompts.
 
@@ -371,6 +362,7 @@ def cmd_sync(
     that provider (e.g. 'vaultspec-core sync claude').
     Use --skip to exclude providers (e.g. --skip claude --skip codex).
     """
+    skip = skip or []
     apply_target(target, split_source=True)
     if provider == "core":
         typer.echo(

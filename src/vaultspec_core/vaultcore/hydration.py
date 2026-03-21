@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING
 
 from .models import DocType
@@ -19,6 +20,12 @@ from .models import DocType
 __all__ = ["get_template_path", "hydrate_template"]
 
 logger = logging.getLogger(__name__)
+
+_KNOWN_PLACEHOLDERS = (
+    "{yyyy-mm-dd-*}",
+    "[[{yyyy-mm-dd-*}]]",
+    "{accepted|rejected|deprecated}",
+)
 
 if TYPE_CHECKING:
     import pathlib
@@ -87,20 +94,11 @@ def hydrate_template(
         hydrated = _inject_extra_tags(hydrated, extra_tags)
 
     # Check for remaining placeholders that might have been missed
-    import re
-
     # Pattern matches {key} or <key> where key is alphanumeric with hyphens
-    remaining = re.findall(r"[{<][a-z0-9\-|_|*]+[}>]", hydrated)
+    remaining = re.findall(r"[{<][a-z0-9\-_*]+[}>]", hydrated)
     if remaining:
         for placeholder in set(remaining):
-            # Skip common non-placeholder patterns if necessary,
-            # but generally everything in this format should be hydrated.
-            _known = (
-                "{yyyy-mm-dd-*}",
-                "[[{yyyy-mm-dd-*}]]",
-                "{accepted|rejected|deprecated}",
-            )
-            if placeholder in _known:
+            if placeholder in _KNOWN_PLACEHOLDERS:
                 continue
             logger.warning(
                 "Potential unhydrated placeholder found in template: %s", placeholder
@@ -120,8 +118,6 @@ def _inject_related(content: str, related: list[str]) -> str:
     Returns:
         Document text with the ``related:`` field updated.
     """
-    import re
-
     if not related:
         # Empty list - set related to empty
         new_block = "related: []"
@@ -131,10 +127,10 @@ def _inject_related(content: str, related: list[str]) -> str:
             lines.append(f'  - "{link}"')
         new_block = "\n".join(lines)
 
-    # Match the related: field and all its list items until next field or ---
+    # Match the related: field and all its list items
     pattern = re.compile(
-        r"^related:.*?(?=\n[a-zA-Z#-]|\n---|\Z)",
-        re.MULTILINE | re.DOTALL,
+        r"^related:(?:\n[ \t]+- .*)*",
+        re.MULTILINE,
     )
     result = pattern.sub(new_block, content, count=1)
     return result
@@ -150,8 +146,6 @@ def _inject_extra_tags(content: str, extra_tags: list[str]) -> str:
     Returns:
         Document text with extra tags appended to the ``tags:`` field.
     """
-    import re
-
     # Find the last tag entry line in the tags block
     # Tags block looks like:
     #   tags:

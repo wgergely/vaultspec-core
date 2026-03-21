@@ -31,7 +31,7 @@ def _make_git_dir(root: Path) -> Path:
     """Create a standard .git/ directory with enough structure to look real."""
     git_dir = root / ".git"
     git_dir.mkdir()
-    (git_dir / "HEAD").write_text("ref: refs/heads/main\n")
+    (git_dir / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
     (git_dir / "refs").mkdir()
     (git_dir / "objects").mkdir()
     return git_dir
@@ -40,7 +40,7 @@ def _make_git_dir(root: Path) -> Path:
 def _make_git_file(worktree: Path, gitdir_target: Path) -> Path:
     """Create a .git file (linked worktree pointer)."""
     git_file = worktree / ".git"
-    git_file.write_text(f"gitdir: {gitdir_target}\n")
+    git_file.write_text(f"gitdir: {gitdir_target}\n", encoding="utf-8")
     return git_file
 
 
@@ -86,7 +86,7 @@ class TestDiscoverGit:
         # Container with .gt/ bare repo
         gt = tmp_path / ".gt"
         gt.mkdir()
-        (gt / "HEAD").write_text("ref: refs/heads/main\n")
+        (gt / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
 
         info = discover_git(tmp_path)
 
@@ -99,7 +99,7 @@ class TestDiscoverGit:
         # Container root with .gt/
         gt = tmp_path / ".gt"
         gt.mkdir()
-        (gt / "HEAD").write_text("ref: refs/heads/main\n")
+        (gt / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
         wt_git_dir = gt / "worktrees" / "feature"
         wt_git_dir.mkdir(parents=True)
 
@@ -135,7 +135,8 @@ class TestDiscoverGit:
         wt = tmp_path / "wt1"
         wt.mkdir()
         # Write a relative gitdir pointer
-        (wt / ".git").write_text("gitdir: ../repo/.git/worktrees/wt1\n")
+        gitdir = "gitdir: ../repo/.git/worktrees/wt1\n"
+        (wt / ".git").write_text(gitdir, encoding="utf-8")
 
         info = discover_git(wt)
 
@@ -183,7 +184,7 @@ class TestResolveWorkspace:
         fw = _make_framework(tmp_path)
         gt = tmp_path / ".gt"
         gt.mkdir()
-        (gt / "HEAD").write_text("ref: refs/heads/main\n")
+        (gt / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
 
         layout = resolve_workspace(
             framework_root=fw,

@@ -8,16 +8,19 @@ Exports :class:`VaultDocument`, :func:`list_documents`, :func:`get_stats`,
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from .models import DocType
+from .parser import parse_frontmatter
+from .scanner import get_doc_type, scan_vault
 
 if TYPE_CHECKING:
     from pathlib import Path
-from .parser import parse_frontmatter
-from .scanner import get_doc_type, scan_vault
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -55,7 +58,7 @@ def _parse_date_from_filename(name: str) -> str | None:
 
 
 def _parse_feature_from_tags(tags: list[str], doc_type_tag: str | None) -> str | None:
-    """Return the first tag that is not a :class:`~vaultspec_core.vaultcore.models.DocType` value.
+    """Return the first non-:class:`~vaultspec_core.vaultcore.models.DocType` tag.
 
     Args:
         tags: Raw tag list from frontmatter (e.g. ``["#adr", "#editor-demo"]``).
@@ -204,7 +207,8 @@ def get_stats(
         graph = VaultGraph(root_dir)
         orphaned_count = len(graph.get_orphaned())
         invalid_link_count = len(graph.get_invalid_links())
-    except Exception:
+    except (OSError, ValueError) as exc:
+        logger.warning("Failed to build vault graph for stats: %s", exc)
         orphaned_count = 0
         invalid_link_count = 0
 

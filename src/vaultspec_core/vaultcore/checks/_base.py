@@ -15,7 +15,13 @@ if TYPE_CHECKING:
 
     from rich.console import Console
 
-__all__ = ["CheckDiagnostic", "CheckResult", "Severity", "render_check_result"]
+__all__ = [
+    "CheckDiagnostic",
+    "CheckResult",
+    "Severity",
+    "extract_feature_tags",
+    "render_check_result",
+]
 
 
 class Severity(StrEnum):
@@ -83,6 +89,24 @@ class CheckResult:
     def is_clean(self) -> bool:
         """``True`` when no diagnostics were produced."""
         return len(self.diagnostics) == 0
+
+
+def extract_feature_tags(tags: list[str]) -> list[str]:
+    """Return the feature tags from a list of vault tags.
+
+    Filters out directory tags (``#adr``, ``#exec``, etc.) and strips
+    leading ``#`` from the remaining feature tags.
+
+    Args:
+        tags: Raw tag strings from document metadata.
+
+    Returns:
+        List of feature tag values without ``#`` prefix.
+    """
+    from ..models import DocType
+
+    type_values = {d.value for d in DocType}
+    return [t.lstrip("#") for t in tags if t.lstrip("#") not in type_values]
 
 
 _SEVERITY_STYLE = {

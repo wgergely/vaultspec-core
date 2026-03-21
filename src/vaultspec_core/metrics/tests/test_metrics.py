@@ -27,7 +27,10 @@ class TestVaultSummary:
 
 
 class TestGetVaultMetrics:
-    """Integration tests for :func:`~vaultspec_core.metrics.api.get_vault_metrics` against the real fixture vault."""
+    """Integration tests for :func:`~vaultspec_core.metrics.api.get_vault_metrics`.
+
+    Runs against the real fixture vault.
+    """
 
     def test_counts_documents(self, vault_root):
         result = get_vault_metrics(vault_root)

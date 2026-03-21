@@ -1,11 +1,15 @@
-"""Vault document kernel: domain models, parsing, scanning, and hydration.
+"""Vault document kernel: models, parsing, scanning, and hydration.
 
-Re-exports from six internal modules: :mod:`.models` (:class:`~vaultspec_core.vaultcore.models.DocType`,
-:class:`~vaultspec_core.vaultcore.models.DocumentMetadata`, :class:`~vaultspec_core.vaultcore.models.VaultConstants`),
-:mod:`.parser` (:func:`~vaultspec_core.vaultcore.parser.parse_frontmatter`,
-:func:`~vaultspec_core.vaultcore.parser.parse_vault_metadata`), :mod:`.links`,
-:mod:`.scanner`, :mod:`.query`, and :mod:`.hydration`. Consumed by
-:mod:`vaultspec_core.metrics`, :mod:`vaultspec_core.graph`, and :mod:`vaultspec_core.mcp_server`.
+Re-exports from six internal modules: :mod:`.models`
+(:class:`~vaultspec_core.vaultcore.models.DocType`,
+:class:`~vaultspec_core.vaultcore.models.DocumentMetadata`,
+:class:`~vaultspec_core.vaultcore.models.VaultConstants`),
+:mod:`.parser`
+(:func:`~vaultspec_core.vaultcore.parser.parse_frontmatter`,
+:func:`~vaultspec_core.vaultcore.parser.parse_vault_metadata`),
+:mod:`.links`, :mod:`.scanner`, :mod:`.query`, and
+:mod:`.hydration`.  Consumed by :mod:`vaultspec_core.metrics`,
+:mod:`vaultspec_core.graph`, and :mod:`vaultspec_core.mcp_server`.
 """
 
 from .hydration import create_vault_doc as create_vault_doc

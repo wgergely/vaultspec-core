@@ -58,6 +58,9 @@ def _fix_filename(doc_path: Path, root_dir: Path, result: CheckResult) -> None:
             if not new_path.exists():
                 doc_path.rename(new_path)
                 result.fixed_count += 1
+                doc_path = new_path
+                rel = doc_path.relative_to(root_dir)
+                filename = new_filename
                 result.diagnostics.append(
                     CheckDiagnostic(
                         path=rel,
@@ -66,10 +69,9 @@ def _fix_filename(doc_path: Path, root_dir: Path, result: CheckResult) -> None:
                     )
                 )
                 logger.info("Renamed %s -> %s", filename, new_filename)
-                doc_path = new_path
-                filename = new_filename
             else:
                 logger.warning("Cannot rename %s: target exists", filename)
+                return
 
     if not re.match(r"^\d{4}-\d{2}-\d{2}-", filename):
         today = datetime.now().strftime("%Y-%m-%d")
@@ -79,6 +81,7 @@ def _fix_filename(doc_path: Path, root_dir: Path, result: CheckResult) -> None:
         if not new_path.exists():
             doc_path.rename(new_path)
             result.fixed_count += 1
+            rel = new_path.relative_to(root_dir)
             result.diagnostics.append(
                 CheckDiagnostic(
                     path=rel,

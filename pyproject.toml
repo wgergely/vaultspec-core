@@ -44,7 +44,7 @@ version = "0.1.0"
 
   [project.urls]
   "Bug Tracker" = "https://github.com/wgergely/vaultspec-core/issues"
-  Documentation = "https://github.com/wgergely/vaultspec-core/tree/main/.vaultspec/docs"
+  Documentation = "https://github.com/wgergely/vaultspec-core/tree/main/.vaultspec/README.md"
   Homepage = "https://github.com/wgergely/vaultspec-core"
   Repository = "https://github.com/wgergely/vaultspec-core"
 

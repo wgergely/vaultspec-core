@@ -97,7 +97,8 @@ def register_tools(mcp: FastMCP) -> None:
             try:
                 graph = VaultGraph(_t.TARGET_DIR)
                 rankings = dict(graph.get_feature_rankings(limit=100))
-            except Exception:
+            except (OSError, ValueError) as exc:
+                logger.warning("Failed to load vault graph rankings: %s", exc)
                 rankings = {}
 
             results = []
@@ -195,7 +196,16 @@ def register_tools(mcp: FastMCP) -> None:
 
         doc_type_str = type or "research"
         today = date or datetime.date.today().isoformat()
-        title_clean = (title or feature).strip().lower().replace(" ", "-")
+        title_raw = (title or feature).strip().lower().replace(" ", "-")
+        title_clean = re.sub(r"[/\\]", "-", title_raw).replace("..", "")
+        if not re.match(r"^[a-z0-9][a-z0-9-]*$", title_clean):
+            return {
+                "success": False,
+                "message": (
+                    f"Invalid title '{title_raw}'. "
+                    "Must be kebab-case (lowercase, digits, hyphens)."
+                ),
+            }
 
         await ctx.info(
             f"create: feature={feature!r} type={doc_type_str!r} "
@@ -211,8 +221,17 @@ def register_tools(mcp: FastMCP) -> None:
                 "message": f"Invalid document type: {doc_type_str}",
             }
 
-        # Clean feature
+        # Clean feature and reject path traversal characters
         feature_clean = feature.lstrip("#").strip().lower()
+        feature_clean = re.sub(r"[/\\]", "-", feature_clean).replace("..", "")
+        if not re.match(r"^[a-z0-9][a-z0-9-]*$", feature_clean):
+            return {
+                "success": False,
+                "message": (
+                    f"Invalid feature '{feature}'. "
+                    "Must be kebab-case (lowercase, digits, hyphens)."
+                ),
+            }
 
         # Validate extra tags
         extra_tags: list[str] | None = None
@@ -258,7 +277,7 @@ def register_tools(mcp: FastMCP) -> None:
                 warnings.append(diag)
 
         # Load template
-        template_path = _t.TEMPLATES_DIR / f"{doc_type_str}.md"
+        template_path = _t.TEMPLATES_DIR / f"{doc_type.value}.md"
         if not template_path.exists():
             return {
                 "success": False,
@@ -312,8 +331,12 @@ def register_tools(mcp: FastMCP) -> None:
                 doc_content = out_path.read_text(encoding="utf-8")
                 metadata, _ = parse_vault_metadata(doc_content)
                 validation_warnings = metadata.validate()
-            except (OSError, UnicodeDecodeError):
-                pass
+            except (OSError, UnicodeDecodeError) as exc:
+                logger.warning(
+                    "Post-creation validation failed for %s: %s",
+                    out_path.name,
+                    exc,
+                )
 
             parts = ["Document created successfully."]
             if warnings:

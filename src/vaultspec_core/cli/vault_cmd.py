@@ -7,17 +7,19 @@ Sub-groups: ``vault feature`` (:data:`feature_app`), ``vault graph``
 all backend logic. Mounted onto :data:`.root.app` as the ``vault`` sub-group.
 """
 
-import logging
-from typing import Annotated
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Annotated
 
 import typer
-from rich.console import Console
 
 from vaultspec_core.cli._target import TargetOption, apply_target
-from vaultspec_core.graph.api import VaultGraph
-from vaultspec_core.vaultcore.checks._base import CheckResult
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from rich.console import Console
+
+    from vaultspec_core.graph.api import VaultGraph
+    from vaultspec_core.vaultcore.checks._base import CheckResult
 
 vault_app = typer.Typer(
     help="Create, query, and audit records in the .vault/ project history.",

@@ -1,6 +1,7 @@
 """Vault health check suite for ``.vault/`` content.
 
-Re-exports the result contract (:class:`~vaultspec_core.vaultcore.checks._base.CheckResult`,
+Re-exports the result contract
+(:class:`~vaultspec_core.vaultcore.checks._base.CheckResult`,
 :class:`~vaultspec_core.vaultcore.checks._base.CheckDiagnostic`,
 :class:`~vaultspec_core.vaultcore.checks._base.Severity`) and all seven
 checker functions from their submodules. Use :func:`run_all_checks` for a

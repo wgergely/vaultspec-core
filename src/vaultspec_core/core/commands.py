@@ -84,7 +84,9 @@ def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, st
 def _scaffold_provider(
     target: Path, tool: Tool, *, dry_run: bool = False
 ) -> list[tuple[str, str]]:
-    """Scaffold directories for a single provider based on its :class:`~vaultspec_core.core.types.ToolConfig`.
+    """Scaffold directories for a single provider.
+
+    Uses its :class:`~vaultspec_core.core.types.ToolConfig`.
 
     Args:
         target: Workspace root directory.

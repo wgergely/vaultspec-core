@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from . import types as _t
+from .config_gen import _toml_quote
 from .enums import Tool
 from .exceptions import ResourceExistsError
 from .helpers import (
@@ -54,14 +55,9 @@ def transform_agent(_tool: Tool, _name: str, meta: dict[str, Any], body: str) ->
     return build_file(meta, body)
 
 
-def _toml_quote(value: str) -> str:
-    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
-    return f'"{escaped}"'
-
-
 def _toml_multiline(value: str) -> str:
-    escaped = value.replace("\\", "\\\\").replace('"""', '\\"""')
-    return f'"""\n{escaped}\n"""'
+    escaped = value.replace("'''", "'''\"'''\"'''")
+    return f"'''\n{escaped}\n'''"
 
 
 def _coerce_codex_model(meta: dict[str, Any]) -> str | None:

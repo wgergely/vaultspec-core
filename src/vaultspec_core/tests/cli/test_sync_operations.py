@@ -591,7 +591,8 @@ class TestEndToEndAllDestinations:
             "---\n---\n\n# Base", encoding="utf-8"
         )
 
-        # Remove all destination dirs and root configs to prove dry-run doesn't create them
+        # Remove all destination dirs and root configs to prove
+        # dry-run doesn't create them
         import shutil
 
         for d in [".claude", ".gemini", ".agents", ".codex"]:
