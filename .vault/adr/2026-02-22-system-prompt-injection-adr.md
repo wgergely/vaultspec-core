@@ -4,7 +4,7 @@ tags:
   - "#system-prompt-injection"
 date: "2026-02-22"
 related:
-  - "[[2026-02-22-system-prompt-injection-research.md]]"
+  - "[[2026-02-22-system-prompt-injection-research]]"
 ---
 # ADR: XML-Based System Prompt Injection
 

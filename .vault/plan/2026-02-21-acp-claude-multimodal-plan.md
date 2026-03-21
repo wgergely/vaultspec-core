@@ -4,8 +4,8 @@ tags:
   - "#acp-claude-multimodal"
 date: "2026-02-21"
 related:
-  - "[[2026-02-21-acp-claude-multimodal-adr.md]]"
-  - "[[2026-02-21-acp-claude-prompt-audit-research.md]]"
+  - "[[2026-02-21-acp-claude-multimodal-adr]]"
+  - "[[2026-02-21-acp-claude-prompt-audit-research]]"
 ---
 # Implementation Plan: ACP Claude Multi-Modal Prompt Support
 

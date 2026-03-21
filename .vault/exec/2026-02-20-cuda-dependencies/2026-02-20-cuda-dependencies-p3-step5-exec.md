@@ -10,7 +10,7 @@ related:
 
 Added `VAULTSPEC_RAG_ENABLED` entry to the Configuration table in `docs/search-guide.md`.
 
-- Modified: `[[docs/search-guide.md]]`
+- Modified: `[[docs/search-guide]]`
 
 ## Description
 

@@ -4,7 +4,8 @@ tags:
   - "#skill-audit"
 date: "2026-02-22"
 related:
-  - "[[2026-02-22-skill-audit-adr.md]]"
+  - "[[2026-02-22-skill-audit-research]]"
+  - "[[2026-02-22-skill-audit-adr]]"
 ---
 # Plan: Refactor Skills to Spec
 

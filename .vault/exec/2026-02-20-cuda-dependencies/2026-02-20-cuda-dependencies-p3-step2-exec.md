@@ -10,7 +10,7 @@ related:
 
 Added clarifying note about `nvidia-smi` vs `nvcc --version` to `docs/getting-started.md`.
 
-- Modified: `[[docs/getting-started.md]]`
+- Modified: `[[docs/getting-started]]`
 
 ## Description
 

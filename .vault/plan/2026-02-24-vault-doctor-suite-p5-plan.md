@@ -2,11 +2,11 @@
 tags: ["#plan", "#vault-doctor-suite"]
 date: "2026-02-24"
 related:
+  - "[[2026-02-24-vault-doctor-suite-research]]"
   - "[[2026-02-24-vault-doctor-suite-adr]]"
   - "[[2026-02-24-vault-doctor-suite-plan]]"
   - "[[2026-02-24-vault-doctor-suite-p1-plan]]"
 ---
-
 # `vault-doctor-suite` P5 plan: Coverage Matrix and Reporting
 
 This phase implements the `COVERAGE` check category — a per-feature doc-type

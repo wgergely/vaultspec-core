@@ -4,8 +4,8 @@ tags:
   - "#acp-claude-reliability"
 date: "2026-02-21"
 related:
-  - "[[2026-02-21-acp-claude-reliability-adr.md]]"
-  - "[[2026-02-21-acp-claude-final-audit-research.md]]"
+  - "[[2026-02-21-acp-claude-reliability-adr]]"
+  - "[[2026-02-21-acp-claude-final-audit-research]]"
 ---
 # Implementation Plan: ACP Claude Reliability & Permissions
 

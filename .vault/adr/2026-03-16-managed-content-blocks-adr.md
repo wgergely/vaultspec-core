@@ -5,11 +5,15 @@ tags:
   - "#managed-blocks"
 date: "2026-03-16"
 related:
+  - "[[2026-03-16-binding-decisions-research]]"
+  - "[[2026-03-16-antigravity-provider-research]]"
+  - "[[2026-03-15-gemini-cli-provider-research]]"
+  - "[[2026-03-15-codex-cli-provider-research]]"
+  - "[[2026-03-15-claude-code-provider-research]]"
   - "[[2026-03-16-managed-content-blocks-research]]"
   - "[[2026-03-16-binding-decisions]]"
   - "[[2026-03-15-install-cmds-capability-audit]]"
 ---
-
 # Managed content blocks ADR: `<vaultspec>` tag system | (**status:** `accepted`)
 
 ## Problem Statement

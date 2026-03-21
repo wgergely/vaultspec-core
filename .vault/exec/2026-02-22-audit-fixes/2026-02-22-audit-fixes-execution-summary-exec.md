@@ -4,7 +4,7 @@ tags:
   - "#audit-fixes"
 date: "2026-02-22"
 related:
-  - "[[2026-02-22-audit-fixes-plan.md]]"
+  - "[[2026-02-22-audit-fixes-plan]]"
 ---
 # Execution Summary: Audit Remediations
 

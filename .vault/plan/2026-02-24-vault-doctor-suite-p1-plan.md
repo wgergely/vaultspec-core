@@ -2,10 +2,10 @@
 tags: ["#plan", "#vault-doctor-suite"]
 date: "2026-02-24"
 related:
+  - "[[2026-02-24-vault-doctor-suite-research]]"
   - "[[2026-02-24-vault-doctor-suite-adr]]"
   - "[[2026-02-24-vault-doctor-suite-plan]]"
 ---
-
 # `vault-doctor-suite` P1 plan: Foundation — Models, Registry, Safe Writer, CLI Scaffold, Remove `vault audit`
 
 This phase lays the complete foundation for the doctor suite. It creates the

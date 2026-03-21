@@ -4,7 +4,7 @@ tags:
   - "#codebase-audit"
 date: "2026-02-22"
 related:
-  - "[[2026-02-22-codebase-audit-research.md]]"
+  - "[[2026-02-22-codebase-audit-research]]"
 ---
 # Codebase Audit Report: Security & Robustness
 

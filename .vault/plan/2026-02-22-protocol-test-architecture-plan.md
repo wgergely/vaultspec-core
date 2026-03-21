@@ -4,6 +4,7 @@ tags:
   - "#protocol-tests"
 date: "2026-02-22"
 related:
+  - "[[2026-02-22-protocol-test-architecture-research]]"
   - "[[2026-02-22-protocol-test-architecture-adr]]"
 ---
 # Plan: Protocol Test Architecture Implementation

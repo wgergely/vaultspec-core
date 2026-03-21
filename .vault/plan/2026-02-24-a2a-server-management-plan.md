@@ -4,7 +4,7 @@ tags:
   - "#a2a-server-management"
 date: 2026-02-24
 related:
-  - "[[2026-02-24-a2a-adr.md]]"
+  - "[[2026-02-24-a2a-adr]]"
 ---
 
 # A2A Server Management CLI & Daemonization Plan

@@ -4,7 +4,8 @@ tags:
   - "#acp-claude-multimodal"
 date: "2026-02-21"
 related:
-  - "[[2026-02-21-acp-claude-prompt-audit-research.md]]"
+  - "[[2026-02-21-claude-sdk-query-signature-research]]"
+  - "[[2026-02-21-acp-claude-prompt-audit-research]]"
 ---
 # ACP Claude Multi-Modal Prompt Support | (**status:** `proposed`)
 
@@ -46,4 +47,4 @@ We will upgrade the `ClaudeACPBridge` to support multi-modal prompts by implemen
 ## Compliance
 
 *   **Tags**: `#adr`, `#acp-claude-multimodal`
-*   **Related**: `[[2026-02-21-acp-claude-prompt-audit-research.md]]`
+*   **Related**: `[[2026-02-21-acp-claude-prompt-audit-research]]`

@@ -10,9 +10,9 @@ related:
 
 Added compute capability >= 7.5 (Turing+) requirement to prerequisites sections, scoped to the RAG index backend.
 
-- Modified: `[[README.md]]`
-- Modified: `[[docs/getting-started.md]]`
-- Modified: `[[docs/search-guide.md]]`
+- Modified: `[[README]]`
+- Modified: `[[docs/getting-started]]`
+- Modified: `[[docs/search-guide]]`
 
 ## Description
 

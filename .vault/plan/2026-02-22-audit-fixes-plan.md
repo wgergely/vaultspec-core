@@ -4,11 +4,11 @@ tags:
   - "#audit-fixes"
 date: "2026-02-22"
 related:
-  - "[[2026-02-22-audit-fixes-adr.md]]"
+  - "[[2026-02-22-audit-fixes-adr]]"
 ---
 # Plan: Audit Remediations (Logging & Robustness)
 
-This plan executes the fixes mandated by `[[2026-02-22-audit-fixes-adr.md]]` to improve logging and robustness across the codebase.
+This plan executes the fixes mandated by `[[2026-02-22-audit-fixes-adr]]` to improve logging and robustness across the codebase.
 
 ## Phase 1: RAG Resilience
 - [ ] **Target:** `src/vaultspec/rag/api.py`

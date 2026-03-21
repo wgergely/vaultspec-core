@@ -10,7 +10,7 @@ related:
 
 Strengthened README Prerequisites section and Quick Start note to explicitly couple all CUDA/GPU requirements with the RAG index backend.
 
-- Modified: `[[README.md]]`
+- Modified: `[[README]]`
 
 ## Description
 

@@ -34,7 +34,7 @@ top level).
 No `@rules/...` include syntax is used anywhere — there are zero occurrences.
 No YAML frontmatter `skill_file:`, `agent_file:`, or `template:` path fields
 exist in any file. Wiki-links (`[[...]]`) are all used as artifact cross-
-references (e.g., `[[yyyy-mm-dd-feature-plan.md]]`), not as filesystem path
+references (e.g., `[[yyyy-mm-dd-feature-plan]]`), not as filesystem path
 references — they are all correct by convention.
 
 ---
@@ -85,7 +85,7 @@ These references should read `.vaultspec/rules/templates/`.
 
 - **Line 59:** `.vaultspec/templates/adr.md`
   ```
-    the findings in `[[...-research.md]]`. Use the template at
+    the findings in `[[...-research]]`. Use the template at
     `.vaultspec/templates/adr.md`."
   ```
   STATUS: STALE — omits `rules/` segment.
@@ -100,7 +100,7 @@ These references should read `.vaultspec/rules/templates/`.
 
 - **Line 70:** `.vaultspec/templates/plan.md`
   ```
-    `[[...-adr.md]]`. Use the template at `.vaultspec/templates/plan.md`."
+    `[[...-adr]]`. Use the template at `.vaultspec/templates/plan.md`."
   ```
   STATUS: STALE — omits `rules/` segment.
 

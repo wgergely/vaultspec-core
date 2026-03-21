@@ -4,7 +4,7 @@ tags:
   - "#system-prompt-injection"
 date: "2026-02-22"
 related:
-  - "[[2026-02-22-system-prompt-injection-plan.md]]"
+  - "[[2026-02-22-system-prompt-injection-plan]]"
 ---
 # Execution Summary: System Prompt Injection
 

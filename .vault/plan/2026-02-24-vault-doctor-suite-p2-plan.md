@@ -2,11 +2,11 @@
 tags: ["#plan", "#vault-doctor-suite"]
 date: "2026-02-24"
 related:
+  - "[[2026-02-24-vault-doctor-suite-research]]"
   - "[[2026-02-24-vault-doctor-suite-adr]]"
   - "[[2026-02-24-vault-doctor-suite-plan]]"
   - "[[2026-02-24-vault-doctor-suite-p1-plan]]"
 ---
-
 # `vault-doctor-suite` P2 plan: Structure and Links Checks
 
 This phase implements the `STRUCTURE` and `LINKS` check categories. Both are

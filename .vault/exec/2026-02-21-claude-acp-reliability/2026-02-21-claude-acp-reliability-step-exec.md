@@ -4,7 +4,7 @@ tags:
   - "#claude-acp-reliability"
 date: "2026-02-21"
 related:
-  - "[[2026-02-21-acp-claude-reliability-plan.md]]"
+  - "[[2026-02-21-acp-claude-reliability-plan]]"
 ---
 # Step Record: ACP Claude Reliability & Permissions
 

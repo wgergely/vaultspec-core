@@ -4,7 +4,7 @@ tags:
   - "#skill-audit"
 date: "2026-02-22"
 related:
-  - "[[2026-02-22-skill-audit-research.md]]"
+  - "[[2026-02-22-skill-audit-research]]"
 ---
 # ADR: Standardize Skill Structure
 

@@ -4,11 +4,12 @@ tags:
   - "#system-prompt-injection"
 date: "2026-02-22"
 related:
-  - "[[2026-02-22-system-prompt-injection-adr.md]]"
+  - "[[2026-02-22-system-prompt-injection-research]]"
+  - "[[2026-02-22-system-prompt-injection-adr]]"
 ---
 # Plan: XML-Based System Prompt Injection
 
-This plan executes the refactor of `src/vaultspec/cli.py` to use XML-based injection for skills and sub-agents, as mandated by `[[2026-02-22-system-prompt-injection-adr.md]]`.
+This plan executes the refactor of `src/vaultspec/cli.py` to use XML-based injection for skills and sub-agents, as mandated by `[[2026-02-22-system-prompt-injection-adr]]`.
 
 ## Phase 1: Preparation
 - [ ] Verify `skills-ref` library availability in the environment (installed from local `tmp-ref/agentskills` or via pip if published).

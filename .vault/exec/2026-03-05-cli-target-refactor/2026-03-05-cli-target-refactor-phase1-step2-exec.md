@@ -1,9 +1,11 @@
 ---
+tags:
+  - "#cli"
+  - "#refactor"
+  - "#phase1"
+date: 2026-03-05
 title: "Phase 1 Step 2: Global Reference Updates & Config Registry Cleanup"
-date: "2026-03-05"
-tags: [cli, refactor, phase1]
 ---
-
 # Global Reference Updates & Config Registry Cleanup
 
 **Context:** Following the reorientation of `WorkspaceLayout` towards a single `target_dir`, all remaining usage of the older variables (`_t.ROOT_DIR`, `args.root`, `args.content_dir`) throughout the codebase needed to be replaced to solidify the unified path mechanism.

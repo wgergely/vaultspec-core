@@ -2,6 +2,7 @@
 tags: ["#plan", "#vault-doctor-suite"]
 date: "2026-02-24"
 related:
+  - "[[2026-02-24-vault-doctor-suite-research]]"
   - "[[2026-02-24-vault-doctor-suite-adr]]"
   - "[[2026-02-24-vault-doctor-suite-plan]]"
   - "[[2026-02-24-vault-doctor-suite-p1-plan]]"
@@ -10,7 +11,6 @@ related:
   - "[[2026-02-24-vault-doctor-suite-p4-plan]]"
   - "[[2026-02-24-vault-doctor-suite-p5-plan]]"
 ---
-
 # `vault-doctor-suite` P6 plan: Integration, Pre-commit Hooks, MCP Tool, and Docs
 
 This phase is the integration and hardening layer. It runs the full check

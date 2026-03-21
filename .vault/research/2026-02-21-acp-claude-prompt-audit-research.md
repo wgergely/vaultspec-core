@@ -4,7 +4,7 @@ tags:
   - "#acp-claude-audit"
 date: "2026-02-21"
 related:
-  - "[[2026-02-21-acp-claude-audit-research.md]]"
+  - "[[2026-02-21-acp-claude-audit-research]]"
 ---
 # ACP Claude Prompt Handling Audit
 

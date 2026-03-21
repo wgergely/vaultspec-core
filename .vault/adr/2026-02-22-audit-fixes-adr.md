@@ -4,12 +4,12 @@ tags:
   - "#audit-fixes"
 date: "2026-02-22"
 related:
-  - "[[2026-02-22-codebase-audit.md]]"
+  - "[[2026-02-22-codebase-audit]]"
 ---
 # ADR: Audit Remediations (Logging & Robustness)
 
 ## Context
-A comprehensive codebase audit `[[2026-02-22-codebase-audit.md]]` identified three key areas for improvement:
+A comprehensive codebase audit `[[2026-02-22-codebase-audit]]` identified three key areas for improvement:
 1.  **RAG Resilience:** The `get_document` API crashes on non-GPU systems when RAG is enabled.
 2.  **CLI Logging:** The `cli.py` module uses `print` statements instead of the structured logging infrastructure.
 3.  **Hydration Visibility:** The `hydration.py` module silently swallows errors during template hydration.

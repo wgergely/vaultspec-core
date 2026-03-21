@@ -4,7 +4,7 @@ tags:
   - "#claude-acp-multimodal"
 date: "2026-02-21"
 related:
-  - "[[2026-02-21-acp-claude-multimodal-plan.md]]"
+  - "[[2026-02-21-acp-claude-multimodal-plan]]"
 ---
 # Code Review: Multi-Modal Prompt Support
 

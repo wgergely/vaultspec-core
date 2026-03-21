@@ -4,7 +4,7 @@ tags:
   - "#framework"
 date: "2026-03-06"
 related:
-  - "[[2026-03-06-mcp-agent-persona-research.md]]"
+  - "[[2026-03-06-mcp-agent-persona-research]]"
 ---
 
 # Architecture Decision Record: MCP Agent Persona Tools

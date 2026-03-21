@@ -12,7 +12,7 @@ related:
 Removed `AGENTS_SRC_DIR` from `src/vaultspec/core/__init__.py` (implicitly, as it was not found). Verified no `ImportError` crashes prevented `uv run vaultspec` from executing.
 
 - Modified: None
-- Created: `[[.vault/exec/2026-03-05-cli-target-refactor/2026-03-05-cli-target-refactor-phase0-step1.md]]`
+- Created: `[[.vault/exec/2026-03-05-cli-target-refactor/2026-03-05-cli-target-refactor-phase0-step1]]`
 
 ## Description
 

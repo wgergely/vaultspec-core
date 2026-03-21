@@ -4,7 +4,8 @@ tags:
   - "#acp-claude-reliability"
 date: "2026-02-21"
 related:
-  - "[[2026-02-21-acp-claude-final-audit-research.md]]"
+  - "[[2026-02-21-claude-sdk-verification-research]]"
+  - "[[2026-02-21-acp-claude-final-audit-research]]"
 ---
 # ACP Claude Permission & Reliability Fixes | (**status:** `superseded`)
 
@@ -60,4 +61,4 @@ We will implement the following changes to achieve full parity and reliability:
 ## Compliance
 
 * **Tags**: `#adr`, `#acp-claude-reliability`
-* **Related**: `[[2026-02-21-acp-claude-final-audit-research.md]]`
+* **Related**: `[[2026-02-21-acp-claude-final-audit-research]]`

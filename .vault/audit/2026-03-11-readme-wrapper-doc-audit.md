@@ -1,10 +1,9 @@
 ---
-date: 2026-03-11
 tags:
-  - audit
-  - documentation
+  - "#audit"
+  - "#documentation"
+date: 2026-03-11
 ---
-
 # README Wrapper and User-Facing Documentation Audit
 
 ## Scope

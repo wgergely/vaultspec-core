@@ -4,6 +4,7 @@ tags:
   - "#protocol"
 date: "2026-02-15"
 related:
+  - "[[2026-02-07-a2a-research]]"
   - "[[2026-02-08-vault-api-adr]]"
 ---
 # provider-parity adr: Align Provider Feature Surface and Terminology | (**status:** accepted)

@@ -4,7 +4,7 @@ tags:
   - "#claude-acp-bidirectional"
 date: "2026-02-21"
 related:
-  - "[[2026-02-21-claude-acp-bidirectional-impl-plan.md]]"
+  - "[[2026-02-21-claude-acp-bidirectional-impl-plan]]"
 ---
 # Step Record: Phase 5 & 6 - Tool Content & TodoWrite
 

@@ -10,10 +10,10 @@ related:
 
 Standardized `--extra-index-url` across all install references in documentation and added a prominent warning callout in `docs/getting-started.md`.
 
-- Modified: `[[README.md]]`
-- Modified: `[[docs/getting-started.md]]`
-- Modified: `[[docs/search-guide.md]]`
-- Modified: `[[docs/guides/individual-developer.md]]`
+- Modified: `[[README]]`
+- Modified: `[[docs/getting-started]]`
+- Modified: `[[docs/search-guide]]`
+- Modified: `[[docs/guides/individual-developer]]`
 
 ## Description
 
