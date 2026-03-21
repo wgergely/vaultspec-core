@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#exec"
-  - "#cli-ecosystem-factoring"
-date: "2026-02-22"
+  - '#exec'
+  - '#cli-ecosystem-factoring'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-cli-ecosystem-factoring-plan]]"
-  - "[[2026-02-22-cli-ecosystem-factoring-research]]"
+  - '[[2026-02-22-cli-ecosystem-factoring-plan]]'
+  - '[[2026-02-22-cli-ecosystem-factoring-research]]'
 ---
+
 # cli-ecosystem-factoring phase2 step1
 
 ## objective

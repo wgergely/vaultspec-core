@@ -1,13 +1,14 @@
 ---
 tags:
-  - "#adr"
-  - "#framework"
-date: "2026-02-16"
+  - '#adr'
+  - '#framework'
+date: '2026-02-16'
 related:
-  - "[[2026-02-16-env-var-research]]"
-  - "[[2026-02-16-hardcoded-constants-research]]"
-  - "[[2026-02-16-environment-variable-research]]"
+  - '[[2026-02-16-env-var-research]]'
+  - '[[2026-02-16-hardcoded-constants-research]]'
+  - '[[2026-02-16-environment-variable-research]]'
 ---
+
 ## Environment Variable Standardization Blueprint
 
 ## Executive Summary
@@ -33,19 +34,24 @@ The vaultspec codebase has **fragmented environment variable management** across
 Create a unified, maintainable configuration system that:
 
 1. **Centralizes all configuration** in a single `config.py` module
-2. **Standardizes naming** using `VAULTSPEC_*` prefix for all environment variables
-3. **Validates all configuration** with type safety and bounds checking
 
-4. **Documents all variables** in a canonical registry (`.env.example`)
-5. **Supports dependency injection** for testing without environment manipulation
-6. **Eliminates duplicate constants** through shared test fixtures
-7. **Provides clear precedence** (constructor param → env var → hardcoded default)
+1. **Standardizes naming** using `VAULTSPEC_*` prefix for all environment variables
+
+1. **Validates all configuration** with type safety and bounds checking
+
+1. **Documents all variables** in a canonical registry (`.env.example`)
+
+1. **Supports dependency injection** for testing without environment manipulation
+
+1. **Eliminates duplicate constants** through shared test fixtures
+
+1. **Provides clear precedence** (constructor param → env var → hardcoded default)
 
 ### High-Level Impact & Benefits
 
 | Benefit | Impact |
 
-|---------|--------|
+|\---------|--------|
 | **Discoverability** | Developers immediately know all available configurations |
 | **Maintainability** | Centralized registry prevents drift and duplication |
 | **Type Safety** | Structured config with validation catches errors early |
@@ -55,7 +61,7 @@ Create a unified, maintainable configuration system that:
 | **Extensibility** | Add new configs without discovering scattered patterns |
 | **Auditability** | Single source of truth for configuration access |
 
----
+______________________________________________________________________
 
 ## Complete Environment Variable Registry
 
@@ -64,18 +70,22 @@ This is the canonical table of **ALL environment variables that SHOULD exist** i
 ### Naming Convention
 
 - **Prefix**: `VAULTSPEC_` (primary standard), legacy `VS_*` accepted during transition
+
 - **Grouping**: `VAULTSPEC_{CATEGORY}_{ITEM}` (e.g., `VAULTSPEC_MCP_PORT`)
 
 - **Format**: ALL_CAPS with underscores
+
 - **Lists**: Comma-separated values (e.g., `tool1,tool2,tool3`)
+
 - **Numeric**: Bare numbers for ports, decimal for timeouts/floats
+
 - **Paths**: Absolute or relative; resolved at runtime
 
 ### Complete Registry
 
-| Variable Name | Category | Current Value | Type | Default | Description | Priority | Risk | Status |
-|---|---|---|---|---|---|---|---|---|
-| `VAULTSPEC_ROOT_DIR` | Core | `os.getcwd()` | Path | `cwd` | Workspace root directory | HIGH | LOW | Existing (VS_ROOT_DIR) |
+| Variable Name        | Category | Current Value | Type | Default | Description              | Priority | Risk | Status                 |
+| -------------------- | -------- | ------------- | ---- | ------- | ------------------------ | -------- | ---- | ---------------------- |
+| `VAULTSPEC_ROOT_DIR` | Core     | `os.getcwd()` | Path | `cwd`   | Workspace root directory | HIGH     | LOW  | Existing (VS_ROOT_DIR) |
 
 | `VAULTSPEC_AGENT_MODE` | Agent | "read-write" | Enum | "read-write" | Agent sandboxing policy (read-write/read-only) | HIGH | LOW | Existing (VS_AGENT_MODE) |
 | `VAULTSPEC_SYSTEM_PROMPT` | Agent | `None` | String | `None` | System prompt override for agent | MEDIUM | LOW | Existing (VS_SYSTEM_PROMPT) |
@@ -120,12 +130,12 @@ This is the canonical table of **ALL environment variables that SHOULD exist** i
 **Summary:**
 
 - **Total variables**: 33
-- **Existing (VS_*)**: 14
-- **New (VAULTSPEC_*)**: 19
+- **Existing (VS\_\*)**: 14
+- **New (VAULTSPEC\_\*)**: 19
 - **Priority distribution**: 6 HIGH, 12 MEDIUM, 15 LOW/REFERENCE
 - **Categories**: Agent (7), MCP (4), A2A (2), Storage (4), Tools (3), Orchestration (1), RAG (3), I/O (2), Test (1), Legacy (1), Reference (2)
 
----
+______________________________________________________________________
 
 ## Core Config Module Design
 
@@ -177,7 +187,9 @@ class ConfigVariable:
 # ===== REGISTRY =====
 
 CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
+
     # Agent variables
+
     "VAULTSPEC_AGENT_MODE": ConfigVariable(
         name="VAULTSPEC_AGENT_MODE",
         var_type=str,
@@ -255,6 +267,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
     ),
 
     # MCP variables
+
     "VAULTSPEC_MCP_ROOT_DIR": ConfigVariable(
         name="VAULTSPEC_MCP_ROOT_DIR",
         var_type=Path,
@@ -286,6 +299,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
     ),
 
     # A2A variables
+
     "VAULTSPEC_A2A_DEFAULT_PORT": ConfigVariable(
         name="VAULTSPEC_A2A_DEFAULT_PORT",
         var_type=int,
@@ -302,6 +316,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
     ),
 
     # Storage variables
+
     "VAULTSPEC_DOCS_DIR": ConfigVariable(
         name="VAULTSPEC_DOCS_DIR",
         var_type=Path,
@@ -328,6 +343,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
     ),
 
     # Tool directories
+
     "VAULTSPEC_CLAUDE_DIR": ConfigVariable(
         name="VAULTSPEC_CLAUDE_DIR",
         var_type=Path,
@@ -348,6 +364,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
     ),
 
     # Orchestration variables
+
     "VAULTSPEC_TASK_ENGINE_TTL_SECONDS": ConfigVariable(
         name="VAULTSPEC_TASK_ENGINE_TTL_SECONDS",
         var_type=float,
@@ -357,6 +374,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
     ),
 
     # RAG variables
+
     "VAULTSPEC_GRAPH_TTL_SECONDS": ConfigVariable(
         name="VAULTSPEC_GRAPH_TTL_SECONDS",
         var_type=float,
@@ -382,6 +400,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
     ),
 
     # I/O variables
+
     "VAULTSPEC_IO_BUFFER_SIZE": ConfigVariable(
         name="VAULTSPEC_IO_BUFFER_SIZE",
         var_type=int,
@@ -400,6 +419,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
     ),
 
     # Reference variables (read-only, not configurable at runtime)
+
     "VAULTSPEC_GEMINI_MIN_VERSION_WINDOWS": ConfigVariable(
         name="VAULTSPEC_GEMINI_MIN_VERSION_WINDOWS",
         var_type=str,
@@ -414,6 +434,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
     ),
 
     # Test variables
+
     "VAULTSPEC_TEST_LANCE_SUFFIX": ConfigVariable(
         name="VAULTSPEC_TEST_LANCE_SUFFIX",
         var_type=str,
@@ -459,6 +480,7 @@ class VaultSpecConfig:
     """
 
     # Agent configuration
+
     agent_mode: str = "read-write"
     max_turns: Optional[int] = None
     budget_usd: Optional[float] = None
@@ -472,43 +494,52 @@ class VaultSpecConfig:
     root_dir: Path = field(default_factory=lambda: Path.cwd())
 
     # MCP configuration
+
     mcp_root_dir: Optional[Path] = None
     mcp_port: int = 10010
     mcp_host: str = "0.0.0.0"
     mcp_ttl_seconds: float = 3600.0
 
     # A2A configuration
+
     a2a_default_port: int = 10010
     a2a_host: str = "localhost"
 
     # Storage configuration
+
     docs_dir: Path = field(default_factory=lambda: Path(".vault"))
     framework_dir: Path = field(default_factory=lambda: Path(".vaultspec"))
     lance_dir: Path = field(default_factory=lambda: Path(".lance"))
     index_metadata_file: str = "index_meta.json"
 
     # Tool directories
+
     claude_dir: Path = field(default_factory=lambda: Path(".claude"))
     gemini_dir: Path = field(default_factory=lambda: Path(".gemini"))
     agent_dir: Path = field(default_factory=lambda: Path(".agent"))
 
     # Orchestration configuration
+
     task_engine_ttl_seconds: float = 3600.0
 
     # RAG configuration
+
     graph_ttl_seconds: float = 300.0
     embedding_batch_size: int = 64
     max_embed_chars: int = 8000
 
     # I/O configuration
+
     io_buffer_size: int = 8192
     terminal_output_limit: int = 1000000
 
     # Reference configuration
+
     gemini_min_version_windows: str = "0.9.0"
     gemini_min_version_recommended: str = "0.27.0"
 
     # Test configuration
+
     test_lance_suffix: str = "-fast"
 
     @classmethod
@@ -528,13 +559,16 @@ class VaultSpecConfig:
         kwargs = {}
 
         for attr_name, config_var in CONFIG_REGISTRY.items():
+
             # Check override first
+
             if override and config_var.name.lower().replace("vaultspec_", "") in override:
                 kwargs[config_var.name.lower().replace("vaultspec_", "")] = \
                     override[config_var.name.lower().replace("vaultspec_", "")]
                 continue
 
             # Read from environment
+
             env_value = os.environ.get(config_var.name)
 
             if env_value is None:
@@ -546,6 +580,7 @@ class VaultSpecConfig:
                 continue
 
             # Parse value
+
             try:
                 if config_var.parser:
                     parsed_value = config_var.parser(env_value)
@@ -559,6 +594,7 @@ class VaultSpecConfig:
                     parsed_value = env_value
 
                 # Validate options if provided
+
                 if config_var.options and parsed_value not in config_var.options:
                     raise ValueError(
                         f"Invalid value for {config_var.name}: {parsed_value}. "
@@ -566,6 +602,7 @@ class VaultSpecConfig:
                     )
 
                 # Validate min/max if provided
+
                 if config_var.min_value is not None and parsed_value < config_var.min_value:
                     raise ValueError(
                         f"Value for {config_var.name} ({parsed_value}) below minimum ({config_var.min_value})"
@@ -603,20 +640,13 @@ class VaultSpecConfig:
             raise ValueError("MCP root directory is required")
 
 
-
-
-
         logger.info("Configuration validated successfully")
 
 
 # ===== GLOBAL INSTANCE =====
 
 
-
-
 _config: Optional[VaultSpecConfig] = None
-
-
 
 
 def get_config(override: Optional[Dict[str, Any]] = None) -> VaultSpecConfig:
@@ -625,17 +655,12 @@ def get_config(override: Optional[Dict[str, Any]] = None) -> VaultSpecConfig:
     Get the global configuration instance.
 
 
-
-
-
     Creates one on first call, caches it for subsequent calls.
 
     Pass override dict to create a new instance for testing.
 
     """
     global _config
-
-
 
 
     if override is not None:
@@ -651,12 +676,7 @@ def get_config(override: Optional[Dict[str, Any]] = None) -> VaultSpecConfig:
         _config = VaultSpecConfig.from_environment()
 
 
-
-
-
     return _config
-
-
 
 
 def reset_config() -> None:
@@ -696,6 +716,7 @@ Constructor param (override dict)
 #### 3. Validation Patterns
 
 - **Type checking**: Parser functions handle str→int/float/Path conversion
+
 - **Range validation**: Min/max bounds for numeric values
 
 - **Option validation**: Enum-like values must be in allowed list
@@ -725,6 +746,7 @@ reset_config()
 
 
 # Or use pytest fixture
+
 @pytest.fixture
 
 def config():
@@ -734,7 +756,7 @@ def config():
     reset_config()
 ```
 
----
+______________________________________________________________________
 
 ## Test Constants Consolidation
 
@@ -772,6 +794,7 @@ TEST_VAULT = TEST_PROJECT / ".vault"
 
 
 # RAG test corpus (representative subset for fast tests)
+
 GPU_FAST_CORPUS_STEMS: FrozenSet[str] = frozenset({
     "adr/2025-12-05-gemini-provider-acp-integration",
     "adr/2026-01-10-vector-store-incremental-indexing",
@@ -797,6 +820,7 @@ GPU_FAST_CORPUS_STEMS: FrozenSet[str] = frozenset({
 
 
 # Detection flags
+
 try:
 
 
@@ -808,24 +832,19 @@ except ImportError:
     HAS_CUDA = False
 
 
-
 HAS_RAG = HAS_CUDA  # RAG tests only run on GPU systems
 
 
-
-
 # Lance test directory suffixes (for test isolation)
+
 LANCE_SUFFIX_FAST = "-fast"      # Fast corpus subset
 LANCE_SUFFIX_FULL = "-full"      # Full corpus (slow tests)
 
 LANCE_SUFFIX_UNIT = "-fast-unit" # Unit test isolation
 
 
-
-
-
-
 # Test port ranges (safe ranges that don't conflict)
+
 TEST_PORT_BASE = 10001
 
 TEST_PORT_A2A_BASE = 10020
@@ -834,9 +853,8 @@ TEST_PORT_A2A_BASE = 10020
 TEST_PORT_SUBAGENT = 10010  # MCP server default
 
 
-
-
 # Test timeouts (seconds)
+
 TIMEOUT_QUICK_TEST = 15
 
 TIMEOUT_INTEGRATION_TEST = 120
@@ -853,8 +871,6 @@ TIMEOUT_FULL_CYCLE = 180
 TIMEOUT_A2A_E2E = 300
 
 
-
-
 # Test delays (sleep values in seconds)
 
 DELAY_SHORT = 0.2
@@ -865,6 +881,7 @@ DELAY_LONG = 1.0
 
 
 # ACP test helpers timeouts
+
 ACP_TIMEOUT_READ = 10.0
 
 ACP_TIMEOUT_MESSAGE = 30.0
@@ -879,18 +896,17 @@ ACP_TIMEOUT_MESSAGE = 30.0
 # BEFORE (lines 37-58):
 
 
-
 GPU_FAST_CORPUS_STEMS = frozenset({
     "adr/2025-12-05-gemini-provider-acp-integration",
+
     # ... 12 more items
 
 })
 
 
 # AFTER:
+
 from tests.constants import GPU_FAST_CORPUS_STEMS, HAS_RAG, TEST_PROJECT
-
-
 
 
 ```
@@ -898,6 +914,7 @@ from tests.constants import GPU_FAST_CORPUS_STEMS, HAS_RAG, TEST_PROJECT
 **`.vaultspec/lib/src/rag/tests/conftest.py`:**
 
 ```python
+
 # BEFORE (lines 31-47):
 
 GPU_FAST_CORPUS_STEMS = frozenset({
@@ -905,13 +922,13 @@ GPU_FAST_CORPUS_STEMS = frozenset({
     "adr/2025-12-05-gemini-provider-acp-integration",
 
 
-
-
     # ... 12 more items
+
 })
 
 
 # AFTER:
+
 from tests.constants import GPU_FAST_CORPUS_STEMS, LANCE_SUFFIX_FAST, LANCE_SUFFIX_FULL, LANCE_SUFFIX_UNIT
 
 ```
@@ -923,7 +940,7 @@ from tests.constants import GPU_FAST_CORPUS_STEMS, LANCE_SUFFIX_FAST, LANCE_SUFF
 - **Clear intent** (constants named for their purpose)
 - **Fixtures can reference** constants consistently across test suite
 
----
+______________________________________________________________________
 
 ## Implementation Roadmap (4 Phases)
 
@@ -936,27 +953,27 @@ from tests.constants import GPU_FAST_CORPUS_STEMS, LANCE_SUFFIX_FAST, LANCE_SUFF
 1. Create `.vaultspec/lib/src/core/config.py` with:
 
    - `VaultSpecConfig` dataclass
+
    - `CONFIG_REGISTRY` with all 33 variables
+
    - Helper functions for parsing
 
    - `get_config()` and `reset_config()` functions
 
-2. Create `.vaultspec/tests/constants.py` with consolidated test constants
+1. Create `.vaultspec/tests/constants.py` with consolidated test constants
 
-3. Create `.env.example` at project root with all Tier 1-2 variables:
+1. Create `.env.example` at project root with all Tier 1-2 variables:
 
    ```bash
+
    # .env.example
+
    # Core Configuration
 
    VAULTSPEC_ROOT_DIR=.
    VAULTSPEC_DOCS_DIR=.vault
 
    VAULTSPEC_FRAMEWORK_DIR=.vaultspec
-
-
-
-
 
 
    # MCP Server
@@ -969,6 +986,7 @@ from tests.constants import GPU_FAST_CORPUS_STEMS, LANCE_SUFFIX_FAST, LANCE_SUFF
 
 
    # Agent Configuration
+
    VAULTSPEC_AGENT_MODE=read-write
 
    # VAULTSPEC_MAX_TURNS=          # Optional
@@ -976,15 +994,14 @@ from tests.constants import GPU_FAST_CORPUS_STEMS, LANCE_SUFFIX_FAST, LANCE_SUFF
    # VAULTSPEC_BUDGET_USD=         # Optional
 
 
-
-
    # VAULTSPEC_SYSTEM_PROMPT=      # Optional
 
 
    # ... rest of variables
+
    ```
 
-4. Create ADR documenting the standardization decision (this document)
+1. Create ADR documenting the standardization decision (this document)
 
 #### Files Modified
 
@@ -993,7 +1010,9 @@ from tests.constants import GPU_FAST_CORPUS_STEMS, LANCE_SUFFIX_FAST, LANCE_SUFF
 - Created: `.vaultspec/lib/src/core/__init__.py`
 
 - Created: `.vaultspec/tests/constants.py` (~60 lines)
+
 - Modified: `.vaultspec/tests/conftest.py` (import GPU_FAST_CORPUS_STEMS from constants)
+
 - Modified: `.vaultspec/lib/src/rag/tests/conftest.py` (import constants)
 
 - Created: `.env.example` (~40 lines)
@@ -1007,7 +1026,9 @@ from tests.constants import GPU_FAST_CORPUS_STEMS, LANCE_SUFFIX_FAST, LANCE_SUFF
 - ✓ Type conversion works for all types (int, float, Path, CSV list)
 
 - ✓ Validation catches out-of-range values
+
 - ✓ Test constants consolidated without duplication
+
 - ✓ Old conftest.py files import from new constants module
 
 #### Estimated Effort
@@ -1015,9 +1036,10 @@ from tests.constants import GPU_FAST_CORPUS_STEMS, LANCE_SUFFIX_FAST, LANCE_SUFF
 - 4-6 hours development
 
 - 2 hours testing
+
 - 1 hour documentation
 
----
+______________________________________________________________________
 
 ### Phase 2: Migration (Week 2)
 
@@ -1030,7 +1052,9 @@ from tests.constants import GPU_FAST_CORPUS_STEMS, LANCE_SUFFIX_FAST, LANCE_SUFF
 **`.vaultspec/lib/src/rag/store.py` (Line 122)**
 
 ```python
+
 # BEFORE:
+
 self.db_path = self.root_dir / ".lance"
 
 
@@ -1045,7 +1069,9 @@ self.db_path = self.root_dir / cfg.lance_dir
 **`.vaultspec/lib/src/vault/models.py` (Line 106)**
 
 ```python
+
 # BEFORE:
+
 class VaultConstants:
 
 
@@ -1053,12 +1079,11 @@ class VaultConstants:
 
 
 # AFTER:
+
 class VaultConstants:
     @property
 
     def DOCS_DIR(self):
-
-
 
 
         from core.config import get_config
@@ -1069,6 +1094,7 @@ class VaultConstants:
 **`.vaultspec/scripts/cli.py` (Lines 145-190)**
 
 ```python
+
 # BEFORE:
 
 RULES_SRC_DIR = root / ".vaultspec" / "rules"
@@ -1076,11 +1102,6 @@ RULES_SRC_DIR = root / ".vaultspec" / "rules"
 AGENTS_SRC_DIR = root / ".vaultspec" / "agents"
 
 # ... etc
-
-
-
-
-
 
 
 # AFTER:
@@ -1091,6 +1112,7 @@ from core.config import get_config
 cfg = get_config()
 RULES_SRC_DIR = root / cfg.framework_dir / "rules"
 AGENTS_SRC_DIR = root / cfg.framework_dir / "agents"
+
 # ... etc
 
 
@@ -1103,14 +1125,13 @@ AGENTS_SRC_DIR = root / cfg.framework_dir / "agents"
 ```python
 
 
-
-
-
 # BEFORE:
+
 def agent_card_from_definition(..., host: str = "localhost", port: int = 10010):
 
 
 # AFTER:
+
 def agent_card_from_definition(..., host: str = None, port: int = None):
     from core.config import get_config
     cfg = get_config()
@@ -1146,12 +1167,14 @@ def write_agent_discovery(..., host: str = None, port: int = None):
 **`.vaultspec/scripts/subagent.py` (Line 181)**
 
 ```python
+
 # BEFORE:
 
 uvicorn.run(app, host="0.0.0.0", port=port)
 
 
 # AFTER:
+
 from core.config import get_config
 cfg = get_config()
 host = args.host or cfg.mcp_host
@@ -1191,17 +1214,16 @@ def __init__(self, ..., graph_ttl_seconds: float = None):
 
 
 # BEFORE:
+
 def __init__(self, ..., ttl_seconds: float = 3600.0):
 
 
-
-
 # AFTER:****
+
 def __init__(self, ..., ttl_seconds: float = None):
     from core.config import get_config
     cfg = get_config()
     self._ttl_seconds = ttl_seconds or cfg.task_engine_ttl_seconds
-
 
 
 ```
@@ -1214,10 +1236,10 @@ def __init__(self, ..., ttl_seconds: float = None):
 
 
 # BEFORE:
+
 DEFAULT_BATCH_SIZE = 64
 
 MAX_EMBED_CHARS = 8000
-
 
 
 # AFTER:
@@ -1230,7 +1252,6 @@ def get_batch_size():
     return get_config().embedding_batch_size
 
 
-
 def get_max_embed_chars():
 
 
@@ -1241,6 +1262,7 @@ def get_max_embed_chars():
 **`.vaultspec/lib/src/protocol/acp/client.py` (Lines 334, 340)**
 
 ```python
+
 # BEFORE:
 
 output_byte_limit or 1_000_000
@@ -1250,10 +1272,9 @@ chunk = await proc.stdout.read(8192)***
 
 
 # AFTER:
+
 from core.config import get_config
 cfg = get_config()
-
-
 
 
 output_byte_limit or cfg.terminal_output_limit
@@ -1265,9 +1286,11 @@ chunk = await proc.stdout.read(cfg.io_buffer_size)
 #### Files Modified
 
 - `6` RAG/storage files
+
 - `5` Protocol/A2A files
 
 - `3` Orchestration files
+
 - `2` CLI scripts
 
 Total: **16 files**, ~200 lines of changes
@@ -1279,6 +1302,7 @@ Total: **16 files**, ~200 lines of changes
 - ✓ Defaults in config.py match original hardcoded values
 
 - ✓ No behavioral change (all tests pass)
+
 - ✓ Env vars are optional (graceful defaults)
 
 - ✓ Logging shows which config values were loaded
@@ -1286,11 +1310,12 @@ Total: **16 files**, ~200 lines of changes
 #### Estimated Effort
 
 - 8-10 hours development
+
 - 4 hours testing
 
 - 2 hours validation/debugging
 
----
+______________________________________________________________________
 
 ### Phase 3: Test Infrastructure (Wee**3)**
 
@@ -1304,21 +1329,13 @@ Total: **16 files**, ~200 lines of changes
 """Pytest fixtures for configuration override."""
 
 
-
-
-
-
 import pytest
 from core.config import get_config, reset_config, VaultSpecConfig
-
-
-
 
 
 @pytest.fixture
 
 def vaultspec_config():
-
 
 
     """Get fresh config instance for test."""
@@ -1328,14 +1345,8 @@ def vaultspec_config():
     reset_config()
 
 
-
-
-
-
-
 @pytest.fixture
 def config_override():
-
 
 
     """Factory fixture for creating config with overrides."""
@@ -1346,25 +1357,17 @@ def config_override():
     return _make_config
 
 
-
-
 @pytest.fixture
 def with_custom_port(config_override):
 
     """Provide config with custom MCP port."""
 
 
-
     return config_override(mcp_port=1**99)**
-
-
 
 
 @pytest.fixture
 def with_small_batch(config_override):
-
-
-
 
 
     """Provide config with small embedding batch for testing."""
@@ -1372,18 +1375,15 @@ def with_small_batch(config_override):
     return config_override(embedding_batch_size=8)
 ```
 
-2. **Update all conftest.py files** to use constants and fixtures:
+1. **Update all conftest.py files** to use constants and fixtures:
 
 ```python
 
 
-
-
 # Old pattern:
+
 GPU_FAST_CORPUS_STEMS = frozenset({...})  # Duplicated
 HAS_RAG = check_cuda()
-
-
 
 
 # New pattern:
@@ -1391,11 +1391,10 @@ HAS_RAG = check_cuda()
 from tests.constants import GPU_FAST_CORPUS_STEMS, HAS_RAG
 
 
-
 from tests.fixtures.config import vaultspec_config, config_override
 ```
 
-3. **Create pytest.ini configuration** for timeouts:
+1. **Create pytest.ini configuration** for timeouts:
 
 ```ini
 
@@ -1404,8 +1403,6 @@ from tests.fixtures.config import vaultspec_config, config_override
 
 timeout = 60
 timeout_method = thread
-
-
 
 
 markers =
@@ -1424,6 +1421,7 @@ markers =
 - Created: `.vaultspec/tests/fixtures/__init__.py`
 
 - Created: `.vaultspec/tests/fixtures**onfi**py` (~60 lines)
+
 - Modified: All `conftest.py` files (import from constants/fixtures)
 
 - Created: `pytest.ini` (~20 lines)
@@ -1433,8 +1431,11 @@ markers =
 - ✓ All test constants consolidated in `tests/constants.py`
 
 - ✓ No duplication of constants across conftest files
+
 - ✓ Config override fixtures work correctly
+
 - ✓ All existing tests pass without modification
+
 - ✓ New tests can use `config_override` fixture
 
 #### Estimated Effort
@@ -1443,7 +1444,7 @@ markers =
 - 3 hours testing
 - 1 hour documentation
 
----
+______________________________________________________________________
 
 ### Phase 4: Documentation & Validation (Week 4)
 
@@ -1453,27 +1454,25 @@ markers =
 
 1. **Update README.md** with env var section:
 
-```markdown
+````markdown
+
 ## Configuration
-
-
 
 
 vaultspec uses environment variables for configuration. See `.env.example`
 for all available options.
 
 
-
 ### Quick Start
 
 
-
 ```bash
+
 # Copy example configuration
+
 cp .env.example .env.local
 
 # Edit for your environment
-
 
 
 vim .env.local****
@@ -1487,15 +1486,14 @@ export $(cat .env.local | xargs)
 # Run application
 
 
-
-
 python .vaultspec/scripts/cli.py
 
-```
+````
 
 ### Environment Variables
 
 - **Agent**: `VAULTSPEC_AGENT_MODE`, `VAULTSPEC_MAX_TURNS`, etc.
+
 - **MCP**: `VAULTSPEC_MCP_PORT`, `VAULTSPEC_MCP_HOST`, etc.
 
 - **Storage**: `VAULTSPEC_LANCE_DIR`, `VAULTSPEC_DOCS_DIR`, etc.
@@ -1504,13 +1502,10 @@ python .vaultspec/scripts/cli.py
 
 See `.env.example` for complete list with descriptions.
 
-```
-
-
+````
 
 
 2. **Create config reference documentation** (`.vault/reference/environment-variables.md`):
-
 
 
    - Description of each variable
@@ -1520,17 +1515,14 @@ See `.env.example` for complete list with descriptions.
    - Troubleshooting guide
 
 
-
-
 3. **Create validation checklist**:
 
    ```markdown
+
    # Configuration Validatio Checklist
 
 
    - [ ] All 33 env vars defined in CONFIG_REGISTRY
-
-
 
 
    - [ ] All 38+ hardcoded constants migrated to env vars
@@ -1547,22 +1539,25 @@ See `.env.example` for complete list with descriptions.
 
    - [ ] No circular dependencies in import chain
    - [ ] Performance baseline verified (no regression)
-   ```
+````
 
-4. **Create deployment guide** (`.vau**/pla**2026-02-16-config-deployment.md`):
+1. **Create deployment guide** (`.vau**/pla**2026-02-16-config-deployment.md`):
    - How to set env vars in Docker
 
    - How to set env vars in Kubernetes
 
    - How to set env vars in GitHub Actions
+
    - How to set env vars in local development
 
 #### Files Created/Modified
 
 - Modified: `README.md` (new section ~50 lines)
+
 - Created: `.vault/reference/environment-variables.md` (~200 lines)
 
 - Created: `.vault/plan/2026-02-16-config-deployment.md` (~150 lines)
+
 - Created: `VALIDATION_CHECKLIST.md` (~100 lines)
 
 #### Validation Criteria
@@ -1570,6 +1565,7 @@ See `.env.example` for complete list with descriptions.
 - ✓ All documentation is up-to-date
 
 - ✓ `.env.example` matches CONFIG_REGISTRY
+
 - ✓ Examples work as documented
 
 - ✓ Deployment guide tested in test environment
@@ -1581,13 +1577,14 @@ See `.env.example` for complete list with descriptions.
 - 3-4 hours documentation
 
 - 2 hours testing/validation
+
 - 1 hour review/refinement
 
----
+______________________________________________________________________
 
 ### Phase 5: Deprecation & Cleanup (Optional, Week 5+)
 
-**Goal**: Remove legacy VS_*variables in favor of VAULTSPEC_* prefix (long-term).
+**Goal**: Remove legacy VS\_*variables in favor of VAULTSPEC\_* prefix (long-term).
 
 #### Strategy
 
@@ -1601,10 +1598,10 @@ See `.env.example` for complete list with descriptions.
 ```python
 
 # In config.py:
+
 def _load_legacy_vs_var(var_name: str):
     """Load legacy VS_* variable with deprecation warning."""
     legacy_name = f"VS_{var_name[len('VAULTSPEC_'):]}"
-
 
 
     value = os.environ.get(legacy_nam****
@@ -1619,13 +1616,10 @@ def _load_legacy_vs_var(var_name: str):
         )
 
 
-
-
-
     return value
 ```
 
----
+______________________________________________________________________
 
 ## Migration Strategy by Category
 
@@ -1633,7 +1627,7 @@ def _load_legacy_vs_var(var_name: str):
 
 | Variable | Files | Current Pattern | Proposed Change | Risk | Rollback |
 
-|---|---|---|---|---|---|
+|\---|---|---|---|---|---|
 | `VAULTSPEC_AGENT_MODE` | claude_bridge.py | `os.environ.get()` with default | Read from config | LOW | Revert to direct env read |
 
 | `VAULTSPEC_MAX_TURNS` | claude_bridge.py | `os.environ[]` with try/except | Read from config | LOW | Revert to direct env read |
@@ -1649,22 +1643,24 @@ def _load_legacy_vs_var(var_name: str):
 **Migration Steps:**
 
 1. Update `claude_bridge.py` to use `get_config()` instead of `os.environ` reads
-2. Verify all parameter precedence still works (param > env > default)
 
-3. Update tests to verify defaults work
-4. Run test suite
+1. Verify all parameter precedence still works (param > env > default)
+
+1. Update tests to verify defaults work
+
+1. Run test suite
 
 **Affected Files:**
 
 - `.vaultspec/lib/src/protocol/acp/claude_bridge.py`
 - `.vaultspec/lib/src/protocol/tests/test_providers.py`
 
----
+______________________________________________________________________
 
 ### Category 2: MCP Server (4 variables)
 
-| Variable | Files | Current Pattern | Proposed Change | Risk | Rollback |
-|---|---|---|---|---|---|
+| Variable                 | Files     | Current Pattern             | Proposed Change          | Risk | Rollback         |
+| ------------------------ | --------- | --------------------------- | ------------------------ | ---- | ---------------- |
 | `VAULTSPEC_MCP_ROOT_DIR` | server.py | `os.environ.get()` required | Already env-configurable | NONE | No change needed |
 
 | `VAULTSPEC_MCP_PORT` | subagent.py | Hardcoded 10010 | Add env var fallback | MEDIUM | Hardcode default |
@@ -1675,24 +1671,25 @@ def _load_legacy_vs_var(var_name: str):
 **Migration Steps:**
 
 1. Add `mcp_port` and `mcp_host` to c**fig.** registry
-2. Update `subagent.py` to read from config
 
-3. Verify argparse still overrides config
+1. Update `subagent.py` to read from config
 
-4. Update tests
+1. Verify argparse still overrides config
+
+1. Update tests
 
 **Affected Files:**
 
 - `.vaultspec/scripts/subagent.py`
 - `.vaultspec/lib/src/subagent_server/server.py`
 
----
+______________________________________________________________________
 
 ### Category 3: Storage & Directory Paths (9 variables)
 
 | Variable | Files | Current Pattern | Proposed Change | Risk | Rollback |
 
-|---|---|---|---|---|---|
+|\---|---|---|---|---|---|
 | `VAULTSPEC_DOCS_DIR` | 15 files | Hardcoded ".vault" | Use config property | HIGH | Search/replace back |
 
 | `VAULTSPEC_FRAMEWORK_DIR` | cli.py | Hardcoded ".vaultspec" | Use config property | MEDIUM | Search/replace back |
@@ -1708,10 +1705,10 @@ def _load_legacy_vs_var(var_name: str):
 **Migration Steps:**
 
 1. Add all directory variables to config registry
-2. Update path construction throughout codebase
-3. Verify multi-project layouts work
-4. Test with different `VAULTSPEC_LANCE_DIR` values
-5. Run full test suite
+1. Update path construction throughout codebase
+1. Verify multi-project layouts work
+1. Test with different `VAULTSPEC_LANCE_DIR` values
+1. Run full test suite
 
 **Affected Files:**
 
@@ -1722,12 +1719,12 @@ def _load_legacy_vs_var(var_name: str):
 - `.vaultspec/lib/src/protocol/a2a/discovery.py`
 - 10+ other files with path references
 
----
+______________________________________________________________________
 
 ### Category 4: RAG/Embeddings (3 variables)
 
 | Variable | Files | Current Pattern | Proposed Change | Risk | Rollback |
-|---|---|---|---|---|---|
+| -------- | ----- | --------------- | --------------- | ---- | -------- |
 
 | `VAULTSPEC_EMBEDDING_BATCH_SIZE` | embeddings.py | Hardcoded 64 | Add env var fallback | MEDIUM | Hardcode back |
 
@@ -1737,27 +1734,30 @@ def _load_legacy_vs_var(var_name: str):
 **Migration Steps:**
 
 1. Add getter functions in embeddings.py
-2. Add env var fallback in search.py **init**
-3. Test with different batch sizes (8, 16, 32, 64, 128)
 
-4. Verify performance on different GPUs
+1. Add env var fallback in search.py **init**
 
-5. Run full embedding test suite
+1. Test with different batch sizes (8, 16, 32, 64, 128)
+
+1. Verify performance on different GPUs
+
+1. Run full embedding test suite
 
 **Affected Files:**
 
 - `.vaultspec/lib/src/rag/embeddings.py`
 
 - `.vaultspec/lib/src/rag/search.py`
+
 - `.vaultspec/lib/src/rag/tests/conftest.py`
 
----
+______________________________________________________________________
 
 ### Category 5: I/O & Buffers (2 variables)
 
 | Variable | Files | Current Pattern | Proposed Change | Risk | Rollback |
 
-|---|---|---|---|---|---|
+|\---|---|---|---|---|---|
 | `VAULTSPEC_IO_BUFFER_SIZE` | client.py | Hardcoded 8192 | Add env var fallback | LOW | Hardcode back |
 
 | `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | client.py | Hardcoded 1_000_000 | Add env var fallback | LOW | Hardcode back |
@@ -1765,44 +1765,49 @@ def _load_legacy_vs_var(var_name: str):
 **Migration Steps:**
 
 1. Add env var reads to ACP client
-2. Test with different buffer sizes
 
-3. Test high-throughput scenarios
+1. Test with different buffer sizes
 
-4. Run integration tests
+1. Test high-throughput scenarios
+
+1. Run integration tests
 
 **Affected Files:**
 
 - `.vaultspec/lib/src/protocol/acp/client.py`
 
----
+______________________________________________________________________
 
 ### Category 6: Port Numbers & Network (4 variables)
 
-| Variable | Files | Current Pattern | Proposed Change | Risk | Rollback |
-|---|---|---|---|---|---|
-| `VAULTSPEC_A2A_DEFAULT_PORT` | agent_card.py | Function default 10010 | Add env var fallback | MEDIUM | Revert to default |
-| `VAULTSPEC_A2A_HOST` | discovery.py | Function default "localhost" | Add env var fallback | MEDIUM | Revert to default |
-| `VAULTSPEC_MCP_PORT` | subagent.py | Hardcoded 10010 | Add env var fallback | MEDIUM | Hardcode back |
-| `VAULTSPEC_MCP_HOST` | subagent.py | Hardcoded "0.0.0.0" | Add env var fallback | LOW | Hardcode back |
+| Variable                     | Files         | Current Pattern              | Proposed Change      | Risk   | Rollback          |
+| ---------------------------- | ------------- | ---------------------------- | -------------------- | ------ | ----------------- |
+| `VAULTSPEC_A2A_DEFAULT_PORT` | agent_card.py | Function default 10010       | Add env var fallback | MEDIUM | Revert to default |
+| `VAULTSPEC_A2A_HOST`         | discovery.py  | Function default "localhost" | Add env var fallback | MEDIUM | Revert to default |
+| `VAULTSPEC_MCP_PORT`         | subagent.py   | Hardcoded 10010              | Add env var fallback | MEDIUM | Hardcode back     |
+| `VAULTSPEC_MCP_HOST`         | subagent.py   | Hardcoded "0.0.0.0"          | Add env var fallback | LOW    | Hardcode back     |
 
 **Migration Steps:**
 
 1. Update function signatures to use config defaults
-2. Test port conflict detection
-3. Test with external host addresses
-4. Verify discovery endpoint generation
 
-5. Run full A2A test suite
+1. Test port conflict detection
+
+1. Test with external host addresses
+
+1. Verify discovery endpoint generation
+
+1. Run full A2A test suite
 
 **Affected Files:**
 
 - `.vaultspec/lib/src/protocol/a2a/agent_card.py`
 
 - `.vaultspec/lib/src/protocol/a2a/discovery.py`
+
 - `.vaultspec/scripts/subagent.py`
 
----
+______________________________________________________________________
 
 ## Naming Convention Standards
 
@@ -1811,7 +1816,9 @@ def _load_legacy_vs_var(var_name: str):
 - **Primary**: `VAULTSPEC_` (all new variables)
 
 - **Legacy**: `VS_*` (existing, for backward compatibility during transition)
+
 - **Standard Library**: `EDITOR`, `PYTHONPATH`, etc. (use as-is)
+
 - **Third-party**: Tool-specific (e.g., `GEMINI_SYSTEM_MD`)
 
 ### Grouping Hierarchy
@@ -1830,7 +1837,7 @@ Examples:
 ### Format Conventions
 
 | Type | Convention | Example |
-|------|-----------|---------|
+| ---- | ---------- | ------- |
 
 | **Boolean** | `_ENABLED`, `_DISABLED` | `VAULTSPEC_DEBUG_ENABLED=true` |
 | **Numeric** | Bare number | `VAULTSPEC_MCP_PORT=10010` |
@@ -1849,7 +1856,6 @@ Agent       - Agent behavior and constraints
 MCP         - MCP server configuration
 A2A         - Agent-to-Agent protocol
 Storage     - Database and file storage paths
-
 
 
 Tools       - Tool-specific directories
@@ -1872,7 +1878,7 @@ VAULTSPEC_INTERNAL_*    - Internal-only variables
 VAULTSPEC_DEPRECATED_*  - Deprecated variables (for transition)
 ```
 
----
+______________________________________________________________________
 
 ## Backwards Compatibility & Deprecation
 
@@ -1901,15 +1907,15 @@ VAULTSPEC_DEPRECATED_*  - Deprecated variables (for transition)
 **For local development:**
 
 ```bash
+
 # Old approach (still works):
-
-
 
 
 export VS_ROOT_DIR=/my/project
 export VS_AGENT_MODE=read-write
 
 # New approach (recommended):
+
 export VAULTSPEC_ROOT_DIR=/my/project
 
 export VAULTSPEC_AGENT_MODE=read-write
@@ -1920,10 +1926,12 @@ export VAULTSPEC_AGENT_MODE=read-write
 ```dockerfile
 
 # Old approach:
+
 ENV VS_ROOT_DIR=/app
 ENV VS_AGENT_MODE=read-write
 
 # New approach:
+
 ENV VAULTSPEC_ROOT_DIR=/app
 ENV VAULTSPEC_AGENT_MODE=read-write
 ```
@@ -1931,12 +1939,15 @@ ENV VAULTSPEC_AGENT_MODE=read-write
 **For CI/CD:**
 
 ```yaml
+
 # Old approach:
+
 env:
   VS_ROOT_DIR: ${{ github.workspace }}
   VS_AGENT_MODE: read-write
 
 # New approach:
+
 env:
   VAULTSPEC_ROOT_DIR: ${{ github.workspace }}
   VAULTSPEC_AGENT_MODE: read-write
@@ -1948,6 +1959,7 @@ env:
 In `.vault/reference/environment-variables.md`:
 
 ```markdown
+
 ## Deprecated Variables
 
 The following `VS_*` variables are deprecated and will be removed in vaultspec 2.0.
@@ -1961,22 +1973,23 @@ Please migrate to the new `VAULTSPEC_*` names:
 | ... | ... | ... |
 
 **Timeline:**
+
 - v1.5+: Both work, warnings logged
 
 - v2.0: Only VAULTSPEC_* supported
 ```
 
----
+______________________________________________________________________
 
 ## Testing & Validation Strategy
 
 ### Test Coverage Matrix
 
-| Test Type | Scope | Approach | Files |
-|-----------|-------|----------|-------|
-| **Unit Tests** | Config parsing | Test each parser function | `tests/test_config.py` |
-| **Integration Tests** | Config loading | Test CONFIG_REGISTRY loads | `tests/test_config_integration.py` |
-| **E2E Tests** | Config in use | Verify behavior changes with config | Existing test suite |
+| Test Type             | Scope          | Approach                            | Files                              |
+| --------------------- | -------------- | ----------------------------------- | ---------------------------------- |
+| **Unit Tests**        | Config parsing | Test each parser function           | `tests/test_config.py`             |
+| **Integration Tests** | Config loading | Test CONFIG_REGISTRY loads          | `tests/test_config_integration.py` |
+| **E2E Tests**         | Config in use  | Verify behavior changes with config | Existing test suite                |
 
 | **Deployment Tests** | CI/CD | Test env vars in GitHub Actions | `.github/workflows/test.yml` |
 
@@ -2030,7 +2043,9 @@ def test_config_validates_enum_values():
 def test_legacy_vs_variables_still_work():
     """Verify VS_* variables still load (with deprecation)."""
     os.environ["VS_AGENT_MODE"] = "read-only"
+
     # Should still work during transition
+
     config = VaultSpecConfig.from_environment()
 
     assert config.agent_mode == "read-only"
@@ -2050,7 +2065,9 @@ def test_config_disables_hardcoded_paths():
     """Verify config overrides hardcoded paths."""
     os.environ["VAULTSPEC_LANCE_DIR"] = "/custom/lance"
     config = get_config()
+
     # Create store with config
+
     store = VaultStore(root_dir=Path("."), config=config)
 
     assert store.db_path == Path("/custom/lance").resolve()
@@ -2060,7 +2077,9 @@ def test_config_enables_port_override():
     os.environ["VAULTSPEC_MCP_PORT"] = "9999"
 
     config = get_config()
+
     # Verify server would bind to new port
+
     assert config.mcp_port == 9999
 ```
 
@@ -2082,7 +2101,9 @@ def test_config_isolation_1(clean_config):
     assert config1.mcp_port == 10010
 
 def test_config_isolation_2(clean_config):
+
     # Port should be default, not 10010 from previous test
+
     config2 = get_config()
     assert config2.mcp_port == 10010  # Default value
 ```
@@ -2097,41 +2118,45 @@ def test_config_isolation_2(clean_config):
 - [ ] CI/CD pipeline passes all checks
 - [ ] Deployment scripts work with new env vars
 
----
+______________________________________________________________________
 
 ## Success Criteria & Metrics
 
 ### Primary Success Criteria
 
 1. **All Configuration Centralized**
+
    - [x] All 33 env vars in CONFIG_REGISTRY
    - [x] All 38+ hardcoded constants mapped to env vars
    - [x] No scattered os.environ calls outside config.py
 
-2. **Type Safety Enforced**
+1. **Type Safety Enforced**
+
    - [x] All values validated at load time
    - [x] Invalid values produce clear error messages
    - [x] Type conversions handle edge cases
 
-3. **Testing Infrastructure Unified**
+1. **Testing Infrastructure Unified**
+
    - [x] All test constants in tests/constants.py
    - [x] No duplication across conftest files
    - [x] Config override fixtures work consistently
 
-4. **Documentation Complete**
+1. **Documentation Complete**
+
    - [x] .env.example documents all Tier 1-2 variables
    - [x] README has configuration section
    - [x] Deployment guide covers common scenarios
 
 ### Metrics to Track
 
-| Metric | Current | Target | Phase |
-|--------|---------|--------|-------|
-| Config variables centralized | 0% | 100% | 1 |
-| Hardcoded constants eliminated | 0% | 100% | 2 |
-| Test constants deduplicated | 0% | 100% | 3 |
-| Documentation completeness | 0% | 100% | 4 |
-| Circular dependencies | 0 | 0 | All |
+| Metric                         | Current | Target | Phase |
+| ------------------------------ | ------- | ------ | ----- |
+| Config variables centralized   | 0%      | 100%   | 1     |
+| Hardcoded constants eliminated | 0%      | 100%   | 2     |
+| Test constants deduplicated    | 0%      | 100%   | 3     |
+| Documentation completeness     | 0%      | 100%   | 4     |
+| Circular dependencies          | 0       | 0      | All   |
 
 | Test suite pass rate | ~95% | 100% | All |
 
@@ -2165,7 +2190,7 @@ def test_config_isolation_2(clean_config):
 - ✓ Deployment guide used in practice
 - ✓ Team feedback incorporated
 
----
+______________________________________________________________________
 
 ## Implementation Checklist
 
@@ -2218,12 +2243,12 @@ def test_config_isolation_2(clean_config):
 
 ### Optional Phase 5: Deprecation
 
-- [ ] Add deprecation warnings for VS_* variables
+- [ ] Add deprecation warnings for VS\_\* variables
 - [ ] Update documentation with migration timeline
-- [ ] Plan removal of VS_* for next major version
+- [ ] Plan removal of VS\_\* for next major version
 - [ ] Communicate timeline to users
 
----
+______________________________________________________________________
 
 ## Conclusion
 
@@ -2242,4 +2267,4 @@ This standardization blueprint provides a comprehensive path to unified environm
 
 **Team Effort:** 40-50 hours total (flexible across team members)
 
----
+______________________________________________________________________

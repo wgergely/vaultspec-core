@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#packaging-restructure"
-date: "2026-02-21"
+  - '#exec'
+  - '#packaging-restructure'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-packaging-restructure-p1p2-plan]]"
+  - '[[2026-02-21-packaging-restructure-p1p2-plan]]'
 ---
+
 # Step 6: Rewrite imports in mid-tier packages `orchestration/`, `protocol/`, `hooks/`
 
 ## Status: COMPLETE
@@ -17,6 +18,7 @@ Rewrote all bare-name imports in `src/vaultspec/orchestration/`, `src/vaultspec/
 ## Files Modified
 
 ### orchestration/
+
 - `session_logger.py` -- `from core.config` -> `from vaultspec.core.config`
 - `subagent.py` -- 7 import rewrites: `vaultcore.parser`, `orchestration.utils`, `protocol.acp.client`, `protocol.acp.types`, `protocol.providers.claude`, `protocol.providers.gemini`, plus TYPE_CHECKING `protocol.providers.base`
 - `tests/test_utils.py` -- `from orchestration.utils` -> `from vaultspec.orchestration.utils`
@@ -26,6 +28,7 @@ Rewrote all bare-name imports in `src/vaultspec/orchestration/`, `src/vaultspec/
 - `tests/test_task_engine.py` -- `from orchestration.task_engine` -> `from vaultspec.orchestration.task_engine`
 
 ### protocol/
+
 - `acp/claude_bridge.py` -- `from logging_config`, `from protocol.providers.base`, `from protocol.sandbox` (3 rewrites)
 - `a2a/executors/base.py` -- `from protocol.sandbox` -> `from vaultspec.protocol.sandbox`
 - `a2a/executors/gemini_executor.py` -- `from orchestration.subagent`, `from protocol.providers.base` (2 rewrites)
@@ -53,6 +56,7 @@ Rewrote all bare-name imports in `src/vaultspec/orchestration/`, `src/vaultspec/
 - `a2a/tests/test_integration_a2a.py` -- `from protocol.a2a.server`, `from protocol.a2a.tests.conftest` (2 rewrites)
 
 ### hooks/
+
 - `engine.py` -- deferred `from core.config` -> `from vaultspec.core.config`
 - `tests/test_hooks.py` -- `from hooks.engine` -> `from vaultspec.hooks.engine`
 

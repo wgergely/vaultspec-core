@@ -1,21 +1,22 @@
 ---
 tags:
-  - "#adr"
-  - "#cuda-dependencies"
-date: "2026-02-20"
+  - '#adr'
+  - '#cuda-dependencies'
+date: '2026-02-20'
 related:
-  - "[[2026-02-20-cuda-dependencies-audit-research]]"
-  - "[[2026-02-12-rag-embeddings-adr]]"
-  - "[[2026-02-12-rag-vectordb-adr]]"
-  - "[[2026-02-12-rag-retrieval-adr]]"
+  - '[[2026-02-20-cuda-dependencies-audit-research]]'
+  - '[[2026-02-12-rag-embeddings-adr]]'
+  - '[[2026-02-12-rag-vectordb-adr]]'
+  - '[[2026-02-12-rag-retrieval-adr]]'
 ---
+
 # `cuda-dependencies` adr: Elevate RAG Dependency Floors to Frontier Versions | (**status:** `accepted`)
 
 ## Problem Statement
 
 The RAG subsystem mandates **Python 3.13+** and **CUDA 13.0+** as a deliberate frontier stance. However, dependency floors in `pyproject.toml` are stale and contradictory: `torch>=2.5.0` has no cu130 wheel, `sentence-transformers>=3.0.0` is two years behind current, `lancedb>=0.15.0` predates critical features the code depends on, and in-code error messages reference the wrong CUDA index URL (`cu124` instead of `cu130`). These mismatches cause installation failures, misleading diagnostics, and unnecessary import-time coupling.
 
-See [[2026-02-20-cuda-dependencies-audit-research]] for the full audit.
+See \[[2026-02-20-cuda-dependencies-audit-research]\] for the full audit.
 
 ## Considerations
 

@@ -1,3 +1,10 @@
+---
+tags:
+  - '#reference'
+  - '#cli-architecture'
+date: 2026-03-21
+---
+
 # vaultspec-core CLI Binding Contract
 
 Date: 2026-03-16
@@ -22,7 +29,7 @@ vaultspec-core [--target PATH] [--debug]
 
 ## Top-level commands
 
-### install \<path\> [provider] [--upgrade] [--dry-run] [--force]
+### install \<path> [provider] [--upgrade] [--dry-run] [--force]
 
 Providers: `all` (default), `core`, `claude`, `gemini`, `antigravity`, `codex`
 
@@ -39,7 +46,7 @@ Providers: `all` (default), `core`, `claude`, `gemini`, `antigravity`, `codex`
   - "Would" wording explicitly rejected.
 - Path error messages must be clear when path is wrong or missing.
 
-### uninstall \<path\> [provider] [--keep-vault] [--dry-run] [--force]
+### uninstall \<path> [provider] [--keep-vault] [--dry-run] [--force]
 
 Providers: `all` (default), `core`, `claude`, `gemini`, `antigravity`, `codex`
 
@@ -66,6 +73,7 @@ Manages `.vault/` documentation records.
 ```
 vault add adr|research|plan --feature "feature-tag" [--date YYYY-MM-DD] [--title TITLE] [--content CONTENT]
 ```
+
 - Creates empty templates.
 - `--feature` is required.
 - `--date` defaults to today.
@@ -74,6 +82,7 @@ vault add adr|research|plan --feature "feature-tag" [--date YYYY-MM-DD] [--title
 ```
 vault stats [--feature TAG] [--date YYYY-MM-DD] [--type TYPE] [--invalid] [--orphaned]
 ```
+
 - Vault statistics and metadata: document counts per tag, per feature, per type.
 
 ```
@@ -88,6 +97,7 @@ vault feature archive "feature-tag"
 ```
 vault doctor
 ```
+
 - Autofix vault issues.
 
 ### spec

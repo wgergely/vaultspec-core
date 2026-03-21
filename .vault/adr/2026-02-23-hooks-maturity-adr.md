@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#adr"
-  - "#hooks-maturity"
-date: "2026-02-23"
+  - '#adr'
+  - '#hooks-maturity'
+date: '2026-02-23'
 related:
-  - "[[2026-02-23-hooks-maturity-research]]"
+  - '[[2026-02-23-hooks-maturity-research]]'
 ---
+
 # hooks-maturity adr: production-readiness hardening | (**status:** `accepted`)
 
 ## Problem Statement
@@ -20,11 +21,17 @@ documentation. The system must be hardened to production-ready status.
 
 - The engine's core abstractions (`Hook`, `HookAction`, `HookResult`,
   `load_hooks`, `trigger`) are clean and should be preserved
+
 - `shell=False` security posture must be maintained
+
 - Hook failures must never block or crash parent CLI commands
+
 - The project runs on Windows 11 — platform safety is mandatory
+
 - The project strictly bans all mocking in tests — real code paths only
+
 - PyYAML is already a hard dependency across the codebase
+
 - The subagent CLI uses `--goal` (not `--task`) and is accessed via
   `vaultspec subagent run`
 
@@ -32,10 +39,14 @@ documentation. The system must be hardened to production-ready status.
 
 - Hook execution must be synchronous within the parent command (no background
   threads for v1) to maintain predictable ordering
+
 - Auto-triggers must be safe for concurrent/re-entrant execution (a hook must
   not trigger itself)
+
 - Changes must not alter the public API surface (`__init__.py` exports)
+
 - Documentation must cover all features present in the implementation
+
 - All new code paths must have corresponding tests exercising real execution
 
 ## Implementation
@@ -47,6 +58,7 @@ Eight work streams, organized into three phases:
 **1a. Process safety — kill timed-out subprocesses**
 In both `_execute_shell()` and `_execute_agent()`, replace the bare
 `except subprocess.TimeoutExpired` with proper process cleanup:
+
 ```python
 except subprocess.TimeoutExpired:
     process.kill()
@@ -54,18 +66,21 @@ except subprocess.TimeoutExpired:
     logger.warning(...)
     return HookResult(hook_name=..., action_type=..., success=False, ...)
 ```
+
 Files: `engine.py` (~lines 365-371, 431-438)
 
 **1b. Platform safety — fix Windows path handling**
 Replace `shlex.split(cmd)` with a platform-aware approach. Pass context
 values as separate subprocess arguments instead of interpolating them into
 the command string before splitting. Introduce a `_build_command()` helper:
+
 ```python
 def _build_command(template: str, ctx: dict[str, str]) -> list[str]:
     """Build command args list, passing context values as trailing args."""
     base_parts = shlex.split(template, posix=(os.name != 'nt'))
     return base_parts
 ```
+
 For the interpolation path, use `shlex.split(cmd, posix=(os.name != 'nt'))`
 to respect Windows quoting conventions.
 Files: `engine.py` (~lines 285-299, 350-355)
@@ -73,10 +88,12 @@ Files: `engine.py` (~lines 285-299, 350-355)
 **1c. Agent dispatch fix**
 Replace the hardcoded `lib/scripts/subagent.py` path with a
 `sys.executable` + module invocation pattern:
+
 ```python
 cmd = [sys.executable, "-m", "vaultspec", "subagent", "run",
        "--agent", action.agent_name, "--goal", interpolated_task]
 ```
+
 This uses the same Python interpreter and avoids path resolution issues.
 Fix `--task` → `--goal` to match the actual subagent CLI.
 Files: `engine.py` (~lines 400-430)
@@ -96,6 +113,7 @@ Files: `engine.py` (~lines 155-172)
 **1f. Re-entrant safety guard**
 Add a module-level `_triggering: set[str]` guard to prevent a hook from
 re-triggering the same event recursively:
+
 ```python
 _triggering: set[str] = set()
 
@@ -109,6 +127,7 @@ def trigger(hooks, event, ctx):
     finally:
         _triggering.discard(event)
 ```
+
 Files: `engine.py`
 
 ### Phase 2 — Auto-Trigger Wiring + Dead Code Cleanup
@@ -117,6 +136,7 @@ Files: `engine.py`
 Add `_fire_hooks(event, ctx)` helper in `src/vaultspec/core/commands.py`
 (or a new `hooks/integration.py`) that wraps `load_hooks()` + `trigger()`
 in a try/except that logs but never raises:
+
 ```python
 def _fire_hooks(event: str, ctx: dict[str, str]) -> None:
     try:
@@ -127,6 +147,7 @@ def _fire_hooks(event: str, ctx: dict[str, str]) -> None:
 ```
 
 Wire this into four lifecycle points:
+
 - `vault_cli.py:handle_create` → `vault.document.created` after doc write
 - `vault_cli.py:handle_index` → `vault.index.updated` after index completes
 - `vault_cli.py:handle_audit` → `audit.completed` after audit finishes
@@ -137,9 +158,12 @@ Context dict for each: `{"path": str(path), "root": str(ROOT_DIR), "event": even
 Files: `vault_cli.py`, `spec_cli.py`, `core/commands.py`
 
 **2b. Dead code cleanup**
+
 - Remove `vault.document.modified` from `SUPPORTED_EVENTS` (no trigger
   path exists; re-add when an edit command is implemented)
+
 - Keep `Hook.source_path` (useful for debugging output in `hooks list`)
+
 - Keep `HookResult.output`/`.error` (used by CLI formatting)
 
 Files: `engine.py`
@@ -148,28 +172,38 @@ Files: `engine.py`
 
 **3a. Test hardening**
 Fix and add tests (all exercising real code paths, no mocking):
+
 - Fix `test_failing_command`: use a real executable that returns non-zero
   (e.g., `python -c "import sys; sys.exit(1)"`)
+
 - Add `test_agent_action_dispatch`: test `_execute_agent` with a real
   `vaultspec subagent run` invocation (or a known agent that exits quickly)
+
 - Add `test_deduplication`: create both `.yaml` and `.yml` and assert only
   one is loaded
+
 - Add `test_reentrant_guard`: verify that recursive trigger calls are blocked
+
 - Add integration test: write a temp hook YAML, call the lifecycle command,
   assert the hook's shell side-effect occurred (e.g., a file was created)
 
 Files: `hooks/tests/test_hooks.py`
 
 **3b. Documentation**
+
 - **README.md**: Add a "Hooks" section (3-4 lines) with pointer to the
   dedicated guide
+
 - **`.vaultspec/docs/hooks-guide.md`** (new): Dedicated guide covering YAML
   schema, both action types with examples, supported events, context
   variables, timeout limits, error behavior, debugging tips
+
 - **`.vaultspec/docs/cli-reference.md`**: Expand the hooks section with
   supported event names, `--path` semantics, example output
+
 - **`.vaultspec/docs/concepts.md`**: Add a hooks subsection in the
   workflow overview
+
 - **`.vaultspec/rules/hooks/example-audit-on-create.yaml`**: Add an agent
   action example, fix the naming guidance comment, set `enabled: false`
   with clear instructions on activation
@@ -210,12 +244,17 @@ execution.
 
 - All lifecycle commands will gain ~10ms overhead for hook loading (YAML
   parsing of hook files in `.vaultspec/rules/hooks/`)
+
 - Agent-type hooks will now work but add subprocess overhead (up to 300s
   timeout)
+
 - Removing `vault.document.modified` is a breaking change for anyone who
   has hooks targeting it (mitigated: the event never fired anyway)
+
 - The re-entrant guard blocks legitimate recursive patterns (unlikely in
   practice; can be relaxed with a depth counter in v2)
+
 - New documentation file (`.vaultspec/docs/hooks-guide.md`) adds to
   maintenance surface
+
 - Test suite will grow by ~5-7 test functions

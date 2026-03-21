@@ -48,9 +48,9 @@ For standalone setups where the working directory isn't the workspace, set `VAUL
 
 ## Environment
 
-| Variable | Default | Description |
-|---|---|---|
-| `VAULTSPEC_TARGET_DIR` | cwd | Path to the workspace root containing `.vault/` and `.vaultspec/`. Equivalent to `--target` on the CLI. Defaults to the current working directory if unset. |
+| Variable               | Default | Description                                                                                                                                                 |
+| ---------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VAULTSPEC_TARGET_DIR` | cwd     | Path to the workspace root containing `.vault/` and `.vaultspec/`. Equivalent to `--target` on the CLI. Defaults to the current working directory if unset. |
 
 See the [CLI reference](./CLI.md) for all `VAULTSPEC_` environment variables.
 
@@ -66,14 +66,14 @@ Read-only, idempotent. Discovers vault documents or lists features.
 
 **With filters**, returns matching documents.
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `feature` | `string \| null` | `null` | Filter to documents tagged with this feature. |
-| `type` | `string[] \| null` | `null` | Document types to include. Defaults to `["adr", "plan", "research", "reference"]` when filtering by feature/date. `exec` and `audit` are excluded unless explicitly listed. |
-| `date` | `string \| null` | `null` | Filter to documents with this ISO-8601 date. |
-| `body` | `boolean` | `false` | Include full markdown body text in each result. |
-| `json` | `boolean` | `false` | Include extended fields in feature listing (`status`, `types`, `earliest_date`, `has_plan`). |
-| `limit` | `integer` | `20` | Maximum number of results to return. |
+| Parameter | Type               | Default | Description                                                                                                                                                                 |
+| --------- | ------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `feature` | `string \| null`   | `null`  | Filter to documents tagged with this feature.                                                                                                                               |
+| `type`    | `string[] \| null` | `null`  | Document types to include. Defaults to `["adr", "plan", "research", "reference"]` when filtering by feature/date. `exec` and `audit` are excluded unless explicitly listed. |
+| `date`    | `string \| null`   | `null`  | Filter to documents with this ISO-8601 date.                                                                                                                                |
+| `body`    | `boolean`          | `false` | Include full markdown body text in each result.                                                                                                                             |
+| `json`    | `boolean`          | `false` | Include extended fields in feature listing (`status`, `types`, `earliest_date`, `has_plan`).                                                                                |
+| `limit`   | `integer`          | `20`    | Maximum number of results to return.                                                                                                                                        |
 
 **Feature listing response** (no filters):
 
@@ -103,21 +103,21 @@ With `json: true`, adds `"status"`, `"types"`, `"earliest_date"`, `"has_plan"` f
 
 With `body: true`, adds a `"body"` field containing the full file content.
 
----
+______________________________________________________________________
 
 ### `create`
 
 Non-destructive, idempotent. Creates a new vault document from a type template.
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `feature` | `string` | — | **Required.** Feature tag for the document (leading `#` is stripped). |
-| `type` | `string \| null` | `"research"` | Document type. Must be one of: `adr`, `audit`, `exec`, `plan`, `reference`, `research`. |
-| `date` | `string \| null` | today | ISO-8601 date (`YYYY-MM-DD`). Defaults to the current date. |
-| `title` | `string \| null` | `null` | Document title / topic slug. Defaults to `feature` when omitted. |
-| `content` | `string \| null` | `null` | Optional additional content appended under a `## Context` heading. |
-| `related` | `string[] \| null` | `null` | Related document(s). Accepts path, filename, stem, or `[[wiki-link]]`. Resolved to wiki-link format in frontmatter. |
-| `tags` | `string[] \| null` | `null` | Additional freeform tags beyond the required directory and feature tags. |
+| Parameter | Type               | Default      | Description                                                                                                         |
+| --------- | ------------------ | ------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `feature` | `string`           | —            | **Required.** Feature tag for the document (leading `#` is stripped).                                               |
+| `type`    | `string \| null`   | `"research"` | Document type. Must be one of: `adr`, `audit`, `exec`, `plan`, `reference`, `research`.                             |
+| `date`    | `string \| null`   | today        | ISO-8601 date (`YYYY-MM-DD`). Defaults to the current date.                                                         |
+| `title`   | `string \| null`   | `null`       | Document title / topic slug. Defaults to `feature` when omitted.                                                    |
+| `content` | `string \| null`   | `null`       | Optional additional content appended under a `## Context` heading.                                                  |
+| `related` | `string[] \| null` | `null`       | Related document(s). Accepts path, filename, stem, or `[[wiki-link]]`. Resolved to wiki-link format in frontmatter. |
+| `tags`    | `string[] \| null` | `null`       | Additional freeform tags beyond the required directory and feature tags.                                            |
 
 The tool reads the template at `.vaultspec/rules/templates/{type}.md`, replaces `{feature}`, `{yyyy-mm-dd}`, `{topic}`, and `{title}` placeholders, then writes to `.vault/{type}/{filename}`.
 
@@ -153,10 +153,10 @@ All server logs are written to **stderr**. **stdout is reserved for the JSON-RPC
 
 ## See Also
 
-| Document | What it covers |
-|---|---|
-| [Repository README](../README.md) | Project overview, installation, and getting started |
-| [Framework Manual](./README.md) | Development workflow, skills, and customization |
-| [CLI Reference](./CLI.md) | All commands, flags, and options for `vaultspec-core` |
+| Document                          | What it covers                                        |
+| --------------------------------- | ----------------------------------------------------- |
+| [Repository README](../README.md) | Project overview, installation, and getting started   |
+| [Framework Manual](./README.md)   | Development workflow, skills, and customization       |
+| [CLI Reference](./CLI.md)         | All commands, flags, and options for `vaultspec-core` |
 
 For bug reports and feature requests, open an issue on the [vaultspec-core issue tracker](https://github.com/wgergely/vaultspec-core/issues).

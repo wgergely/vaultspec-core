@@ -1,3 +1,13 @@
+---
+tags:
+  - '#plan'
+  - '#cli-restructure'
+date: 2026-03-16
+related:
+  - '[[2026-03-05-cli-engine-typer-adr]]'
+  - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
+---
+
 # CLI Restructure Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
@@ -9,10 +19,11 @@
 **Tech Stack:** Python 3.13+, Typer, Rich, PyYAML, pytest, just
 
 **References:**
+
 - Contract: `cli-contract.md`
 - Research: `cli-grounding-research.md`
 
----
+______________________________________________________________________
 
 ## Phase 0: Foundation — Console & Global Options
 
@@ -21,13 +32,16 @@ Fix the output layer first. Every phase after this depends on Rich console worki
 ### Task 0.1: Fix Unicode crash on Windows
 
 **Files:**
+
 - Modify: `src/vaultspec_core/console.py`
 - Test: `src/vaultspec_core/tests/cli/test_console.py` (create)
 
 **Step 1: Write the failing test**
 
 ```python
+
 # src/vaultspec_core/tests/cli/test_console.py
+
 """Tests for console singleton."""
 
 import pytest
@@ -54,7 +68,9 @@ class TestConsole:
     def test_console_can_print_unicode(self):
         """Console must handle Unicode without UnicodeEncodeError."""
         console = get_console()
+
         # These characters caused cp1252 crash on Windows
+
         console.print("✓ OK")
         console.print("⚠ WARN")
         console.print("█░")
@@ -130,18 +146,21 @@ git add src/vaultspec_core/console.py src/vaultspec_core/tests/cli/test_console.
 git commit -m "fix: prevent Unicode crash on Windows by enabling safe_box on non-UTF-8 terminals"
 ```
 
----
+______________________________________________________________________
 
 ### Task 0.2: Remove --verbose, fix --target help, suppress completions
 
 **Files:**
+
 - Modify: `src/vaultspec_core/cli.py`
 - Test: `src/vaultspec_core/tests/cli/test_main_cli.py` (will be rewritten later; update minimally now)
 
 **Step 1: Write the failing test**
 
 ```python
+
 # Add to test_main_cli.py or a new test_global_options.py
+
 @pytest.mark.unit
 class TestGlobalOptions:
     def test_no_verbose_flag(self, runner, test_project):
@@ -176,9 +195,9 @@ Expected: FAIL — `--verbose` still exists, `--target` has wrong help text
 In `cli.py`:
 
 1. Change `app = typer.Typer(...)` to include `add_completion=False`
-2. Remove the `verbose` parameter from `main()`
-3. Simplify logging: only `--debug` toggles between WARNING (default) and DEBUG
-4. Update `--target` help text
+1. Remove the `verbose` parameter from `main()`
+1. Simplify logging: only `--debug` toggles between WARNING (default) and DEBUG
+1. Update `--target` help text
 
 ```python
 app = typer.Typer(
@@ -227,7 +246,9 @@ def main(
     """Initialize workspace and logging."""
     log_level = logging.DEBUG if debug else logging.WARNING
     configure_logging(level=log_level, debug=debug)
+
     # ... rest unchanged
+
 ```
 
 **Step 4: Run test to verify it passes**
@@ -242,7 +263,7 @@ git add src/vaultspec_core/cli.py
 git commit -m "fix: remove --verbose, fix --target help text, suppress typer completions"
 ```
 
----
+______________________________________________________________________
 
 ## Phase 1: Backend Hardening
 
@@ -251,6 +272,7 @@ Build the backend functions that new CLI commands will need. No CLI changes yet 
 ### Task 1.1: Vault query engine — scan, filter, list
 
 **Files:**
+
 - Create: `src/vaultspec_core/vaultcore/query.py`
 - Test: `src/vaultspec_core/vaultcore/tests/test_query.py`
 
@@ -259,7 +281,9 @@ This module composes `scan_vault()`, `get_doc_type()`, `parse_frontmatter()`, an
 **Step 1: Write the failing tests**
 
 ```python
+
 # src/vaultspec_core/vaultcore/tests/test_query.py
+
 """Tests for vault query engine."""
 
 import pytest
@@ -294,12 +318,16 @@ class TestListDocuments:
 
     def test_list_orphaned(self, vault_project):
         docs = list_documents(vault_project, doc_type="orphaned")
+
         # Orphaned = no incoming links
+
         assert isinstance(docs, list)
 
     def test_list_invalid(self, vault_project):
         docs = list_documents(vault_project, doc_type="invalid")
+
         # Invalid = has broken outgoing links
+
         assert isinstance(docs, list)
 
 
@@ -344,7 +372,9 @@ Expected: FAIL — `vaultcore.query` module does not exist
 **Step 3: Write minimal implementation**
 
 ```python
+
 # src/vaultspec_core/vaultcore/query.py
+
 """Unified query engine for .vault/ document operations.
 
 Composes scanner, parser, graph, and metrics into a single query surface
@@ -484,6 +514,7 @@ def get_stats(
             features.add(d.feature)
 
     # Orphan/invalid counts from graph (unfiltered)
+
     from ..graph import VaultGraph
 
     try:
@@ -518,12 +549,14 @@ def list_feature_details(
     docs = _scan_all(root_dir)
 
     # Group by feature
+
     by_feature: dict[str, list[VaultDocument]] = {}
     for d in docs:
         if d.feature:
             by_feature.setdefault(d.feature, []).append(d)
 
     # Orphan detection
+
     orphan_features: set[str] = set()
     if orphaned_only:
         from ..graph import VaultGraph
@@ -571,6 +604,7 @@ Expected: PASS (may need conftest fixture for `vault_project` — use existing v
 **Step 5: Update `vaultcore/__init__.py` exports**
 
 Add to `src/vaultspec_core/vaultcore/__init__.py`:
+
 ```python
 from .query import VaultDocument as VaultDocument
 from .query import get_stats as get_stats
@@ -585,11 +619,12 @@ git add src/vaultspec_core/vaultcore/query.py src/vaultspec_core/vaultcore/tests
 git commit -m "feat: add vault query engine for stats, list, and feature detail operations"
 ```
 
----
+______________________________________________________________________
 
 ### Task 1.2: Feature archive mechanism
 
 **Files:**
+
 - Modify: `src/vaultspec_core/vaultcore/query.py` (add `archive_feature`)
 - Test: `src/vaultspec_core/vaultcore/tests/test_query.py` (add archive tests)
 
@@ -605,7 +640,9 @@ class TestArchiveFeature:
         result = archive_feature(vault_project, "test-feature")
         assert result["archived_count"] >= 0
         archive_dir = vault_project / ".vault" / "_archive"
+
         # If docs existed, archive dir should be created
+
         if result["archived_count"] > 0:
             assert archive_dir.exists()
 
@@ -650,7 +687,9 @@ def archive_feature(root_dir: Path, feature: str) -> dict:
 
     archived: list[str] = []
     for doc in docs:
+
         # Preserve subdirectory (e.g., adr/, plan/)
+
         rel = doc.path.relative_to(vault_dir)
         dest = archive_dir / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -672,18 +711,21 @@ git add src/vaultspec_core/vaultcore/query.py src/vaultspec_core/vaultcore/tests
 git commit -m "feat: add feature archive mechanism (moves docs to .vault/_archive/)"
 ```
 
----
+______________________________________________________________________
 
 ### Task 1.3: Manifest-aware sync filtering
 
 **Files:**
+
 - Modify: `src/vaultspec_core/core/sync.py`
 - Test: `src/vaultspec_core/tests/cli/test_sync_manifest.py` (create)
 
 **Step 1: Write the failing test**
 
 ```python
+
 # src/vaultspec_core/tests/cli/test_sync_manifest.py
+
 """Tests for manifest-aware sync filtering."""
 
 import json
@@ -697,13 +739,17 @@ from vaultspec_core.core.enums import Tool
 class TestManifestAwareSync:
     def test_sync_to_all_skips_uninstalled_providers(self, test_project):
         """sync_to_all_tools must skip providers not in manifest."""
+
         # Write manifest with only claude installed
+
         manifest_path = test_project / ".vaultspec" / "providers.json"
         manifest_path.write_text(
             json.dumps({"version": "1.0", "installed": ["claude"]}),
             encoding="utf-8",
         )
+
         # Create a test rule
+
         rule = _t.RULES_SRC_DIR / "test.md"
         rule.write_text("---\nname: test\n---\nTest rule.\n", encoding="utf-8")
 
@@ -713,7 +759,9 @@ class TestManifestAwareSync:
         result = sync_to_all_tools(
             sources, "rules_dir", transform_rule, "Rules"
         )
+
         # Should only have synced to .claude/rules, not .gemini/rules etc.
+
         claude_rules = test_project / ".claude" / "rules"
         gemini_rules = test_project / ".gemini" / "rules"
         assert (claude_rules / "test.md").exists()
@@ -744,14 +792,18 @@ def sync_to_all_tools(
     total = SyncResult()
 
     for tool_type, cfg in _t.TOOL_CONFIGS.items():
+
         # Skip providers not in manifest (when manifest exists)
+
         if installed and cfg.name not in installed:
             continue
 
         dest_dir = getattr(cfg, dir_attr, None)
         if dest_dir is None:
             continue
+
         # ... rest of existing logic
+
 ```
 
 **Step 4: Run test to verify it passes**
@@ -766,18 +818,21 @@ git add src/vaultspec_core/core/sync.py src/vaultspec_core/tests/cli/test_sync_m
 git commit -m "fix: sync_to_all_tools respects provider manifest instead of syncing all configured tools"
 ```
 
----
+______________________________________________________________________
 
 ### Task 1.4: Revert mechanism for builtin resources
 
 **Files:**
+
 - Create: `src/vaultspec_core/core/revert.py`
 - Test: `src/vaultspec_core/core/tests/test_revert.py` (create)
 
 **Step 1: Write the failing test**
 
 ```python
+
 # src/vaultspec_core/core/tests/test_revert.py
+
 """Tests for builtin resource revert."""
 
 import pytest
@@ -798,10 +853,15 @@ class TestRevert:
 
     def test_get_builtin_content_returns_original(self):
         """Builtin resources ship with the package and can be retrieved."""
+
         # This depends on actual builtin files existing in the package
+
         # For now, test the interface
+
         content = get_builtin_content("rules", "governance.builtin.md")
+
         # Either returns content (if file exists in package) or None
+
         assert content is None or isinstance(content, str)
 
     def test_revert_builtin_restores_content(self, tmp_path):
@@ -813,6 +873,7 @@ class TestRevert:
 
         result = revert_resource("rules", "governance.builtin.md", rules_dir)
         assert result["reverted"] is True or result["reverted"] is False
+
         # If original exists in package, file should be restored
 
     def test_revert_custom_resource_fails(self, tmp_path):
@@ -835,7 +896,9 @@ Expected: FAIL — module does not exist
 **Step 3: Write minimal implementation**
 
 ```python
+
 # src/vaultspec_core/core/revert.py
+
 """Revert mechanism for builtin firmware resources.
 
 Builtin resources (files ending in .builtin.md) ship with the vaultspec-core
@@ -854,6 +917,7 @@ logger = logging.getLogger(__name__)
 _BUILTIN_SUFFIX = ".builtin.md"
 
 # Map resource categories to their package data paths
+
 _PACKAGE_PATHS: dict[str, str] = {
     "rules": "vaultspec_core.firmware.rules",
     "skills": "vaultspec_core.firmware.skills",
@@ -927,18 +991,21 @@ git add src/vaultspec_core/core/revert.py src/vaultspec_core/core/tests/test_rev
 git commit -m "feat: add revert mechanism for builtin firmware resources"
 ```
 
----
+______________________________________________________________________
 
 ### Task 1.5: Dry-run tree renderer
 
 **Files:**
+
 - Create: `src/vaultspec_core/core/dry_run.py`
 - Test: `src/vaultspec_core/core/tests/test_dry_run.py` (create)
 
 **Step 1: Write the failing test**
 
 ```python
+
 # src/vaultspec_core/core/tests/test_dry_run.py
+
 """Tests for dry-run tree renderer."""
 
 import pytest
@@ -955,7 +1022,9 @@ class TestDryRunTree:
             DryRunItem(".vaultspec/rules/", DryRunStatus.NEW),
         ]
         render_dry_run_tree(items, title="Install preview")
+
         # Should not crash and should produce output
+
         # (Rich console output captured via capsys)
 
     def test_renders_mixed_statuses(self, capsys):
@@ -983,7 +1052,9 @@ Expected: FAIL — module does not exist
 **Step 3: Write minimal implementation**
 
 ```python
+
 # src/vaultspec_core/core/dry_run.py
+
 """Rich tree renderer for dry-run previews.
 
 Used by install --dry-run and uninstall --dry-run to display a coloured,
@@ -1031,6 +1102,7 @@ def render_dry_run_tree(items: list[DryRunItem], *, title: str = "Preview") -> N
     """Render a coloured tree of dry-run items to the console.
 
     Groups items by status category and displays with colour coding:
+
     - green (+) = new
     - dim (=) = already exists, no change
     - yellow (~) = will be updated
@@ -1041,11 +1113,13 @@ def render_dry_run_tree(items: list[DryRunItem], *, title: str = "Preview") -> N
     tree = Tree(f"[bold]{title}[/bold]")
 
     # Group by status for summary
+
     by_status: dict[DryRunStatus, list[DryRunItem]] = {}
     for item in items:
         by_status.setdefault(item.status, []).append(item)
 
     # Render each item
+
     for item in items:
         prefix, style = _STATUS_STYLES[item.status]
         tree.add(f"{prefix} {style}{item.path}[/{style.lstrip('[')}]" if style.startswith("[") else f"{prefix} {item.path}")
@@ -1053,6 +1127,7 @@ def render_dry_run_tree(items: list[DryRunItem], *, title: str = "Preview") -> N
     console.print(tree)
 
     # Summary line
+
     parts = []
     for status in DryRunStatus:
         count = len(by_status.get(status, []))
@@ -1074,7 +1149,7 @@ git add src/vaultspec_core/core/dry_run.py src/vaultspec_core/core/tests/test_dr
 git commit -m "feat: add Rich tree renderer for dry-run previews with colour-coded status categories"
 ```
 
----
+______________________________________________________________________
 
 ## Phase 2: CLI Namespace Restructure
 
@@ -1083,6 +1158,7 @@ Rewrite the CLI surface layer. This is the big structural change — flat namesp
 ### Task 2.1: Create the new CLI module structure
 
 **Files:**
+
 - Create: `src/vaultspec_core/cli/` (package)
 - Create: `src/vaultspec_core/cli/__init__.py`
 - Create: `src/vaultspec_core/cli/root.py` (root app + global options + top-level commands)
@@ -1093,10 +1169,13 @@ Rewrite the CLI surface layer. This is the big structural change — flat namesp
 **Step 1: Create the package structure**
 
 ```python
+
 # src/vaultspec_core/cli/__init__.py
+
 """CLI package — the user-facing command surface for vaultspec-core.
 
 Organized into domain groups:
+
 - root: install, uninstall, sync (top-level commands + global options)
 - vault_cmd: vault stats, vault list, vault add, vault feature, vault doctor
 - spec_cmd: spec rules, spec skills, spec agents, spec system, spec hooks
@@ -1111,7 +1190,9 @@ __all__ = ["app", "run"]
 **Step 2: Create root.py with top-level commands (stubs)**
 
 ```python
+
 # src/vaultspec_core/cli/root.py
+
 """Root CLI application with global options and top-level commands.
 
 Top-level commands: install, uninstall, sync.
@@ -1153,6 +1234,7 @@ app = typer.Typer(
 )
 
 # Mount domain groups
+
 app.add_typer(vault_app, name="vault")
 app.add_typer(spec_app, name="spec")
 app.add_typer(dev_app, name="dev")
@@ -1203,6 +1285,7 @@ def main(
         raise typer.Exit(0)
 
     # install/uninstall manage their own target — skip workspace resolution
+
     if ctx.invoked_subcommand in ("install", "uninstall"):
         from vaultspec_core.core import types as _t
 
@@ -1212,6 +1295,7 @@ def main(
         return
 
     # All other commands need a resolved workspace
+
     try:
         layout = resolve_workspace(target_override=target)
         init_paths(layout)
@@ -1222,9 +1306,11 @@ def main(
 
 
 # --- Top-level commands: install, uninstall, sync ---
+
 # These are defined here (not in sub-modules) because they are root-level.
 
 # Placeholder signatures — full implementation in Phase 3.
+
 # For now, delegate to existing core.commands functions.
 
 
@@ -1340,7 +1426,9 @@ def run():
 **Step 3: Create vault_cmd.py (stubs)**
 
 ```python
+
 # src/vaultspec_core/cli/vault_cmd.py
+
 """Vault command group — manages .vault/ documentation records."""
 
 from __future__ import annotations
@@ -1434,7 +1522,9 @@ def cmd_feature_archive(
 **Step 4: Create spec_cmd.py (stubs)**
 
 ```python
+
 # src/vaultspec_core/cli/spec_cmd.py
+
 """Spec command group — author and modify .vaultspec/ firmware contents."""
 
 from __future__ import annotations
@@ -1467,6 +1557,7 @@ spec_app.add_typer(hooks_app, name="hooks")
 
 
 # --- Rules ---
+
 @rules_app.command("list")
 def cmd_rules_list():
     """List all rules in .vaultspec/rules/rules/."""
@@ -1519,6 +1610,7 @@ def cmd_rules_revert(
 
 
 # --- Skills (same pattern as rules) ---
+
 @skills_app.command("list")
 def cmd_skills_list():
     """List all skills in .vaultspec/rules/skills/."""
@@ -1572,6 +1664,7 @@ def cmd_skills_revert(
 
 
 # --- Agents (same pattern) ---
+
 @agents_app.command("list")
 def cmd_agents_list():
     """List all agent definitions in .vaultspec/rules/agents/."""
@@ -1624,6 +1717,7 @@ def cmd_agents_revert(
 
 
 # --- System ---
+
 @system_app.command("list")
 def cmd_system_list():
     """List all system prompt parts in .vaultspec/rules/system/."""
@@ -1676,6 +1770,7 @@ def cmd_system_revert(
 
 
 # --- Hooks ---
+
 @hooks_app.command("list")
 def cmd_hooks_list():
     """List all defined lifecycle hooks."""
@@ -1696,7 +1791,9 @@ def cmd_hooks_run(
 **Step 5: Create dev_cmd.py**
 
 ```python
+
 # src/vaultspec_core/cli/dev_cmd.py
+
 """Dev command group — development-specific commands, not user-facing."""
 
 from __future__ import annotations
@@ -1774,11 +1871,12 @@ git add src/vaultspec_core/cli/ src/vaultspec_core/__main__.py pyproject.toml
 git commit -m "refactor: restructure CLI into domain groups (vault, spec, dev) per contract"
 ```
 
----
+______________________________________________________________________
 
 ### Task 2.2: Delete old CLI modules
 
 **Files:**
+
 - Delete: `src/vaultspec_core/cli.py` (replaced by `cli/root.py`)
 - Delete: `src/vaultspec_core/spec_cli.py` (replaced by `cli/spec_cmd.py` + `cli/root.py`)
 - Delete: `src/vaultspec_core/vault_cli.py` (replaced by `cli/vault_cmd.py`)
@@ -1794,6 +1892,7 @@ git rm src/vaultspec_core/cli.py src/vaultspec_core/spec_cli.py src/vaultspec_co
 Search for `from vaultspec_core.cli import`, `from vaultspec_core.spec_cli import`, `from vaultspec_core.vault_cli import` across the codebase and update to new paths.
 
 Key files to check:
+
 - `src/vaultspec_core/core/commands.py` — imports `_sync_provider` from `spec_cli`
 - `src/vaultspec_core/mcp_server/app.py` — may reference old CLI
 
@@ -1804,7 +1903,7 @@ git add -A
 git commit -m "refactor: remove old flat CLI modules (cli.py, spec_cli.py, vault_cli.py)"
 ```
 
----
+______________________________________________________________________
 
 ## Phase 3: Fix Top-Level Commands
 
@@ -1813,6 +1912,7 @@ Now fix the actual behavior of install, uninstall, sync to match the contract.
 ### Task 3.1: Install --force and --dry-run tree
 
 **Files:**
+
 - Modify: `src/vaultspec_core/core/commands.py` (install_run)
 - Modify: `src/vaultspec_core/cli/root.py` (wire --force)
 - Test: `src/vaultspec_core/tests/cli/test_install.py` (create)
@@ -1820,7 +1920,9 @@ Now fix the actual behavior of install, uninstall, sync to match the contract.
 **Step 1: Write failing tests**
 
 ```python
+
 # src/vaultspec_core/tests/cli/test_install.py
+
 """Tests for install command."""
 
 import pytest
@@ -1849,24 +1951,29 @@ class TestInstallDryRun:
         """--dry-run must produce coloured tree with status categories."""
         result = runner.invoke(app, ["install", str(tmp_path), "--dry-run"])
         assert result.exit_code == 0
+
         # Must NOT use "would" wording
+
         assert "would" not in result.output.lower()
 ```
 
 **Step 2-5: Implement and commit** (follow standard TDD cycle)
 
----
+______________________________________________________________________
 
 ### Task 3.2: Uninstall --force safety gate and core cascade
 
 **Files:**
+
 - Modify: `src/vaultspec_core/core/commands.py` (uninstall_run)
 - Test: `src/vaultspec_core/tests/cli/test_uninstall.py` (create)
 
 **Step 1: Write failing tests**
 
 ```python
+
 # src/vaultspec_core/tests/cli/test_uninstall.py
+
 """Tests for uninstall command."""
 
 import pytest
@@ -1905,58 +2012,72 @@ class TestUninstallCoreCascade:
 
 **Step 2-5: Implement and commit** (follow standard TDD cycle)
 
----
+______________________________________________________________________
 
 ### Task 3.3: Sync manifest-aware all and core error
 
 Already partially done in Task 1.3. This task wires it into the CLI and adds the explicit "core" error message.
 
 **Files:**
+
 - Modify: `src/vaultspec_core/cli/root.py`
 - Test: `src/vaultspec_core/tests/cli/test_sync.py` (create)
 
----
+______________________________________________________________________
 
 ## Phase 4: Implement Vault Commands
 
 Wire the vault_cmd.py stubs to the backend from Phase 1.
 
 ### Task 4.1: vault add (with --date, --content)
+
 ### Task 4.2: vault stats
+
 ### Task 4.3: vault list
+
 ### Task 4.4: vault feature list
+
 ### Task 4.5: vault feature archive
+
 ### Task 4.6: vault doctor
 
 Each task follows the same pattern:
-1. Write failing test against vault_cmd.py
-2. Implement by calling query.py / verification API / hydration
-3. Run tests
-4. Commit
 
----
+1. Write failing test against vault_cmd.py
+1. Implement by calling query.py / verification API / hydration
+1. Run tests
+1. Commit
+
+______________________________________________________________________
 
 ## Phase 5: Rewrite CLI Tests
 
 ### Task 5.1: Rewrite test_main_cli.py for new namespace
+
 ### Task 5.2: Rewrite test_vault_cli.py for decomposed commands
+
 ### Task 5.3: Rewrite test_spec_cli.py for spec nesting
+
 ### Task 5.4: Write test_dev_cli.py
+
 ### Task 5.5: Update test_automation_contracts.py for new justfile
 
----
+______________________________________________________________________
 
 ## Phase 6: Justfile Alignment
 
 ### Task 6.1: Rename `sync` → `deps` to resolve collision
 
 **Files:**
+
 - Modify: `justfile`
 
 Rename the uv dependency sync recipe to avoid collision:
 
 ```just
+
 # Rename 'sync' to 'deps' for dependency management
+
 deps target='sync':
   case "{{target}}" in \
     sync) uv sync --locked --group dev ;; \
@@ -1965,6 +2086,7 @@ deps target='sync':
   esac
 
 # Add vaultspec-core sync passthrough
+
 sync provider='all' *args='':
   uv run vaultspec-core sync {{provider}} {{args}}
 ```
@@ -1991,7 +2113,7 @@ test target='all':
   esac
 ```
 
----
+______________________________________________________________________
 
 ## Phase 7: Help Text Quality Pass
 
@@ -1999,7 +2121,7 @@ test target='all':
 
 Go through every `help=` parameter in every command and option across all CLI modules. Each must clearly state what the command does and what it changes. No word salad.
 
----
+______________________________________________________________________
 
 ## Dependency Graph
 
@@ -2016,18 +2138,18 @@ Phase 7 (help text pass — after everything else)
 
 Phases 1 and 2 can partially overlap: backend work (1.1–1.5) is independent of CLI wiring (2.1–2.2). Phase 6 can start as soon as Phase 2 is committed.
 
----
+______________________________________________________________________
 
 ## Estimated Task Count
 
-| Phase | Tasks | Approx Steps |
-|-------|-------|-------------|
-| 0: Foundation | 2 | 10 |
-| 1: Backend | 5 | 25 |
-| 2: CLI Restructure | 2 | 14 |
-| 3: Top-Level Fixes | 3 | 15 |
-| 4: Vault Commands | 6 | 30 |
-| 5: Test Rewrite | 5 | 25 |
-| 6: Justfile | 3 | 9 |
-| 7: Help Text | 1 | 5 |
-| **Total** | **27** | **~133** |
+| Phase              | Tasks  | Approx Steps |
+| ------------------ | ------ | ------------ |
+| 0: Foundation      | 2      | 10           |
+| 1: Backend         | 5      | 25           |
+| 2: CLI Restructure | 2      | 14           |
+| 3: Top-Level Fixes | 3      | 15           |
+| 4: Vault Commands  | 6      | 30           |
+| 5: Test Rewrite    | 5      | 25           |
+| 6: Justfile        | 3      | 9            |
+| 7: Help Text       | 1      | 5            |
+| **Total**          | **27** | **~133**     |

@@ -1,9 +1,10 @@
 ---
 tags:
-  - "#research"
-  - "#marketing-audit"
-date: "2026-02-18"
+  - '#research'
+  - '#marketing-audit'
+date: '2026-02-18'
 ---
+
 ## Marketing Audit: Documentation Quality
 
 **Date**: 2026-02-18
@@ -11,7 +12,7 @@ date: "2026-02-18"
 **Scope**: Root README, `.vaultspec/README.md`, and all `docs/` files
 **Status**: Complete
 
----
+______________________________________________________________________
 
 ## Executive Summary
 
@@ -21,7 +22,7 @@ vaultspec's documentation is technically accurate and well-structured for a deve
 
 The docs excel at reference material (CLI reference, configuration, search guide) and are serviceable for concepts. They fail at marketing (the README does not sell the product), onboarding (the getting-started guide assumes too much), and tutorials (there are none beyond the quickstart). The GPU-only requirement is a significant adoption barrier that is mentioned but not contextualized or mitigated. There are no worked examples showing real artifacts, no video or screenshots, and no content targeting team leads or enterprise evaluators.
 
----
+______________________________________________________________________
 
 ## 1. README First Impression
 
@@ -56,7 +57,7 @@ vaultspec's README starts with a tagline and immediately drops into a bullet lis
 
 **The GPU-only requirement** (`NVIDIA GPU with CUDA 13.0+ required for RAG/search features`) appears in Prerequisites with no context. For a developer on macOS or with AMD hardware, this is an immediate dealbreaker. There is no mention of whether the framework is usable without the GPU (answer: yes, for most features), nor is there a note that the GPU is only needed for semantic search. This alone likely causes a significant portion of evaluators to bounce.
 
----
+______________________________________________________________________
 
 ## 2. Getting Started Flow
 
@@ -101,7 +102,7 @@ A new user following this guide has no way to verify they did it correctly until
 - How to verify the framework loaded into Claude Code or Gemini CLI (e.g., "open Claude Code in your project and type 'activate vaultspec-research' — you should see...")
 - Troubleshooting section (common errors, especially GPU-related)
 
----
+______________________________________________________________________
 
 ## 3. Conceptual Documentation
 
@@ -123,7 +124,7 @@ A new user following this guide has no way to verify they did it correctly until
 - The "Config Sync Flow" diagram is technically accurate but will confuse a new user who does not yet understand the `.vaultspec/` vs. tool destination relationship. A simpler version of this diagram should appear in getting-started.
 - No worked example of a real research document. Showing an actual snippet of `.vault/research/YYYY-MM-DD-example-research.md` would make the vault concept tangible.
 
----
+______________________________________________________________________
 
 ## 4. CLI Reference
 
@@ -137,7 +138,7 @@ The CLI reference is thorough and well-formatted. Every command is documented wi
 - The `vaultspec-fd`, `vaultspec-rg`, `vaultspec-sg`, `vaultspec-sd` skills visible in `.vaultspec/skills/` do not appear in any documentation. These appear to be utility skills (ripgrep, fd, etc.) that should either be documented or removed from the skills directory if internal-only.
 - No mention of the `--root` flag's behavior when ROOT_DIR environment variable is also set (priority resolution).
 
----
+______________________________________________________________________
 
 ## 5. Configuration Guide
 
@@ -151,7 +152,7 @@ The configuration reference is complete, clearly tabulated, and includes the typ
 - `VAULTSPEC_ALLOWED_TOOLS` and `VAULTSPEC_DISALLOWED_TOOLS` have no examples of valid tool names.
 - The `VAULTSPEC_MCP_ROOT_DIR` is marked "required when MCP server starts" but the condition under which the MCP server starts is not explained inline (user must cross-reference to CLI reference).
 
----
+______________________________________________________________________
 
 ## 6. Search Guide
 
@@ -173,7 +174,7 @@ This is the only place in any doc where the consequence of not having a GPU is s
 
 For an open-source framework targeting individual developers, GPU-only is a significant adoption barrier. The search guide documents the constraint accurately but does nothing to reduce its friction.
 
----
+______________________________________________________________________
 
 ## 7. API Documentation
 
@@ -188,7 +189,7 @@ This is a moderate gap now but will become critical if vaultspec positions as a 
 - Module-level docstrings or a `docs/api/` section documenting the public surface of key modules (`vault`, `rag`, `orchestration`, `protocol`)
 - A guide on embedding vaultspec programmatically (e.g., "use `VaultStore` in your CI pipeline to query vault documents")
 
----
+______________________________________________________________________
 
 ## 8. Tutorials and Worked Examples
 
@@ -199,14 +200,14 @@ There are no tutorials beyond the getting-started quickstart. No recipe-style gu
 **High-value tutorial ideas (in priority order):**
 
 1. **"From Scratch: Your First Governed Feature"** — Full worked tutorial showing actual artifact content, from research document through code review.
-2. **"Adding vaultspec to an Existing Project"** — How to adopt vaultspec mid-project, import existing decisions into the vault, seed the RAG index.
-3. **"Running vaultspec with Gemini CLI"** — ACP integration walkthrough, since ACP is a differentiator.
-4. **"Multi-Agent Workflow: Research Agent Calls Executor"** — Shows the MCP subagent server in action.
-5. **"Customizing Agents: Creating Your Own Executor"** — How to define a new agent with custom rules and tier.
+1. **"Adding vaultspec to an Existing Project"** — How to adopt vaultspec mid-project, import existing decisions into the vault, seed the RAG index.
+1. **"Running vaultspec with Gemini CLI"** — ACP integration walkthrough, since ACP is a differentiator.
+1. **"Multi-Agent Workflow: Research Agent Calls Executor"** — Shows the MCP subagent server in action.
+1. **"Customizing Agents: Creating Your Own Executor"** — How to define a new agent with custom rules and tier.
 
 The `.vault/` directory itself contains real example artifacts (ADRs, research documents, plans) that could be referenced from tutorials as worked examples. This is an underused resource.
 
----
+______________________________________________________________________
 
 ## 9. User Personas
 
@@ -222,7 +223,7 @@ The documentation addresses a single implicit persona: a developer who is alread
 
 **Developer using macOS or AMD GPU:** The GPU requirement is documented but there is no persona-specific path for this user ("use vaultspec without search features," "deploy the search component to a cloud GPU").
 
----
+______________________________________________________________________
 
 ## 10. Visual Aids
 
@@ -237,7 +238,7 @@ The Mermaid diagrams in `.vaultspec/README.md` and `docs/concepts.md` are effect
 - **Architecture diagram** — A single diagram showing how `.vaultspec/`, `.vault/`, and the tool destinations (`.claude/`, `.gemini/`) relate to each other, suitable for inclusion in the README.
 - The large workflow diagram in `.vaultspec/README.md` (the 30-node flowchart) is detailed but dense for a first-time reader. A simplified version with 5 boxes should precede it.
 
----
+______________________________________________________________________
 
 ## 11. Cross-Referencing and Navigation
 
@@ -257,7 +258,7 @@ The Mermaid diagrams in `.vaultspec/README.md` and `docs/concepts.md` are effect
 - There is no navigation index or table of contents for the `docs/` directory as a whole.
 - The skills and agents in `.vaultspec/` are mentioned in documentation but there are no links from the docs into those files (understandable for skills, but agent definitions serve as documentation).
 
----
+______________________________________________________________________
 
 ## 12. Competitor Documentation Comparison
 
@@ -268,7 +269,9 @@ Comparing vaultspec's documentation against relevant competitors:
 - Full website with animated demos, blog, leaderboards, benchmarks
 
 - Getting started in 3 commands
+
 - FAQ section addressing common objections
+
 - **Lesson**: Demo GIF on the README homepage is the single highest-ROI documentation investment
 
 ### Cursor (cursor.com/docs)
@@ -297,7 +300,7 @@ Comparing vaultspec's documentation against relevant competitors:
 - Conceptual, how-to, reference, and tutorial sections (Diátaxis framework)
 - **Lesson**: Separate conceptual from how-to from reference — vaultspec conflates these
 
----
+______________________________________________________________________
 
 ## Summary of Findings
 
@@ -312,12 +315,15 @@ Comparing vaultspec's documentation against relevant competitors:
 
 1. **README does not sell the product** — needs a compelling hook, demo GIF/screenshot, and concrete "before/after" framing
 
-2. **GPU barrier is unmitigated** — the GPU-only requirement needs a clear escape hatch for non-GPU users
+1. **GPU barrier is unmitigated** — the GPU-only requirement needs a clear escape hatch for non-GPU users
 
-3. **No tutorials** — worked examples beyond the quickstart are entirely absent
-4. **No persona targeting** — single audience assumption leaves team leads and enterprise evaluators unserved
-5. **No API documentation** — programmatic use of the library is completely undocumented
-6. **Onboarding blockers** — placeholder URLs, no `venv` step, no verification steps, no `doctor` in getting-started
+1. **No tutorials** — worked examples beyond the quickstart are entirely absent
+
+1. **No persona targeting** — single audience assumption leaves team leads and enterprise evaluators unserved
+
+1. **No API documentation** — programmatic use of the library is completely undocumented
+
+1. **Onboarding blockers** — placeholder URLs, no `venv` step, no verification steps, no `doctor` in getting-started
 
 ### Priority Recommendations
 
@@ -326,7 +332,9 @@ Comparing vaultspec's documentation against relevant competitors:
 - Add a terminal recording (asciinema or GIF) to the README showing a 2-minute workflow
 
 - Add a "GPU-not-required" note to README/getting-started: "Search requires NVIDIA GPU; all other features work without it"
+
 - Add `cli.py doctor` as step 1 in getting-started
+
 - Fill in `<repository-url>` placeholder
 
 **Short-term:**
@@ -342,7 +350,7 @@ Comparing vaultspec's documentation against relevant competitors:
 - Document the Python library API (at minimum: vault, rag, orchestration modules)
 - Build a documentation site (mkdocs or similar) for searchability
 
----
+______________________________________________________________________
 
 ## Appendix: Files Audited
 

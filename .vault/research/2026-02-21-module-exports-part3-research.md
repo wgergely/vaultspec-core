@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#research"
-  - "#module-exports"
-date: "2026-02-21"
+  - '#research'
+  - '#module-exports'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-packaging-restructure-adr]]"
+  - '[[2026-02-21-packaging-restructure-adr]]'
 ---
+
 # `module-exports` research: graph, metrics, verification, subagent_server, mcp_tools, top-level
 
 Part 3 of the import/export audit covers the remaining packages
@@ -14,7 +15,7 @@ and all top-level modules under `src/vaultspec/`. This part also
 provides cross-cutting analysis: complexity totals, test import
 strategy, and circular import risk assessment.
 
----
+______________________________________________________________________
 
 ## 1. `vaultspec.graph`
 
@@ -24,19 +25,19 @@ Empty (single blank line). No re-exports.
 
 ### 1B. `api.py` -- public symbols
 
-| Symbol | Kind | Description |
-|--------|------|-------------|
-| `DocNode` | dataclass | Node in the vault document graph |
-| `VaultGraph` | class | Directed graph of vault documents |
+| Symbol       | Kind      | Description                       |
+| ------------ | --------- | --------------------------------- |
+| `DocNode`    | dataclass | Node in the vault document graph  |
+| `VaultGraph` | class     | Directed graph of vault documents |
 
 ### 1C. Cross-package imports (absolute)
 
-| Source file | Import statement | Target package |
-|-------------|-----------------|----------------|
-| `graph/api.py` | `from vaultspec.vaultcore.links import extract_related_links, extract_wiki_links` | `vaultcore` |
-| `graph/api.py` | `from vaultspec.vaultcore.models import DocType` | `vaultcore` |
-| `graph/api.py` | `from vaultspec.vaultcore.parser import parse_vault_metadata` | `vaultcore` |
-| `graph/api.py` | `from vaultspec.vaultcore.scanner import get_doc_type, scan_vault` | `vaultcore` |
+| Source file    | Import statement                                                                  | Target package |
+| -------------- | --------------------------------------------------------------------------------- | -------------- |
+| `graph/api.py` | `from vaultspec.vaultcore.links import extract_related_links, extract_wiki_links` | `vaultcore`    |
+| `graph/api.py` | `from vaultspec.vaultcore.models import DocType`                                  | `vaultcore`    |
+| `graph/api.py` | `from vaultspec.vaultcore.parser import parse_vault_metadata`                     | `vaultcore`    |
+| `graph/api.py` | `from vaultspec.vaultcore.scanner import get_doc_type, scan_vault`                | `vaultcore`    |
 
 No intra-package imports (single-module package).
 
@@ -54,7 +55,7 @@ from vaultspec.graph.api import DocNode, VaultGraph
 __all__ = ["DocNode", "VaultGraph"]
 ```
 
----
+______________________________________________________________________
 
 ## 2. `vaultspec.metrics`
 
@@ -64,18 +65,18 @@ Empty (single blank line). No re-exports.
 
 ### 2B. `api.py` -- public symbols
 
-| Symbol | Kind | Description |
-|--------|------|-------------|
-| `VaultSummary` | dataclass | Aggregate statistics for the vault |
-| `get_vault_metrics` | function | Calculate summary statistics |
+| Symbol              | Kind      | Description                        |
+| ------------------- | --------- | ---------------------------------- |
+| `VaultSummary`      | dataclass | Aggregate statistics for the vault |
+| `get_vault_metrics` | function  | Calculate summary statistics       |
 
 ### 2C. Cross-package imports (absolute)
 
-| Source file | Import statement | Target package |
-|-------------|-----------------|----------------|
-| `metrics/api.py` | `from vaultspec.vaultcore.models import DocType` | `vaultcore` |
-| `metrics/api.py` | `from vaultspec.vaultcore.scanner import get_doc_type, scan_vault` | `vaultcore` |
-| `metrics/api.py` | `from vaultspec.verification.api import list_features` | `verification` (lazy, inside function) |
+| Source file      | Import statement                                                   | Target package                         |
+| ---------------- | ------------------------------------------------------------------ | -------------------------------------- |
+| `metrics/api.py` | `from vaultspec.vaultcore.models import DocType`                   | `vaultcore`                            |
+| `metrics/api.py` | `from vaultspec.vaultcore.scanner import get_doc_type, scan_vault` | `vaultcore`                            |
+| `metrics/api.py` | `from vaultspec.verification.api import list_features`             | `verification` (lazy, inside function) |
 
 ### 2D. Proposed `__all__` for `api.py`
 
@@ -91,7 +92,7 @@ from vaultspec.metrics.api import VaultSummary, get_vault_metrics
 __all__ = ["VaultSummary", "get_vault_metrics"]
 ```
 
----
+______________________________________________________________________
 
 ## 3. `vaultspec.verification`
 
@@ -101,27 +102,27 @@ Empty (single blank line). No re-exports.
 
 ### 3B. `api.py` -- public symbols
 
-| Symbol | Kind | Description |
-|--------|------|-------------|
-| `VerificationError` | class | Single vault verification failure |
-| `verify_vault_structure` | function | Check unsupported dirs/files |
-| `verify_file` | function | All checks on a single file |
-| `get_malformed` | function | All docs that fail verification |
-| `list_features` | function | Infer features from tags |
-| `verify_vertical_integrity` | function | Feature-to-plan mapping check |
-| `FixResult` | dataclass | Result of a single auto-repair |
-| `fix_violations` | function | Auto-repair common violations |
+| Symbol                      | Kind      | Description                       |
+| --------------------------- | --------- | --------------------------------- |
+| `VerificationError`         | class     | Single vault verification failure |
+| `verify_vault_structure`    | function  | Check unsupported dirs/files      |
+| `verify_file`               | function  | All checks on a single file       |
+| `get_malformed`             | function  | All docs that fail verification   |
+| `list_features`             | function  | Infer features from tags          |
+| `verify_vertical_integrity` | function  | Feature-to-plan mapping check     |
+| `FixResult`                 | dataclass | Result of a single auto-repair    |
+| `fix_violations`            | function  | Auto-repair common violations     |
 
 Private helper: `_rebuild_frontmatter` (not exported).
 
 ### 3C. Cross-package imports (absolute)
 
-| Source file | Import statement | Target package |
-|-------------|-----------------|----------------|
-| `verification/api.py` | `from vaultspec.vaultcore.models import DocType, DocumentMetadata, VaultConstants` | `vaultcore` |
-| `verification/api.py` | `from vaultspec.vaultcore.parser import parse_vault_metadata` | `vaultcore` |
-| `verification/api.py` | `from vaultspec.vaultcore.scanner import get_doc_type, scan_vault` | `vaultcore` |
-| `verification/api.py` | `from vaultspec.core.config import get_config` | `core` (lazy, x2) |
+| Source file           | Import statement                                                                   | Target package    |
+| --------------------- | ---------------------------------------------------------------------------------- | ----------------- |
+| `verification/api.py` | `from vaultspec.vaultcore.models import DocType, DocumentMetadata, VaultConstants` | `vaultcore`       |
+| `verification/api.py` | `from vaultspec.vaultcore.parser import parse_vault_metadata`                      | `vaultcore`       |
+| `verification/api.py` | `from vaultspec.vaultcore.scanner import get_doc_type, scan_vault`                 | `vaultcore`       |
+| `verification/api.py` | `from vaultspec.core.config import get_config`                                     | `core` (lazy, x2) |
 
 ### 3D. Proposed `__all__` for `api.py`
 
@@ -164,7 +165,7 @@ __all__ = [
 ]
 ```
 
----
+______________________________________________________________________
 
 ## 4. `vaultspec.subagent_server`
 
@@ -176,17 +177,17 @@ Empty (single blank line). No re-exports.
 
 **Functions:**
 
-| Symbol | Kind | Description |
-|--------|------|-------------|
-| `initialize_server` | function | Initialize server config (must call before run) |
-| `register_tools` | function | Register MCP tools on FastMCP instance |
-| `subagent_lifespan` | async context mgr | Lifespan: starts agent-file polling |
-| `list_agents` | async function | List available sub-agents |
-| `dispatch_agent` | async function | Run sub-agent asynchronously |
-| `get_task_status` | async function | Check task status |
-| `cancel_task` | async function | Cancel a running task |
-| `get_locks` | async function | List active advisory locks |
-| `main` | function | Legacy standalone entry point |
+| Symbol              | Kind              | Description                                     |
+| ------------------- | ----------------- | ----------------------------------------------- |
+| `initialize_server` | function          | Initialize server config (must call before run) |
+| `register_tools`    | function          | Register MCP tools on FastMCP instance          |
+| `subagent_lifespan` | async context mgr | Lifespan: starts agent-file polling             |
+| `list_agents`       | async function    | List available sub-agents                       |
+| `dispatch_agent`    | async function    | Run sub-agent asynchronously                    |
+| `get_task_status`   | async function    | Check task status                               |
+| `cancel_task`       | async function    | Cancel a running task                           |
+| `get_locks`         | async function    | List active advisory locks                      |
+| `main`              | function          | Legacy standalone entry point                   |
 
 **Private helpers (not for export):**
 `_resolve_effective_mode`, `_inject_permission_prompt`, `_prepare_dispatch_kwargs`,
@@ -197,16 +198,16 @@ Empty (single blank line). No re-exports.
 
 ### 4C. Cross-package imports (absolute)
 
-| Source file | Import statement | Target package |
-|-------------|-----------------|----------------|
-| `subagent_server/server.py` | `from vaultspec.logging_config import configure_logging` | top-level |
-| `subagent_server/server.py` | `from vaultspec.vaultcore.parser import parse_frontmatter` | `vaultcore` |
-| `subagent_server/server.py` | `from vaultspec.orchestration.constants import READONLY_PERMISSION_PROMPT` | `orchestration` |
-| `subagent_server/server.py` | `from vaultspec.orchestration.subagent import run_subagent` | `orchestration` |
-| `subagent_server/server.py` | `from vaultspec.orchestration.task_engine import LockManager, TaskEngine` | `orchestration` |
-| `subagent_server/server.py` | `from vaultspec.orchestration.utils import safe_read_text` | `orchestration` |
-| `subagent_server/server.py` | `from vaultspec.protocol.acp.types import SubagentError` | `protocol` |
-| `subagent_server/server.py` | `from vaultspec.core.config import get_config` | `core` (lazy, x3) |
+| Source file                 | Import statement                                                           | Target package    |
+| --------------------------- | -------------------------------------------------------------------------- | ----------------- |
+| `subagent_server/server.py` | `from vaultspec.logging_config import configure_logging`                   | top-level         |
+| `subagent_server/server.py` | `from vaultspec.vaultcore.parser import parse_frontmatter`                 | `vaultcore`       |
+| `subagent_server/server.py` | `from vaultspec.orchestration.constants import READONLY_PERMISSION_PROMPT` | `orchestration`   |
+| `subagent_server/server.py` | `from vaultspec.orchestration.subagent import run_subagent`                | `orchestration`   |
+| `subagent_server/server.py` | `from vaultspec.orchestration.task_engine import LockManager, TaskEngine`  | `orchestration`   |
+| `subagent_server/server.py` | `from vaultspec.orchestration.utils import safe_read_text`                 | `orchestration`   |
+| `subagent_server/server.py` | `from vaultspec.protocol.acp.types import SubagentError`                   | `protocol`        |
+| `subagent_server/server.py` | `from vaultspec.core.config import get_config`                             | `core` (lazy, x3) |
 
 ### 4D. Proposed `__all__` for `server.py`
 
@@ -239,7 +240,7 @@ from vaultspec.subagent_server.server import (
 __all__ = ["initialize_server", "register_tools", "subagent_lifespan"]
 ```
 
----
+______________________________________________________________________
 
 ## 5. `vaultspec.mcp_tools`
 
@@ -253,10 +254,10 @@ No re-exports, no `__all__`.
 All three are **no-op stubs** deferred to future phases. Each exports
 a single function:
 
-| Module | Symbol | Status |
-|--------|--------|--------|
-| `vault_tools.py` | `register_tools(mcp)` | Stub (Phase 3) |
-| `team_tools.py` | `register_tools(mcp)` | Stub (Phase 4) |
+| Module               | Symbol                | Status         |
+| -------------------- | --------------------- | -------------- |
+| `vault_tools.py`     | `register_tools(mcp)` | Stub (Phase 3) |
+| `team_tools.py`      | `register_tools(mcp)` | Stub (Phase 4) |
 | `framework_tools.py` | `register_tools(mcp)` | Stub (Phase 3) |
 
 ### 5C. Cross-package imports
@@ -278,25 +279,25 @@ __all__ = [
 ]
 ```
 
----
+______________________________________________________________________
 
 ## 6. Top-level modules
 
 ### 6A. `logging_config.py`
 
-| Symbol | Kind | Description |
-|--------|------|-------------|
+| Symbol              | Kind     | Description              |
+| ------------------- | -------- | ------------------------ |
 | `configure_logging` | function | Idempotent logging setup |
-| `reset_logging` | function | Reset for tests |
+| `reset_logging`     | function | Reset for tests          |
 
 **Cross-package imports:** None (stdlib only).
 
 ### 6B. `server.py`
 
-| Symbol | Kind | Description |
-|--------|------|-------------|
+| Symbol          | Kind     | Description                     |
+| --------------- | -------- | ------------------------------- |
 | `create_server` | function | Create unified FastMCP instance |
-| `main` | function | Entry point for `vaultspec-mcp` |
+| `main`          | function | Entry point for `vaultspec-mcp` |
 
 **Cross-package imports (absolute):**
 
@@ -382,7 +383,7 @@ from vaultspec.cli import main
 
 Single absolute import enabling `python -m vaultspec`.
 
----
+______________________________________________________________________
 
 ## 7. Complexity assessment
 
@@ -390,21 +391,21 @@ Single absolute import enabling `python -m vaultspec`.
 
 **Production code** (non-test files under `src/vaultspec/`):
 
-| Location | Count |
-|----------|-------|
-| `graph/api.py` | 4 |
-| `metrics/api.py` | 3 |
-| `verification/api.py` | 5 |
-| `subagent_server/server.py` | 10 |
-| `mcp_tools/*.py` | 0 |
-| `logging_config.py` | 0 |
-| `server.py` | 2 |
-| `cli.py` | 12 |
-| `vault_cli.py` | 11 |
-| `team_cli.py` | 3 |
-| `subagent_cli.py` | 12 |
-| `__main__.py` | 1 |
-| **Subtotal (this part)** | **63** |
+| Location                    | Count  |
+| --------------------------- | ------ |
+| `graph/api.py`              | 4      |
+| `metrics/api.py`            | 3      |
+| `verification/api.py`       | 5      |
+| `subagent_server/server.py` | 10     |
+| `mcp_tools/*.py`            | 0      |
+| `logging_config.py`         | 0      |
+| `server.py`                 | 2      |
+| `cli.py`                    | 12     |
+| `vault_cli.py`              | 11     |
+| `team_cli.py`               | 3      |
+| `subagent_cli.py`           | 12     |
+| `__main__.py`               | 1      |
+| **Subtotal (this part)**    | **63** |
 
 Combining with parts 1 and 2 (packages `core`, `vaultcore`, `rag`,
 `orchestration`, `protocol`, `hooks`), the full codebase total of
@@ -414,28 +415,28 @@ absolute `from vaultspec.*` imports in production code is approximately
 ### 7B. Package complexity ranking (most complex first)
 
 1. **`cli.py`** -- 2359 lines, 12 cross-package imports, imports from 5 different packages
-2. **`subagent_cli.py`** -- 367 lines, 12 cross-package imports, imports from 5 different packages
-3. **`subagent_server/server.py`** -- 755 lines, 10 cross-package imports, heavy async/state management
-4. **`vault_cli.py`** -- 466 lines, 11 cross-package imports, imports from 6 different packages
-5. **`verification/api.py`** -- 353 lines, 5 cross-package imports, complex repair logic
-6. **`graph/api.py`** -- 128 lines, 4 cross-package imports, self-contained
-7. **`metrics/api.py`** -- 53 lines, 3 cross-package imports, simple
-8. **`mcp_tools/*`** -- stubs, no imports
+1. **`subagent_cli.py`** -- 367 lines, 12 cross-package imports, imports from 5 different packages
+1. **`subagent_server/server.py`** -- 755 lines, 10 cross-package imports, heavy async/state management
+1. **`vault_cli.py`** -- 466 lines, 11 cross-package imports, imports from 6 different packages
+1. **`verification/api.py`** -- 353 lines, 5 cross-package imports, complex repair logic
+1. **`graph/api.py`** -- 128 lines, 4 cross-package imports, self-contained
+1. **`metrics/api.py`** -- 53 lines, 3 cross-package imports, simple
+1. **`mcp_tools/*`** -- stubs, no imports
 
 ### 7C. Recommended execution order (leaf-first)
 
 1. `mcp_tools/` -- stubs, trivial, no real imports
-2. `graph/` -- leaf package, depends only on `vaultcore`
-3. `metrics/` -- leaf package, depends on `vaultcore` + lazy `verification`
-4. `verification/` -- leaf package, depends on `vaultcore` + lazy `core`
-5. `subagent_server/` -- depends on `orchestration`, `protocol`, `vaultcore`, `core`
-6. `logging_config.py` -- no internal deps, trivial
-7. `server.py` -- thin wrapper over `subagent_server`
-8. `__main__.py` -- single import
-9. `vault_cli.py` -- entry point, imports many packages
-10. `team_cli.py` -- entry point
-11. `subagent_cli.py` -- entry point
-12. `cli.py` -- entry point, largest module
+1. `graph/` -- leaf package, depends only on `vaultcore`
+1. `metrics/` -- leaf package, depends on `vaultcore` + lazy `verification`
+1. `verification/` -- leaf package, depends on `vaultcore` + lazy `core`
+1. `subagent_server/` -- depends on `orchestration`, `protocol`, `vaultcore`, `core`
+1. `logging_config.py` -- no internal deps, trivial
+1. `server.py` -- thin wrapper over `subagent_server`
+1. `__main__.py` -- single import
+1. `vault_cli.py` -- entry point, imports many packages
+1. `team_cli.py` -- entry point
+1. `subagent_cli.py` -- entry point
+1. `cli.py` -- entry point, largest module
 
 ### 7D. Should CLI modules and `server.py` use relative imports?
 
@@ -447,8 +448,10 @@ using absolute imports for these reasons:
 
 - Entry points are the "outermost layer" and do not benefit from refactor
   portability that relative imports provide.
+
 - Absolute imports in entry points make the dependency graph explicit and
   readable.
+
 - PEP 328 relative imports only add value within packages with internal
   structure; top-level modules have no parent package to be relative to
   (their relative import would be `from .core.config import get_config`,
@@ -463,7 +466,7 @@ This could become `from .cli import main` but the gain is negligible.
 imports (e.g., within `subagent_server/` if it had multiple modules
 importing each other) should use relative form.
 
----
+______________________________________________________________________
 
 ## 8. Test import strategy
 
@@ -497,7 +500,9 @@ re-exports are in place). However, reaching into sub-modules is
 
 - Test private/internal helpers directly (e.g., `_parse_json_list`,
   `_extract_feature`)
+
 - Need to monkeypatch module-level state
+
 - Need fine-grained import control for isolation
 
 The pragmatic approach: do NOT rewrite existing test imports during
@@ -505,7 +510,7 @@ the module-exports restructure. Tests should not break. Once
 `__init__.py` re-exports are in place, new tests should prefer the
 public API surface. Existing tests can be migrated opportunistically.
 
----
+______________________________________________________________________
 
 ## 9. Circular import risk analysis
 
@@ -525,9 +530,10 @@ subagent_server <- orchestration, protocol, vaultcore, core (lazy), logging_conf
 mcp_tools      <- (no deps, stubs)
 ```
 
-### 9B. Identified circular risk: `metrics` <-> `verification`
+### 9B. Identified circular risk: `metrics` \<-> `verification`
 
 **Current state:**
+
 - `metrics/api.py` has a **lazy** import: `from vaultspec.verification.api import list_features` (inside `get_vault_metrics()`)
 - `verification/api.py` does NOT import from `metrics`
 
@@ -541,9 +547,10 @@ this chain is **one-directional** and safe. No circular dependency exists.
 a function body), so even if both `__init__.py` files eagerly re-export
 their `api.py` symbols, no circular import occurs at module load time.
 
-### 9C. Identified circular risk: `orchestration` <-> `protocol`
+### 9C. Identified circular risk: `orchestration` \<-> `protocol`
 
 **Current state:**
+
 - `orchestration/subagent.py` imports from `protocol.acp.client`, `protocol.acp.types`, `protocol.providers.claude`, `protocol.providers.gemini`
 - `protocol/a2a/executors/gemini_executor.py` imports from `orchestration.subagent`
 - `protocol/acp/claude_bridge.py` does NOT import from `orchestration`
@@ -560,6 +567,7 @@ protocol/a2a/executors/gemini_executor -> orchestration/subagent
 ```
 
 This is NOT a circular import because:
+
 - The `orchestration/__init__.py` would import from `orchestration/subagent.py`
 - `subagent.py` imports from `protocol.providers.claude`, `protocol.providers.gemini`, etc.
 - Those provider modules do NOT import from `orchestration`
@@ -579,13 +587,13 @@ chain is strictly one-directional. **No circular risk.**
 
 ### 9E. Summary of circular import risks
 
-| Pair | Direction | Risk | Mitigation |
-|------|-----------|------|------------|
-| `metrics` -> `verification` | One-way | None | Lazy import already in place |
-| `orchestration` <-> `protocol` | Bidirectional | Low | Keep `protocol/__init__` shallow; do NOT re-export `a2a.executors` |
-| `rag` -> `graph/metrics/verification` | One-way | None | All lazy imports |
-| `core` <- everything | One-way inward | None | `core` has no internal deps |
-| `vaultcore` <- everything | One-way inward | None | `vaultcore` depends only on `core` (lazy) |
+| Pair                                  | Direction      | Risk | Mitigation                                                         |
+| ------------------------------------- | -------------- | ---- | ------------------------------------------------------------------ |
+| `metrics` -> `verification`           | One-way        | None | Lazy import already in place                                       |
+| `orchestration` \<-> `protocol`       | Bidirectional  | Low  | Keep `protocol/__init__` shallow; do NOT re-export `a2a.executors` |
+| `rag` -> `graph/metrics/verification` | One-way        | None | All lazy imports                                                   |
+| `core` \<- everything                 | One-way inward | None | `core` has no internal deps                                        |
+| `vaultcore` \<- everything            | One-way inward | None | `vaultcore` depends only on `core` (lazy)                          |
 
 **Key rule:** When populating `__init__.py` files with re-exports, limit
 re-exports to the package's own `api.py` or immediate children. Do NOT

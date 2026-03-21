@@ -5,14 +5,14 @@
 # Feature tag (replace {feature} with your feature name, e.g., #editor-demo)
 # Additional tags may be appended below the required pair
 tags:
-  - "#audit"
-  - "#{feature}"
+  - '#audit'
+  - '#{feature}'
 # ISO date format (e.g., 2026-02-06)
-date: "{yyyy-mm-dd}"
+date: '{yyyy-mm-dd}'
 # Related documents as quoted wiki-links
 # (e.g., "[[2026-02-04-feature-plan]]")
 related:
-  - "[[{yyyy-mm-dd-*}]]"
+  - '[[{yyyy-mm-dd-*}]]'
 ---
 
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
@@ -21,4 +21,5 @@ related:
 # `{feature}` Code Review
 
 <!-- Persistent log of audit findings appended below. -->
+
 <!-- Use: {TOPIC}-### | {LEVEL} | {Summary} \n {DESCRIPTION} format-->

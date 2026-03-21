@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#exec"
-  - "#cuda-dependencies"
-date: "2026-02-20"
+  - '#exec'
+  - '#cuda-dependencies'
+date: '2026-02-20'
 related:
-  - "[[2026-02-20-cuda-dependencies-p1-plan]]"
-  - "[[2026-02-20-cuda-dependencies-adr]]"
+  - '[[2026-02-20-cuda-dependencies-p1-plan]]'
+  - '[[2026-02-20-cuda-dependencies-adr]]'
 ---
+
 # `cuda-dependencies` `p3` review
 
 **Status:** PASS

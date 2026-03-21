@@ -1,13 +1,14 @@
 ---
 tags:
-  - "#research"
-  - "#cuda-dependencies"
-date: "2026-02-20"
+  - '#research'
+  - '#cuda-dependencies'
+date: '2026-02-20'
 related:
-  - "[[2026-02-12-rag-embeddings-adr]]"
-  - "[[2026-02-12-rag-vectordb-adr]]"
-  - "[[2026-02-12-rag-retrieval-adr]]"
+  - '[[2026-02-12-rag-embeddings-adr]]'
+  - '[[2026-02-12-rag-vectordb-adr]]'
+  - '[[2026-02-12-rag-retrieval-adr]]'
 ---
+
 # `cuda-dependencies` research: RAG CUDA Environment Audit
 
 Full audit of the CUDA dependency stack powering the RAG subsystem. The project mandates **Python 3.13+** and **CUDA 13.0+** as a deliberate frontier stance. This audit identifies where dependency floors, documentation, and in-code messages fail to align with that mandate.
@@ -22,12 +23,12 @@ All documentation references **CUDA 13.0+** and the `cu130` index URL. CUDA 13.0
 
 #### Files audited
 
-| File | CUDA claim | Install command |
-|------|-----------|-----------------|
-| `README.md:44` | "CUDA 13.0+" | `pip install -e ".[rag,dev]" --extra-index-url https://download.pytorch.org/whl/cu130` |
-| `docs/getting-started.md:9` | "CUDA 13.0+" | Same cu130 URL |
-| `docs/getting-started.md:244` | Troubleshooting | `pip install torch --extra-index-url https://download.pytorch.org/whl/cu130` |
-| `docs/search-guide.md:78` | "CUDA: 13.0+" | N/A |
+| File                          | CUDA claim      | Install command                                                                        |
+| ----------------------------- | --------------- | -------------------------------------------------------------------------------------- |
+| `README.md:44`                | "CUDA 13.0+"    | `pip install -e ".[rag,dev]" --extra-index-url https://download.pytorch.org/whl/cu130` |
+| `docs/getting-started.md:9`   | "CUDA 13.0+"    | Same cu130 URL                                                                         |
+| `docs/getting-started.md:244` | Troubleshooting | `pip install torch --extra-index-url https://download.pytorch.org/whl/cu130`           |
+| `docs/search-guide.md:78`     | "CUDA: 13.0+"   | N/A                                                                                    |
 
 #### Issues found
 
@@ -42,19 +43,19 @@ All documentation references **CUDA 13.0+** and the `cu130` index URL. CUDA 13.0
 
 #### Warning/error inventory
 
-| Location | Type | Message quality |
-|----------|------|----------------|
-| `embeddings.py:19-23` | `GPUNotAvailableError` class | Clear custom exception |
-| `embeddings.py:25-33` | `_check_rag_deps()` | Clear: tells user to run `pip install -e '.[rag]'` |
-| `embeddings.py:36-53` | `_require_cuda()` | **Stale**: hardcodes `cu124` in install hint |
-| `embeddings.py:63-66` | `get_device_info()` | Calls both checks, good |
-| `embeddings.py:112-114` | `EmbeddingModel.__init__` | Calls both checks, good |
-| `api.py:107-132` | `get_engine()` | Calls `_require_cuda()`, catches exceptions, good |
-| `api.py:206-208` | `get_document()` | Catches `ImportError` with debug log, good |
-| `api.py:326-329` | `get_status()` | Catches `ImportError` and `FileNotFoundError`, good |
-| `vault.py:119,145` | CLI epilog | "Requires NVIDIA GPU with CUDA" — adequate |
-| `vault.py:374-376` | `handle_index` ImportError | "RAG dependencies not installed" — adequate |
-| `vault.py:425-427` | `handle_search` ImportError | Same — adequate |
+| Location                | Type                         | Message quality                                     |
+| ----------------------- | ---------------------------- | --------------------------------------------------- |
+| `embeddings.py:19-23`   | `GPUNotAvailableError` class | Clear custom exception                              |
+| `embeddings.py:25-33`   | `_check_rag_deps()`          | Clear: tells user to run `pip install -e '.[rag]'`  |
+| `embeddings.py:36-53`   | `_require_cuda()`            | **Stale**: hardcodes `cu124` in install hint        |
+| `embeddings.py:63-66`   | `get_device_info()`          | Calls both checks, good                             |
+| `embeddings.py:112-114` | `EmbeddingModel.__init__`    | Calls both checks, good                             |
+| `api.py:107-132`        | `get_engine()`               | Calls `_require_cuda()`, catches exceptions, good   |
+| `api.py:206-208`        | `get_document()`             | Catches `ImportError` with debug log, good          |
+| `api.py:326-329`        | `get_status()`               | Catches `ImportError` and `FileNotFoundError`, good |
+| `vault.py:119,145`      | CLI epilog                   | "Requires NVIDIA GPU with CUDA" — adequate          |
+| `vault.py:374-376`      | `handle_index` ImportError   | "RAG dependencies not installed" — adequate         |
+| `vault.py:425-427`      | `handle_search` ImportError  | Same — adequate                                     |
 
 #### Issues found
 
@@ -67,14 +68,14 @@ All documentation references **CUDA 13.0+** and the `cu130` index URL. CUDA 13.0
 
 #### Current state vs required state
 
-| Component | Current floor | Latest stable | Required floor | Rationale |
-|-----------|--------------|---------------|----------------|-----------|
-| CUDA Toolkit | 13.0+ (docs) | 13.1.1 (Jan 2026) | **13.0+** | Mandate — correct |
-| PyTorch | `>=2.5.0` | 2.10.0 (Jan 2026) | **`>=2.9.0`** | cu130 wheels start at 2.9.0. torch 2.5 has no cu130 build. |
-| sentence-transformers | `>=3.0.0` | 5.2 (Feb 2026) | **`>=5.0.0`** | 3.0 is 2+ years old. 5.x has Python 3.13 improvements and Transformers v5 support. |
-| lancedb | `>=0.15.0` | 0.29.2 (Feb 2026) | **`>=0.27.0`** | 0.15 is ancient. RRFReranker, hybrid search stability, and float32 fixes landed in 0.20+. |
-| einops | `>=0.7.0` | 0.8.1 | **`>=0.8.0`** | Minor bump for Python 3.13 compat. |
-| Python | `>=3.13` (pyproject) | 3.13 | **`>=3.13`** | Mandate — correct |
+| Component             | Current floor        | Latest stable     | Required floor | Rationale                                                                                 |
+| --------------------- | -------------------- | ----------------- | -------------- | ----------------------------------------------------------------------------------------- |
+| CUDA Toolkit          | 13.0+ (docs)         | 13.1.1 (Jan 2026) | **13.0+**      | Mandate — correct                                                                         |
+| PyTorch               | `>=2.5.0`            | 2.10.0 (Jan 2026) | **`>=2.9.0`**  | cu130 wheels start at 2.9.0. torch 2.5 has no cu130 build.                                |
+| sentence-transformers | `>=3.0.0`            | 5.2 (Feb 2026)    | **`>=5.0.0`**  | 3.0 is 2+ years old. 5.x has Python 3.13 improvements and Transformers v5 support.        |
+| lancedb               | `>=0.15.0`           | 0.29.2 (Feb 2026) | **`>=0.27.0`** | 0.15 is ancient. RRFReranker, hybrid search stability, and float32 fixes landed in 0.20+. |
+| einops                | `>=0.7.0`            | 0.8.1             | **`>=0.8.0`**  | Minor bump for Python 3.13 compat.                                                        |
+| Python                | `>=3.13` (pyproject) | 3.13              | **`>=3.13`**   | Mandate — correct                                                                         |
 
 #### Key issues
 
@@ -87,12 +88,12 @@ All documentation references **CUDA 13.0+** and the `cu130` index URL. CUDA 13.0
 
 **Verdict: Python 3.13 mandate is correct. All dependencies support it when floors are raised.**
 
-| Component | Python 3.13 support |
-|-----------|-------------------|
-| PyTorch >= 2.9.0 | Fully supported (since 2.6, Jan 2025) |
+| Component                      | Python 3.13 support                            |
+| ------------------------------ | ---------------------------------------------- |
+| PyTorch >= 2.9.0               | Fully supported (since 2.6, Jan 2025)          |
 | sentence-transformers >= 5.0.0 | Supported (requires PyTorch with 3.13 support) |
-| lancedb >= 0.27.0 | Supported (stable ABI `cp39-abi3`) |
-| einops >= 0.8.0 | Pure Python, fully supported |
+| lancedb >= 0.27.0              | Supported (stable ABI `cp39-abi3`)             |
+| einops >= 0.8.0                | Pure Python, fully supported                   |
 
 The Python 3.13 mandate is self-consistent **once the torch floor is raised to >=2.9.0**. With the current `torch>=2.5.0`, there is no Python 3.13 wheel for torch 2.5, making the spec unsatisfiable in edge cases where pip resolves to an old torch version.
 
@@ -134,13 +135,13 @@ pip install -e ".[rag,dev]" --extra-index-url https://download.pytorch.org/whl/c
 
 ### 7. Online Research: Known Stack Issues
 
-| Issue | Source | Impact |
-|-------|--------|--------|
-| GPU overclocking causes `CUBLAS_STATUS_EXECUTION_FAILED` with nomic-embed-text-v1.5 | [PyTorch Forums](https://discuss.pytorch.org/t/cuda-error-when-trying-to-run-nomic-embed-text-v1-5/206384) | Users with OC'd GPUs get cryptic errors |
-| LanceDB float32 type errors in v0.18+ | [GitHub #2090](https://github.com/lancedb/lancedb/issues/2090) | Fixed in later versions — raising floor avoids this |
-| `torch.utils.data.DataLoader` with fork hangs Lance | [GitHub lance-format #2405](https://github.com/lance-format/lance/issues/2405) | Relevant if indexer ever uses DataLoader |
-| `cuda-bindings==13.0.3` missing from cu130 index | [GitHub pytorch #172926](https://github.com/pytorch/pytorch/issues/172926) | Must use `--extra-index-url` not `--index-url` |
-| nomic model requires compute capability >= 7.5 | [HuggingFace TEI docs](https://huggingface.co/docs/text-embeddings-inference/en/supported_models) | Pascal/Volta GPUs fail — should be documented |
+| Issue                                                                               | Source                                                                                                     | Impact                                              |
+| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| GPU overclocking causes `CUBLAS_STATUS_EXECUTION_FAILED` with nomic-embed-text-v1.5 | [PyTorch Forums](https://discuss.pytorch.org/t/cuda-error-when-trying-to-run-nomic-embed-text-v1-5/206384) | Users with OC'd GPUs get cryptic errors             |
+| LanceDB float32 type errors in v0.18+                                               | [GitHub #2090](https://github.com/lancedb/lancedb/issues/2090)                                             | Fixed in later versions — raising floor avoids this |
+| `torch.utils.data.DataLoader` with fork hangs Lance                                 | [GitHub lance-format #2405](https://github.com/lance-format/lance/issues/2405)                             | Relevant if indexer ever uses DataLoader            |
+| `cuda-bindings==13.0.3` missing from cu130 index                                    | [GitHub pytorch #172926](https://github.com/pytorch/pytorch/issues/172926)                                 | Must use `--extra-index-url` not `--index-url`      |
+| nomic model requires compute capability >= 7.5                                      | [HuggingFace TEI docs](https://huggingface.co/docs/text-embeddings-inference/en/supported_models)          | Pascal/Volta GPUs fail — should be documented       |
 
 ## Executive Summary
 

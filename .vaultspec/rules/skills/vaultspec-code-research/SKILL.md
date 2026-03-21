@@ -12,10 +12,14 @@ description: >-
 Use this skill:
 
 - When auditing, researching, or implementing a specific technical implementation.
+
 - When you need to identify a reference project.
+
 - When need to ground current task with source code references to see
   how reference project achieves feature.
+
 - Ensuring we do not miss implementation aspects or details.
+
 - To ground and de-risk complex coding tasks. Anchoring research with actual code.,
 
 Invoke when `vaultspec-research` -> `vaultspec-adr` -> `vaultspec-write-plan`
@@ -25,9 +29,11 @@ explicitly requires direct code referencing.
 
 - **Announce at start:** "I'm using the `vaultspec-code-reference` skill to find
   out how `{Reference}` implements `{Feature}`."
+
 - Use an appropiate parallelized sub-agents, e.g. `vaultspec-code-reference-agent`.
   Instruct them to locate and audit `{Feature}`
   implementation in reference codebase.
+
 - **Must persist findings** to
   `.vault/reference/YYYY-MM-DD-{Feature}-reference.md`."
 

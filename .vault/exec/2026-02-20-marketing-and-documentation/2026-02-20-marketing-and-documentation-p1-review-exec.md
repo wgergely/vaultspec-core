@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#exec"
-  - "#marketing-and-documentation"
-date: "2026-02-20"
+  - '#exec'
+  - '#marketing-and-documentation'
+date: '2026-02-20'
 related:
-  - "[[2026-02-20-marketing-and-documentation-p1-plan]]"
-  - "[[2026-02-20-marketing-and-documentation-p1-summary]]"
+  - '[[2026-02-20-marketing-and-documentation-p1-plan]]'
+  - '[[2026-02-20-marketing-and-documentation-p1-summary]]'
 ---
+
 # `marketing-and-documentation` code review
 
 **Status:** `REVISION REQUIRED → PASS`
@@ -45,10 +46,12 @@ None.
 
 1. Fix `README.md` Project Structure: replace `docs/` entry with
    `.vaultspec/docs/` to reflect the new sub-chapter location.
-2. Update sample task in `concepts.md` plan output: replace
+
+1. Update sample task in `concepts.md` plan output: replace
    `docs/api.md` with a path that exists under the new structure
    (e.g., `src/` path or omit the docs task from the example).
-3. Both fixes applied inline before marking PASS — see below.
+
+1. Both fixes applied inline before marking PASS — see below.
 
 ## Notes
 
@@ -56,12 +59,17 @@ None.
 No crash risk, no security surface change.
 
 **Intent alignment:** All five plan decisions confirmed implemented:
+
 - `concepts.md` — tutorial section precedes concepts section ✓
+
 - `cli-reference.md` — Configuration Reference appendix present at line 770 ✓
+
 - `search-guide.md` — config table removed; cross-reference link to
   `cli-reference.md#configuration-reference` present ✓
+
 - `README.md` — `doctor` step added, `## Worked Example` section present,
   documentation links updated to `.vaultspec/docs/` ✓
+
 - `.vaultspec/README.md` — `## Documentation` section with three links added ✓
 
 **Link validity:** `.vaultspec/README.md` links (`docs/concepts.md`,

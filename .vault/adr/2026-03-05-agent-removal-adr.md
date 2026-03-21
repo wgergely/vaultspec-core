@@ -4,22 +4,22 @@
 # Directory tag (hardcoded - DO NOT CHANGE - based on .vault/adr/ location)
 # Feature tag (replace {feature} with your feature name, e.g., #editor-demo)
 tags:
-  - "#adr"
-  - "#agent-removal"
+  - '#adr'
+  - '#agent-removal'
 # ISO date format (e.g., 2026-02-06)
-date: "2026-03-05"
+date: '2026-03-05'
 # Related documents as quoted wiki-links
 # (e.g., "[[2026-02-04-feature-research]]")
 related:
-  - "[[2026-03-05-agent-removal-research]]"
-  - "[[2026-03-05-agent-removal-reference]]"
+  - '[[2026-03-05-agent-removal-research]]'
+  - '[[2026-03-05-agent-removal-reference]]'
 ---
 
 # `agent-removal` adr: `Remove obsolete agent management and A2A protocol` | (**status:** `accepted`)
 
 ## Problem Statement
 
-The `vaultspec` repository currently contains extensive code for agent management, A2A (Agent-to-Agent) protocol, sub-agents, and team coordination. This functionality has been migrated to the dedicated `vaultspec-a2a` repository. Retaining this obsolete code in the core `vaultspec` repository causes maintenance overhead, confusion, and bloating of the codebase, CLI, and MCP tools. 
+The `vaultspec` repository currently contains extensive code for agent management, A2A (Agent-to-Agent) protocol, sub-agents, and team coordination. This functionality has been migrated to the dedicated `vaultspec-a2a` repository. Retaining this obsolete code in the core `vaultspec` repository causes maintenance overhead, confusion, and bloating of the codebase, CLI, and MCP tools.
 
 ## Considerations
 
@@ -37,13 +37,13 @@ The `vaultspec` repository currently contains extensive code for agent managemen
 
 The implementation will involve removing the following components as identified in the research and reference documents:
 
-1.  **CLI Commands:** Remove `team`, `subagent`, `server`, and `agents` commands and their associated entry point files (`team_cli.py`, `subagent_cli.py`, `server_cli.py`).
-2.  **MCP Tools:** Remove `subagent_tools.py` and `team_tools.py` from `src/vaultspec/mcp_server/`.
-3.  **Library/Orchestration Code:** Remove `core/agents.py`, `orchestration/subagent.py`, `orchestration/team.py`, `orchestration/team_session.py`, `orchestration/team_task_engine.py`.
-4.  **Protocol Layer:** Delete the entire `src/vaultspec/protocol/a2a/` directory. Remove A2A specific methods like `prepare_process` from `providers/base.py`, `providers/claude.py`, and `providers/gemini.py`.
-5.  **Core Entry Points:** Update `__main__.py`, `__init__.py`, `spec_cli.py`, `core/enums.py`, and `core/types.py` to remove all references, routing logic, and namespaces related to agents and teams.
-6.  **Configuration:** Remove `a2a_default_port`, `a2a_host`, `agent_mode`, `agent_dir` and related env variables from `config/config.py`.
-7.  **Tests:** Remove all tests under `protocol/a2a/tests/`, and specific team/agent tests like `test_team_mixed.py`, `test_team_provider.py`, `test_e2e.py` (A2A parts), and `test_load_agent.py`.
+1. **CLI Commands:** Remove `team`, `subagent`, `server`, and `agents` commands and their associated entry point files (`team_cli.py`, `subagent_cli.py`, `server_cli.py`).
+1. **MCP Tools:** Remove `subagent_tools.py` and `team_tools.py` from `src/vaultspec/mcp_server/`.
+1. **Library/Orchestration Code:** Remove `core/agents.py`, `orchestration/subagent.py`, `orchestration/team.py`, `orchestration/team_session.py`, `orchestration/team_task_engine.py`.
+1. **Protocol Layer:** Delete the entire `src/vaultspec/protocol/a2a/` directory. Remove A2A specific methods like `prepare_process` from `providers/base.py`, `providers/claude.py`, and `providers/gemini.py`.
+1. **Core Entry Points:** Update `__main__.py`, `__init__.py`, `spec_cli.py`, `core/enums.py`, and `core/types.py` to remove all references, routing logic, and namespaces related to agents and teams.
+1. **Configuration:** Remove `a2a_default_port`, `a2a_host`, `agent_mode`, `agent_dir` and related env variables from `config/config.py`.
+1. **Tests:** Remove all tests under `protocol/a2a/tests/`, and specific team/agent tests like `test_team_mixed.py`, `test_team_provider.py`, `test_e2e.py` (A2A parts), and `test_load_agent.py`.
 
 Reference `[[2026-03-05-agent-removal-research]]` and `[[2026-03-05-agent-removal-reference]]` specs.
 

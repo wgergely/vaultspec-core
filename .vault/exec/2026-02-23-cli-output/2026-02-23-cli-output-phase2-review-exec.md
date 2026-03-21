@@ -1,21 +1,22 @@
 ---
 tags:
-  - "#exec"
-  - "#cli-output"
-date: "2026-02-23"
+  - '#exec'
+  - '#cli-output'
+date: '2026-02-23'
 related:
-  - "[[2026-02-23-cli-output-plan]]"
-  - "[[2026-02-23-cli-output-architecture-adr]]"
-  - "[[2026-02-23-cli-output-phase1-steps]]"
+  - '[[2026-02-23-cli-output-plan]]'
+  - '[[2026-02-23-cli-output-architecture-adr]]'
+  - '[[2026-02-23-cli-output-phase1-steps]]'
 ---
+
 # cli-output code review
 
 **Status:** PASS
 
 ## Audit Context
 
-- **Plan:** [[2026-02-23-cli-output-plan]]
-- **ADR:** [[2026-02-23-cli-output-architecture-adr]]
+- **Plan:** \[[2026-02-23-cli-output-plan]\]
+- **ADR:** \[[2026-02-23-cli-output-architecture-adr]\]
 - **Scope:**
   - src/vaultspec/printer.py (new - Phase 1 infrastructure)
   - src/vaultspec/cli_common.py (modified - Phase 1 wiring)
@@ -84,7 +85,7 @@ singleton; no locks required.
 **Circular imports:** printer.py imports only json, typing.Any, and
 rich.console.Console - zero vaultspec-internal imports. The
 from .printer import Printer in __init__.py cannot create a circular import
-cycle, even when commands.py _get_package_dir() does import vaultspec at
+cycle, even when commands.py \_get_package_dir() does import vaultspec at
 runtime. Verified by tracing the full import graph.
 
 **MCP stdio transport safety:** mcp_server/app.py calls configure_logging()
@@ -103,24 +104,24 @@ All six sub-phase B tasks from the plan are implemented and verified:
    logger.info() calls replaced with args.printer.out(...). Both the
    empty-state and populated paths now emit to stdout consistently.
 
-2. handle_index() summary block (vault_cli.py lines 394-400): Seven
+1. handle_index() summary block (vault_cli.py lines 394-400): Seven
    logger.info() calls replaced with args.printer.out(...). The pre-index
    status messages at lines 365 and 371 remain as logger.info() -- correct
    per the plan.
 
-3. hooks_list() empty-state (commands.py lines 612-614): Three logger.info()
-   calls replaced with _args.printer.out(...). The _args prefix is preserved
+1. hooks_list() empty-state (commands.py lines 612-614): Three logger.info()
+   calls replaced with \_args.printer.out(...). The \_args prefix is preserved
    as the least-disruptive choice; the plan explicitly permitted this.
 
-4. init_run() duplicate removal (commands.py lines 231-234): The mirrored
+1. init_run() duplicate removal (commands.py lines 231-234): The mirrored
    logger.info() calls and trailing logger.info("Created %d ...") removed.
    Only print() calls remain. No functional regression.
 
-5. Three f-string debug conversions (orchestration/subagent.py lines 267,
+1. Three f-string debug conversions (orchestration/subagent.py lines 267,
    275, 499): All three now use lazy %s format. No f-string debug calls
    remain in that file.
 
-6. mcp_server/app.py configure_logging() addition (line 95): Import is via
+1. mcp_server/app.py configure_logging() addition (line 95): Import is via
    from ..logging_config import configure_logging. Call is correctly
    positioned before the first logger.info() call, using the no-argument
    default that reads VAULTSPEC_LOG_LEVEL from the environment.
@@ -129,9 +130,12 @@ All four Phase 1 deliverables are present and correct:
 
 - printer.py has all five public methods matching the ADR signature exactly,
   including highlight=False on both default consoles.
+
 - cli_common.py setup_logging() attaches args.printer as the final step
   after configure_logging() runs.
+
 - __init__.py exports Printer with __all__ = ["Printer"].
+
 - test_printer.py has 13 tests, all passing (live run: 13 passed in 0.14s),
   no mocks.
 
@@ -151,10 +155,13 @@ under python -m py_compile. Exit 0, no output.
 
 - Execute sub-phase C at leisure to bring handle_search() populated-results
   path and remaining print() call sites into the printer.out() pattern.
+
 - In a separate hygiene PR, convert the remaining f-string logger calls in
   task_engine.py, rag/store.py, and rag/indexer.py to lazy %s format.
+
 - Add a brief comment to test_out_json_valid_json noting that json.loads() is
   whitespace-tolerant, making Rich trailing-newline behavior safe to rely on.
+
 - Check lines 37-38 of printer.py against the project ruff line-length config.
   If E501 is active, split each line to keep CI green.
 
@@ -166,7 +173,7 @@ because the MCP server has no CLI argument parser: the startup message becomes
 visible when the env var is set to INFO or DEBUG in a terminal session, and
 defaults to WARNING in normal MCP client usage.
 
-The _isolate_cli autouse fixture in the CLI test conftest resets real
+The \_isolate_cli autouse fixture in the CLI test conftest resets real
 filesystem state via init_paths() and directory scaffolding - no mocking. It
 is applied to the printer tests via autouse=True, which is harmless since
 test_printer.py does not touch the filesystem.

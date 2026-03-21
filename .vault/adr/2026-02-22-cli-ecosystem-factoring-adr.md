@@ -1,11 +1,13 @@
 ---
 tags:
-  - "#adr"
-  - "#cli-ecosystem-factoring"
-date: "2026-02-22"
+  - '#adr'
+  - '#cli-ecosystem-factoring'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-cli-ecosystem-factoring-research]]"
+  - '[[2026-02-22-cli-ecosystem-factoring-research]]'
+  - '[[2026-02-23-cli-test-coverage-plan]]'
 ---
+
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 
@@ -53,7 +55,7 @@ This inversion causes concrete problems:
   CLI module itself.
 
 - **Duplicated boilerplate.** As documented in
-  [[2026-02-22-cli-ecosystem-factoring-research]] sections 2.1--2.7, the four
+  \[[2026-02-22-cli-ecosystem-factoring-research]\] sections 2.1--2.7, the four
   CLI entry points (`cli.py`, `subagent_cli.py`, `team_cli.py`, `vault_cli.py`)
   duplicate `_get_version()` (4 copies), workspace resolution (4 copies),
   logging setup (4 copies with variations), common argparse arguments (4
@@ -64,7 +66,7 @@ This inversion causes concrete problems:
   around core dependencies (`yaml`, `protocol.providers`) that are always
   installed, producing dead code, silent degradation, and a `NameError` bug
   where `logger` is referenced before definition (see
-  [[2026-02-22-cli-ecosystem-factoring-research]] section 3.6).
+  \[[2026-02-22-cli-ecosystem-factoring-research]\] section 3.6).
 
 ## Considerations
 
@@ -74,8 +76,7 @@ Renaming `vaultspec.core` to `vaultspec.config` touches every file that imports
 from it. The research identified **57 import occurrences across 34 files** in
 `src/vaultspec/` and 2 more in `tests/`. The imports follow two patterns:
 
-- **Top-level imports** (`from vaultspec.core import WorkspaceLayout,
-  resolve_workspace`) -- found in all 4 CLI modules plus
+- **Top-level imports** (`from vaultspec.core import WorkspaceLayout, resolve_workspace`) -- found in all 4 CLI modules plus
   `tests/cli/test_integration.py` and `core/tests/test_workspace.py`.
 
 - **Deferred/lazy imports** (`from vaultspec.core import get_config`) -- found
@@ -93,7 +94,9 @@ To prevent breakage for any external consumers or scripts that import
 `vaultspec.core`, a compatibility shim can be maintained:
 
 ```python
+
 # src/vaultspec/core/__init__.py (deprecated shim)
+
 """Deprecated: use vaultspec.config instead."""
 import warnings
 warnings.warn(
@@ -113,8 +116,7 @@ hypothetical external consumers.
 - **`src/vaultspec/core/tests/test_config.py`** and
   **`src/vaultspec/core/tests/test_workspace.py`** move to
   `src/vaultspec/config/tests/`. Their internal imports
-  (`from vaultspec.core.config import ...`, `from vaultspec.core.workspace
-  import ...`) become `from vaultspec.config.config import ...` and
+  (`from vaultspec.core.config import ...`, `from vaultspec.core.workspace import ...`) become `from vaultspec.config.config import ...` and
   `from vaultspec.config.workspace import ...`.
 
 - **8 `conftest.py` files** across `graph/`, `metrics/`, `orchestration/`,
@@ -162,8 +164,10 @@ depends on. Alternative names considered:
 
 - `vaultspec.engine` -- implies a single long-running process; the resource
   management library is stateless and synchronous.
+
 - `vaultspec.lib` -- too generic; does not communicate that this is the
   primary domain logic.
+
 - `vaultspec.resources` -- too narrow; the library also handles config
   generation, system prompt assembly, and sync orchestration.
 
@@ -209,27 +213,34 @@ other and can execute in parallel. Phases 3 and 4 depend on Phase 1.
 **Steps:**
 
 - Rename `src/vaultspec/core/` to `src/vaultspec/config/`.
+
 - Rename `src/vaultspec/core/tests/` to `src/vaultspec/config/tests/`.
+
 - Update all 57 import sites in `src/` and 2 in `tests/` from
   `vaultspec.core` to `vaultspec.config`.
+
 - Update `src/vaultspec/config/__init__.py` docstring.
+
 - Place a deprecation shim at `src/vaultspec/core/__init__.py` that re-exports
   everything from `vaultspec.config` with a `DeprecationWarning`.
+
 - Run the full test suite to verify zero behavioral change.
 
 **Concrete path changes:**
 
-| Before | After |
-|:---|:---|
-| `src/vaultspec/core/__init__.py` | `src/vaultspec/config/__init__.py` |
-| `src/vaultspec/core/config.py` | `src/vaultspec/config/config.py` |
+| Before                            | After                               |
+| :-------------------------------- | :---------------------------------- |
+| `src/vaultspec/core/__init__.py`  | `src/vaultspec/config/__init__.py`  |
+| `src/vaultspec/core/config.py`    | `src/vaultspec/config/config.py`    |
 | `src/vaultspec/core/workspace.py` | `src/vaultspec/config/workspace.py` |
-| `src/vaultspec/core/tests/` | `src/vaultspec/config/tests/` |
+| `src/vaultspec/core/tests/`       | `src/vaultspec/config/tests/`       |
 
 **Import change pattern (all 36 files):**
 
 ```python
+
 # Before:
+
 from vaultspec.core import WorkspaceLayout, resolve_workspace
 from vaultspec.core import get_config
 from vaultspec.core import reset_config
@@ -237,6 +248,7 @@ from vaultspec.core.config import VaultSpecConfig, CONFIG_REGISTRY
 from vaultspec.core.workspace import LayoutMode, WorkspaceError, resolve_workspace
 
 # After:
+
 from vaultspec.config import WorkspaceLayout, resolve_workspace
 from vaultspec.config import get_config
 from vaultspec.config import reset_config
@@ -251,16 +263,16 @@ from vaultspec.config.workspace import LayoutMode, WorkspaceError, resolve_works
 **Module:** `src/vaultspec/cli_common.py`
 
 **Extracted functions** (based on
-[[2026-02-22-cli-ecosystem-factoring-research]] sections 2.1--2.7):
+\[[2026-02-22-cli-ecosystem-factoring-research]\] sections 2.1--2.7):
 
-| Function | Replaces | Source modules |
-|:---|:---|:---|
-| `get_version(root_dir=None) -> str` | 4 copies of `_get_version()` | all 4 CLIs |
-| `add_common_args(parser) -> None` | 4 copies of `--root`, `--verbose`, etc. | all 4 CLIs |
-| `setup_logging(args, default_format=None) -> None` | 4 copies of logging dance | all 4 CLIs |
-| `resolve_args_workspace(args, default_layout) -> WorkspaceLayout` | 3 copies of post-parse resolution | cli, subagent_cli, team_cli |
-| `run_async(coro, *, debug=False) -> T` | 7+ copies of async scaffold | subagent_cli, team_cli |
-| `cli_error_handler(debug) -> ContextManager` | 7+ copies of try/except + traceback | subagent_cli, team_cli |
+| Function                                                          | Replaces                                | Source modules              |
+| :---------------------------------------------------------------- | :-------------------------------------- | :-------------------------- |
+| `get_version(root_dir=None) -> str`                               | 4 copies of `_get_version()`            | all 4 CLIs                  |
+| `add_common_args(parser) -> None`                                 | 4 copies of `--root`, `--verbose`, etc. | all 4 CLIs                  |
+| `setup_logging(args, default_format=None) -> None`                | 4 copies of logging dance               | all 4 CLIs                  |
+| `resolve_args_workspace(args, default_layout) -> WorkspaceLayout` | 3 copies of post-parse resolution       | cli, subagent_cli, team_cli |
+| `run_async(coro, *, debug=False) -> T`                            | 7+ copies of async scaffold             | subagent_cli, team_cli      |
+| `cli_error_handler(debug) -> ContextManager`                      | 7+ copies of try/except + traceback     | subagent_cli, team_cli      |
 
 **Estimated impact:** +120 lines (new module), -130 lines (removed
 duplication) = net -10 lines. More importantly, all four CLI modules shrink
@@ -274,21 +286,21 @@ testable, separate from the CLI layer.
 **Package:** `src/vaultspec/core/` (reclaiming the name from Phase 1)
 
 **Module decomposition** (based on
-[[2026-02-22-cli-ecosystem-factoring-research]] section 1.1 functional
+\[[2026-02-22-cli-ecosystem-factoring-research]\] section 1.1 functional
 domains):
 
-| New module | Functions moved from `cli.py` | Lines (approx) |
-|:---|:---|:---|
-| `core/__init__.py` | Public API re-exports | 20 |
-| `core/types.py` | `ToolConfig`, `SyncResult`, `init_paths()`, path globals | 100 |
-| `core/helpers.py` | `build_file`, `atomic_write`, `ensure_dir`, `resolve_model`, `_yaml_load`, `_yaml_dump` | 80 |
-| `core/rules.py` | `collect_rules`, `transform_rule`, `rules_list`, `rules_add`, `rules_sync` | 100 |
-| `core/agents.py` | `collect_agents`, `transform_agent`, `agents_list`, `agents_add`, `agents_set_tier`, `agents_sync` | 130 |
-| `core/skills.py` | `collect_skills`, `transform_skill`, `skill_dest_path`, `skills_list`, `skills_add`, `skills_sync` | 130 |
-| `core/config_gen.py` | `_collect_rule_refs`, `_xml_to_heading`, `_generate_agents_md`, `_generate_config`, `_is_cli_managed`, `config_show`, `config_sync` | 160 |
-| `core/system.py` | `collect_system_parts`, `_collect_agent_listing`, `_collect_skill_listing`, `_generate_system_prompt`, `_generate_system_rules`, `system_show`, `system_sync` | 200 |
-| `core/sync.py` | `sync_files`, `sync_skills`, `print_summary` | 140 |
-| `core/resources.py` | `resource_show`, `resource_edit`, `resource_remove`, `resource_rename` | 120 |
+| New module           | Functions moved from `cli.py`                                                                                                                                 | Lines (approx) |
+| :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------------- |
+| `core/__init__.py`   | Public API re-exports                                                                                                                                         | 20             |
+| `core/types.py`      | `ToolConfig`, `SyncResult`, `init_paths()`, path globals                                                                                                      | 100            |
+| `core/helpers.py`    | `build_file`, `atomic_write`, `ensure_dir`, `resolve_model`, `_yaml_load`, `_yaml_dump`                                                                       | 80             |
+| `core/rules.py`      | `collect_rules`, `transform_rule`, `rules_list`, `rules_add`, `rules_sync`                                                                                    | 100            |
+| `core/agents.py`     | `collect_agents`, `transform_agent`, `agents_list`, `agents_add`, `agents_set_tier`, `agents_sync`                                                            | 130            |
+| `core/skills.py`     | `collect_skills`, `transform_skill`, `skill_dest_path`, `skills_list`, `skills_add`, `skills_sync`                                                            | 130            |
+| `core/config_gen.py` | `_collect_rule_refs`, `_xml_to_heading`, `_generate_agents_md`, `_generate_config`, `_is_cli_managed`, `config_show`, `config_sync`                           | 160            |
+| `core/system.py`     | `collect_system_parts`, `_collect_agent_listing`, `_collect_skill_listing`, `_generate_system_prompt`, `_generate_system_rules`, `system_show`, `system_sync` | 200            |
+| `core/sync.py`       | `sync_files`, `sync_skills`, `print_summary`                                                                                                                  | 140            |
+| `core/resources.py`  | `resource_show`, `resource_edit`, `resource_remove`, `resource_rename`                                                                                        | 120            |
 
 **After extraction, `cli.py` contains only:**
 
@@ -305,7 +317,7 @@ Estimated residual `cli.py` size: ~700 lines (down from 2460).
 move to `core/types.py`. The `init_paths()` function moves there as well.
 This preserves current behavior while consolidating the state into one module.
 A future phase can replace these with a `CLIContext` dataclass (see Phase 4
-in [[2026-02-22-cli-ecosystem-factoring-research]] section 6, Option C).
+in \[[2026-02-22-cli-ecosystem-factoring-research]\] section 6, Option C).
 
 ### Phase 4: Delete import-fallback antipatterns
 
@@ -313,23 +325,23 @@ in [[2026-02-22-cli-ecosystem-factoring-research]] section 6, Option C).
 errors.
 
 **Changes** (based on
-[[2026-02-22-cli-ecosystem-factoring-research]] section 3.6):
+\[[2026-02-22-cli-ecosystem-factoring-research]\] section 3.6):
 
-| Action | Location | Detail |
-|:---|:---|:---|
-| **Delete** | `cli.py:59-110` (after extraction: `core/helpers.py`) | 50-line fallback YAML parser. `PyYAML>=6.0` is a declared core dependency. Import `yaml` unconditionally. |
-| **Delete** | `cli.py:120-131` (after extraction: `core/agents.py` or `core/types.py`) | Silent `PROVIDERS = {}` fallback + `logger` NameError bug. Import `ClaudeProvider`/`GeminiProvider` unconditionally. |
-| **Move** | `cli.py:29` | Move `import html` to top-level stdlib imports. It is bundled inside a `try/except` for `skills_ref.prompt` but `html` is stdlib. |
-| **Delete** | `subagent_cli.py:38-46` | `sys.exit(1)` guard around first-party `orchestration.*` imports. Let `ImportError` propagate with full traceback. |
-| **Delete** | `team_cli.py:41-53` | `sys.exit(1)` guard around first-party `orchestration.team.*` imports. Let `ImportError` propagate with full traceback. |
-| **Keep** | `cli.py:1593+` (`doctor_run`/`readiness_run`) | Legitimate diagnostic probing of optional `[rag]` extras. |
-| **Keep** | `vault_cli.py:377-383` | Legitimate lazy-import guard for optional RAG dependencies with user-facing error message. |
-| **Keep** | `cli.py:28-32` (after moving `html`) | `skills_ref.prompt` is a genuinely optional third-party dependency not in `pyproject.toml`. |
+| Action     | Location                                                                 | Detail                                                                                                                            |
+| :--------- | :----------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------- |
+| **Delete** | `cli.py:59-110` (after extraction: `core/helpers.py`)                    | 50-line fallback YAML parser. `PyYAML>=6.0` is a declared core dependency. Import `yaml` unconditionally.                         |
+| **Delete** | `cli.py:120-131` (after extraction: `core/agents.py` or `core/types.py`) | Silent `PROVIDERS = {}` fallback + `logger` NameError bug. Import `ClaudeProvider`/`GeminiProvider` unconditionally.              |
+| **Move**   | `cli.py:29`                                                              | Move `import html` to top-level stdlib imports. It is bundled inside a `try/except` for `skills_ref.prompt` but `html` is stdlib. |
+| **Delete** | `subagent_cli.py:38-46`                                                  | `sys.exit(1)` guard around first-party `orchestration.*` imports. Let `ImportError` propagate with full traceback.                |
+| **Delete** | `team_cli.py:41-53`                                                      | `sys.exit(1)` guard around first-party `orchestration.team.*` imports. Let `ImportError` propagate with full traceback.           |
+| **Keep**   | `cli.py:1593+` (`doctor_run`/`readiness_run`)                            | Legitimate diagnostic probing of optional `[rag]` extras.                                                                         |
+| **Keep**   | `vault_cli.py:377-383`                                                   | Legitimate lazy-import guard for optional RAG dependencies with user-facing error message.                                        |
+| **Keep**   | `cli.py:28-32` (after moving `html`)                                     | `skills_ref.prompt` is a genuinely optional third-party dependency not in `pyproject.toml`.                                       |
 
 ## Rationale
 
 The restructuring is driven by three findings from
-[[2026-02-22-cli-ecosystem-factoring-research]]:
+\[[2026-02-22-cli-ecosystem-factoring-research]\]:
 
 **Naming accuracy matters for navigation.** When `vaultspec.core` contains
 only config and workspace resolution, developers looking for the "core" of
@@ -382,8 +394,11 @@ warning rather than a hard failure. The mitigation strategy is:
 
 - Use `rg "from vaultspec\.core" src/ tests/` to generate the exhaustive
   file list before starting.
+
 - Execute the rename via scripted find-and-replace, not manual editing.
+
 - Run the full test suite immediately after.
+
 - The CI pipeline will catch any remaining references.
 
 ### Risk: mutable globals during Phase 3
@@ -416,7 +431,7 @@ where they live in `cli.py`.
 - **Elimination of dead code.** Removing the import-fallback antipatterns
   deletes ~60 lines of dead code and fixes the `logger` NameError bug
   documented in
-  [[2026-02-22-cli-ecosystem-factoring-research]] section 3.6.2.
+  \[[2026-02-22-cli-ecosystem-factoring-research]\] section 3.6.2.
 
 - **Extensibility.** Adding new resource types follows the established
   `core/<resource>.py` pattern rather than appending to a monolith.

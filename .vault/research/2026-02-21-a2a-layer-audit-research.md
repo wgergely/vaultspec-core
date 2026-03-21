@@ -1,9 +1,10 @@
 ---
 tags:
-  - "#research"
-  - "#a2a"
-date: "2026-02-21"
+  - '#research'
+  - '#a2a'
+date: '2026-02-21'
 ---
+
 # A2A Layer Audit
 
 ## File Map
@@ -13,14 +14,18 @@ date: "2026-02-21"
 - **`__init__.py`** — Re-exports: `agent_card_from_definition`, `create_app`,
   `generate_agent_md`, `write_agent_discovery`, `write_gemini_settings`,
   `A2A_TO_VAULTSPEC`, `VAULTSPEC_TO_A2A`
+
 - **`agent_card.py`** — Converts vaultspec agent YAML metadata to A2A `AgentCard`.
   One skill per agent. Hardcoded version `"0.1.0"`. Default modes: `["text"]`.
   Capabilities: `streaming=True`, `push_notifications=False`, `state_transition_history=True`.
+
 - **`discovery.py`** — Gemini CLI discovery: `generate_agent_md()`, `write_agent_discovery()`,
   `write_gemini_settings()`. Preserves existing keys.
+
 - **`server.py`** — `create_app(executor, agent_card)`: wraps executor in
   `DefaultRequestHandler` + `InMemoryTaskStore`, returns Starlette ASGI app.
-- **`state_map.py`** — Bidirectional state mapping: 6 vaultspec states <-> 9 A2A
+
+- **`state_map.py`** — Bidirectional state mapping: 6 vaultspec states \<-> 9 A2A
   `TaskState` values. Fallbacks: `rejected -> "failed"`, `auth_required -> "input_required"`.
 
 ### `src/vaultspec/protocol/a2a/executors/`
@@ -52,24 +57,24 @@ date: "2026-02-21"
 ### `execute()` Flow
 
 1. Create `TaskUpdater`, extract prompt from context
-2. `await updater.start_work()` — emits `TaskState.working`
-3. Build `ClaudeAgentOptions` (sandbox callback, `permission_mode="bypassPermissions"`)
-4. Create `ClaudeSDKClient`, register in `_active_clients`
-5. Pop `CLAUDECODE` env var (prevents child refusing inside Claude Code session)
-6. `await sdk_client.connect()`
-7. `await sdk_client.query(prompt)`
-8. Iterate `sdk_client.receive_messages()`:
+1. `await updater.start_work()` — emits `TaskState.working`
+1. Build `ClaudeAgentOptions` (sandbox callback, `permission_mode="bypassPermissions"`)
+1. Create `ClaudeSDKClient`, register in `_active_clients`
+1. Pop `CLAUDECODE` env var (prevents child refusing inside Claude Code session)
+1. `await sdk_client.connect()`
+1. `await sdk_client.query(prompt)`
+1. Iterate `sdk_client.receive_messages()`:
    - `AssistantMessage`: collect `TextBlock.text` chunks
    - `ResultMessage`: join text, add artifact, emit `complete()` or `failed()`; break
    - `MessageParseError`: log debug, `continue` (rate_limit_event workaround)
-9. If no `ResultMessage` received: complete with collected text or fail with "Stream ended without result"
-10. `finally`: disconnect, cleanup, restore `CLAUDECODE`
+1. If no `ResultMessage` received: complete with collected text or fail with "Stream ended without result"
+1. `finally`: disconnect, cleanup, restore `CLAUDECODE`
 
 ### `cancel()` Flow
 
 1. Pop client from `_active_clients`
-2. `client.interrupt()` (sync), `await client.disconnect()`
-3. `await updater.cancel()`
+1. `client.interrupt()` (sync), `await client.disconnect()`
+1. `await updater.cancel()`
 
 ## GeminiA2AExecutor
 
@@ -80,6 +85,7 @@ Cancel is fire-and-forget (no process handle to kill).
 
 - `_load_claude_oauth_token()`: Reads `~/.claude/.credentials.json`, refreshes OAuth if
   expired (5-min buffer), writes back atomically.
+
 - `ClaudeProvider.prepare_process()`: Spawns `python -m vaultspec.protocol.acp.claude_bridge`.
   Sets env vars, pops `CLAUDECODE` from env copy (safe).
 
@@ -88,8 +94,10 @@ Cancel is fire-and-forget (no process handle to kill).
 ### 1. `rate_limit_event` Crash (KNOWN — MEMORY)
 
 - `claude_executor.py:134-136`: `MessageParseError` caught and skipped.
+
 - Fragile: depends on exact exception type. If stream dies differently, fallback
   path silently completes with partial text or fails with generic error.
+
 - No retry logic. Rate limit error is swallowed entirely.
 
 ### 2. Gemini Cancel Is a No-Op
@@ -126,9 +134,13 @@ Cancel is fire-and-forget (no process handle to kill).
 
 - `test_unit_a2a.py`: State mapping, agent card, EchoExecutor, PrefixExecutor,
   message serialization. All real types, no mocks.
+
 - `test_agent_card.py`: 11 tests for `agent_card_from_definition`.
+
 - `test_discovery.py`: generate_agent_md, write_agent_discovery, write_gemini_settings.
+
 - `test_gemini_executor.py`: 5 tests via DI recorder. Happy path, error, cancel, empty, custom.
+
 - `test_claude_executor.py`: 6 tests via DI `_InProcessSDKClient`.
 
 ### Integration (real HTTP via ASGITransport, no LLM)

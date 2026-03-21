@@ -1,9 +1,10 @@
 ---
 tags:
-  - "#research"
-  - "#acp"
-date: "2026-02-21"
+  - '#research'
+  - '#acp'
+date: '2026-02-21'
 ---
+
 # ACP Reference Implementation: acp-claude-code
 
 ## Overview
@@ -13,6 +14,7 @@ Published as npm package. Deprecated in favor of `@zed-industries/claude-code-ac
 contains excellent, well-documented code.
 
 **Files studied:**
+
 - `src/agent.ts` (core — ClaudeACPAgent)
 - `src/types.ts`
 - `src/utils.ts`
@@ -42,10 +44,13 @@ interface AgentSession {
 
 - **`initialize()`** — Returns protocol version + capabilities: `loadSession: true`,
   `image: true`, `embeddedContext: true`.
+
 - **`newSession()`** — Creates random ACP session ID. `claudeSessionId` is initially
   `undefined` — filled lazily from first SDK message containing `session_id`.
+
 - **`loadSession()`** — If session in map, keeps `claudeSessionId`. If not, creates
   fresh state. Handles client reconnects after bridge restarts.
+
 - **`authenticate()`** — No-op. Claude Code SDK uses `~/.claude/config.json`.
 
 ## 2. Session Persistence & Resume (Critical Pattern)
@@ -54,9 +59,12 @@ The key mechanism — completely different from our Python implementation:
 
 - Uses `@anthropic-ai/claude-code`'s `query()` function: a **stateless call** returning
   an async iterable.
+
 - Session resume via `resume: session.claudeSessionId` option passed to `query()`.
+
 - `claudeSessionId` extracted from any SDK message with `session_id` field via
   `tryToStoreClaudeSessionId()`.
+
 - Multi-turn = multiple separate `query()` calls, each resuming by passing stored session ID.
 
 **Our gap:** We never extract Claude's native `session_id` from messages and never pass
@@ -84,21 +92,22 @@ iterable — no persistent connection needed.
 
 `handleClaudeMessage()` handles ALL SDK message types:
 
-| Type | Handling |
-|------|----------|
-| `system` | Silently ignored |
-| `user` | Processes `tool_result` blocks → `tool_call_update` with `status: "completed"` |
-| `assistant` | text → `agent_message_chunk`; tool_use → `tool_call` (or `plan` if TodoWrite) |
-| `result` | Logged, not emitted |
-| `text` | Direct text → `agent_message_chunk` |
-| `tool_use_start` | `tool_call` with `status: "pending"` (or `plan` if TodoWrite) |
-| `tool_use_output` | `tool_call_update` with `status: "completed"` + accumulated content |
-| `tool_use_error` | `tool_call_update` with `status: "failed"` |
-| `stream_event` | `content_block_delta` with `text_delta` → `agent_message_chunk` |
+| Type              | Handling                                                                       |
+| ----------------- | ------------------------------------------------------------------------------ |
+| `system`          | Silently ignored                                                               |
+| `user`            | Processes `tool_result` blocks → `tool_call_update` with `status: "completed"` |
+| `assistant`       | text → `agent_message_chunk`; tool_use → `tool_call` (or `plan` if TodoWrite)  |
+| `result`          | Logged, not emitted                                                            |
+| `text`            | Direct text → `agent_message_chunk`                                            |
+| `tool_use_start`  | `tool_call` with `status: "pending"` (or `plan` if TodoWrite)                  |
+| `tool_use_output` | `tool_call_update` with `status: "completed"` + accumulated content            |
+| `tool_use_error`  | `tool_call_update` with `status: "failed"`                                     |
+| `stream_event`    | `content_block_delta` with `text_delta` → `agent_message_chunk`                |
 
 ## 5. Tool Call Mapping
 
 `mapToolKind()` maps tool names by substring matching:
+
 - `read/view/get` → `"read"`
 - `write/create/update/edit` → `"edit"`
 - `delete/remove` → `"delete"`
@@ -121,7 +130,8 @@ Intercepted at TWO points:
 
 1. **`tool_use_start`** (streaming): If `tool_name === "TodoWrite"` and input has `todos`,
    calls `sendAgentPlan()` and tracks `tool_call_id` in `todoWriteToolCallIds`.
-2. **`assistant` message**: If `content.name === "TodoWrite"`, calls `sendAgentPlan()`.
+
+1. **`assistant` message**: If `content.name === "TodoWrite"`, calls `sendAgentPlan()`.
 
 `sendAgentPlan()` emits ACP `plan` update with entries mapped from todos. TodoWrite tool
 results are **suppressed** — not emitted as `tool_call` or `tool_call_update`.
@@ -131,6 +141,7 @@ results are **suppressed** — not emitted as `tool_call` or `tool_call_update`.
 ## 7. Tool Call Content Accumulation
 
 Accumulates content across the lifecycle:
+
 - On `tool_use_start`/`tool_use`: stores initial `ACPToolCallContent[]` (diff blocks for Edit)
 - On `tool_use_output`/`tool_result`: prepends prior content, adds new `content` block
 - Sends cumulative array on each update
@@ -140,6 +151,7 @@ Accumulates content across the lifecycle:
 ## 8. Input Content Block Handling
 
 `prompt()` handles four ACP prompt block types:
+
 - `text` → appended to `textMessagePieces`
 - `image` → base64 image block added to SDK message content
 - `resource` → `file://` URI → `@/path/to/file` (Claude's @-mention syntax)
@@ -150,6 +162,7 @@ Accumulates content across the lifecycle:
 ## 9. Permission Mode
 
 Supports dynamic switching via special prompt markers:
+
 - `[ACP:PERMISSION:ACCEPT_EDITS]`
 - `[ACP:PERMISSION:BYPASS]`
 - `[ACP:PERMISSION:DEFAULT]`

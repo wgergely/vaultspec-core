@@ -1,16 +1,17 @@
 ---
 tags:
-  - "#research"
-  - "#marketing-audit"
-date: "2026-02-18"
+  - '#research'
+  - '#marketing-audit'
+date: '2026-02-18'
 ---
+
 ## Marketing Audit: Governance & SDD Positioning
 
 ## Executive Summary
 
 Spec-driven development (SDD) has emerged in 2025 as one of the most significant methodological shifts in AI-assisted software engineering. vaultspec's Research→Specify→Plan→Execute→Verify pipeline and its emphasis on auditable, documented development workflows are well-aligned with both the emerging tooling landscape and deepening enterprise governance requirements. The window for positioning vaultspec as the gold-standard governed AI development framework is open — but competitors are moving fast.
 
----
+______________________________________________________________________
 
 ## 1. Spec-Driven Development: Established Term, Growing Momentum
 
@@ -33,7 +34,7 @@ vaultspec's pipeline (`Research → Specify → Plan → Execute → Verify`) ex
 - SDD is distinct: it is documentation-first with AI as the implementation engine
 - SDD does not replace TDD/BDD — it wraps them, providing the specification layer that guides AI before tests are written
 
----
+______________________________________________________________________
 
 ## 2. AI Agent Governance: Real Demand, Immature Tooling
 
@@ -59,16 +60,16 @@ Sources: [WitnessAI](https://witness.ai/blog/agentic-ai-governance-framework/), 
 
 ### 2.3 Current Tool Landscape: Governance Gaps
 
-| Tool | Spec-Driven | Audit Trail | ADR-backed | Verify Phase | Agent Dispatch |
-|------|-------------|-------------|------------|--------------|----------------|
-| AWS Kiro | Yes | Partial | No | No | No |
-| GitHub Copilot + Spec-Kit | Partial | Audit logs | No | No | Limited |
-| Cursor / Windsurf | No | No | No | No | No |
-| **vaultspec** | **Yes** | **Yes (.vault/)** | **Yes** | **Yes** | **Yes** |
+| Tool                      | Spec-Driven | Audit Trail       | ADR-backed | Verify Phase | Agent Dispatch |
+| ------------------------- | ----------- | ----------------- | ---------- | ------------ | -------------- |
+| AWS Kiro                  | Yes         | Partial           | No         | No           | No             |
+| GitHub Copilot + Spec-Kit | Partial     | Audit logs        | No         | No           | Limited        |
+| Cursor / Windsurf         | No          | No                | No         | No           | No             |
+| **vaultspec**             | **Yes**     | **Yes (.vault/)** | **Yes**    | **Yes**      | **Yes**        |
 
 No existing tool enforces a full Research→Specify→Plan→Execute→Verify pipeline. No competitor generates ADR-backed decisions as first-class artifacts. No competitor provides session-persistent context as a governance mechanism.
 
----
+______________________________________________________________________
 
 ## 3. Regulatory Tailwinds: The EU AI Act and Beyond
 
@@ -95,7 +96,7 @@ Penalties for non-compliance reach €10 million or 2% of annual turnover. ([And
 
 Executive Order 14179 (January 2025) focuses on AI leadership, but federal agencies still require accountability frameworks (see [US GAO AI Accountability Framework](https://www.gao.gov/products/gao-21-519sp)). NIST AI RMF remains the primary US reference.
 
----
+______________________________________________________________________
 
 ## 4. Architecture Decision Records: Mainstream, But Manual
 
@@ -110,7 +111,7 @@ ADR adoption has matured significantly and has strong enterprise backing — but
 
 **The gap vaultspec fills:** While ADRs are broadly endorsed, no AI coding tool generates them automatically as part of the development workflow. vaultspec is the only framework where ADRs are a *required first-class artifact* before execution proceeds.
 
----
+______________________________________________________________________
 
 ## 5. Context Persistence: The Unsolved Problem
 
@@ -125,17 +126,17 @@ Context loss between AI sessions is a critical pain point across the industry.
 
 **vaultspec's answer:** `.vault/` is a documentation-as-memory system. Research artifacts, ADRs, plans, and exec records collectively constitute a *semantic memory* of why decisions were made — not just what happened. This is RAG-indexed and queryable, which is architecturally superior to session-based retention.
 
----
+______________________________________________________________________
 
 ## 6. Market Positioning Implications
 
 ### Differentiated Claims (evidence-backed)
 
 1. **"The only framework that enforces the complete Research→Specify→Plan→Execute→Verify pipeline"** — no competitor implements all 5 phases as mandatory workflow
-2. **"ADR-backed every decision"** — no competitor makes architecture decision records a first-class, required workflow artifact
-3. **"Built for EU AI Act compliance"** — `.vault/` audit trail + mandatory human review directly addresses transparency/accountability requirements
-4. **"Documentation as memory"** — RAG-indexed `.vault/` solves context persistence at a deeper level than vector-store retention
-5. **"Governed, not governed by vibes"** — directly positions against the "vibe coding → production disasters" narrative
+1. **"ADR-backed every decision"** — no competitor makes architecture decision records a first-class, required workflow artifact
+1. **"Built for EU AI Act compliance"** — `.vault/` audit trail + mandatory human review directly addresses transparency/accountability requirements
+1. **"Documentation as memory"** — RAG-indexed `.vault/` solves context persistence at a deeper level than vector-store retention
+1. **"Governed, not governed by vibes"** — directly positions against the "vibe coding → production disasters" narrative
 
 ### Target Segments
 
@@ -150,7 +151,7 @@ Context loss between AI sessions is a critical pain point across the industry.
 - GitHub Copilot's enterprise governance features (audit logs, agent control plane) address the compliance angle but not the workflow structure
 - The methodology is becoming established enough that larger players may add SDD-like features to existing tools
 
----
+______________________________________________________________________
 
 ## Sources
 

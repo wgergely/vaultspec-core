@@ -1,18 +1,19 @@
 ---
 tags:
-  - "#audit"
-  - "#protocol"
-date: "2026-02-17"
+  - '#audit'
+  - '#protocol'
+date: '2026-02-17'
 related:
-  - "[[2026-02-17-audit-summary-audit]]"
+  - '[[2026-02-17-audit-summary-audit]]'
 ---
+
 # Protocol Ecosystem & Feature Gap Analysis
 
 **Date**: 2026-02-17
 **Author**: ProductResearch-B (Protocol Ecosystem Analyst)
 **Cross-reference**: [2026-02-17-competitive-landscape-audit.md](2026-02-17-competitive-landscape-audit.md)
 
----
+______________________________________________________________________
 
 ## Executive Summary
 
@@ -27,7 +28,7 @@ Vaultspec's three-protocol stack (MCP + ACP + A2A) is architecturally sound and 
 - RAG has evolved toward agentic and graph-based architectures
 - Embedding models have leaped forward (Qwen3-Embedding family, variable dimensions, matryoshka)
 
----
+______________________________________________________________________
 
 ## 1. Protocol Ecosystem Maps
 
@@ -35,25 +36,25 @@ Vaultspec's three-protocol stack (MCP + ACP + A2A) is architecturally sound and 
 
 **Status**: De facto universal standard. Under AAIF/Linux Foundation governance.
 
-| Dimension | State of the Art (Feb 2026) | vaultspec Status |
-|-----------|---------------------------|-----------------|
-| SDK version | Python SDK latest | v1.26.0 (current) |
-| Server count | 1000+ community-built | 1 (vs-subagent-mcp) |
-| OAuth Resource Server auth | Spec-mandated since 2025 | Not implemented |
-| MCP Registry | Preview (GA planned 2026) | Not integrated |
-| .well-known discovery | Supported in spec | Not implemented |
-| MCP Gateway pattern | Enterprise pattern (Kong, MintMCP) | Not implemented |
-| OWASP MCP Top 10 | Published and maintained | Not addressed |
+| Dimension                  | State of the Art (Feb 2026)        | vaultspec Status    |
+| -------------------------- | ---------------------------------- | ------------------- |
+| SDK version                | Python SDK latest                  | v1.26.0 (current)   |
+| Server count               | 1000+ community-built              | 1 (vs-subagent-mcp) |
+| OAuth Resource Server auth | Spec-mandated since 2025           | Not implemented     |
+| MCP Registry               | Preview (GA planned 2026)          | Not integrated      |
+| .well-known discovery      | Supported in spec                  | Not implemented     |
+| MCP Gateway pattern        | Enterprise pattern (Kong, MintMCP) | Not implemented     |
+| OWASP MCP Top 10           | Published and maintained           | Not addressed       |
 
 **Ecosystem adoption:**
 
-4. MCP04: Software Supply Chain Attacks
-5. MCP05: Command Injection & Execution
-6. MCP06: Prompt Injection via Contextual Payloads
-7. MCP07: Insufficient Authentication & Authorization
-8. MCP08: Lack of Audit & Telemetry
-9. MCP09: Shadow MCP Servers
-10. MCP10: Context Injection & Over-Sharing
+1. MCP04: Software Supply Chain Attacks
+1. MCP05: Command Injection & Execution
+1. MCP06: Prompt Injection via Contextual Payloads
+1. MCP07: Insufficient Authentication & Authorization
+1. MCP08: Lack of Audit & Telemetry
+1. MCP09: Shadow MCP Servers
+1. MCP10: Context Injection & Over-Sharing
 
 **Notable vulnerabilities disclosed (Jan 2026):** CVE-2025-68143/44/45 in Anthropic's own Git MCP server — RCE via prompt injection. BlueRock found 36.7% of 7,000+ MCP servers exposed to SSRF. This underscores that MCP security is not hypothetical.
 
@@ -61,12 +62,12 @@ Vaultspec's three-protocol stack (MCP + ACP + A2A) is architecturally sound and 
 
 **Status**: Multi-editor standard. Active development by Zed Industries.
 
-| Dimension | State of the Art (Feb 2026) | vaultspec Status |
-|-----------|---------------------------|-----------------|
-| SDK version | v0.8.1 | v0.8.0 (one minor behind) |
-| Editor support | Zed, JetBrains, Neovim, Emacs, Kiro | Claude Code/Gemini CLI integration |
-| ACP Registry | Live (joint Zed + JetBrains) | Not registered |
-| Agent discovery | Registry-based | Manual configuration |
+| Dimension       | State of the Art (Feb 2026)         | vaultspec Status                   |
+| --------------- | ----------------------------------- | ---------------------------------- |
+| SDK version     | v0.8.1                              | v0.8.0 (one minor behind)          |
+| Editor support  | Zed, JetBrains, Neovim, Emacs, Kiro | Claude Code/Gemini CLI integration |
+| ACP Registry    | Live (joint Zed + JetBrains)        | Not registered                     |
+| Agent discovery | Registry-based                      | Manual configuration               |
 
 | Registered agents | Claude Code, Codex CLI, Copilot CLI, Gemini CLI, OpenCode, Auggie | Not listed |
 
@@ -83,15 +84,15 @@ Key development --- ACP Registry (Jan 2026):
 
 **Status**: Linux Foundation project. v0.3 released with gRPC support.
 
-| Dimension | State of the Art (Feb 2026) | vaultspec Status |
-|-----------|---------------------------|-----------------|
-| SDK version | v0.3.x (a2a-sdk) | v0.3.22 installed, production code exists |
-| Agent Card | .well-known/agent.json standard | agent_card.py implements generation |
-| Discovery | HTTP-based .well-known | discovery.py implemented |
-| Executors | Multiple implementations exist | claude_executor.py, gemini_executor.py |
-| Server | A2AStarletteApplication | server.py implemented |
-| gRPC support | v0.3 feature | Not implemented |
-| Push notifications | Spec-supported | Disabled in capabilities |
+| Dimension          | State of the Art (Feb 2026)     | vaultspec Status                          |
+| ------------------ | ------------------------------- | ----------------------------------------- |
+| SDK version        | v0.3.x (a2a-sdk)                | v0.3.22 installed, production code exists |
+| Agent Card         | .well-known/agent.json standard | agent_card.py implements generation       |
+| Discovery          | HTTP-based .well-known          | discovery.py implemented                  |
+| Executors          | Multiple implementations exist  | claude_executor.py, gemini_executor.py    |
+| Server             | A2AStarletteApplication         | server.py implemented                     |
+| gRPC support       | v0.3 feature                    | Not implemented                           |
+| Push notifications | Spec-supported                  | Disabled in capabilities                  |
 
 | Task state machine | 9 states (submitted through auth-required) | state_map.py maps 7 states |
 | Enterprise adoption | S&P Global, ServiceNow, Tyson Foods | Framework-only |
@@ -109,10 +110,10 @@ Key development --- ACP Registry (Jan 2026):
 
 - **MCP** = resource/tool layer (vertical: agent connects to tools/data)
 - **A2A** = network/collaboration layer (horizontal: agents talk to agents)
-This is exactly the architecture vaultspec has adopted. LangGraph v0.2 (Jan 2026) validated this pattern by shipping A2A and MCP as first-class protocol targets. The industry metaphor is "TCP/IP for agentic AI" — MCP is the transport, A2A is the application protocol, ACP is the session layer.
-**Vaultspec advantage:** Very few frameworks implement all three protocols. Most implement MCP only, or MCP + one other. Vaultspec's three-protocol stance is architecturally prescient.
+  This is exactly the architecture vaultspec has adopted. LangGraph v0.2 (Jan 2026) validated this pattern by shipping A2A and MCP as first-class protocol targets. The industry metaphor is "TCP/IP for agentic AI" — MCP is the transport, A2A is the application protocol, ACP is the session layer.
+  **Vaultspec advantage:** Very few frameworks implement all three protocols. Most implement MCP only, or MCP + one other. Vaultspec's three-protocol stance is architecturally prescient.
 
----
+______________________________________________________________________
 
 ## 2. AAIF (Agentic AI Foundation) Progress
 
@@ -122,7 +123,7 @@ This is exactly the architecture vaultspec has adopted. LangGraph v0.2 (Jan 2026
 
 | Project | Origin | Purpose |
 
-|---------|--------|---------|
+|\---------|--------|---------|
 | MCP | Anthropic | Agent-to-tool protocol |
 | AGENTS.md | OpenAI | Machine-readable project guidance for agents |
 | Goose | Block | Open-source local-first AI agent framework |
@@ -137,7 +138,7 @@ This is exactly the architecture vaultspec has adopted. LangGraph v0.2 (Jan 2026
 
 **Gap for vaultspec:** AGENTS.md and Goose are now industry standards. Vaultspec does not generate or consume AGENTS.md files, and has no Goose integration.
 
----
+______________________________________________________________________
 
 ## 3. Spec-Driven Development (SDD) Landscape
 
@@ -147,7 +148,7 @@ Vaultspec's core methodology — spec-driven development — has gone from niche
 
 | Tool | Origin | Methodology | Status |
 
-|------|--------|-------------|--------|
+|\------|--------|-------------|--------|
 | **Amazon Kiro** | AWS | Spec -> Design -> Tasks -> Implementation | IDE (VS Code fork), cloud-agnostic |
 | **GitHub Spec-Kit** | GitHub | Constitution -> Specify -> Plan -> Tasks | CLI + slash commands |
 | **BMAD-METHOD** | Community | Multi-agent spec-driven | Open-source |
@@ -170,7 +171,7 @@ Vaultspec's core methodology — spec-driven development — has gone from niche
 ### 4.2 Embedding Model Landscape (2026)
 
 | Model | Parameters | MTEB Rank | Features |
-|-------|-----------|-----------|----------|
+| ----- | ---------- | --------- | -------- |
 
 | **Qwen3-Embedding-8B** | 8B | #1 multilingual | Variable dims (32-1024), instruction-aware |
 | **Qwen3-Embedding-4B** | 4B | Top-5 | Good quality/size balance |
@@ -192,12 +193,12 @@ Vaultspec's core methodology — spec-driven development — has gone from niche
 
 **Performance comparison estimate (RTX 4080 SUPER):**
 
-| Model | Size | Expected Throughput | Quality vs nomic-v1.5 |
-|-------|------|-------------------|-----------------------|
-| nomic-v1.5 (current) | 137M | ~33 docs/sec | Baseline |
-| Qwen3-Embedding-0.6B | 600M | ~20-25 docs/sec | Significantly better |
-| Qwen3-Embedding-4B | 4B | ~5-8 docs/sec | Much better |
-| BGE-M3 | 568M | ~18-22 docs/sec | Better + hybrid retrieval |
+| Model                | Size | Expected Throughput | Quality vs nomic-v1.5     |
+| -------------------- | ---- | ------------------- | ------------------------- |
+| nomic-v1.5 (current) | 137M | ~33 docs/sec        | Baseline                  |
+| Qwen3-Embedding-0.6B | 600M | ~20-25 docs/sec     | Significantly better      |
+| Qwen3-Embedding-4B   | 4B   | ~5-8 docs/sec       | Much better               |
+| BGE-M3               | 568M | ~18-22 docs/sec     | Better + hybrid retrieval |
 
 The throughput decrease is offset by dramatically better retrieval quality, and 214 docs indexes in under 30 seconds even at 5 docs/sec.
 
@@ -205,39 +206,42 @@ The throughput decrease is offset by dramatically better retrieval quality, and 
 
 Vaultspec uses LanceDB as its vector store. LanceDB has added significant capabilities:
 
-| Feature | LanceDB Status | Vaultspec Usage |
-|---------|---------------|----------------|
-| GPU-accelerated indexing | Supported (IVF/HNSW) | Not used (CPU indexing) |
-| Full-text search | Supported | Not used |
-| Hybrid search (vector + FTS) | Supported | Not used |
-| Multimodal storage | Supported | Not used |
-| Enterprise auto-GPU indexing | Enterprise only | N/A |
-| Serverless cloud | Available | Local only (appropriate) |
+| Feature                      | LanceDB Status       | Vaultspec Usage          |
+| ---------------------------- | -------------------- | ------------------------ |
+| GPU-accelerated indexing     | Supported (IVF/HNSW) | Not used (CPU indexing)  |
+| Full-text search             | Supported            | Not used                 |
+| Hybrid search (vector + FTS) | Supported            | Not used                 |
+| Multimodal storage           | Supported            | Not used                 |
+| Enterprise auto-GPU indexing | Enterprise only      | N/A                      |
+| Serverless cloud             | Available            | Local only (appropriate) |
 
 **Opportunity:** LanceDB's hybrid search (vector + full-text) could significantly improve vaultspec's retrieval quality with minimal code changes.
 
----
+______________________________________________________________________
 
 ## 5. AI Agent Verification & Evaluation
 
 ### 5.1 Industry State of the Art
 
-| Tool/Framework | Focus | Key Feature |
-|---------------|-------|-------------|
-| **Maxim AI** | Simulation + evaluation + observability | Comprehensive platform |
-| **Langfuse** | Open-source tracing | Agent trajectory analysis |
-| **Braintrust** | Evaluation + observability | LLM-based rubric grading |
-| **Galileo** | Hallucination detection | Guardrails |
+| Tool/Framework | Focus                                   | Key Feature               |
+| -------------- | --------------------------------------- | ------------------------- |
+| **Maxim AI**   | Simulation + evaluation + observability | Comprehensive platform    |
+| **Langfuse**   | Open-source tracing                     | Agent trajectory analysis |
+| **Braintrust** | Evaluation + observability              | LLM-based rubric grading  |
+| **Galileo**    | Hallucination detection                 | Guardrails                |
 
 | **Anthropic Bloom** | Automated behavioral evals | Open-source (Anthropic) |
 
 **Anthropic's evaluation framework (Jan 2026):**
 
 - 20-50 real-failure-derived tasks are sufficient for meaningful evals
+
 - Grade outcomes, not paths (agents find creative solutions)
 
 - Combine deterministic tests + LLM-based rubrics
+
 - Run evals in CI/CD as first line of defense
+
 - Production monitoring for distribution drift
 
 ### 5.2 Vaultspec's Verification Layer
@@ -258,41 +262,41 @@ Vaultspec's current verification (`verification/api.py`) focuses on:
 - No production telemetry or observability
 - No eval framework for measuring spec compliance of generated code
 
----
+______________________________________________________________________
 
 ## 6. Feature Gap Analysis
 
 ### 6.1 Critical Gaps (High Impact, Clear Path)
 
-| Gap | What Exists in Ecosystem | Vaultspec Status | Recommendation |
-|-----|-------------------------|-----------------|----------------|
-| **AGENTS.md support** | 60,000+ projects, AAIF standard | Not implemented | Generate AGENTS.md from vaultspec config |
-| **MCP security hardening** | OWASP MCP Top 10 published | No security measures | Implement auth, input validation, sandboxing |
-| **Embedding model upgrade** | Qwen3 family, BGE-M3 | nomic-embed-text-v1.5 (2024) | Upgrade to Qwen3-Embedding-0.6B or BGE-M3 |
-| **Hybrid search** | LanceDB native support | Vector-only search | Add full-text + vector hybrid retrieval |
-| **Agent eval framework** | Anthropic's eval methodology | Structure validation only | Add outcome-based agent evaluation |
+| Gap                         | What Exists in Ecosystem        | Vaultspec Status             | Recommendation                               |
+| --------------------------- | ------------------------------- | ---------------------------- | -------------------------------------------- |
+| **AGENTS.md support**       | 60,000+ projects, AAIF standard | Not implemented              | Generate AGENTS.md from vaultspec config     |
+| **MCP security hardening**  | OWASP MCP Top 10 published      | No security measures         | Implement auth, input validation, sandboxing |
+| **Embedding model upgrade** | Qwen3 family, BGE-M3            | nomic-embed-text-v1.5 (2024) | Upgrade to Qwen3-Embedding-0.6B or BGE-M3    |
+| **Hybrid search**           | LanceDB native support          | Vector-only search           | Add full-text + vector hybrid retrieval      |
+| **Agent eval framework**    | Anthropic's eval methodology    | Structure validation only    | Add outcome-based agent evaluation           |
 
 ### 6.2 Strategic Gaps (High Impact, Requires Design)
 
-| Gap | What Exists in Ecosystem | Vaultspec Status | Recommendation |
-|-----|-------------------------|-----------------|----------------|
-| **ACP Registry listing** | Live registry, multi-editor | Not registered | Register vaultspec agents in ACP Registry |
-| **A2A v0.3 features** | gRPC, security signing | v0.3.22 SDK, partial impl | Add gRPC transport, card signing |
-| **Agentic RAG** | LangGraph, LlamaIndex agents | Static retrieval | Add iterative retrieve-evaluate-refine loop |
-| **GraphRAG** | Microsoft GraphRAG, LightRAG | No knowledge graph | Consider for cross-document relationships |
-| **MCP Registry integration** | Preview, GA planned 2026 | Not integrated | Plan for when registry goes GA |
+| Gap                          | What Exists in Ecosystem     | Vaultspec Status          | Recommendation                              |
+| ---------------------------- | ---------------------------- | ------------------------- | ------------------------------------------- |
+| **ACP Registry listing**     | Live registry, multi-editor  | Not registered            | Register vaultspec agents in ACP Registry   |
+| **A2A v0.3 features**        | gRPC, security signing       | v0.3.22 SDK, partial impl | Add gRPC transport, card signing            |
+| **Agentic RAG**              | LangGraph, LlamaIndex agents | Static retrieval          | Add iterative retrieve-evaluate-refine loop |
+| **GraphRAG**                 | Microsoft GraphRAG, LightRAG | No knowledge graph        | Consider for cross-document relationships   |
+| **MCP Registry integration** | Preview, GA planned 2026     | Not integrated            | Plan for when registry goes GA              |
 
 ### 6.3 Emerging Opportunities (Watch & Plan)
 
-| Opportunity | Ecosystem Status | Recommendation |
-|-------------|-----------------|----------------|
-| **Goose integration** | AAIF anchor project, MCP-native | Evaluate as complementary agent framework |
-| **Variable-dimension embeddings** | Qwen3 supports 32-1024 dims | Use for speed/quality tradeoff per query |
-| **Reranking models** | Standard in production RAG | Add reranking step (cross-encoder) |
+| Opportunity                       | Ecosystem Status                | Recommendation                            |
+| --------------------------------- | ------------------------------- | ----------------------------------------- |
+| **Goose integration**             | AAIF anchor project, MCP-native | Evaluate as complementary agent framework |
+| **Variable-dimension embeddings** | Qwen3 supports 32-1024 dims     | Use for speed/quality tradeoff per query  |
+| **Reranking models**              | Standard in production RAG      | Add reranking step (cross-encoder)        |
 
 | **MCP Gateway** | Kong, MintMCP, enterprise pattern | Consider for multi-agent security |
 
----
+______________________________________________________________________
 
 ## 7. Technology Trends
 
@@ -303,12 +307,14 @@ Vaultspec's current verification (`verification/api.py`) focuses on:
 - MCP + A2A + ACP is the emerging standard stack (vaultspec is aligned)
 
 - AAIF provides neutral governance (reduces vendor lock-in risk)
+
 - LangGraph v0.2 validates the MCP-for-tools + A2A-for-agents pattern
-**SDD maturation:**
+  **SDD maturation:**
 
 - Amazon andialized architectures per use case
 
 - GraphRAG for relationship-heavy domains
+
 - Hybrid search becoming table stakes
 
 **Security urgency:**
@@ -316,6 +322,7 @@ Vaultspec's current verification (`verification/api.py`) focuses on:
 - MCP security is now a top concern (OWASP Top 10, real CVEs)
 
 - Every tool execution must be treated as a potential injection vector
+
 - Authentication, sandboxing, and audit logging are no longer optional
 
 **Embeddings leap:**
@@ -343,7 +350,7 @@ Vaultspec's current verification (`verification/api.py`) focuses on:
 - A2A implementation may be ahead of actual user demand
 - No IDE integration limits accessibility
 
----
+______________________________________________________________________
 
 ## 8. Recommendations
 
@@ -351,44 +358,54 @@ Vaultspec's current verification (`verification/api.py`) focuses on:
 
 1. **Generate AGENTS.md from vaultspec config** — This is the lowest-effort, highest-signal improvement. AGENTS.md is adopted by 60,000+ projects and is now an AAIF standard. Vaultspec already has agent definitions and project metadata that can be automatically rendered as AGENTS.md.
 
-2. **Upgrade embedding model** — Replace nomic-embed-text-v1.5 with Qwen3-Embedding-0.6B or BGE-M3. The RTX 4080 SUPER handles these easily. Expected retrieval quality improvement: 15-30% on standard benchmarks. Implementation: change model name in embeddings.py, adjust MAX_EMBED_CHARS.
+1. **Upgrade embedding model** — Replace nomic-embed-text-v1.5 with Qwen3-Embedding-0.6B or BGE-M3. The RTX 4080 SUPER handles these easily. Expected retrieval quality improvement: 15-30% on standard benchmarks. Implementation: change model name in embeddings.py, adjust MAX_EMBED_CHARS.
 
-3. **Enable LanceDB hybrid search** — Add full-text search alongside vector search. LanceDB supports this natively. Minimal code change, significant retrieval improvement for exact-match queries (function names, error codes, etc.).
+1. **Enable LanceDB hybrid search** — Add full-text search alongside vector search. LanceDB supports this natively. Minimal code change, significant retrieval improvement for exact-match queries (function names, error codes, etc.).
 
 ### Short-Term (Next Quarter)
 
-4. **Implement MCP security baseline** — Address OWASP MCP Top 10 items MCP01 (secrets), MCP05 (command injection), MCP07 (auth). Add input validation to the 5 MCP tools in vs-subagent-mcp.
+1. **Implement MCP security baseline** — Address OWASP MCP Top 10 items MCP01 (secrets), MCP05 (command injection), MCP07 (auth). Add input validation to the 5 MCP tools in vs-subagent-mcp.
 
-5. **Register in ACP Registry** — Make vaultspec agents discoverable in Zed, JetBrains, Neovim, and Emacs. This is primarily a metadata/registration task.
+1. **Register in ACP Registry** — Make vaultspec agents discoverable in Zed, JetBrains, Neovim, and Emacs. This is primarily a metadata/registration task.
 
-6. **Add agent eval framework** — Following Anthropic's methodology: 20-50 real-failure tasks, outcome-based grading, CI/CD integration. Vaultspec's verification layer is the natural home for this.
+1. **Add agent eval framework** — Following Anthropic's methodology: 20-50 real-failure tasks, outcome-based grading, CI/CD integration. Vaultspec's verification layer is the natural home for this.
 
 ### Medium-Term (Next 6 Months)
 
-9. **Explore GraphRAG** — For cross-document relationship tracking in the vault. ADRs reference plans, plans reference specs, specs reference requirements — these relationships are currently lost in flat vector search.
+1. **Explore GraphRAG** — For cross-document relationship tracking in the vault. ADRs reference plans, plans reference specs, specs reference requirements — these relationships are currently lost in flat vector search.
 
-10. **Consider MCP Registry integration** — When the registry reaches GA, publish vs-subagent-mcp for discoverability.
+1. **Consider MCP Registry integration** — When the registry reaches GA, publish vs-subagent-mcp for discoverability.
 
----
+______________________________________________________________________
 
 ## 9. Sources
 
 ### Protocol Ecosystem
 
 - [MCP Roadmap](https://modelcontextprotocol.io/development/roadmap)
+
 - [A Year of MCP Review (Pento)](https://www.pento.ai/blog/a-year-of-mcp-2025-review)
+
 - [MCP Wikipedia](https://en.wikipedia.org/wiki/Model_Context_Protocol)
 
 - [ACP Progress Report (Zed)](https://zed.dev/blog/acp-progress-report)
+
 - [JetBrains ACP Agent Registry](https://blog.jetbrains.com/ai/2026/01/acp-agent-registry/)
+
 - [JetBrains x Zed ACP](https://blog.jetbrains.com/ai/2025/10/jetbrains-zed-open-interoperability-for-ai-coding-agents-in-your-ide/)
+
 - [Auggie ACP Support](https://www.augmentcode.com/blog/auggie-acp-zed-neovim-emacs)
+
 - [Kiro Adopts ACP](https://kiro.dev/blog/kiro-adopts-acp/)
 
 - [A2A Protocol (Google)](https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/)
+
 - [A2A Getting Upgrade (Google Cloud)](https://cloud.google.com/blog/products/ai-machine-learning/agent2agent-protocol-is-getting-an-upgrade)
+
 - [A2A Linux Foundation](https://www.linuxfoundation.org/press/linux-foundation-launches-the-agent2agent-protocol-project-to-enable-secure-intelligent-communication-between-ai-agents)
+
 - [A2A Python SDK Guide](https://towardsdatascience.com/multi-agent-communication-with-the-a2a-python-sdk/)
+
 - [A2A Protocol Specification](https://a2a-protocol.org/latest/specification/)
 
 ### AAIF & Standards

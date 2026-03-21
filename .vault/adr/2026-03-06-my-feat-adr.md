@@ -4,14 +4,14 @@
 # Directory tag (hardcoded - DO NOT CHANGE - based on .vault/adr/ location)
 # Feature tag (replace my-feat with your feature name, e.g., #editor-demo)
 tags:
-  - "#adr"
-  - "#my-feat"
+  - '#adr'
+  - '#my-feat'
 # ISO date format (e.g., 2026-02-06)
-date: "2026-03-06"
+date: '2026-03-06'
 # Related documents as quoted wiki-links
 # (e.g., "[[2026-02-04-feature-research]]")
 related:
-  - "[[{yyyy-mm-dd-*}]]"
+  - '[[{yyyy-mm-dd-*}]]'
 ---
 
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields

@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#protocol-stack"
-date: "2026-02-22"
+  - '#exec'
+  - '#protocol-stack'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-protocol-stack-deep-audit-plan]]"
+  - '[[2026-02-22-protocol-stack-deep-audit-plan]]'
 ---
+
 # `protocol-stack` Track C `Step 2a`
 
 Added 6 missing CLI flags to close the CLI/backend parity gap.

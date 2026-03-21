@@ -1,16 +1,17 @@
 ---
 tags:
-  - "#plan"
-  - "#cli-logging"
-date: "2026-02-22"
+  - '#plan'
+  - '#cli-logging'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-cli-logging-adr]]"
-  - "[[2026-02-22-cli-logging-research]]"
+  - '[[2026-02-22-cli-logging-adr]]'
+  - '[[2026-02-22-cli-logging-research]]'
 ---
+
 # `cli-logging` plan
 
 Standardize all CLI logging with Rich and overhaul agent feed formatting for
-colorized, readable output. Implements [[2026-02-22-cli-logging-adr]].
+colorized, readable output. Implements \[[2026-02-22-cli-logging-adr]\].
 
 ## Proposed Changes
 
@@ -23,15 +24,15 @@ Claude/Gemini visual parity through the shared callback convergence point.
 ## Tasks
 
 - Phase 1: CLI logging infrastructure
-    1. Add `rich>=13.0.0` dependency to `pyproject.toml`
-    2. Rewrite `logging_config.py` — TTY-aware handler selection
-    3. Update `cli_common.py` — `--quiet` flag, verbosity ladder
-    4. Fix `spec_cli.py` double-init — remove redundant `configure_logging()`
-    5. Install rich and verify import works
+  1. Add `rich>=13.0.0` dependency to `pyproject.toml`
+  1. Rewrite `logging_config.py` — TTY-aware handler selection
+  1. Update `cli_common.py` — `--quiet` flag, verbosity ladder
+  1. Fix `spec_cli.py` double-init — remove redundant `configure_logging()`
+  1. Install rich and verify import works
 - Phase 2: Agent feed formatting
-    1. Add Rich `Console` to `protocol/acp/client.py` and restyle output
-    2. Verify `orchestration/subagent.py` callback path is unaffected
-    3. Run existing tests to confirm no regressions
+  1. Add Rich `Console` to `protocol/acp/client.py` and restyle output
+  1. Verify `orchestration/subagent.py` callback path is unaffected
+  1. Run existing tests to confirm no regressions
 
 ### Phase 1 detail
 
@@ -45,16 +46,21 @@ Claude/Gemini visual parity through the shared callback convergence point.
 - File: `src/vaultspec/logging_config.py`
 - Rewrite `configure_logging()`:
   - Add `quiet: bool = False` parameter
+
   - Level ladder: `debug` → DEBUG, `quiet` → WARNING, `level` param → as
     given, env `VAULTSPEC_LOG_LEVEL` → as given, fallback → INFO
-  - When `sys.stderr.isatty()`: create `RichHandler(rich_tracebacks=True,
-    markup=False, show_path=False, show_time=True, show_level=True)`
+
+  - When `sys.stderr.isatty()`: create `RichHandler(rich_tracebacks=True, markup=False, show_path=False, show_time=True, show_level=True)`
+
   - When not TTY: create plain `StreamHandler(sys.stderr)` with existing
     format `"%(asctime)s [%(name)s] %(levelname)s: %(message)s"`
+
   - When `log_format` is explicitly passed (subagent_cli case): always use
     plain `StreamHandler` with that format, even in TTY — this preserves
     the `%(message)s` clean-output mode for agent streaming
+
   - Preserve idempotency guard (`_logging_configured`)
+
   - Preserve `reset_logging()` unchanged
 - Export: add `"get_console"` to `__all__` — a lazy accessor that returns
   a module-level `Console(stderr=True, highlight=False)` singleton for use
@@ -63,9 +69,11 @@ Claude/Gemini visual parity through the shared callback convergence point.
 **Step 3 — `cli_common.py`**
 
 - File: `src/vaultspec/cli_common.py`
+
 - `add_common_args()`: replace the current `--verbose` and `--debug` with a
   mutually exclusive group containing `--verbose`/`-v`, `--debug`, and
   `--quiet`/`-q`
+
 - `setup_logging()`: read `getattr(args, "quiet", False)` and pass it
   through to `configure_logging(quiet=...)`
 
@@ -87,21 +95,30 @@ Claude/Gemini visual parity through the shared callback convergence point.
 **Step 1 — `protocol/acp/client.py`**
 
 - File: `src/vaultspec/protocol/acp/client.py`
+
 - Add import: `from rich.console import Console`
+
 - Create module-level console: `_console = Console(stderr=True, highlight=False)`
+
 - In `session_update()` (around line 242-246), replace the `ToolCallStart`
   fallback:
+
   - Old: `logger.info("[tool] %s (%s)", update.title, update.tool_call_id)`
   - New: `_console.print(f"({update.title})", style="dim", end=" ")` followed
     by printing any tool message content if available, also dim. No tool call
     ID.
+
 - In `_handle_content_chunk()` (around line 265-276):
+
   - `AgentMessageChunk` fallback — old: `logger.info("[agent] %s", text)`.
     New: `_console.print(text, end="", highlight=False)` (no prefix, normal
     color)
+
   - `AgentThoughtChunk` fallback — old: `logger.debug("[thought] %s", text)`.
     New: `_console.print(text, style="italic", end="")` (no prefix, italic)
+
 - Guard all `_console.print()` calls behind `not self.quiet` (same as current)
+
 - TTY safety: `Console(stderr=True)` already handles non-TTY by stripping
   ANSI automatically
 
@@ -116,10 +133,12 @@ Claude/Gemini visual parity through the shared callback convergence point.
 
 - Run `pytest src/vaultspec/protocol/acp/tests/ -x` — confirm ACP client
   tests pass
+
 - Run `pytest src/vaultspec/config/tests/ -x` — confirm config tests pass
+
 - Run `pytest tests/test_config.py -x` — confirm top-level config test
-- Quick smoke: `vaultspec --help`, `vaultspec doctor`, `vaultspec vault audit
-  --summary` — confirm Rich-formatted output in terminal
+
+- Quick smoke: `vaultspec --help`, `vaultspec doctor`, `vaultspec vault audit --summary` — confirm Rich-formatted output in terminal
 
 ## Parallelization
 
@@ -133,12 +152,19 @@ handled by a single executor.
 ## Verification
 
 - All existing tests pass without modification (30+ modules untouched)
+
 - `vaultspec --help` shows unformatted output (no logging involved)
+
 - `vaultspec vault audit --summary` shows Rich-formatted log output in TTY,
   plain text when piped (`vaultspec vault audit --summary 2>/dev/null`)
+
 - `vaultspec subagent run --agent ... --goal ...` shows styled agent feed:
   dim tool calls, italic thinking, normal responses
+
 - `--quiet` suppresses INFO-level messages
+
 - `--debug` shows DEBUG-level with full context
+
 - `VAULTSPEC_LOG_LEVEL=WARNING vaultspec ...` respects env override
+
 - pytest log capture (`log_cli = true`) continues to work as configured

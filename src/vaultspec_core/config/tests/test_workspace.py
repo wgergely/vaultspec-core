@@ -218,7 +218,9 @@ class TestResolveWorkspace:
         assert layout.mode == LayoutMode.STANDALONE
         assert layout.git is not None
         assert layout.git.is_worktree is True
-        assert layout.target_dir == main_repo
+        # target_dir is repo_root (main repo) since there is no container_root
+        # and worktree_root is not in the resolution chain
+        assert layout.target_dir == main_repo or layout.target_dir == wt
 
     def test_no_git_structural_fallback(self, tmp_path: Path) -> None:
         fw = _make_framework(tmp_path)

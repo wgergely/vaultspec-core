@@ -1,13 +1,14 @@
 ---
 tags:
-  - "#exec"
-  - "#packaging-restructure"
-date: "2026-02-21"
+  - '#exec'
+  - '#packaging-restructure'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-packaging-restructure-p1p2-plan]]"
-  - "[[2026-02-21-packaging-restructure-adr]]"
-  - "[[2026-02-21-packaging-restructure-research]]"
+  - '[[2026-02-21-packaging-restructure-p1p2-plan]]'
+  - '[[2026-02-21-packaging-restructure-adr]]'
+  - '[[2026-02-21-packaging-restructure-research]]'
 ---
+
 # `packaging-restructure` Phase 1 code review
 
 **Status:** `REVISION REQUIRED`
@@ -37,6 +38,7 @@ All 142 failures and 86 errors trace to **12 missed bare-name imports** in produ
 ### Step 16: CLI entry points -- PASS
 
 Both entry points work correctly:
+
 - `uv run python -m vaultspec --help` -- prints CLI help
 - `uv run vaultspec --help` -- prints CLI help
 
@@ -81,20 +83,20 @@ The `vaultspec-mcp` entry point in `[project.scripts]` points to `vaultspec.serv
 
 12 occurrences across 10 files, all inside function/method bodies (lazy imports):
 
-| File | Line | Import |
-|------|------|--------|
-| `src/vaultspec/vaultcore/models.py` | 106 | `from core.config import get_config` |
-| `src/vaultspec/orchestration/subagent.py` | 83 | `from core.config import get_config` |
-| `src/vaultspec/orchestration/task_engine.py` | 128 | `from core.config import get_config` |
-| `src/vaultspec/orchestration/task_engine.py` | 245 | `from core.config import get_config` |
-| `src/vaultspec/protocol/acp/claude_bridge.py` | 212 | `from core.config import get_config` |
-| `src/vaultspec/protocol/acp/client.py` | 264 | `from core.config import get_config` |
-| `src/vaultspec/protocol/acp/client.py` | 330 | `from core.config import get_config` |
-| `src/vaultspec/protocol/providers/gemini.py` | 164 | `from core.config import get_config` |
-| `src/vaultspec/protocol/a2a/agent_card.py` | 17 | `from core.config import get_config` |
-| `src/vaultspec/protocol/a2a/discovery.py` | 61 | `from core.config import get_config` |
-| `src/vaultspec/protocol/a2a/server.py` | 8 | `from protocol.a2a.server import create_app` |
-| `src/vaultspec/protocol/a2a/server.py` | 9 | `from protocol.a2a.agent_card import agent_card_from_definition` |
+| File                                          | Line | Import                                                           |
+| --------------------------------------------- | ---- | ---------------------------------------------------------------- |
+| `src/vaultspec/vaultcore/models.py`           | 106  | `from core.config import get_config`                             |
+| `src/vaultspec/orchestration/subagent.py`     | 83   | `from core.config import get_config`                             |
+| `src/vaultspec/orchestration/task_engine.py`  | 128  | `from core.config import get_config`                             |
+| `src/vaultspec/orchestration/task_engine.py`  | 245  | `from core.config import get_config`                             |
+| `src/vaultspec/protocol/acp/claude_bridge.py` | 212  | `from core.config import get_config`                             |
+| `src/vaultspec/protocol/acp/client.py`        | 264  | `from core.config import get_config`                             |
+| `src/vaultspec/protocol/acp/client.py`        | 330  | `from core.config import get_config`                             |
+| `src/vaultspec/protocol/providers/gemini.py`  | 164  | `from core.config import get_config`                             |
+| `src/vaultspec/protocol/a2a/agent_card.py`    | 17   | `from core.config import get_config`                             |
+| `src/vaultspec/protocol/a2a/discovery.py`     | 61   | `from core.config import get_config`                             |
+| `src/vaultspec/protocol/a2a/server.py`        | 8    | `from protocol.a2a.server import create_app`                     |
+| `src/vaultspec/protocol/a2a/server.py`        | 9    | `from protocol.a2a.agent_card import agent_card_from_definition` |
 
 All bare-name imports in `tests/` have been successfully rewritten. The issue is confined to production code lazy imports.
 
@@ -105,11 +107,13 @@ The restructure is architecturally sound and nearly complete. Two targeted fixes
 - **Fix all 12 bare-name imports:** Replace `from core.config` with `from vaultspec.core.config` and `from protocol.a2a.` with `from vaultspec.protocol.a2a.` across the 10 listed files. This is a mechanical find-and-replace. After this fix, the 142 failing tests and 86 errors should resolve to passes.
 
 - **Add `[dependency-groups]` to `pyproject.toml`:** Add a `[dependency-groups]` section so that `uv sync --dev` works as documented:
-  ```toml
+
+```toml
   [dependency-groups]
   dev = ["vaultspec[dev]"]
-  ```
-  Alternatively, include the dev dependencies directly in the group.
+```
+
+Alternatively, include the dev dependencies directly in the group.
 
 After these two fixes, re-run the full verification (steps 14-17) to confirm PASS status.
 

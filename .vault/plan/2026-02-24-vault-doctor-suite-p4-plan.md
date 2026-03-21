@@ -1,10 +1,10 @@
 ---
-tags: ["#plan", "#vault-doctor-suite"]
-date: "2026-02-24"
+tags: ['#plan', '#vault-doctor-suite']
+date: '2026-02-24'
 related:
-  - "[[2026-02-24-vault-doctor-suite-adr]]"
-  - "[[2026-02-24-vault-doctor-suite-plan]]"
-  - "[[2026-02-24-vault-doctor-suite-p1-plan]]"
+  - '[[2026-02-24-vault-doctor-suite-adr]]'
+  - '[[2026-02-24-vault-doctor-suite-plan]]'
+  - '[[2026-02-24-vault-doctor-suite-p1-plan]]'
 ---
 
 # `vault-doctor-suite` P4 plan: Frontmatter Drift Checks
@@ -22,16 +22,16 @@ executed in parallel with those phases once Phase 1 is complete.
 
 **`src/vaultspec/doctor/checks/drift.py`** — eight check functions:
 
-| Check name | Severity | Fixable | Detection method |
-|---|---|---|---|
-| `filename-date-drift` | ERROR | Yes | Filename stem first 10 chars vs `date` frontmatter field |
-| `filename-feature-drift` | ERROR | Yes | Filename feature slug vs non-doctype tag |
-| `unquoted-date` | WARNING | Yes | Regex `date:\s+\d{4}-\d{2}-\d{2}` on raw YAML (no quotes) |
-| `crlf-endings` | WARNING | Yes | Raw bytes contain `\r\n` in frontmatter block |
-| `duplicate-tags` | ERROR | Yes | Case-insensitive duplicate detection in `tags` list |
-| `bom-detected` | WARNING | Yes | UTF-8 BOM (`\xef\xbb\xbf`) at file start |
-| `extra-fields` | INFO | No | Frontmatter keys outside `{tags, date, related}` |
-| `missing-related-field` | INFO | Yes | `related` key absent from frontmatter |
+| Check name               | Severity | Fixable | Detection method                                          |
+| ------------------------ | -------- | ------- | --------------------------------------------------------- |
+| `filename-date-drift`    | ERROR    | Yes     | Filename stem first 10 chars vs `date` frontmatter field  |
+| `filename-feature-drift` | ERROR    | Yes     | Filename feature slug vs non-doctype tag                  |
+| `unquoted-date`          | WARNING  | Yes     | Regex `date:\s+\d{4}-\d{2}-\d{2}` on raw YAML (no quotes) |
+| `crlf-endings`           | WARNING  | Yes     | Raw bytes contain `\r\n` in frontmatter block             |
+| `duplicate-tags`         | ERROR    | Yes     | Case-insensitive duplicate detection in `tags` list       |
+| `bom-detected`           | WARNING  | Yes     | UTF-8 BOM (`\xef\xbb\xbf`) at file start                  |
+| `extra-fields`           | INFO     | No      | Frontmatter keys outside `{tags, date, related}`          |
+| `missing-related-field`  | INFO     | Yes     | `related` key absent from frontmatter                     |
 
 For `filename-date-drift` and `filename-feature-drift`, the filename is
 authoritative. Fixes update frontmatter to match the filename, never the
@@ -40,16 +40,18 @@ reverse. For multi-segment feature slugs (e.g. `editor-demo` from
 date prefix and the doc-type suffix.
 
 **`src/vaultspec/doctor/fixes/frontmatter.py`** — extended from P2:
+
 - `fix_drift(path, checks, dry_run) -> list[DoctorResult]` — batched fix
   runner; applies all applicable drift fixes for a path in one atomic write.
   Application order:
+
   1. BOM strip
-  2. CRLF → LF normalisation
-  3. Duplicate tag deduplication (preserve first occurrence)
-  4. Unquoted date quoting
-  5. Missing `related` insertion (`related: []`)
-  6. Filename date drift correction
-  7. Filename feature drift correction
+  1. CRLF → LF normalisation
+  1. Duplicate tag deduplication (preserve first occurrence)
+  1. Unquoted date quoting
+  1. Missing `related` insertion (`related: []`)
+  1. Filename date drift correction
+  1. Filename feature drift correction
 
 The ordered application ensures that each fix sees a clean state from the
 previous step. A single `atomic_write` call at the end of the batch commits all
@@ -73,42 +75,42 @@ logic).
 - Name: Implement `filename-date-drift` and `filename-feature-drift` checks in `drift.py`
 - Step summary: `.vault/exec/2026-02-24-vault-doctor-suite/2026-02-24-vault-doctor-suite-p4-s1-exec.md`
 - Executing sub-agent: vaultspec-complex-executor
-- References: [[2026-02-24-vault-doctor-suite-adr]], [[2026-02-24-vault-doctor-suite-p1-plan]], [[2026-02-24-vault-doctor-suite-plan]]
+- References: \[[2026-02-24-vault-doctor-suite-adr]\], \[[2026-02-24-vault-doctor-suite-p1-plan]\], \[[2026-02-24-vault-doctor-suite-plan]\]
 
----
+______________________________________________________________________
 
 - Name: Implement `unquoted-date`, `crlf-endings`, and `bom-detected` drift checks
 - Step summary: `.vault/exec/2026-02-24-vault-doctor-suite/2026-02-24-vault-doctor-suite-p4-s2-exec.md`
 - Executing sub-agent: vaultspec-standard-executor
-- References: [[2026-02-24-vault-doctor-suite-adr]], [[2026-02-24-vault-doctor-suite-p4-s1-exec]]
+- References: \[[2026-02-24-vault-doctor-suite-adr]\], \[[2026-02-24-vault-doctor-suite-p4-s1-exec]\]
 
----
+______________________________________________________________________
 
 - Name: Implement `duplicate-tags`, `extra-fields`, and `missing-related-field` drift checks
 - Step summary: `.vault/exec/2026-02-24-vault-doctor-suite/2026-02-24-vault-doctor-suite-p4-s3-exec.md`
 - Executing sub-agent: vaultspec-standard-executor
-- References: [[2026-02-24-vault-doctor-suite-adr]], [[2026-02-24-vault-doctor-suite-p4-s2-exec]]
+- References: \[[2026-02-24-vault-doctor-suite-adr]\], \[[2026-02-24-vault-doctor-suite-p4-s2-exec]\]
 
----
+______________________________________________________________________
 
 - Name: Implement `fix_drift` batched fix runner in `doctor/fixes/frontmatter.py`
 - Step summary: `.vault/exec/2026-02-24-vault-doctor-suite/2026-02-24-vault-doctor-suite-p4-s4-exec.md`
 - Executing sub-agent: vaultspec-complex-executor
-- References: [[2026-02-24-vault-doctor-suite-adr]], [[2026-02-24-vault-doctor-suite-p1-plan]], [[2026-02-24-vault-doctor-suite-p4-s3-exec]]
+- References: \[[2026-02-24-vault-doctor-suite-adr]\], \[[2026-02-24-vault-doctor-suite-p1-plan]\], \[[2026-02-24-vault-doctor-suite-p4-s3-exec]\]
 
----
+______________________________________________________________________
 
 - Name: Register all eight drift checks in `CheckRegistry`
 - Step summary: `.vault/exec/2026-02-24-vault-doctor-suite/2026-02-24-vault-doctor-suite-p4-s5-exec.md`
 - Executing sub-agent: vaultspec-standard-executor
-- References: [[2026-02-24-vault-doctor-suite-adr]], [[2026-02-24-vault-doctor-suite-p4-s4-exec]]
+- References: \[[2026-02-24-vault-doctor-suite-adr]\], \[[2026-02-24-vault-doctor-suite-p4-s4-exec]\]
 
----
+______________________________________________________________________
 
 - Name: Unit tests — all eight drift checks, `fix_drift` batch runner, `--input` scoping, wet/dry runs
 - Step summary: `.vault/exec/2026-02-24-vault-doctor-suite/2026-02-24-vault-doctor-suite-p4-s6-exec.md`
 - Executing sub-agent: vaultspec-code-reviewer
-- References: [[2026-02-24-vault-doctor-suite-adr]], [[2026-02-24-vault-doctor-suite-p4-s1-exec]], [[2026-02-24-vault-doctor-suite-p4-s2-exec]], [[2026-02-24-vault-doctor-suite-p4-s3-exec]], [[2026-02-24-vault-doctor-suite-p4-s4-exec]], [[2026-02-24-vault-doctor-suite-p4-s5-exec]]
+- References: \[[2026-02-24-vault-doctor-suite-adr]\], \[[2026-02-24-vault-doctor-suite-p4-s1-exec]\], \[[2026-02-24-vault-doctor-suite-p4-s2-exec]\], \[[2026-02-24-vault-doctor-suite-p4-s3-exec]\], \[[2026-02-24-vault-doctor-suite-p4-s4-exec]\], \[[2026-02-24-vault-doctor-suite-p4-s5-exec]\]
 
 ## Parallelization
 
@@ -123,18 +125,25 @@ S5 depends on S4. S6 depends on S5.
 
 - Parametrised fixture tests cover each of the eight drift types individually:
   each fixture file is crafted to trigger exactly one check type.
+
 - For each of the six fixable checks: dry-run run produces `fix_applied = False`
   and a non-empty `fix_detail`; wet-run (`dry_run = False`) produces
   `fix_applied = True` and modifies the file correctly (verified by re-parsing).
+
 - `fix_drift` applied to a file with three simultaneous drift types (e.g. BOM +
   CRLF + unquoted date) produces `fix_applied = True` for all three in a
   single file write (stat shows mtime changed exactly once).
+
 - `--input` scoping: drift in file A, `--input file_B` → zero results.
+
 - `extra-fields` and `missing-related-field` return `fix_available = False` and
   `True` respectively (correct per ADR table).
+
 - After `fix_drift` for `filename-date-drift`, the frontmatter `date` field
   matches the filename prefix (filename is authoritative).
+
 - After `fix_drift` for `filename-feature-drift`, the feature tag in `tags`
   matches the feature slug extracted from the filename.
+
 - All drift checks return `list[DoctorResult]` (no exceptions) even on
   binary files or files with no frontmatter.

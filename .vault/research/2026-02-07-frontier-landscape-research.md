@@ -1,29 +1,30 @@
 ---
 tags:
-  - "#research"
-  - "#framework"
-date: "2026-02-07"
+  - '#research'
+  - '#framework'
+date: '2026-02-07'
 ---
+
 # Frontier Landscape: Agent Protocols and Interoperability
 
 **Date:** 2026-02-07
 **Source:** Research agent -- frontier discussions, RFDs, emerging standards
 **Scope:** Latest thinking from protocol authors, community discussions, gaps
 
----
+______________________________________________________________________
 
 ## Critical Disambiguation: Three Different "ACPs"
 
-| Protocol | Full Name | Origin | Focus |
-|---|---|---|---|
-| ACP (Zed) | Agent Client Protocol | Zed Industries, Aug 2025 | Editor-to-agent (stdin/stdout, JSON-RPC 2.0) |
-| ACP (IBM) | Agent Communication Protocol | IBM BeeAI, Mar 2025 | Agent-to-agent (REST/HTTP) |
-| ACP (Cisco) | Agent Connect Protocol | Cisco/agntcy | Agent connectivity |
+| Protocol    | Full Name                    | Origin                   | Focus                                        |
+| ----------- | ---------------------------- | ------------------------ | -------------------------------------------- |
+| ACP (Zed)   | Agent Client Protocol        | Zed Industries, Aug 2025 | Editor-to-agent (stdin/stdout, JSON-RPC 2.0) |
+| ACP (IBM)   | Agent Communication Protocol | IBM BeeAI, Mar 2025      | Agent-to-agent (REST/HTTP)                   |
+| ACP (Cisco) | Agent Connect Protocol       | Cisco/agntcy             | Agent connectivity                           |
 
 **IBM's ACP merged into A2A** under the Linux Foundation (September 2025).
 **Zed's ACP** remains active and independent. v0.10.8 (2026-02-04), 2,000+ stars, 61 contributors, 30 releases.
 
----
+______________________________________________________________________
 
 ## ACP (Zed) Ecosystem Status
 
@@ -40,16 +41,16 @@ Launched January 2026. Live in JetBrains IDE 2025.3+. Four discovery methods: Ba
 
 19 RFD documents as of February 2026. Key ones:
 
-| RFD | Significance |
-|---|---|
-| **proxy-chains** | Most important for agent-to-agent |
-| **mcp-over-acp** | Bridges MCP tools into ACP |
-| **agent-telemetry-export** | OpenTelemetry monitoring |
-| **meta-propagation** | W3C trace context |
-| **auth-methods** | OAuth flows |
-| **acp-agent-registry** | Discovery |
+| RFD                        | Significance                      |
+| -------------------------- | --------------------------------- |
+| **proxy-chains**           | Most important for agent-to-agent |
+| **mcp-over-acp**           | Bridges MCP tools into ACP        |
+| **agent-telemetry-export** | OpenTelemetry monitoring          |
+| **meta-propagation**       | W3C trace context                 |
+| **auth-methods**           | OAuth flows                       |
+| **acp-agent-registry**     | Discovery                         |
 
----
+______________________________________________________________________
 
 ## Proxy Chains RFD -- Key Agent-to-Agent Primitive
 
@@ -79,7 +80,7 @@ Working Rust prototype: `sacp`, `sacp-proxy`, `sacp-conductor` in the `symposium
 
 Extending `proxy/successor` with optional `peer` field enables M:N topologies.
 
----
+______________________________________________________________________
 
 ## SymmACP Vision
 
@@ -91,7 +92,7 @@ Niko Matsakis proposed **SymmACP** (October 2025) -- symmetric ACP capabilities:
 
 Vision: **Build AI tools like Unix pipes or browser extensions.**
 
----
+______________________________________________________________________
 
 ## Claude Code ACP Adapter
 
@@ -99,26 +100,26 @@ Vision: **Build AI tools like Unix pipes or browser extensions.**
 
 Bridges Claude Code to ACP by translating between ACP, Claude Agent SDK, and Claude's internal protocol. Features: context mentions, images, tool calls, edit review, TODO lists, terminals, slash commands.
 
----
+______________________________________________________________________
 
 ## Anthropic Agent Teams -- Proprietary Protocol
 
 Released with Opus 4.6 (2026-02-05). **Not ACP-based** -- uses filesystem-based coordination.
 
-| Component | Mechanism |
-|---|---|
-| Team config | `~/.claude/teams/{team-name}/config.json` |
-| Task list | `~/.claude/tasks/{team-name}/` |
-| Communication | `SendMessage` tool calls |
-| Task states | pending -> in_progress -> completed |
+| Component     | Mechanism                                 |
+| ------------- | ----------------------------------------- |
+| Team config   | `~/.claude/teams/{team-name}/config.json` |
+| Task list     | `~/.claude/tasks/{team-name}/`            |
+| Communication | `SendMessage` tool calls                  |
+| Task states   | pending -> in_progress -> completed       |
 
 ### Differences from ACP Sub-agents
 
-| | Subagents | Agent Teams |
-|---|---|---|
-| Context | Own window; results return | Own window; independent |
-| Communication | Report back only | Direct peer DMs |
-| Coordination | Main agent manages | Shared task list |
+|               | Subagents                  | Agent Teams             |
+| ------------- | -------------------------- | ----------------------- |
+| Context       | Own window; results return | Own window; independent |
+| Communication | Report back only           | Direct peer DMs         |
+| Coordination  | Main agent manages         | Shared task list        |
 
 ### Limitations
 
@@ -127,21 +128,21 @@ Released with Opus 4.6 (2026-02-05). **Not ACP-based** -- uses filesystem-based 
 - Lead is fixed for lifetime
 - Experimental
 
----
+______________________________________________________________________
 
 ## Emerging IETF Work
 
-| Draft | Topic |
-|---|---|
-| `draft-narvaneni-agent-uri-02` | `agent://` URI scheme |
-| `draft-zyyhl-agent-networks-framework` | AI Agent Networks framework |
-| `draft-cui-ai-agent-discovery-invocation` | HTTP-based discovery |
-| `draft-liu-agent-context-protocol` | Agent Context Protocol |
-| `draft-yl-agent-id-requirements` | Digital Identity for agents |
+| Draft                                     | Topic                       |
+| ----------------------------------------- | --------------------------- |
+| `draft-narvaneni-agent-uri-02`            | `agent://` URI scheme       |
+| `draft-zyyhl-agent-networks-framework`    | AI Agent Networks framework |
+| `draft-cui-ai-agent-discovery-invocation` | HTTP-based discovery        |
+| `draft-liu-agent-context-protocol`        | Agent Context Protocol      |
+| `draft-yl-agent-id-requirements`          | Digital Identity for agents |
 
 The `agent://` protocol proposes layered architecture: addressing + transport + capability discovery + orchestration.
 
----
+______________________________________________________________________
 
 ## Gaps and Open Problems
 
@@ -173,21 +174,21 @@ Credential delegation, permission scoping across proxy chains, sandboxing -- uns
 
 Claude Teams prohibit nested teams. ACP proxy chains allow nesting in theory but no implementations demonstrate deep nesting.
 
----
+______________________________________________________________________
 
 ## Three-Layer Stack Crystallizing
 
-| Layer | Protocol | Status |
-|---|---|---|
-| Client-to-Agent | ACP (Zed) | Production. 25 agents, 16 clients |
-| Agent-to-Tool | MCP (Anthropic) | Production. De facto standard |
-| Agent-to-Agent | A2A (Google/LF) | Growing adoption |
+| Layer           | Protocol        | Status                            |
+| --------------- | --------------- | --------------------------------- |
+| Client-to-Agent | ACP (Zed)       | Production. 25 agents, 16 clients |
+| Agent-to-Tool   | MCP (Anthropic) | Production. De facto standard     |
+| Agent-to-Agent  | A2A (Google/LF) | Growing adoption                  |
 
 ### Central Tension
 
 **Anthropic builds vertically-integrated agent teams** while the **open-source community builds horizontally-composable protocol layers**. These must converge for multi-vendor agent interoperability.
 
----
+______________________________________________________________________
 
 ## Sources
 

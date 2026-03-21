@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#exec"
-  - "#a2a-team"
-date: "2026-02-20"
+  - '#exec'
+  - '#a2a-team'
+date: '2026-02-20'
 related:
-  - "[[2026-02-20-a2a-team-p1-plan]]"
-  - "[[2026-02-20-a2a-team-adr]]"
+  - '[[2026-02-20-a2a-team-p1-plan]]'
+  - '[[2026-02-20-a2a-team-adr]]'
 ---
+
 # `a2a-team` code review
 
 **Status:** `REVISION REQUIRED`
@@ -25,14 +26,14 @@ related:
 
 ## ADR Decision Compliance
 
-| Decision | Requirement | Status |
-|---|---|---|
-| 1 | `TeamCoordinator` in `orchestration/team.py`, not in `protocol/a2a/` | PASS |
-| 2 | `team_id == context_id` (single UUID); name in `metadata["team_name"]` | PASS |
-| 3 | `discovery.py` uses `/.well-known/agent-card.json` | PASS |
-| 4 | `lib/scripts/team.py` follows `subagent.py` CLI conventions | PASS |
-| 5 | `relay_output()` sends `reference_task_ids=[src_task.id]` + two `TextPart` entries | PASS |
-| 6 | Unauthenticated by default; `--api-key` sets `X-API-Key` via `__aenter__` / `_ensure_http_client` | PASS |
+| Decision | Requirement                                                                                       | Status |
+| -------- | ------------------------------------------------------------------------------------------------- | ------ |
+| 1        | `TeamCoordinator` in `orchestration/team.py`, not in `protocol/a2a/`                              | PASS   |
+| 2        | `team_id == context_id` (single UUID); name in `metadata["team_name"]`                            | PASS   |
+| 3        | `discovery.py` uses `/.well-known/agent-card.json`                                                | PASS   |
+| 4        | `lib/scripts/team.py` follows `subagent.py` CLI conventions                                       | PASS   |
+| 5        | `relay_output()` sends `reference_task_ids=[src_task.id]` + two `TextPart` entries                | PASS   |
+| 6        | Unauthenticated by default; `--api-key` sets `X-API-Key` via `__aenter__` / `_ensure_http_client` | PASS   |
 
 All six ADR decisions are correctly implemented.
 
@@ -46,7 +47,7 @@ All six ADR decisions are correctly implemented.
 
 - **[HIGH]** `orchestration/tests/test_team.py:399` (SlowExecutor): The `SlowExecutor` uses `await asyncio.sleep(9999)` inside a test, but the test (`test_dispatch_timeout_degrades_gracefully`) never actually tests a timeout scenario. It only dispatches to the fast `echo-fast` agent. The `SlowExecutor` class is defined but never registered in the coordinator, so the test does not exercise the degradation behavior it claims to test. This means Phase 4 "dispatch timeout degrades gracefully" has **zero actual coverage**. The test must register both a fast agent and a slow agent, dispatch to both, and verify the fast agent's result is still returned despite the slow agent timing out.
 
-- **[HIGH]** `tests/cli/test_team_cli.py`: The CLI test module does **not** use the `_isolate_cli` autouse fixture from `conftest.py`. The `conftest.py` in `tests/cli/` calls `cli.init_paths(TEST_PROJECT)` and `setup_rules_dir(TEST_PROJECT)`. The team CLI tests use `tmp_path` for isolation instead. This is actually fine for correctness (each test gets a fresh `tmp_path`), but it means the team CLI tests are not following the convention described in the plan ("following `test_sync_operations.py` conventions (uses `_isolate_cli` autouse fixture)"). This is an intentional and valid divergence since team CLI tests do not depend on `cli.init_paths`.  **Downgraded to MEDIUM** -- the approach is sound, but diverges from the stated plan.
+- **[HIGH]** `tests/cli/test_team_cli.py`: The CLI test module does **not** use the `_isolate_cli` autouse fixture from `conftest.py`. The `conftest.py` in `tests/cli/` calls `cli.init_paths(TEST_PROJECT)` and `setup_rules_dir(TEST_PROJECT)`. The team CLI tests use `tmp_path` for isolation instead. This is actually fine for correctness (each test gets a fresh `tmp_path`), but it means the team CLI tests are not following the convention described in the plan ("following `test_sync_operations.py` conventions (uses `_isolate_cli` autouse fixture)"). This is an intentional and valid divergence since team CLI tests do not depend on `cli.init_paths`. **Downgraded to MEDIUM** -- the approach is sound, but diverges from the stated plan.
 
 ### Medium / Low (Recommended)
 
@@ -54,9 +55,9 @@ All six ADR decisions are correctly implemented.
 
 - **[MEDIUM]** `orchestration/team.py:282-288` (form_team API key override): When `api_key` is passed to `form_team()` and differs from the constructor key, the HTTP client is torn down and recreated (lines 283-288). This destroys any already-cached `A2AClient` instances in `self._clients`. Since `form_team()` is typically called once before any dispatch, this is unlikely to cause issues in practice, but it is a subtle invalidation hazard. Document this behavior or clear `self._clients` when the HTTP client is replaced.
 
-- **[MEDIUM]** `orchestration/team.py:243-255` (_dispatch_one error handling): Error detection uses `hasattr(result, "error")` (line 246) rather than type-checking against `JSONRPCErrorResponse`. This is fragile -- if the A2A SDK adds an `error` attribute to success responses in a future version, this would false-positive. Prefer `isinstance(result, JSONRPCErrorResponse)` or check the SDK's response discrimination pattern.
+- **[MEDIUM]** `orchestration/team.py:243-255` (\_dispatch_one error handling): Error detection uses `hasattr(result, "error")` (line 246) rather than type-checking against `JSONRPCErrorResponse`. This is fragile -- if the A2A SDK adds an `error` attribute to success responses in a future version, this would false-positive. Prefer `isinstance(result, JSONRPCErrorResponse)` or check the SDK's response discrimination pattern.
 
-- **[MEDIUM]** `scripts/team.py:119-125` (_restore_coordinator): Accesses private `coordinator._session` directly with `# noqa: SLF001`. This pattern is used twice (also at line 299 for `_get_client`). While pragmatic, consider adding a `TeamCoordinator.restore_session(session)` public method to avoid private attribute access from outside the class.
+- **[MEDIUM]** `scripts/team.py:119-125` (\_restore_coordinator): Accesses private `coordinator._session` directly with `# noqa: SLF001`. This pattern is used twice (also at line 299 for `_get_client`). While pragmatic, consider adding a `TeamCoordinator.restore_session(session)` public method to avoid private attribute access from outside the class.
 
 - **[MEDIUM]** `scripts/team.py:174-190` (event loop management): All async command handlers create a new event loop via `asyncio.new_event_loop()` + `asyncio.set_event_loop()`. This is functional but redundant -- `asyncio.run()` would handle this automatically and is the standard pattern since Python 3.7. The current approach also risks leaving a global event loop set if an error occurs between `set_event_loop` and `loop.close()`.
 
@@ -74,39 +75,39 @@ All six ADR decisions are correctly implemented.
 
 ## Key Quality Criteria Verification
 
-| Criterion | Verdict |
-|---|---|
-| Tests assert specific observable values | PASS -- tests check `task.context_id`, `task.status.state.value`, `captured_ref_ids`, and `member.status` explicitly |
-| Decision 2 proof: test asserts `task.context_id == session.team_id` | PASS -- `test_dispatch_parallel_fan_out` (line 190) and `test_two_agent_parallel_dispatch` (line 461) both assert this |
-| Decision 5 proof: test inspects outbound `reference_task_ids` | PASS -- `test_relay_output_injects_reference_task_id` (line 279) and `test_relay_chain` (line 534) use `CapturingExecutor`/`RefCapturingExecutor` to capture and assert `reference_task_ids` on the inbound server message |
-| No `# type: ignore` without justification | PASS -- zero occurrences |
-| No bare `except: pass` | PASS -- all exception handlers use `except Exception as exc:` with logging and `# noqa: BLE001` |
-| No `asyncio.sleep()` as synchronization in tests | PASS in tests -- the `asyncio.sleep(9999)` in `SlowExecutor` is intentionally simulating a hung agent (it is never awaited in the actual test path) |
-| `orchestration/team.py` has no `from protocol.a2a import ...` at module level | PASS -- all imports are from `a2a.client` and `a2a.types` (the SDK), not from `protocol.a2a.*` |
+| Criterion                                                                     | Verdict                                                                                                                                                                                                                    |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tests assert specific observable values                                       | PASS -- tests check `task.context_id`, `task.status.state.value`, `captured_ref_ids`, and `member.status` explicitly                                                                                                       |
+| Decision 2 proof: test asserts `task.context_id == session.team_id`           | PASS -- `test_dispatch_parallel_fan_out` (line 190) and `test_two_agent_parallel_dispatch` (line 461) both assert this                                                                                                     |
+| Decision 5 proof: test inspects outbound `reference_task_ids`                 | PASS -- `test_relay_output_injects_reference_task_id` (line 279) and `test_relay_chain` (line 534) use `CapturingExecutor`/`RefCapturingExecutor` to capture and assert `reference_task_ids` on the inbound server message |
+| No `# type: ignore` without justification                                     | PASS -- zero occurrences                                                                                                                                                                                                   |
+| No bare `except: pass`                                                        | PASS -- all exception handlers use `except Exception as exc:` with logging and `# noqa: BLE001`                                                                                                                            |
+| No `asyncio.sleep()` as synchronization in tests                              | PASS in tests -- the `asyncio.sleep(9999)` in `SlowExecutor` is intentionally simulating a hung agent (it is never awaited in the actual test path)                                                                        |
+| `orchestration/team.py` has no `from protocol.a2a import ...` at module level | PASS -- all imports are from `a2a.client` and `a2a.types` (the SDK), not from `protocol.a2a.*`                                                                                                                             |
 
 ## Safety Audit
 
-| Category | Status | Notes |
-|---|---|---|
-| Panic Prevention | N/A | Python -- no `.unwrap()` / `panic!` equivalents |
-| Exception Safety | PASS | All exception handlers catch `Exception`, log, and degrade. No bare `except:` |
-| Resource Cleanup | PASS | `__aexit__` closes httpx client. `dissolve_team` clears in-flight state |
-| Concurrency Safety | PASS | `asyncio.gather` with `return_exceptions=True` prevents one coroutine from crashing the group. `asyncio.timeout` guards the polling loop |
-| State Consistency | HIGH | `dispatch_parallel` leaves failed members in `WORKING` (see finding above) |
+| Category           | Status | Notes                                                                                                                                    |
+| ------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Panic Prevention   | N/A    | Python -- no `.unwrap()` / `panic!` equivalents                                                                                          |
+| Exception Safety   | PASS   | All exception handlers catch `Exception`, log, and degrade. No bare `except:`                                                            |
+| Resource Cleanup   | PASS   | `__aexit__` closes httpx client. `dissolve_team` clears in-flight state                                                                  |
+| Concurrency Safety | PASS   | `asyncio.gather` with `return_exceptions=True` prevents one coroutine from crashing the group. `asyncio.timeout` guards the polling loop |
+| State Consistency  | HIGH   | `dispatch_parallel` leaves failed members in `WORKING` (see finding above)                                                               |
 
 ## Recommendations
 
 1. **[Must Fix]** In `dispatch_parallel`, reset failed members' status to `IDLE` in the error branch of the outcomes loop. Specifically, after the `if isinstance(item, BaseException)` check, identify the agent name from the coroutine mapping and set its status back to `IDLE`.
 
-2. **[Must Fix]** Rewrite `test_dispatch_timeout_degrades_gracefully` to actually register the `SlowExecutor` as a second agent in the coordinator and verify that the fast agent's result is returned even when the slow agent times out. The current test is a false positive.
+1. **[Must Fix]** Rewrite `test_dispatch_timeout_degrades_gracefully` to actually register the `SlowExecutor` as a second agent in the coordinator and verify that the fast agent's result is returned even when the slow agent times out. The current test is a false positive.
 
-3. **[Should Fix]** Add exponential backoff to the `collect_results` polling loop. A simple doubling from 0.1s to a cap of 5s would reduce unnecessary load by ~90% for long-running tasks.
+1. **[Should Fix]** Add exponential backoff to the `collect_results` polling loop. A simple doubling from 0.1s to a cap of 5s would reduce unnecessary load by ~90% for long-running tasks.
 
-4. **[Should Fix]** Add error checking to `command_message` relay mode (line 306) for `get_task` response errors, matching the pattern in `_dispatch_one`.
+1. **[Should Fix]** Add error checking to `command_message` relay mode (line 306) for `get_task` response errors, matching the pattern in `_dispatch_one`.
 
-5. **[Should Fix]** Consider replacing `asyncio.new_event_loop()` / `set_event_loop()` with `asyncio.run()` in CLI command handlers.
+1. **[Should Fix]** Consider replacing `asyncio.new_event_loop()` / `set_event_loop()` with `asyncio.run()` in CLI command handlers.
 
-6. **[Optional]** Add a public `TeamCoordinator.restore_session()` method to eliminate private attribute access from `scripts/team.py`.
+1. **[Optional]** Add a public `TeamCoordinator.restore_session()` method to eliminate private attribute access from `scripts/team.py`.
 
 ## Notes
 

@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#french-novel-relay"
-date: "2026-02-19"
+  - '#exec'
+  - '#french-novel-relay'
+date: '2026-02-19'
 related:
-  - "[[2026-02-19-french-novel-relay-p1-plan]]"
+  - '[[2026-02-19-french-novel-relay-p1-plan]]'
 ---
+
 # `french-novel-relay` `p1` implementation step record
 
 ## Files Created

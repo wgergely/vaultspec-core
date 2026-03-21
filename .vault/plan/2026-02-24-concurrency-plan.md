@@ -1,8 +1,8 @@
 ---
 tags:
-  - "#plan"
-  - "#concurrency"
-date: "2026-02-24"
+  - '#plan'
+  - '#concurrency'
+date: '2026-02-24'
 ---
 
 # Concurrency Plan

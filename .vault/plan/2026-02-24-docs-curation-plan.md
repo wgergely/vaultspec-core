@@ -1,8 +1,8 @@
 ---
 tags:
-  - "#plan"
-  - "#docs-curation"
-date: "2026-02-24"
+  - '#plan'
+  - '#docs-curation'
+date: '2026-02-24'
 ---
 
 # Docs-curation Plan

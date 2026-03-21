@@ -1,20 +1,21 @@
 ---
 tags:
-  - "#adr"
-  - "#gemini-overhaul"
-date: "2026-02-22"
+  - '#adr'
+  - '#gemini-overhaul'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-gemini-acp-bridge-adr]]"
-  - "[[2026-02-22-gemini-acp-audit-research]]"
-  - "[[2026-02-22-gemini-acp-audit-expanded]]"
-  - "[[2026-02-22-gemini-overhaul-reference]]"
-  - "[[2026-02-20-a2a-team-gemini-research]]"
-  - "[[2026-02-21-gemini-bridge-auth-research]]"
-  - "[[2026-02-21-gemini-provider-auth-strategy-adr]]"
-  - "[[2026-02-21-claude-a2a-overhaul-adr]]"
-  - "[[2026-02-22-gemini-acp-bridge-review]]"
-  - "[[2026-02-22-gemini-a2a-review]]"
+  - '[[2026-02-22-gemini-acp-bridge-adr]]'
+  - '[[2026-02-22-gemini-acp-audit-research]]'
+  - '[[2026-02-22-gemini-acp-audit-expanded]]'
+  - '[[2026-02-22-gemini-overhaul-reference]]'
+  - '[[2026-02-20-a2a-team-gemini-research]]'
+  - '[[2026-02-21-gemini-bridge-auth-research]]'
+  - '[[2026-02-21-gemini-provider-auth-strategy-adr]]'
+  - '[[2026-02-21-claude-a2a-overhaul-adr]]'
+  - '[[2026-02-22-gemini-acp-bridge-review]]'
+  - '[[2026-02-22-gemini-a2a-review]]'
 ---
+
 # `gemini-overhaul` adr: Gemini ACP Bridge Rewrite and A2A Executor Hardening | (**status:** `superseded`)
 
 **SUPERSEDED** — This ADR is fully superseded by
@@ -124,24 +125,24 @@ Seven decisions addressing the bridge rewrite, executor hardening, and integrati
 
 Method implementation strategy:
 
-| Method | Implementation | Notes |
-|--------|---------------|-------|
-| `on_connect` | Store connection reference | Same as current |
-| `initialize` | Return capabilities with correct imports | Fix `McpCapabilities`, advertise real capabilities |
-| `new_session` | Spawn child via `spawn_fn`, ACP handshake | Remove sync version check, use SDK env trimming |
-| `prompt` | Proxy to child, check `cancel_event` | Add timeout and cancel check |
-| `cancel` | Set event, delegate to child, force-close on timeout | Follow Claude bridge: interrupt, not disconnect |
-| `authenticate` | Fix signature `(self, method_id, **kwargs)`, return `AuthenticateResponse()` | Gemini auth is env-based, not ACP-negotiated |
-| `load_session` | Look up stored state, rebuild child connection | Mirror Claude bridge lines 782-861 |
-| `resume_session` | Thin wrapper over `load_session` logic | Mirror Claude bridge lines 904-905 |
-| `list_sessions` | Iterate `self._sessions`, return `SessionInfo` list | Mirror Claude bridge lines 982-1013 |
-| `fork_session` | Clone config into new child process | Mirror Claude bridge lines 924-980 |
-| `set_session_mode` | Store mode, delegate to child if supported | Sandbox -> `--sandbox` on next spawn |
-| `set_session_model` | Store model, delegate to child if supported | Model -> `--model` on next spawn |
-| `set_config_option` | No-op with debug log | Same as Claude bridge lines 1059-1066 |
-| `ext_method` | Return empty dict | Same as Claude bridge |
-| `ext_notification` | No-op | Same as Claude bridge |
-| `close` | Cancel all proxy workers, close all exit stacks, clear sessions | Fix resource leaks |
+| Method              | Implementation                                                               | Notes                                              |
+| ------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------- |
+| `on_connect`        | Store connection reference                                                   | Same as current                                    |
+| `initialize`        | Return capabilities with correct imports                                     | Fix `McpCapabilities`, advertise real capabilities |
+| `new_session`       | Spawn child via `spawn_fn`, ACP handshake                                    | Remove sync version check, use SDK env trimming    |
+| `prompt`            | Proxy to child, check `cancel_event`                                         | Add timeout and cancel check                       |
+| `cancel`            | Set event, delegate to child, force-close on timeout                         | Follow Claude bridge: interrupt, not disconnect    |
+| `authenticate`      | Fix signature `(self, method_id, **kwargs)`, return `AuthenticateResponse()` | Gemini auth is env-based, not ACP-negotiated       |
+| `load_session`      | Look up stored state, rebuild child connection                               | Mirror Claude bridge lines 782-861                 |
+| `resume_session`    | Thin wrapper over `load_session` logic                                       | Mirror Claude bridge lines 904-905                 |
+| `list_sessions`     | Iterate `self._sessions`, return `SessionInfo` list                          | Mirror Claude bridge lines 982-1013                |
+| `fork_session`      | Clone config into new child process                                          | Mirror Claude bridge lines 924-980                 |
+| `set_session_mode`  | Store mode, delegate to child if supported                                   | Sandbox -> `--sandbox` on next spawn               |
+| `set_session_model` | Store model, delegate to child if supported                                  | Model -> `--model` on next spawn                   |
+| `set_config_option` | No-op with debug log                                                         | Same as Claude bridge lines 1059-1066              |
+| `ext_method`        | Return empty dict                                                            | Same as Claude bridge                              |
+| `ext_notification`  | No-op                                                                        | Same as Claude bridge                              |
+| `close`             | Cancel all proxy workers, close all exit stacks, clear sessions              | Fix resource leaks                                 |
 
 **Capability declaration** (correcting the current false claims):
 
@@ -170,10 +171,10 @@ Note: `McpCapabilities` is removed entirely. It was incorrectly used in the scaf
 **Spawn flow**:
 
 1. Resolve CLI path: `shutil.which("gemini")`. If `None`, raise `FileNotFoundError` with actionable message.
-2. Build args: `[gemini_path, "--experimental-acp", "--model", model]` plus optional `--sandbox`, `--allowed-tools`, `--approval-mode`, `--output-format`.
-3. Call `spawn_fn(proxy_client, gemini_path, *args, cwd=cwd)`. The default `spawn_fn` is `spawn_agent_process` which internally calls `spawn_stdio_transport` with trimmed env and defensive shutdown.
-4. Store the returned `(child_conn, proc)` in `_SessionState`.
-5. Track background tasks (`_read_stderr`, `_monitor_exit`) in `_SessionState.background_tasks: list[asyncio.Task]` for cleanup.
+1. Build args: `[gemini_path, "--experimental-acp", "--model", model]` plus optional `--sandbox`, `--allowed-tools`, `--approval-mode`, `--output-format`.
+1. Call `spawn_fn(proxy_client, gemini_path, *args, cwd=cwd)`. The default `spawn_fn` is `spawn_agent_process` which internally calls `spawn_stdio_transport` with trimmed env and defensive shutdown.
+1. Store the returned `(child_conn, proc)` in `_SessionState`.
+1. Track background tasks (`_read_stderr`, `_monitor_exit`) in `_SessionState.background_tasks: list[asyncio.Task]` for cleanup.
 
 **What is removed**:
 
@@ -225,9 +226,9 @@ class _SessionState:
 **`load_session` flow** (mirroring Claude bridge):
 
 1. Look up `session_id` in `self._sessions`.
-2. If found and child process is alive, return the existing session.
-3. If found but child process has exited, reconstruct: spawn a new child using stored config (`cwd`, `model`, `mode`, `mcp_servers`), perform ACP handshake, create new child session, update `_SessionState` with new `child_conn` and `child_proc`.
-4. If not found, raise appropriate error.
+1. If found and child process is alive, return the existing session.
+1. If found but child process has exited, reconstruct: spawn a new child using stored config (`cwd`, `model`, `mode`, `mcp_servers`), perform ACP handshake, create new child session, update `_SessionState` with new `child_conn` and `child_proc`.
+1. If not found, raise appropriate error.
 
 **`resume_session` flow**: Same as `load_session` but semantically signals intent to continue conversation. Delegates to `load_session` internally.
 
@@ -353,11 +354,11 @@ __all__ = [
 
 **Bridge DI**:
 
-| Parameter | Type | Default | Purpose |
-|-----------|------|---------|---------|
-| `model` | `str` | `GeminiModels.LOW` | Gemini model identifier |
-| `debug` | `bool` | `False` | Enable debug logging |
-| `spawn_fn` | `Callable` | `spawn_agent_process` | Subprocess spawner |
+| Parameter  | Type       | Default               | Purpose                 |
+| ---------- | ---------- | --------------------- | ----------------------- |
+| `model`    | `str`      | `GeminiModels.LOW`    | Gemini model identifier |
+| `debug`    | `bool`     | `False`               | Enable debug logging    |
+| `spawn_fn` | `Callable` | `spawn_agent_process` | Subprocess spawner      |
 
 The `spawn_fn` callable receives `(client, executable, *args, cwd=cwd)` and returns an async context manager yielding `(ClientSideConnection, Process)`. Test doubles return a `(FakeChildConn, FakeChildProc)` pair.
 
@@ -365,14 +366,14 @@ Bridge no longer reads `get_config()` in `__init__`. Configuration comes from en
 
 **Executor DI** (unchanged from current, plus new parameters):
 
-| Parameter | Type | Default | Purpose |
-|-----------|------|---------|---------|
-| `root_dir` | `pathlib.Path` | required | Workspace root |
-| `model` | `str` | `GeminiModels.LOW` | Model identifier |
-| `agent_name` | `str` | `"vaultspec-researcher"` | Agent definition name |
-| `run_subagent` | `Callable` | `_default_run_subagent` | Subagent spawner |
-| `max_retries` | `int` | `3` | Max retry attempts |
-| `retry_base_delay` | `float` | `1.0` | Base delay for backoff |
+| Parameter          | Type           | Default                  | Purpose                |
+| ------------------ | -------------- | ------------------------ | ---------------------- |
+| `root_dir`         | `pathlib.Path` | required                 | Workspace root         |
+| `model`            | `str`          | `GeminiModels.LOW`       | Model identifier       |
+| `agent_name`       | `str`          | `"vaultspec-researcher"` | Agent definition name  |
+| `run_subagent`     | `Callable`     | `_default_run_subagent`  | Subagent spawner       |
+| `max_retries`      | `int`          | `3`                      | Max retry attempts     |
+| `retry_base_delay` | `float`        | `1.0`                    | Base delay for backoff |
 
 **Test double pattern** (matching the existing `_RunSubagentRecorder` in `test_gemini_executor.py`):
 

@@ -1,4 +1,5 @@
 set positional-arguments := false
+set shell := ["bash", "-cu"]
 
 image := "ghcr.io/wgergely/vaultspec-core"
 local_image := "vaultspec-core:local"
@@ -125,11 +126,19 @@ _dev-lint target='all':
         exit 127; \
       fi ;; \
     toml) \
-      npx --yes @taplo/cli lint "$(pwd)"/*.toml ;; \
+      if command -v taplo >/dev/null 2>&1; then \
+        taplo lint *.toml; \
+      elif command -v docker >/dev/null 2>&1; then \
+        docker run --rm -v "$PWD:/repo" -w /repo \
+          tamasfe/taplo:0.9 lint *.toml; \
+      else \
+        echo "taplo not found and docker is unavailable" >&2; \
+        exit 127; \
+      fi ;; \
     markdown) \
-      npx --yes markdownlint-cli \
-        --config .markdownlint.json \
-        .vaultspec/ .vault/ README.md ;; \
+      uv run mdformat --check README.md .vaultspec/ .vault/ && \
+      uv run pymarkdown --config .pymarkdown.json \
+        scan -r README.md .vaultspec/ .vault/ ;; \
     workflow) \
       if command -v actionlint >/dev/null 2>&1; then \
         actionlint; \
@@ -159,11 +168,19 @@ _dev-fix target='all':
       uv run ruff format src tests && \
       uv run ruff check --fix src tests ;; \
     toml) \
-      npx --yes @taplo/cli fmt "$(pwd)"/*.toml ;; \
+      if command -v taplo >/dev/null 2>&1; then \
+        taplo fmt *.toml; \
+      elif command -v docker >/dev/null 2>&1; then \
+        docker run --rm -v "$PWD:/repo" -w /repo \
+          tamasfe/taplo:0.9 fmt *.toml; \
+      else \
+        echo "taplo not found and docker is unavailable" >&2; \
+        exit 127; \
+      fi ;; \
     markdown) \
-      npx --yes markdownlint-cli \
-        --config .markdownlint.json --fix \
-        .vaultspec/ .vault/ README.md ;; \
+      uv run mdformat README.md .vaultspec/ .vault/ && \
+      uv run pymarkdown --config .pymarkdown.json \
+        fix -r README.md .vaultspec/ .vault/ ;; \
     vault) \
       uv run vaultspec-core vault check all --fix ;; \
     all) \

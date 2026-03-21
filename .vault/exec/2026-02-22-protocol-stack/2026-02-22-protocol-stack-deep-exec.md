@@ -1,17 +1,18 @@
 ---
 tags:
-  - "#exec"
-  - "#protocol-stack"
-date: "2026-02-22"
+  - '#exec'
+  - '#protocol-stack'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-protocol-stack-deep-audit-plan]]"
-  - "[[2026-02-22-protocol-stack-deep-audit-adr]]"
-  - "[[2026-02-22-protocol-stack-deep-audit-research]]"
+  - '[[2026-02-22-protocol-stack-deep-audit-plan]]'
+  - '[[2026-02-22-protocol-stack-deep-audit-adr]]'
+  - '[[2026-02-22-protocol-stack-deep-audit-research]]'
 ---
+
 # `protocol-stack` deep audit execution summary
 
 Executed all 4 authorized decision tracks from
-[[2026-02-22-protocol-stack-deep-audit-adr]].
+\[[2026-02-22-protocol-stack-deep-audit-adr]\].
 
 ## Modified Files
 
@@ -63,11 +64,13 @@ Step 4c (stale constants removal) deferred per user decision.
 
 Protocol isolation tests (`tests/protocol/isolation/`) validate the full
 session resume chain (Track A). Run with:
+
 ```bash
 python -m pytest tests/protocol/isolation/ -x --tb=short
 ```
 
 Full suite verification:
+
 ```bash
 python -m pytest src/vaultspec/ tests/ -x --tb=short
 ```

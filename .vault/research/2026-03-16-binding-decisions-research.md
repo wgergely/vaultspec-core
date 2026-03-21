@@ -1,16 +1,15 @@
 ---
 tags:
-  - "#research"
-  - "#install-cmds"
-  - "#binding-decisions"
-date: "2026-03-16"
+  - '#research'
+  - '#install-cmds'
+date: '2026-03-16'
 related:
-  - "[[2026-03-15-install-cmds-plan]]"
-  - "[[2026-03-15-install-cmds-capability-audit]]"
-  - "[[2026-03-15-claude-code-provider-research]]"
-  - "[[2026-03-15-gemini-cli-provider-research]]"
-  - "[[2026-03-15-codex-cli-provider-research]]"
-  - "[[2026-03-16-antigravity-provider-research]]"
+  - '[[2026-03-15-install-cmds-plan]]'
+  - '[[2026-03-15-install-cmds-capability-audit]]'
+  - '[[2026-03-15-claude-code-provider-research]]'
+  - '[[2026-03-15-gemini-cli-provider-research]]'
+  - '[[2026-03-15-codex-cli-provider-research]]'
+  - '[[2026-03-16-antigravity-provider-research]]'
 ---
 
 # Binding decisions for install-cmds feature
@@ -31,11 +30,11 @@ Change Claude `config_file` from `.claude/CLAUDE.md` to `./CLAUDE.md`
 (project root). Consistent with Gemini and Codex. All three root configs
 at project root:
 
-| Provider | Root Config |
-|----------|------------|
-| Claude | `./CLAUDE.md` |
+| Provider             | Root Config   |
+| -------------------- | ------------- |
+| Claude               | `./CLAUDE.md` |
 | Gemini + Antigravity | `./GEMINI.md` |
-| Codex | `./AGENTS.md` |
+| Codex                | `./AGENTS.md` |
 
 ## Decision 3: Gemini skills_dir → `.agents/skills/` with shared ownership — APPROVED
 
@@ -56,6 +55,7 @@ ownership concern.
 ## Decision 5: Antigravity ToolConfig shape confirmed — APPROVED
 
 Current shape is correct:
+
 - `rules_dir` → `.agents/rules/`
 - `skills_dir` → `.agents/skills/`
 - `agents_dir` → `None`
@@ -68,13 +68,17 @@ Current shape is correct:
 ## Decision 6: Codex ToolConfig, AGENTS.md unification, TOML adapter — APPROVED
 
 1. Add `config_file` → `TARGET_DIR / "AGENTS.md"` to Codex ToolConfig
-2. Remove `_generate_codex_agents_md()` — use standard `_generate_config()`
-3. Keep `native_config_file` → `.codex/config.toml`
-4. Codex behavioral rules are delivered via `AGENTS.md` rule references
+
+1. Remove `_generate_codex_agents_md()` — use standard `_generate_config()`
+
+1. Keep `native_config_file` → `.codex/config.toml`
+
+1. Codex behavioral rules are delivered via `AGENTS.md` rule references
    — the same mechanism as Claude and Gemini. No separate adapter needed.
    Codex's `.codex/rules/` (execution policies) is a different system
    that vaultspec does not manage.
-5. Codex agent definitions in `[agents.*]` tables in `.codex/config.toml`
+
+1. Codex agent definitions in `[agents.*]` tables in `.codex/config.toml`
    require a TOML adapter using managed block markers.
 
 ## Decision 7: Gemini rules via `.gemini/GEMINI.md` secondary config — APPROVED
@@ -83,9 +87,12 @@ Keep `rules_dir` → `.gemini/rules/` and use `.gemini/GEMINI.md` as a
 secondary config file carrying `@rules/...` references.
 
 Architecture:
+
 - `./GEMINI.md` (project root) = framework + project content, shared
   with Antigravity
+
 - `.gemini/GEMINI.md` = Gemini-specific rule references
+
 - `.gemini/rules/*.md` = synced markdown rule files
 
 Gemini CLI eagerly scans subdirectories at startup, so `.gemini/GEMINI.md`
@@ -102,39 +109,43 @@ included automatically.
 ## Summary: final ToolConfig shapes
 
 ### Claude
-| Field | Value |
-|-------|-------|
+
+| Field       | Value                      |
+| ----------- | -------------------------- |
 | config_file | `TARGET_DIR / "CLAUDE.md"` |
-| rules_dir | `.claude/rules/` |
-| skills_dir | `.claude/skills/` |
-| agents_dir | `.claude/agents/` |
-| system_file | None |
+| rules_dir   | `.claude/rules/`           |
+| skills_dir  | `.claude/skills/`          |
+| agents_dir  | `.claude/agents/`          |
+| system_file | None                       |
 
 ### Gemini
-| Field | Value |
-|-------|-------|
-| config_file | `TARGET_DIR / "GEMINI.md"` |
-| rules_dir | `.gemini/rules/` |
-| skills_dir | `.agents/skills/` |
-| agents_dir | `.gemini/agents/` |
-| system_file | `.gemini/system.md` |
+
+| Field            | Value                           |
+| ---------------- | ------------------------------- |
+| config_file      | `TARGET_DIR / "GEMINI.md"`      |
+| rules_dir        | `.gemini/rules/`                |
+| skills_dir       | `.agents/skills/`               |
+| agents_dir       | `.gemini/agents/`               |
+| system_file      | `.gemini/system.md`             |
 | secondary config | `.gemini/GEMINI.md` (rule refs) |
 
 ### Antigravity
-| Field | Value |
-|-------|-------|
+
+| Field       | Value                      |
+| ----------- | -------------------------- |
 | config_file | `TARGET_DIR / "GEMINI.md"` |
-| rules_dir | `.agents/rules/` |
-| skills_dir | `.agents/skills/` |
-| agents_dir | None |
-| system_file | None |
+| rules_dir   | `.agents/rules/`           |
+| skills_dir  | `.agents/skills/`          |
+| agents_dir  | None                       |
+| system_file | None                       |
 
 ### Codex
-| Field | Value |
-|-------|-------|
-| config_file | `TARGET_DIR / "AGENTS.md"` |
-| native_config_file | `.codex/config.toml` |
-| rules_dir | None (rules delivered via AGENTS.md references) |
-| skills_dir | `.agents/skills/` |
-| agents_dir | None (TOML `[agents.*]` in config.toml, first-class) |
-| system_file | None |
+
+| Field              | Value                                                |
+| ------------------ | ---------------------------------------------------- |
+| config_file        | `TARGET_DIR / "AGENTS.md"`                           |
+| native_config_file | `.codex/config.toml`                                 |
+| rules_dir          | None (rules delivered via AGENTS.md references)      |
+| skills_dir         | `.agents/skills/`                                    |
+| agents_dir         | None (TOML `[agents.*]` in config.toml, first-class) |
+| system_file        | None                                                 |

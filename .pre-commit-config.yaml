@@ -2,7 +2,7 @@ repos:
   # ── Read-only checks only ───────────────────────────────────────────
   # Every hook here is a pure gate: it exits non-zero when the code is
   # not acceptable but NEVER modifies files.  Auto-fixing lives in
-  # `just dev format` which is safe to run outside the stash cycle.
+  # `just dev fix` which is safe to run outside the stash cycle.
   #
   # Why: pre-commit stashes unstaged changes before running hooks, then
   # restores them afterward.  If any hook modifies files AND the restore
@@ -27,8 +27,7 @@ repos:
       - id: taplo-lint
         name: Lint TOML files (Taplo)
         entry: taplo lint
-        language: node
-        additional_dependencies: ["@taplo/cli@0.7.0"]
+        language: system
         types: [toml]
         pass_filenames: true
 
@@ -46,12 +45,10 @@ repos:
         types: [markdown]
         pass_filenames: false
 
-      - id: markdownlint
-        name: Lint Markdown style (markdownlint)
-        entry: markdownlint
-        language: node
-        additional_dependencies: ["markdownlint-cli@0.44.0"]
-        args: ["--config", ".markdownlint.json"]
+      - id: mdformat-check
+        name: Check Markdown formatting (mdformat)
+        entry: uv run --no-sync mdformat --check
+        language: system
         pass_filenames: true
         types: [markdown]
 

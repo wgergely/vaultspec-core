@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#marketing-and-documentation"
-date: "2026-02-20"
+  - '#exec'
+  - '#marketing-and-documentation'
+date: '2026-02-20'
 related:
-  - "[[2026-02-20-marketing-and-documentation-p1-plan]]"
+  - '[[2026-02-20-marketing-and-documentation-p1-plan]]'
 ---
+
 # `marketing-and-documentation` `phase1` `step2`
 
 Retired all 9 source files and removed the `docs/` directory tree.

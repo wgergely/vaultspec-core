@@ -1,22 +1,23 @@
 ---
 tags:
-  - "#audit"
-  - "#health-audit"
-date: "2026-02-18"
+  - '#audit'
+  - '#health-audit'
+date: '2026-02-18'
 ---
+
 # Code Health Audit: Data & Functional Modules
 
 **Auditor:** Investigator3
 **Date:** 2026-02-18
 **Scope:** `rag/`, `graph/`, `metrics/`, `verification/` source modules + all functional/integration tests under `.vaultspec/lib/tests/`
 
----
+______________________________________________________________________
 
 ## Executive Summary
 
 The data and functional modules are structurally sound with clear separation of concerns. The RAG pipeline is the most complex subsystem and is well-implemented with proper GPU enforcement, incremental indexing, and hybrid search. Test coverage is broad but inconsistent in quality — several tests have silent failure modes, incorrect pytest marker classifications, and fragile coupling to implementation internals. The most actionable findings are: duplicated conftest helper functions, graph tests miscategorized as unit tests, a silently swallowing SQL injection test, and a docs CLI test that never exercises the CLI command it claims to test.
 
----
+______________________________________________________________________
 
 ## Module Audit: `rag/`
 
@@ -50,14 +51,14 @@ The RAG module (`embeddings.py`, `indexer.py`, `store.py`, `search.py`, `api.py`
 
 ### Issues Found
 
-| Severity | Issue |
-|----------|-------|
-| Medium | `_fast_index` / `_build_rag_components` duplicated between `tests/conftest.py` and `rag/tests/conftest.py` |
-| Low | SQL injection defense uses manual escaping rather than parameterized queries |
-| Low | `test_query.py` and `test_search_unit.py` overlap on `parse_query()` tests |
-| Low | `VaultStore.__new__()` bypass pattern in fixtures is fragile against `__init__` changes |
+| Severity | Issue                                                                                                      |
+| -------- | ---------------------------------------------------------------------------------------------------------- |
+| Medium   | `_fast_index` / `_build_rag_components` duplicated between `tests/conftest.py` and `rag/tests/conftest.py` |
+| Low      | SQL injection defense uses manual escaping rather than parameterized queries                               |
+| Low      | `test_query.py` and `test_search_unit.py` overlap on `parse_query()` tests                                 |
+| Low      | `VaultStore.__new__()` bypass pattern in fixtures is fragile against `__init__` changes                    |
 
----
+______________________________________________________________________
 
 ## Module Audit: `graph/`
 
@@ -73,11 +74,11 @@ No concerns with production code quality.
 
 ### Issues Found
 
-| Severity | Issue |
-|----------|-------|
-| Medium | `test_graph.py` marked `pytest.mark.unit` but tests against real filesystem (should be `integration` or a new `api` marker) |
+| Severity | Issue                                                                                                                       |
+| -------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Medium   | `test_graph.py` marked `pytest.mark.unit` but tests against real filesystem (should be `integration` or a new `api` marker) |
 
----
+______________________________________________________________________
 
 ## Module Audit: `metrics/`
 
@@ -95,7 +96,7 @@ Clean, minimal code. No concerns.
 
 None of note.
 
----
+______________________________________________________________________
 
 ## Module Audit: `verification/`
 
@@ -113,11 +114,11 @@ The BOM stripping (`content.lstrip("\ufeff")`) before `parse_vault_metadata()` i
 
 ### Issues Found
 
-| Severity | Issue |
-|----------|-------|
-| High | `test_no_fixes_for_valid_file` runs `fix_violations()` against the live shared `vault_root` — could mutate shared test corpus mid-session |
+| Severity | Issue                                                                                                                                     |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| High     | `test_no_fixes_for_valid_file` runs `fix_violations()` against the live shared `vault_root` — could mutate shared test corpus mid-session |
 
----
+______________________________________________________________________
 
 ## Functional Tests Audit: `tests/cli/`
 
@@ -145,13 +146,13 @@ Two subprocess integration tests (`test_cli_help`, `test_cli_list_agents`). Thin
 
 ### Issues Found
 
-| Severity | Issue |
-|----------|-------|
-| Medium | `test_create_generates_correct_filename` never invokes the CLI `create` command — zero command coverage |
-| Medium | `TestArgumentParsing` reconstructs the parser in-test rather than exercising the real CLI entry point |
-| Low | `test_docs_cli.py` uses `unittest.mock.patch` inconsistently with the rest of the suite (which uses `monkeypatch`) |
+| Severity | Issue                                                                                                              |
+| -------- | ------------------------------------------------------------------------------------------------------------------ |
+| Medium   | `test_create_generates_correct_filename` never invokes the CLI `create` command — zero command coverage            |
+| Medium   | `TestArgumentParsing` reconstructs the parser in-test rather than exercising the real CLI entry point              |
+| Low      | `test_docs_cli.py` uses `unittest.mock.patch` inconsistently with the rest of the suite (which uses `monkeypatch`) |
 
----
+______________________________________________________________________
 
 ## Functional Tests Audit: `tests/rag/`
 
@@ -177,15 +178,15 @@ Known-answer precision tests and ranking quality checks. Authority boost measura
 
 ### `test_performance.py`
 
-Latency bounds (single query <2s, batch 5 queries <5s), disk footprint (<50MB), graph cache TTL. Performance thresholds are generous relative to observed baselines (~36ms p50), providing a large buffer.
+Latency bounds (single query \<2s, batch 5 queries \<5s), disk footprint (\<50MB), graph cache TTL. Performance thresholds are generous relative to observed baselines (~36ms p50), providing a large buffer.
 
 ### Issues Found
 
-| Severity | Issue |
-|----------|-------|
-| High | `test_sql_injection_in_filter_value` uses `try/except: pass` — silently swallows all exceptions including test assertion failures |
+| Severity | Issue                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| High     | `test_sql_injection_in_filter_value` uses `try/except: pass` — silently swallows all exceptions including test assertion failures |
 
----
+______________________________________________________________________
 
 ## Functional Tests Audit: `tests/e2e/`
 
@@ -207,12 +208,12 @@ Directly patches internal server state (`_srv._agent_cache`, `_srv.task_engine`)
 
 ### Issues Found
 
-| Severity | Issue |
-|----------|-------|
-| Low | `test_mcp_e2e.py` directly patches private server attributes — tight coupling to implementation internals |
-| Low | `test_provider_parity.py` module-global monkeypatching via fixture is non-obvious but not defective |
+| Severity | Issue                                                                                                     |
+| -------- | --------------------------------------------------------------------------------------------------------- |
+| Low      | `test_mcp_e2e.py` directly patches private server attributes — tight coupling to implementation internals |
+| Low      | `test_provider_parity.py` module-global monkeypatching via fixture is non-obvious but not defective       |
 
----
+______________________________________________________________________
 
 ## Functional Tests Audit: `tests/subagent/`
 
@@ -226,11 +227,11 @@ Protocol tests via `mcp.call_tool()`. Uses `_noop_run_subagent` (returns a fixed
 
 ### Issues Found
 
-| Severity | Issue |
-|----------|-------|
-| Low | `test_subagent.py` has only one test — subagent subsystem has thin functional coverage |
+| Severity | Issue                                                                                  |
+| -------- | -------------------------------------------------------------------------------------- |
+| Low      | `test_subagent.py` has only one test — subagent subsystem has thin functional coverage |
 
----
+______________________________________________________________________
 
 ## `conftest.py` Audit
 
@@ -255,28 +256,28 @@ All follow the same pattern: `_reset_cfg` autouse fixture + `vault_root` returni
 
 ### Issues Found
 
-| Severity | Issue |
-|----------|-------|
-| Medium | `_fast_index` / `_build_rag_components` duplicated between `tests/conftest.py` and `rag/tests/conftest.py` (same as RAG module issue) |
-| Low | `require_gpu_corpus` fixture is a documented no-op — dead code that should be removed |
+| Severity | Issue                                                                                                                                 |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Medium   | `_fast_index` / `_build_rag_components` duplicated between `tests/conftest.py` and `rag/tests/conftest.py` (same as RAG module issue) |
+| Low      | `require_gpu_corpus` fixture is a documented no-op — dead code that should be removed                                                 |
 
----
+______________________________________________________________________
 
 ## Critical Findings Summary
 
-| # | Severity | Location | Finding |
-|---|----------|----------|---------|
-| 1 | High | `tests/rag/test_search.py` | `test_sql_injection_in_filter_value` uses bare `try/except: pass` — silently swallows all exceptions, providing false positive test result |
-| 2 | High | `verification/tests/test_verification.py:194` | `test_no_fixes_for_valid_file` runs `fix_violations()` against the live shared `vault_root` — can mutate shared corpus mid-session |
-| 3 | Medium | `rag/tests/conftest.py` + `tests/conftest.py` | `_fast_index` and `_build_rag_components` are verbatim duplicates — silent drift risk |
-| 4 | Medium | `graph/tests/test_graph.py` | All tests marked `pytest.mark.unit` but read real filesystem — should be `integration` |
-| 5 | Medium | `tests/cli/test_docs_cli.py` | `test_create_generates_correct_filename` never invokes the CLI `create` command — zero real coverage |
-| 6 | Medium | `tests/cli/test_docs_cli.py` | `TestArgumentParsing` rebuilds the argparser in-test — divergence from production parser will not be caught |
-| 7 | Low | `tests/conftest.py` | `require_gpu_corpus` is a documented no-op — dead code |
-| 8 | Low | `tests/e2e/test_mcp_e2e.py` | Patches private server attributes directly — tight coupling to implementation internals |
-| 9 | Low | `rag/store.py` | SQL injection defense via manual string escaping (functional but not parameterized) |
+| #   | Severity | Location                                      | Finding                                                                                                                                    |
+| --- | -------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | High     | `tests/rag/test_search.py`                    | `test_sql_injection_in_filter_value` uses bare `try/except: pass` — silently swallows all exceptions, providing false positive test result |
+| 2   | High     | `verification/tests/test_verification.py:194` | `test_no_fixes_for_valid_file` runs `fix_violations()` against the live shared `vault_root` — can mutate shared corpus mid-session         |
+| 3   | Medium   | `rag/tests/conftest.py` + `tests/conftest.py` | `_fast_index` and `_build_rag_components` are verbatim duplicates — silent drift risk                                                      |
+| 4   | Medium   | `graph/tests/test_graph.py`                   | All tests marked `pytest.mark.unit` but read real filesystem — should be `integration`                                                     |
+| 5   | Medium   | `tests/cli/test_docs_cli.py`                  | `test_create_generates_correct_filename` never invokes the CLI `create` command — zero real coverage                                       |
+| 6   | Medium   | `tests/cli/test_docs_cli.py`                  | `TestArgumentParsing` rebuilds the argparser in-test — divergence from production parser will not be caught                                |
+| 7   | Low      | `tests/conftest.py`                           | `require_gpu_corpus` is a documented no-op — dead code                                                                                     |
+| 8   | Low      | `tests/e2e/test_mcp_e2e.py`                   | Patches private server attributes directly — tight coupling to implementation internals                                                    |
+| 9   | Low      | `rag/store.py`                                | SQL injection defense via manual string escaping (functional but not parameterized)                                                        |
 
----
+______________________________________________________________________
 
 ## Recommendations
 
@@ -289,9 +290,11 @@ All follow the same pattern: `_reset_cfg` autouse fixture + `vault_root` returni
 **Short-term (Medium severity):**
 
 - Deduplicate `_fast_index` / `_build_rag_components`: define once in `tests/conftest.py` and import in `rag/tests/conftest.py`.
+
 - Reclassify `graph/tests/test_graph.py` tests as `pytest.mark.api` (or `integration`).
 
 - Replace `test_create_generates_correct_filename` with a real subprocess invocation of `vault.py create`.
+
 - Fix `TestArgumentParsing` to invoke the real CLI rather than rebuilding the parser.
 
 **Cleanup (Low severity):**

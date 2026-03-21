@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#exec"
-  - "#claude-a2a-overhaul"
-date: "2026-02-22"
+  - '#exec'
+  - '#claude-a2a-overhaul'
+date: '2026-02-22'
 related:
-  - "[[2026-02-21-claude-a2a-overhaul-impl-plan]]"
-  - "[[2026-02-21-claude-a2a-overhaul-adr]]"
+  - '[[2026-02-21-claude-a2a-overhaul-impl-plan]]'
+  - '[[2026-02-21-claude-a2a-overhaul-adr]]'
 ---
+
 # `claude-a2a-overhaul` Phase 4: Wiring
 
 Registered team tools in the unified `vaultspec-mcp` server and wired

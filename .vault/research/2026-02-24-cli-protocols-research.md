@@ -1,13 +1,14 @@
 ---
 tags:
-  - "#research"
-  - "#cli"
-date: "2026-02-24"
+  - '#research'
+  - '#cli'
+date: '2026-02-24'
 related:
-  - "[[2026-02-24-subagent-protocol-adr]]"
-  - "[[2026-02-24-unified-a2a-rewrite-plan]]"
-  - "[[2026-02-20-a2a-team-gemini-research]]"
+  - '[[2026-02-24-subagent-protocol-adr]]'
+  - '[[2026-02-24-unified-a2a-rewrite-plan]]'
+  - '[[2026-02-20-a2a-team-gemini-research]]'
 ---
+
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 
@@ -39,24 +40,24 @@ and maps ACP messages to/from the Gemini CLI's stdin/stdout.
 
 ### 1.2 Complete Flag Reference
 
-| Group | Key Flags |
-| :--- | :--- |
-| General | `--debug`, `--version`, `--help` |
-| Model | `--model`, `--prompt`, `--prompt-interactive` |
-| Safety | `--sandbox`, `--approval-mode`, `--yolo` |
-| ACP | `--experimental-acp`, `--allowed-mcp-server-names`, `--allowed-tools` |
-| Extensions | `--extensions`, `--list-extensions` |
-| Session | `--resume`, `--list-sessions`, `--delete-session` |
-| Input | `--include-directories`, `--screen-reader` |
-| Output | `--output-format`, `--raw-output`, `--accept-raw-output-risk` |
+| Group      | Key Flags                                                             |
+| :--------- | :-------------------------------------------------------------------- |
+| General    | `--debug`, `--version`, `--help`                                      |
+| Model      | `--model`, `--prompt`, `--prompt-interactive`                         |
+| Safety     | `--sandbox`, `--approval-mode`, `--yolo`                              |
+| ACP        | `--experimental-acp`, `--allowed-mcp-server-names`, `--allowed-tools` |
+| Extensions | `--extensions`, `--list-extensions`                                   |
+| Session    | `--resume`, `--list-sessions`, `--delete-session`                     |
+| Input      | `--include-directories`, `--screen-reader`                            |
+| Output     | `--output-format`, `--raw-output`, `--accept-raw-output-risk`         |
 
 **Model aliases:**
 
-| Shortcut | Maps to |
-| :--- | :--- |
+| Shortcut      | Maps to                                    |
+| :------------ | :----------------------------------------- |
 | `auto`, `pro` | `gemini-2.5-pro` or `gemini-3-pro-preview` |
-| `flash` | `gemini-2.5-flash` |
-| `flash-lite` | `gemini-2.5-flash-lite` |
+| `flash`       | `gemini-2.5-flash`                         |
+| `flash-lite`  | `gemini-2.5-flash-lite`                    |
 
 ### 1.3 Flags Used by Current Bridge
 
@@ -99,7 +100,7 @@ between the executor and the CLI. Two options:
    orchestrator and executor) is A2A over HTTP. This keeps the reliable ACP
    handshake for subprocess communication while exposing A2A to callers.
 
-2. **Use `--prompt` mode**: The executor spawns `gemini -p "<prompt>"` for
+1. **Use `--prompt` mode**: The executor spawns `gemini -p "<prompt>"` for
    single-shot tasks, reading the result from stdout. Simpler but loses session
    resume and streaming capabilities.
 
@@ -123,7 +124,7 @@ This exits after one response. For the A2A rewrite:
 - Does NOT support session resume
 - Does NOT support real-time streaming progress
 
----
+______________________________________________________________________
 
 ## 2. Claude Agent SDK
 
@@ -151,18 +152,18 @@ required. A custom path can be specified via `ClaudeAgentOptions(cli_path=...)`.
 
 **`ClaudeAgentOptions`** — configuration for the SDK client:
 
-| Parameter | Type | Description |
-| :--- | :--- | :--- |
-| `model` | `str` | Claude model identifier |
-| `cwd` | `str` | Working directory for the agent |
-| `system_prompt` | `str` | System prompt text |
-| `permission_mode` | `str` | `"bypassPermissions"` for programmatic use |
-| `mcp_servers` | `dict` | MCP server configurations |
-| `can_use_tool` | `Callable` | Tool permission callback |
-| `env` | `dict` | Environment variables for the subprocess |
-| `cli_path` | `str` | Custom path to `claude` binary |
-| `resume` | `str` | Session ID for conversation resume |
-| `max_turns` | `int` | Maximum conversation turns |
+| Parameter         | Type       | Description                                |
+| :---------------- | :--------- | :----------------------------------------- |
+| `model`           | `str`      | Claude model identifier                    |
+| `cwd`             | `str`      | Working directory for the agent            |
+| `system_prompt`   | `str`      | System prompt text                         |
+| `permission_mode` | `str`      | `"bypassPermissions"` for programmatic use |
+| `mcp_servers`     | `dict`     | MCP server configurations                  |
+| `can_use_tool`    | `Callable` | Tool permission callback                   |
+| `env`             | `dict`     | Environment variables for the subprocess   |
+| `cli_path`        | `str`      | Custom path to `claude` binary             |
+| `resume`          | `str`      | Session ID for conversation resume         |
+| `max_turns`       | `int`      | Maximum conversation turns                 |
 
 **`ClaudeSDKClient`** — bidirectional, interactive client:
 
@@ -192,13 +193,17 @@ The `ClaudeA2AExecutor` (`protocol/a2a/executors/claude_executor.py`, 554 LOC)
 already uses the SDK directly — **no ACP bridge involved**:
 
 ```python
+
 # Simplified flow
+
 options = ClaudeAgentOptions(model=..., cwd=..., system_prompt=..., ...)
 sdk_client = ClaudeSDKClient(options)
 await sdk_client.connect()
 await sdk_client.query(prompt)
 async for msg in sdk_client.receive_response():
+
     # Stream artifacts back via A2A TaskUpdater
+
 ```
 
 **Key features already implemented:**
@@ -219,24 +224,24 @@ Claude SDK without going through the ACP bridge layer. The `ClaudeProvider`
 `run_subagent()` flow. Once that flow is replaced by A2A, the `ClaudeProvider`
 will generate config consumed by `ClaudeA2AExecutor` instead.
 
----
+______________________________________________________________________
 
 ## 3. Comparison Table
 
-| Aspect | Gemini CLI | Claude Agent SDK |
-| :--- | :--- | :--- |
-| **Type** | Node.js CLI binary | Python SDK (wraps CLI internally) |
-| **Invocation** | `gemini [flags]` subprocess | `ClaudeSDKClient(options).connect()` |
-| **ACP support** | `--experimental-acp` flag | Not applicable (SDK protocol) |
-| **A2A server mode** | Not available (RFC only) | Not applicable |
-| **Streaming** | Via ACP or text stream | Via `receive_response()` async iterator |
-| **Session resume** | `--resume <id>` flag | `resume=<session_id>` option |
-| **System prompt** | `GEMINI_SYSTEM_MD` env var | `system_prompt` parameter |
-| **Sandbox** | `--sandbox` flag | `can_use_tool` callback |
-| **Current A2A ready?** | No — executor delegates to ACP | Yes — executor uses SDK directly |
-| **Rewrite effort** | Medium — must inline CLI | Minimal — already A2A-ready |
+| Aspect                 | Gemini CLI                     | Claude Agent SDK                        |
+| :--------------------- | :----------------------------- | :-------------------------------------- |
+| **Type**               | Node.js CLI binary             | Python SDK (wraps CLI internally)       |
+| **Invocation**         | `gemini [flags]` subprocess    | `ClaudeSDKClient(options).connect()`    |
+| **ACP support**        | `--experimental-acp` flag      | Not applicable (SDK protocol)           |
+| **A2A server mode**    | Not available (RFC only)       | Not applicable                          |
+| **Streaming**          | Via ACP or text stream         | Via `receive_response()` async iterator |
+| **Session resume**     | `--resume <id>` flag           | `resume=<session_id>` option            |
+| **System prompt**      | `GEMINI_SYSTEM_MD` env var     | `system_prompt` parameter               |
+| **Sandbox**            | `--sandbox` flag               | `can_use_tool` callback                 |
+| **Current A2A ready?** | No — executor delegates to ACP | Yes — executor uses SDK directly        |
+| **Rewrite effort**     | Medium — must inline CLI       | Minimal — already A2A-ready             |
 
----
+______________________________________________________________________
 
 ## 4. Impact on Unified A2A Rewrite Plan
 
@@ -260,13 +265,13 @@ for the A2A server entry point instead of the ACP bridge `ProcessSpec`.
 
 Must handle both patterns uniformly — **one component, zero duplication:**
 
-| Responsibility | Logic Location | Note |
-| :--- | :--- | :--- |
-| Spawning | `ServerProcessManager` | `asyncio.create_subprocess_exec` |
-| Port discovery | `ServerProcessManager` | Stdio monitoring for `PORT=...` |
-| Readiness | `ServerProcessManager` | HTTP poll on `/.well-known/agent-card.json` |
-| Cleanup | `ServerProcessManager` | `kill_process_tree` + SIGTERM/SIGKILL |
-| Orphan prevention | `ServerProcessManager` | Parent-PID watchdog thread |
+| Responsibility    | Logic Location         | Note                                        |
+| :---------------- | :--------------------- | :------------------------------------------ |
+| Spawning          | `ServerProcessManager` | `asyncio.create_subprocess_exec`            |
+| Port discovery    | `ServerProcessManager` | Stdio monitoring for `PORT=...`             |
+| Readiness         | `ServerProcessManager` | HTTP poll on `/.well-known/agent-card.json` |
+| Cleanup           | `ServerProcessManager` | `kill_process_tree` + SIGTERM/SIGKILL       |
+| Orphan prevention | `ServerProcessManager` | Parent-PID watchdog thread                  |
 
 Server patterns per provider:
 
@@ -274,7 +279,7 @@ Server patterns per provider:
 - **Gemini:** Spawn A2A HTTP server with `GeminiA2AExecutor` (process = Python uvicorn,
   which internally spawns Gemini CLI subprocess via `--experimental-acp`)
 
----
+______________________________________________________________________
 
 ## Sources
 

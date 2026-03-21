@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#research"
-  - "#subagent-protocol"
-date: "2026-02-24"
+  - '#research'
+  - '#subagent-protocol'
+date: '2026-02-24'
 related:
-  - "[[2026-02-24-subagent-protocol-adr]]"
+  - '[[2026-02-24-subagent-protocol-adr]]'
 ---
+
 # `subagent-protocol` research: Subagent Spawning and Debugging Protocol Stack
 
 Research into the optimal protocol stack for spawning, managing, and debugging
@@ -46,9 +47,13 @@ Orchestrator
 
 - Editor-oriented vocabulary (sessions, modes, terminals) doesn't map cleanly
   to orchestrator↔subagent semantics
+
 - Bridges are monolithic (~800 lines each) coupling protocol, process, and I/O
+
 - No inspection tools — messages flow through opaque pipes
+
 - No standard debugging/tracing — must add custom logging
+
 - Testing requires spawning real subprocesses (or building complex mocks)
 
 ### 2. A2A SDK Architecture (a2a-sdk)
@@ -81,10 +86,13 @@ class MyAgentExecutor(AgentExecutor):
         await event_queue.enqueue_event(new_agent_text_message(result))
 
     async def cancel(self, context, event_queue):
+
         # publish TaskState.canceled
+
         ...
 
 # Server setup (~20 lines)
+
 handler = DefaultRequestHandler(
     agent_executor=MyAgentExecutor(),
     task_store=InMemoryTaskStore(),
@@ -95,26 +103,26 @@ uvicorn.run(app, host="127.0.0.1", port=port)
 
 ### 3. Debugging Tooling Comparison
 
-| Tool | A2A | ACP (Zed) |
-|---|---|---|
-| **A2A Inspector** | ✅ Web UI, JSON-RPC console, spec compliance | ❌ N/A |
-| **OpenTelemetry** | ✅ Built-in `[telemetry]` extra | ❌ Manual logging |
-| **TCK conformance** | ✅ Automated spec validation | ❌ N/A |
-| **respx HTTP mocking** | ✅ Mock entire transport in tests | ❌ Must mock stdio |
-| **Message inspection** | ✅ HTTP → any proxy/debugger | ❌ Opaque pipe |
-| **Agent Card discovery** | ✅ Standard capability negotiation | ❌ Hardcoded |
+| Tool                     | A2A                                          | ACP (Zed)          |
+| ------------------------ | -------------------------------------------- | ------------------ |
+| **A2A Inspector**        | ✅ Web UI, JSON-RPC console, spec compliance | ❌ N/A             |
+| **OpenTelemetry**        | ✅ Built-in `[telemetry]` extra              | ❌ Manual logging  |
+| **TCK conformance**      | ✅ Automated spec validation                 | ❌ N/A             |
+| **respx HTTP mocking**   | ✅ Mock entire transport in tests            | ❌ Must mock stdio |
+| **Message inspection**   | ✅ HTTP → any proxy/debugger                 | ❌ Opaque pipe     |
+| **Agent Card discovery** | ✅ Standard capability negotiation           | ❌ Hardcoded       |
 
 ### 4. Transport Trade-offs
 
-| Property | ACP stdio | A2A localhost HTTP |
-|---|---|---|
-| Process lifecycle | Pipe = process | Need graceful shutdown |
-| Port management | None | Ephemeral ports (`--port 0`) |
-| Latency | ~0.1ms | ~1ms (localhost TCP) |
-| Debuggability | Opaque | Full HTTP tooling |
-| Standard compliance | Zed-specific | Linux Foundation standard |
-| Testing | Complex stdio mocks | `respx` / `httpx` mocks |
-| Future portability | Local only | Can deploy remotely |
+| Property            | ACP stdio           | A2A localhost HTTP           |
+| ------------------- | ------------------- | ---------------------------- |
+| Process lifecycle   | Pipe = process      | Need graceful shutdown       |
+| Port management     | None                | Ephemeral ports (`--port 0`) |
+| Latency             | ~0.1ms              | ~1ms (localhost TCP)         |
+| Debuggability       | Opaque              | Full HTTP tooling            |
+| Standard compliance | Zed-specific        | Linux Foundation standard    |
+| Testing             | Complex stdio mocks | `respx` / `httpx` mocks      |
+| Future portability  | Local only          | Can deploy remotely          |
 
 ### 5. Critical Finding — A2A has no stdio transport
 
@@ -123,9 +131,9 @@ transports are HTTP-based (JSON-RPC, REST, gRPC). For subprocess-spawned
 subagents, this means:
 
 1. The child process must start an HTTP server (uvicorn) on localhost
-2. The parent connects via `httpx` to `http://localhost:{port}`
-3. This adds ~1ms latency and port management overhead
-4. But unlocks the entire HTTP debugging ecosystem
+1. The parent connects via `httpx` to `http://localhost:{port}`
+1. This adds ~1ms latency and port management overhead
+1. But unlocks the entire HTTP debugging ecosystem
 
 Community discussion suggests a stdio transport may be added in future A2A
 versions, but for now HTTP is the only option.
@@ -179,13 +187,16 @@ independently running services that the orchestrator connects to by URL.
   `remote_agent_addresses: list[str]` (hardcoded URLs), resolves `AgentCard`
   per address, wraps each in `RemoteAgentConnections(client_factory, card)`.
   No spawning, no shutdown, no health checks.
+
 - `samples/python/hosts/a2a_multiagent_host/__main__.py` — bootstraps a
   _single_ long-lived A2A server via `uvicorn.run(app, host, port)`. No
   dynamic port allocation, no lifecycle management beyond uvicorn's built-in
   signal handling.
+
 - `samples/python/hosts/multiagent/remote_agent_connection.py` — wraps
   `ClientFactory.create(card)` to get a `Client`, tracks pending tasks.
   57 lines total. No reconnection, no process lifecycle awareness.
+
 - `demo/ui/service/server/adk_host_manager.py` (638 lines) — manages
   conversations, tasks, and events, but treats agents as external services
   registered by URL via `register_agent(url)`. No subprocess management.
@@ -195,20 +206,26 @@ independently running services that the orchestrator connects to by URL.
 `orchestration/subagent.py` → `run_subagent()` (618 lines) manages:
 
 1. Provider resolution + `ProcessSpec` construction
-2. `spawn_agent_process()` — creates subprocess with stdio pipes
-3. Stderr drain task (prevents buffer deadlock)
-4. ACP handshake with 30s timeout (`initialize` + `new_session`)
-5. Interactive conversation loop
-6. Graceful shutdown: `cancel()` → `kill_process_tree()` → `wait(5s)` →
+
+1. `spawn_agent_process()` — creates subprocess with stdio pipes
+
+1. Stderr drain task (prevents buffer deadlock)
+
+1. ACP handshake with 30s timeout (`initialize` + `new_session`)
+
+1. Interactive conversation loop
+
+1. Graceful shutdown: `cancel()` → `kill_process_tree()` → `wait(5s)` →
    forced `kill()` → transport cleanup → `gc.collect()`
-7. Temp file cleanup from `ProcessSpec.cleanup_paths`
+
+1. Temp file cleanup from `ProcessSpec.cleanup_paths`
 
 **Two server lifecycle models for A2A migration:**
 
-| Model | Description | Trade-offs |
-|---|---|---|
-| **Per-task ephemeral** | Spawn server before each task, kill after | Clean isolation, no port leaks, mirrors current ACP pattern. Adds ~200ms startup overhead per task (uvicorn boot). |
-| **Long-lived per-provider** | Spawn server once, reuse for all tasks | Lower latency after first task, matches A2A reference patterns. Requires health checks, reconnection logic, graceful shutdown coordination. |
+| Model                       | Description                               | Trade-offs                                                                                                                                  |
+| --------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Per-task ephemeral**      | Spawn server before each task, kill after | Clean isolation, no port leaks, mirrors current ACP pattern. Adds ~200ms startup overhead per task (uvicorn boot).                          |
+| **Long-lived per-provider** | Spawn server once, reuse for all tasks    | Lower latency after first task, matches A2A reference patterns. Requires health checks, reconnection logic, graceful shutdown coordination. |
 
 **Recommended: Per-task ephemeral** — matches the current `run_subagent`
 lifecycle model, avoids stale connection bugs, and keeps the process
@@ -222,7 +239,10 @@ orphaned if the parent crashes without cleanup. The new process supervisor
 must handle:
 
 - Readiness probe (poll `GET /` or `GET /.well-known/agent-card.json` until
-  200)
+  200\)
+
 - Watchdog/heartbeat (detect parent death — e.g. via PID file or pipe trick)
+
 - `kill_process_tree()` on Windows (same as current ACP cleanup)
+
 - Port conflict avoidance (bind to port 0, report actual port to parent)

@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#research"
-  - "#framework"
-date: "2026-02-16"
+  - '#research'
+  - '#framework'
+date: '2026-02-16'
 related:
-  - "[[2026-02-16-environment-variable-research]]"
-  - "[[2026-02-16-environment-variable-adr]]"
+  - '[[2026-02-16-environment-variable-research]]'
+  - '[[2026-02-16-environment-variable-adr]]'
 ---
+
 # Environment Variable Usage Audit Report
 
 **Date**: 2026-02-16
@@ -14,28 +15,28 @@ related:
 **Total Environment Variables Found**: 11 unique variables
 **Total Access Points**: 48 occurrences across 7 Python files
 
----
+______________________________________________________________________
 
 ## Summary by Variable
 
-| Variable Name | Access Method(s) | Files | Occurrences | Default | Purpose |
-|---|---|---|---|---|---|
-| `VS_ROOT_DIR` | `os.environ.get()` | 2 | 4 | `os.getcwd()` | Workspace root directory |
-| `VS_AGENT_MODE` | `os.environ.get()` | 2 | 3 | `"read-write"` | Agent sandboxing policy |
-| `VS_SYSTEM_PROMPT` | `os.environ.get()` | 2 | 3 | `None` | System prompt override |
-| `VS_MAX_TURNS` | `os.environ[]` + membership | 1 | 3 | `None` | Max agent turns limit |
-| `VS_BUDGET_USD` | `os.environ[]` + membership | 1 | 3 | `None` | Max budget in USD |
-| `VS_ALLOWED_TOOLS` | `os.environ[]` + membership | 1 | 3 | `[]` | Comma-separated allowed tools |
-| `VS_DISALLOWED_TOOLS` | `os.environ[]` + membership | 1 | 3 | `[]` | Comma-separated disallowed tools |
-| `VS_EFFORT` | `os.environ.get()` | 1 | 2 | `None` | Agent effort level |
-| `VS_OUTPUT_FORMAT` | `os.environ.get()` | 1 | 2 | `None` | Output format (json, etc) |
-| `VS_FALLBACK_MODEL` | `os.environ.get()` | 1 | 2 | `None` | Fallback model name |
-| `VS_INCLUDE_DIRS` | `os.environ[]` + membership | 1 | 3 | `[]` | Comma-separated include dirs |
-| `VS_MCP_ROOT_DIR` | `os.environ.get()` | 1 | 1 | Required | MCP server root directory |
-| `VS_MCP_TTL_SECONDS` | `os.environ.get()` | 1 | 1 | `"3600.0"` | MCP task TTL in seconds |
-| `EDITOR` | `os.environ.get()` | 1 | 3 | `"zed -w"` | Text editor command |
+| Variable Name         | Access Method(s)            | Files | Occurrences | Default        | Purpose                          |
+| --------------------- | --------------------------- | ----- | ----------- | -------------- | -------------------------------- |
+| `VS_ROOT_DIR`         | `os.environ.get()`          | 2     | 4           | `os.getcwd()`  | Workspace root directory         |
+| `VS_AGENT_MODE`       | `os.environ.get()`          | 2     | 3           | `"read-write"` | Agent sandboxing policy          |
+| `VS_SYSTEM_PROMPT`    | `os.environ.get()`          | 2     | 3           | `None`         | System prompt override           |
+| `VS_MAX_TURNS`        | `os.environ[]` + membership | 1     | 3           | `None`         | Max agent turns limit            |
+| `VS_BUDGET_USD`       | `os.environ[]` + membership | 1     | 3           | `None`         | Max budget in USD                |
+| `VS_ALLOWED_TOOLS`    | `os.environ[]` + membership | 1     | 3           | `[]`           | Comma-separated allowed tools    |
+| `VS_DISALLOWED_TOOLS` | `os.environ[]` + membership | 1     | 3           | `[]`           | Comma-separated disallowed tools |
+| `VS_EFFORT`           | `os.environ.get()`          | 1     | 2           | `None`         | Agent effort level               |
+| `VS_OUTPUT_FORMAT`    | `os.environ.get()`          | 1     | 2           | `None`         | Output format (json, etc)        |
+| `VS_FALLBACK_MODEL`   | `os.environ.get()`          | 1     | 2           | `None`         | Fallback model name              |
+| `VS_INCLUDE_DIRS`     | `os.environ[]` + membership | 1     | 3           | `[]`           | Comma-separated include dirs     |
+| `VS_MCP_ROOT_DIR`     | `os.environ.get()`          | 1     | 1           | Required       | MCP server root directory        |
+| `VS_MCP_TTL_SECONDS`  | `os.environ.get()`          | 1     | 1           | `"3600.0"`     | MCP task TTL in seconds          |
+| `EDITOR`              | `os.environ.get()`          | 1     | 3           | `"zed -w"`     | Text editor command              |
 
----
+______________________________________________________________________
 
 ## Detailed Findings by File
 
@@ -68,7 +69,9 @@ related:
 - **Line 218**: `else os.environ.get("VS_SYSTEM_PROMPT")`
 
 - **Access Method**: `os.environ.get()`
+
 - **Default**: `None`
+
 - **Purpose**: System prompt override for the agent
 
 - **DI Pattern**: Parameter takes precedence over env var
@@ -76,23 +79,31 @@ related:
 #### VS_MAX_TURNS
 
 - **Lines 227-230**: `int(os.environ["VS_MAX_TURNS"]) if "VS_MAX_TURNS" in os.environ else None`
+
 - **Access Method**: `os.environ[]` with membership check, try-except conversion
+
 - **Default**: `None`
+
 - **Purpose**: Maximum number of agent turns (parsed as int)
 
 - **Error Handling**: ValueError caught, defaults to None on parse failure
+
 - **DI Pattern**: Parameter takes precedence
 
 #### VS_BUDGET_USD
 
 - **Lines 239-243**: `float(os.environ["VS_BUDGET_USD"]) if "VS_BUDGET_USD" in os.environ else None`
+
 - **Access Method**: `os.environ[]` with membership check, try-except conversion
+
 - **Default**: `None`
+
 - **Purpose**: Maximum budget in USD (parsed as float)
 
 - **Error Handling**: ValueError caught, defaults to None on parse failure
 
 - **Validation**: Negative values replaced with None (line 249)
+
 - **DI Pattern**: Parameter takes precedence
 
 #### VS_ALLOWED_TOOLS
@@ -100,15 +111,21 @@ related:
 - **Lines 257-263**: `[t.strip() for t in os.environ["VS_ALLOWED_TOOLS"].split(",") if t.strip()] if "VS_ALLOWED_TOOLS" in os.environ else []`
 
 - **Access Method**: `os.environ[]` with membership check, split and strip
+
 - **Default**: `[]` (empty list)
+
 - **Purpose**: Comma-separated list of tools the agent can use
+
 - **DI Pattern**: Parameter takes precedence
 
 #### VS_DISALLOWED_TOOLS
 
 - **Lines 269-276**: `[t.strip() for t in os.environ["VS_DISALLOWED_TOOLS"].split(",") if t.strip()] if "VS_DISALLOWED_TOOLS" in os.environ else []`
+
 - **Access Method**: `os.environ[]` with membership check, split and strip
+
 - **Default**: `[]` (empty list)
+
 - **Purpose**: Comma-separated list of tools the agent cannot use
 
 - **DI Pattern**: Parameter takes precedence
@@ -116,7 +133,9 @@ related:
 #### VS_EFFORT
 
 - **Line 279**: `effort if effort is not None else os.environ.get("VS_EFFORT")`
+
 - **Access Method**: `os.environ.get()`
+
 - **Default**: `None`
 
 - **DI Pattern**: Parameter takes precedence
@@ -124,8 +143,11 @@ related:
 #### VS_OUTPUT_FORMAT
 
 - **Line 284**: `else os.environ.get("VS_OUTPUT_FORMAT")`
+
 - **Access Method**: `os.environ.get()`
+
 - **Default**: `None`
+
 - **Purpose**: Output format specification (e.g., "json")
 
 - **DI Pattern**: Parameter takes precedence
@@ -141,13 +163,16 @@ related:
 #### VS_INCLUDE_DIRS
 
 - **Lines 296-302**: `[d.strip() for d in os.environ["VS_INCLUDE_DIRS"].split(",") if d.strip()] if "VS_INCLUDE_DIRS" in os.environ else []`
+
 - **Access Method**: `os.environ[]` with membership check, split and strip
 
 - **Default**: `[]` (empty list)
+
 - **Purpose**: Comma-separated list of directories to include
+
 - **DI Pattern**: Parameter takes precedence
 
----
+______________________________________________________________________
 
 ### 2. `.vaultspec/lib/src/subagent_server/server.py`
 
@@ -164,13 +189,16 @@ related:
 #### VS_MCP_TTL_SECONDS
 
 - **Line 612**: `ttl = float(os.environ.get("VS_MCP_TTL_SECONDS", "3600.0"))`
+
 - **Access Method**: `os.environ.get()`
 
 - **Default**: `"3600.0"` (3600 seconds = 1 hour)
+
 - **Purpose**: Task TTL (time-to-live) in seconds
+
 - **Parsing**: Converted to float
 
----
+______________________________________________________________________
 
 ### 3. `.vaultspec/scripts/cli.py`
 
@@ -179,6 +207,7 @@ related:
 #### EDITOR
 
 - **Lines 299, 429, 568**: `editor = os.environ.get("EDITOR", "zed -w")`
+
 - **Access Method**: `os.environ.get()`
 
 - **Default**: `"zed -w"`
@@ -187,26 +216,32 @@ related:
 
 - **Usage**: `subprocess.call([*editor.split(), str(file_path)])`
 
----
+______________________________________________________________________
 
 ## Test Files with Environment Variable References
 
 ### `.vaultspec/lib/src/protocol/tests/test_providers.py`
 
-**Lines 368-487**: Tests that verify ClaudeProvider correctly sets VS_* env vars from agent metadata.
+**Lines 368-487**: Tests that verify ClaudeProvider correctly sets VS\_\* env vars from agent metadata.
 
-**VS_* Variables Tested**:
+**VS\_* Variables Tested*\*:
 
 - `VS_MAX_TURNS` (line 382)
 
 - `VS_BUDGET_USD` (line 392)
+
 - `VS_ALLOWED_TOOLS` (line 405)
 
 - `VS_DISALLOWED_TOOLS` (line 418)
+
 - `VS_EFFORT` (line 428)
+
 - `VS_FALLBACK_MODEL` (line 441)
+
 - `VS_INCLUDE_DIRS` (line 455)
+
 - `VS_OUTPUT_FORMAT` (line 468)
+
 - `VS_AGENT_MODE` (lines 616, 627)
 
 ### `.vaultspec/lib/src/protocol/acp/tests/test_bridge_lifecycle.py`
@@ -225,14 +260,16 @@ related:
 
 **Lines 115-120**: Tests verify VS_SYSTEM_PROMPT env var usage between Claude and Gemini providers.
 
----
+______________________________________________________________________
 
 ## Access Patterns Analysis
 
 ### Pattern 1: Dependency Injection with Environment Fallback (9 variables)
 
 ```python
+
 # Constructor parameter takes precedence, else env var, else default
+
 self._field = (
 
     else os.environ.get("VS_VAR", default)
@@ -248,6 +285,7 @@ self._field = (
 ```python
 
 # With membership check and stripping
+
 [
     t.strip()
     for t in os.environ["VS_VAR"].split(",")
@@ -290,7 +328,7 @@ if not root_str:
 
 **Benefit**: Explicit required vs optional handling.
 
----
+______________________________________________________________________
 
 ## Standardization Observations
 
@@ -317,44 +355,48 @@ if not root_str:
 - Comma-separated lists split by bare `.split(",")` — fragile to spacing
 - Tool list parsing duplicated in claude_bridge.py and test files
 
----
+______________________________________________________________________
 
 ## Recommendations for Next Phase
 
 1. **Create Central Constants Module** (`orchestration/env_constants.py`)
+
    - Define all env var names as constants
    - Centralize parsing logic (int, float, comma-list)
    - Document required vs optional, defaults, types
 
-2. **Create EnvConfig Dataclass**
+1. **Create EnvConfig Dataclass**
+
    - Single point to load and validate all env vars
    - Type-safe access, no scattered membership checks
    - Easier to audit and test
 
-3. **Add Validation Schema**
+1. **Add Validation Schema**
+
    - Min/max for numeric values
    - Enum validation for modes (read-write, read-only)
    - Path validation for directory vars
 
-4. **Update Documentation**
+1. **Update Documentation**
+
    - Add env var reference to code comments
    - Document in main README or .vault/ docs
    - Include examples for each var
 
 ## File Locations and Line References
 
-| File | Lines | Variables | Access Types |
-|------|-------|-----------|---|
+| File                                               | Lines                                                                            | Variables                                                                                                                                                                         | Access Types                       |
+| -------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
 | `.vaultspec/lib/src/protocol/acp/claude_bridge.py` | 13-14, 209, 213, 218, 227-230, 239-243, 257-263, 269-276, 279, 284, 289, 296-302 | VS_ROOT_DIR, VS_AGENT_MODE, VS_SYSTEM_PROMPT, VS_MAX_TURNS, VS_BUDGET_USD, VS_ALLOWED_TOOLS, VS_DISALLOWED_TOOLS, VS_EFFORT, VS_OUTPUT_FORMAT, VS_FALLBACK_MODEL, VS_INCLUDE_DIRS | get(), [], split(), int(), float() |
-| `.vaultspec/lib/src/subagent_server/server.py` | 602-609, 612 | VS_MCP_ROOT_DIR, VS_MCP_TTL_SECONDS | get() + error handling, float() |
-| `.vaultspec/scripts/cli.py` | 299, 429, 568 | EDITOR | get() |
-| Test files (5 files) | Various | VS_ROOT_DIR, VS_SYSTEM_PROMPT, VS_MAX_TURNS, VS_BUDGET_USD, VS_ALLOWED_TOOLS, VS_DISALLOWED_TOOLS, VS_EFFORT, VS_FALLBACK_MODEL, VS_INCLUDE_DIRS, VS_OUTPUT_FORMAT, VS_AGENT_MODE | Assertions, direct dict access |
+| `.vaultspec/lib/src/subagent_server/server.py`     | 602-609, 612                                                                     | VS_MCP_ROOT_DIR, VS_MCP_TTL_SECONDS                                                                                                                                               | get() + error handling, float()    |
+| `.vaultspec/scripts/cli.py`                        | 299, 429, 568                                                                    | EDITOR                                                                                                                                                                            | get()                              |
+| Test files (5 files)                               | Various                                                                          | VS_ROOT_DIR, VS_SYSTEM_PROMPT, VS_MAX_TURNS, VS_BUDGET_USD, VS_ALLOWED_TOOLS, VS_DISALLOWED_TOOLS, VS_EFFORT, VS_FALLBACK_MODEL, VS_INCLUDE_DIRS, VS_OUTPUT_FORMAT, VS_AGENT_MODE | Assertions, direct dict access     |
 
----
+______________________________________________________________________
 
 ## Summary Statistics
 
-- **Total Unique Variables**: 14 (11 VS_*, 1 EDITOR, 1 GEMINI_SYSTEM_MD mentioned in docs)
+- **Total Unique Variables**: 14 (11 VS\_\*, 1 EDITOR, 1 GEMINI_SYSTEM_MD mentioned in docs)
 - **Total Access Points**: 48+
 - **Files with Env Access**: 7 Python source files (plus 5 test files)
 - **Production Files**: 3 (claude_bridge.py, server.py, cli.py)

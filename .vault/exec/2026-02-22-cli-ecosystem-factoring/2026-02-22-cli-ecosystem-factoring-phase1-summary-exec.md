@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#exec"
-  - "#cli-ecosystem-factoring"
-date: "2026-02-22"
+  - '#exec'
+  - '#cli-ecosystem-factoring'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-cli-ecosystem-factoring-plan]]"
-  - "[[2026-02-22-cli-ecosystem-factoring-adr]]"
+  - '[[2026-02-22-cli-ecosystem-factoring-plan]]'
+  - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
 ---
+
 # cli-ecosystem-factoring phase1 summary
 
 ## outcome
@@ -17,6 +18,7 @@ entire codebase with zero first-party references remaining.
 ## files changed
 
 - `src/vaultspec/core/` → `src/vaultspec/config/` (git mv)
+
   - `__init__.py` — docstring updated to "Configuration and workspace types for vaultspec."
   - `config.py` — moved verbatim
   - `workspace.py` — moved verbatim

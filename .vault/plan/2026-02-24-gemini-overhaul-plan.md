@@ -1,8 +1,8 @@
 ---
 tags:
-  - "#plan"
-  - "#gemini-overhaul"
-date: "2026-02-24"
+  - '#plan'
+  - '#gemini-overhaul'
+date: '2026-02-24'
 ---
 
 # Gemini-overhaul Plan

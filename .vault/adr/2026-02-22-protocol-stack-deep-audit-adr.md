@@ -1,16 +1,17 @@
 ---
 tags:
-  - "#adr"
-  - "#protocol-stack"
-date: "2026-02-22"
+  - '#adr'
+  - '#protocol-stack'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-protocol-stack-deep-audit-research]]"
-  - "[[2026-02-22-protocol-test-architecture-adr]]"
-  - "[[2026-02-22-protocol-test-architecture-research]]"
-  - "[[2026-02-22-gemini-acp-bridge-adr]]"
-  - "[[2026-02-22-gemini-acp-audit-research]]"
-  - "[[2026-02-22-gemini-overhaul-reference]]"
+  - '[[2026-02-22-protocol-stack-deep-audit-research]]'
+  - '[[2026-02-22-protocol-test-architecture-adr]]'
+  - '[[2026-02-22-protocol-test-architecture-research]]'
+  - '[[2026-02-22-gemini-acp-bridge-adr]]'
+  - '[[2026-02-22-gemini-acp-audit-research]]'
+  - '[[2026-02-22-gemini-overhaul-reference]]'
 ---
+
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 
@@ -36,7 +37,7 @@ invokes them.
 
 This renders multi-turn "state retention" tests meaningless (each turn creates
 an independent session), breaks the State Agent pattern established in
-[[2026-02-22-protocol-test-architecture-adr]], and leaves MCP callers with no
+\[[2026-02-22-protocol-test-architecture-adr]\], and leaves MCP callers with no
 mechanism to resume sessions. The audit also uncovered CLI/MCP parity gaps,
 blocking team tools, test infrastructure defects, and an absent programmatic
 multi-turn API.
@@ -45,24 +46,32 @@ multi-turn API.
 
 - The Gemini bridge already has the resume/load/fork session machinery; the gap
   is purely in the callers
+
 - Claude's A2A executor (`claude_executor.py:141-144`) correctly stores
   `session_id` per `context_id` and passes `resume=prev_session`; Gemini's
   executor stores the ID but never passes it back
+
 - MCP `dispatch_agent` hardcodes `interactive=False` and exposes no
   `resume_session_id` parameter; `get_task_status` does not surface the
   `session_id` it stores
+
 - Team MCP tools (`team_tools.py:310-438`) call `dispatch_parallel()` which
   polls to terminal state before returning, blocking the MCP tool call and
   causing timeouts for long-running A2A agents
+
 - The CLI is missing 6 parameters that `run_subagent()` already accepts:
   `resume_session_id`, `max_turns`, `budget`, `effort`, `output_format`,
   `mcp_servers`
+
 - `vaultspec test` references pre-restructure module paths
   (`.vaultspec/lib/tests/`, `.vaultspec/lib/src/`) and silently finds zero tests
+
 - `src/vaultspec/tests/` is missing `__init__.py`, breaking Python package
   discovery
+
 - The project bans mocking, but `monkeypatch.setenv`/`delenv` for env-var
   config testing is a gray area requiring explicit policy
+
 - A non-blocking programmatic multi-turn API is a prerequisite for MCP
   multi-turn dispatch but is large enough to warrant its own ADR
 
@@ -70,11 +79,15 @@ multi-turn API.
 
 - Session resume must work for both Claude and Gemini providers without
   provider-specific branching in the orchestration layer
+
 - The MCP `dispatch_agent` tool returns a `taskId` immediately (non-blocking);
   any resume mechanism must preserve this async contract
+
 - Team tools cannot be refactored to async without introducing a task engine
   abstraction, which carries its own complexity
+
 - CLI flags must maintain backward compatibility; all new flags are additive
+
 - The `monkeypatch` policy clarification is a documentation change that affects
   contributor behavior and must be explicit
 
@@ -93,7 +106,9 @@ to branch on `resume_session_id`:
 
 - When `resume_session_id` is set, call `conn.resume_session(resume_session_id)`
   instead of `conn.new_session()`
+
 - When unset, preserve the current `conn.new_session()` behavior
+
 - The ACP connection interface already supports both methods; this is a
   conditional dispatch, not a new abstraction
 
@@ -193,7 +208,9 @@ from MCP or programmatic callers. A non-blocking multi-turn API is needed that:
 
 - Accepts a sequence of turns as input (or provides a turn-by-turn callback
   interface)
+
 - Returns results per turn without requiring stdin
+
 - Integrates with MCP `dispatch_agent` for multi-turn dispatch
 
 This is a large architectural change that affects the ACP connection interface,
@@ -233,13 +250,17 @@ a dedicated research and ADR cycle would risk an under-specified implementation.
 **Positive:**
 
 - Multi-turn agent workflows will actually persist state across turns, enabling
-  the State Agent pattern from [[2026-02-22-protocol-test-architecture-adr]]
+  the State Agent pattern from \[[2026-02-22-protocol-test-architecture-adr]\]
+
 - CLI and MCP interfaces will expose identical capabilities, eliminating a class
   of "works in MCP but not CLI" (or vice versa) bugs
+
 - Team operations will no longer block MCP callers, enabling real-time team
   coordination from client tools
+
 - The test suite will have correct package structure, no process-global mutations,
   and a clear policy on permissible `monkeypatch` usage
+
 - The deferred Decision 5 establishes a clear dependency chain: session resume
   first, then multi-turn API, preventing premature implementation
 
@@ -247,10 +268,13 @@ a dedicated research and ADR cycle would risk an under-specified implementation.
 
 - Decision 1 touches the critical path of every agent invocation; regressions
   must be caught by the protocol matrix tests from
-  [[2026-02-22-protocol-test-architecture-adr]]
+  \[[2026-02-22-protocol-test-architecture-adr]\]
+
 - Decision 3 introduces a new `TeamTaskEngine` abstraction that adds complexity
   to the team tools layer and requires its own test coverage
+
 - Decision 4d (policy clarification) may require revisiting existing tests that
   use `monkeypatch.setattr` in ways that were previously tolerated
+
 - Decision 5's deferral means MCP multi-turn dispatch remains unavailable until
   a follow-up ADR is completed

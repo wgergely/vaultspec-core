@@ -17,7 +17,7 @@
 
 ***Give your AI a structured process and a paper trail - so every decision gets made once, recorded, and built on.***
 
----
+______________________________________________________________________
 
 ## A research and decision driven framework for your coding agents
 
@@ -25,7 +25,7 @@ Vaultspec is a spec-driven development rulebook for your AI coders. It enforces 
 
 Each stage produces durable markdown artifacts in your repository that allow collaborating agents to share context and you to track development progress.
 
----
+______________________________________________________________________
 
 ## How it works
 
@@ -41,7 +41,7 @@ Two entry points ship with the framework:
 
 The [framework manual](./.vaultspec/README.md) walks through the development workflow and explains how to customize rules, skills, agents, and system prompts.
 
----
+______________________________________________________________________
 
 ## Getting started
 
@@ -96,60 +96,65 @@ You can also invoke skills explicitly to start a specific stage. The bundled ski
 
 The [framework manual](./.vaultspec/README.md) walks through each stage in detail with examples.
 
----
+______________________________________________________________________
 
 ## The development workflow
 
 Every feature flows through five stages. The AI does the analytical work; you approve each checkpoint before the next stage starts.
 
-| Stage | You | The AI |
-|---|---|---|
-| **Research** | Review and approve the findings | Explores the problem, documents options |
-| **Decide** | Approve the decision record | Drafts an ADR based on research |
-| **Plan** | Review and approve the implementation plan | Breaks the decision into concrete steps |
-| **Execute** | Stay available if the AI gets stuck | Works through each step autonomously |
-| **Review** | Read the report and decide if the work ships | Audits the result, flags any issues |
+| Stage        | You                                          | The AI                                  |
+| ------------ | -------------------------------------------- | --------------------------------------- |
+| **Research** | Review and approve the findings              | Explores the problem, documents options |
+| **Decide**   | Approve the decision record                  | Drafts an ADR based on research         |
+| **Plan**     | Review and approve the implementation plan   | Breaks the decision into concrete steps |
+| **Execute**  | Stay available if the AI gets stuck          | Works through each step autonomously    |
+| **Review**   | Read the report and decide if the work ships | Audits the result, flags any issues     |
 
 Everything produced - findings, ADRs, plans, execution records, and review reports - is saved in `.vault/`.
 
----
+______________________________________________________________________
 
 ## Working with the vault
 
 The `vault` subcommand manages documents in `.vault/`. A few common operations:
 
 ```bash
+
 # Scaffold a new document from a template
+
 vaultspec-core vault add research --feature search-api
 
 # List and inspect documents
+
 vaultspec-core vault list --feature search-api
 vaultspec-core vault stats --feature search-api
 
 # Validate frontmatter, links, and cross-references (--fix to auto-repair)
+
 vaultspec-core vault check all --fix
 
 # Visualize the dependency graph for a feature
+
 vaultspec-core vault graph --feature search-api
 ```
 
 Valid document types: `adr`, `audit`, `exec`, `plan`, `reference`, `research`. See the [CLI reference](./.vaultspec/CLI.md#vault-commands) for the full command surface.
 
----
+______________________________________________________________________
 
 ## Further reading
 
-| Guide | What it covers |
-|---|---|
-| [Framework manual](./.vaultspec/README.md) | Development workflow, skills, and customization |
-| [CLI reference](./.vaultspec/CLI.md) | All commands, flags, and options for `vaultspec-core` |
-| [MCP reference](./.vaultspec/MCP.md) | MCP server tools, setup, and configuration |
+| Guide                                      | What it covers                                        |
+| ------------------------------------------ | ----------------------------------------------------- |
+| [Framework manual](./.vaultspec/README.md) | Development workflow, skills, and customization       |
+| [CLI reference](./.vaultspec/CLI.md)       | All commands, flags, and options for `vaultspec-core` |
+| [MCP reference](./.vaultspec/MCP.md)       | MCP server tools, setup, and configuration            |
 
 ### Getting help
 
 Open an issue on [GitHub](https://github.com/wgergely/vaultspec-core/issues).
 
----
+______________________________________________________________________
 
 ## Contributing and license
 

@@ -1,9 +1,10 @@
 ---
 tags:
-  - "#research"
-  - "#marketing-audit"
-date: "2026-02-18"
+  - '#research'
+  - '#marketing-audit'
+date: '2026-02-18'
 ---
+
 ## Marketing Audit: Consolidated Marketing Assessment
 
 ## 1. Report Quality Evaluation
@@ -52,36 +53,36 @@ The three reports are **highly complementary** with minimal overlap:
 - All three note the missing demo GIF/video/screenshot
 - Agent1 and Agent3 both flag the license as critical; Agent2 does not explicitly cover it
 
----
+______________________________________________________________________
 
 ## 2. Top 10 Blockers to Public Release
 
-| Rank | Blocker | Severity | Source |
-|------|---------|----------|--------|
-| 1 | **Empty LICENSE file** — project is legally "All Rights Reserved"; PyPI will warn/reject; users cannot legally use the software | CRITICAL | Agent1 |
-| 2 | **GitHub repo name `task` does not match package name `vaultspec`** — breaks discoverability, creates cognitive dissonance in clone URLs, PyPI links | CRITICAL | Agent1, Agent3 |
-| 3 | **`<repository-url>` placeholder in README Quick Start** — copy-paste install path is broken for every new user | HIGH | Agent1, Agent2, Agent3 |
-| 4 | **No PyPI publishing pipeline** — no release.yml, no tagging convention, no CHANGELOG; users cannot `pip install vaultspec` | HIGH | Agent1 |
-| 5 | **GPU requirement not communicated in install command** — `pip install -e ".[rag,dev]"` silently installs CPU PyTorch; fails at runtime with `GPUNotAvailableError` and no helpful message | HIGH | Agent1, Agent2 |
-| 6 | **README does not sell the product** — no emotional hook, no demo GIF/screenshot, no before/after framing; evaluators bounce before understanding the value | HIGH | Agent2, Agent3 |
-| 7 | **No PyPI classifiers, keywords, or project URLs** — package will be invisible in PyPI search and missing standard metadata signals | HIGH | Agent1 |
-| 8 | **Non-standard package layout may break setuptools** — `.vaultspec/lib/src/` is not a standard src-layout; no `[tool.setuptools.packages.find]` configuration exists | HIGH | Agent1 |
-| 9 | **No badges in README** — missing build status, PyPI version, Python version, license badges that signal project health at a glance | MEDIUM | Agent3 |
-| 10 | **No tutorials or worked examples** — documentation scores 2/10 for tutorials; new users cannot verify they are using the tool correctly | MEDIUM | Agent2 |
+| Rank | Blocker                                                                                                                                                                                    | Severity | Source                 |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | ---------------------- |
+| 1    | **Empty LICENSE file** — project is legally "All Rights Reserved"; PyPI will warn/reject; users cannot legally use the software                                                            | CRITICAL | Agent1                 |
+| 2    | **GitHub repo name `task` does not match package name `vaultspec`** — breaks discoverability, creates cognitive dissonance in clone URLs, PyPI links                                       | CRITICAL | Agent1, Agent3         |
+| 3    | **`<repository-url>` placeholder in README Quick Start** — copy-paste install path is broken for every new user                                                                            | HIGH     | Agent1, Agent2, Agent3 |
+| 4    | **No PyPI publishing pipeline** — no release.yml, no tagging convention, no CHANGELOG; users cannot `pip install vaultspec`                                                                | HIGH     | Agent1                 |
+| 5    | **GPU requirement not communicated in install command** — `pip install -e ".[rag,dev]"` silently installs CPU PyTorch; fails at runtime with `GPUNotAvailableError` and no helpful message | HIGH     | Agent1, Agent2         |
+| 6    | **README does not sell the product** — no emotional hook, no demo GIF/screenshot, no before/after framing; evaluators bounce before understanding the value                                | HIGH     | Agent2, Agent3         |
+| 7    | **No PyPI classifiers, keywords, or project URLs** — package will be invisible in PyPI search and missing standard metadata signals                                                        | HIGH     | Agent1                 |
+| 8    | **Non-standard package layout may break setuptools** — `.vaultspec/lib/src/` is not a standard src-layout; no `[tool.setuptools.packages.find]` configuration exists                       | HIGH     | Agent1                 |
+| 9    | **No badges in README** — missing build status, PyPI version, Python version, license badges that signal project health at a glance                                                        | MEDIUM   | Agent3                 |
+| 10   | **No tutorials or worked examples** — documentation scores 2/10 for tutorials; new users cannot verify they are using the tool correctly                                                   | MEDIUM   | Agent2                 |
 
----
+______________________________________________________________________
 
 ## 3. Top 5 Marketing Strengths / Opportunities
 
-| Rank | Strength | Assessment |
-|------|----------|------------|
-| 1 | **Unique enforced pipeline (R-S-P-E-V)** — no major competitor (Cursor, Aider, Devin, Copilot Workspace) offers a governed, traceable development pipeline. This is vaultspec's single strongest differentiator. Scored 5/5 by Agent3. | Capitalize immediately |
-| 2 | **Regulatory tailwind (EU AI Act, SOC 2, HIPAA)** — AI governance is shifting from optional to mandatory in 2026. vaultspec's `.vault/` audit trail is exactly what compliance teams need. First-mover advantage in this niche is real. | Position for enterprise |
-| 3 | **"Spec-Driven Development" term ownership** — SDD is gaining traction (InfoQ article, arxiv paper 2602.00180). vaultspec can own this term through early content publication before competitors claim it. | Publish content now |
-| 4 | **Strong reference documentation** — CLI reference (9/10), configuration guide (9/10), and concepts doc (8/10) provide a solid foundation once users get past onboarding. This is above-average for a v0.1.0 project. | Leverage in tutorials |
-| 5 | **Multi-protocol stack (MCP+ACP+A2A)** — the three-protocol architecture is technically distinctive and positions vaultspec as infrastructure-grade, appealing to AI agent researchers and framework builders as community amplifiers. | Use for conference/blog credibility |
+| Rank | Strength                                                                                                                                                                                                                                | Assessment                          |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| 1    | **Unique enforced pipeline (R-S-P-E-V)** — no major competitor (Cursor, Aider, Devin, Copilot Workspace) offers a governed, traceable development pipeline. This is vaultspec's single strongest differentiator. Scored 5/5 by Agent3.  | Capitalize immediately              |
+| 2    | **Regulatory tailwind (EU AI Act, SOC 2, HIPAA)** — AI governance is shifting from optional to mandatory in 2026. vaultspec's `.vault/` audit trail is exactly what compliance teams need. First-mover advantage in this niche is real. | Position for enterprise             |
+| 3    | **"Spec-Driven Development" term ownership** — SDD is gaining traction (InfoQ article, arxiv paper 2602.00180). vaultspec can own this term through early content publication before competitors claim it.                              | Publish content now                 |
+| 4    | **Strong reference documentation** — CLI reference (9/10), configuration guide (9/10), and concepts doc (8/10) provide a solid foundation once users get past onboarding. This is above-average for a v0.1.0 project.                   | Leverage in tutorials               |
+| 5    | **Multi-protocol stack (MCP+ACP+A2A)** — the three-protocol architecture is technically distinctive and positions vaultspec as infrastructure-grade, appealing to AI agent researchers and framework builders as community amplifiers.  | Use for conference/blog credibility |
 
----
+______________________________________________________________________
 
 ## 4. Prioritized Action Plan for Pre-Launch Readiness
 
@@ -125,7 +126,7 @@ The three reports are **highly complementary** with minimal overlap:
 - [ ] **Engage regulatory/compliance community** (EU AI Act discussions, whitepaper)
 - [ ] **Product Hunt launch** with polished demo video
 
----
+______________________________________________________________________
 
 ## 5. Overall Release Readiness
 
@@ -142,7 +143,7 @@ With Phase 0 fixes (estimated effort: 1-2 hours), the project moves to **NEEDS W
 
 The underlying product is sound. The pipeline enforcement, audit trail, and regulatory positioning are genuine competitive advantages that no major competitor currently offers. The gap is entirely in packaging, presentation, and distribution — not in core functionality.
 
----
+______________________________________________________________________
 
 ## 6. Gap Analysis — Additional Work Needed
 

@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#research"
-  - "#protocol"
-date: "2026-02-20"
+  - '#research'
+  - '#protocol'
+date: '2026-02-20'
 related:
-  - "[[2026-02-07-a2a-research]]"
+  - '[[2026-02-07-a2a-research]]'
 ---
+
 # A2A Team research: Gemini CLI Native A2A and ACP Team Support
 
 Investigation of Gemini CLI's native capabilities for participation in multi-agent
@@ -25,11 +26,14 @@ JSON-RPC framing. This is the mechanism used by Zed editor and by vaultspec's ow
 
 - `GeminiProvider.prepare_process()` builds a `ProcessSpec` with
   `["--experimental-acp", "--model", model]` args
+
 - System prompt delivered via `GEMINI_SYSTEM_MD` environment variable pointing to a
   temp file (Gemini CLI has no `--system` flag)
+
 - The process is spawned via `acp.spawn_agent_process()` in
   `orchestration/subagent.py`, which manages the ACP lifecycle:
   handshake -> new_session -> prompt -> cancel -> cleanup
+
 - `SubagentClient` (`.vaultspec/lib/src/protocol/acp/client.py`) implements the ACP
   `Client` interface, handling permissions, file I/O, terminal management, and
   session updates
@@ -72,8 +76,11 @@ the CLI/ADK layer, not the model API layer.
 
 - Defined in `.gemini/agents/*.md` with YAML frontmatter: `kind: remote`,
   `name: <id>`, `agent_card_url: <url>`
+
 - Gemini delegates tasks to these agents using A2A protocol
+
 - Mixed local+remote agents not supported in a single file
+
 - Requires `{"experimental": {"enableAgents": true}}` in settings.json
 
 **Gemini Live API:** Designed for real-time multimodal streaming (audio/video), not
@@ -87,10 +94,14 @@ A2A task coordination. Not relevant for persistent two-way agent channels.
 
 - **Agent hierarchy:** `SequentialAgent`, `ParallelAgent`, `LoopAgent` workflow
   orchestrators for composing multi-agent pipelines
+
 - **Built-in orchestration:** LLM-driven dynamic routing and delegation
+
 - **A2A integration:** `A2AServer` (expose agent) and `RemoteA2aAgent` (consume
   agent) wrappers around a2a-sdk
+
 - **Tool ecosystem:** Pre-built tools, LangChain/CrewAI integration
+
 - **Agent Engine:** Deployment to Google Cloud Agent Engine (Vertex AI)
 
 **What a2a-sdk provides alone:**
@@ -122,8 +133,10 @@ The project already has the pieces:
 
 1. `GeminiA2AExecutor` wraps `run_subagent()` (which spawns Gemini CLI via ACP) into
    an A2A `AgentExecutor`
-2. `a2a-sdk`'s `A2AStarletteApplication` provides the HTTP server
-3. `InMemoryTaskStore` handles task state management
+
+1. `a2a-sdk`'s `A2AStarletteApplication` provides the HTTP server
+
+1. `InMemoryTaskStore` handles task state management
 
 The minimum wrapper is approximately:
 
@@ -138,7 +151,9 @@ handler = DefaultRequestHandler(
     task_store=InMemoryTaskStore(),
 )
 server = A2AStarletteApplication(agent_card=card, http_handler=handler)
+
 # uvicorn.run(server.build(), host="0.0.0.0", port=10010)
+
 ```
 
 Each inbound A2A task spawns a fresh Gemini CLI subprocess via ACP. This is
@@ -215,7 +230,9 @@ by passing `resume_session_id` through `run_subagent()`, but:
 
 - The ACP protocol does not persist conversation history across client instances
   (noted in `ClaudeACPBridge.load_session()` docstring)
+
 - Each new ACP connection creates a fresh SDK/CLI client
+
 - Session "resume" restores configuration, not conversation context
 
 **For true persistence,** the A2A server approach is more appropriate: a persistent
@@ -233,18 +250,23 @@ but the server itself lingers indefinitely.
 **A2A protocol security (per spec):**
 
 - Agent Card declares `securitySchemes` and `securityRequirements`
+
 - Supported: API keys, HTTP auth (Bearer/Basic), OAuth 2.0 (authorization code,
   client credentials, device code), OpenID Connect, mTLS
+
 - Push notifications secured via JWT + JWKS, HMAC, or mTLS
 
 **Authentication as a team member to vaultspec A2A server:**
 
 - For local development (localhost), no auth is strictly required -- the A2A spec
   allows unauthenticated connections
+
 - For production/shared environments, the vaultspec A2A server should declare an API
   key or Bearer token scheme in its AgentCard
+
 - Gemini CLI's `@a2a` tool currently has no authentication configuration for outbound
   A2A calls (limitation of the experimental feature)
+
 - For inbound: Gemini Enterprise on Google Cloud supports registering A2A agents with
   OAuth credentials via `gcloud` CLI
 
@@ -254,15 +276,15 @@ moving to networked deployments.
 
 ## Summary Table
 
-| Capability | Status | Notes |
-|---|---|---|
-| Gemini as ACP agent (subprocess) | Working | Current `GeminiProvider` implementation |
-| Gemini as A2A client (@a2a tool) | Experimental | PR #3079, needs `enableAgents` |
-| Gemini as A2A server | Not available | RFC proposed, unimplemented |
-| Gemini discovering vaultspec A2A agents | Supported | Via `.gemini/agents/*.md` + `enableAgents` |
-| Persistent Gemini team member | Not supported | Each task = new subprocess |
-| ADK vs a2a-sdk | a2a-sdk preferred | ADK adds framework overhead vaultspec doesn't need |
-| Auth for local team | Unauthenticated OK | API keys for networked deployments |
+| Capability                              | Status             | Notes                                              |
+| --------------------------------------- | ------------------ | -------------------------------------------------- |
+| Gemini as ACP agent (subprocess)        | Working            | Current `GeminiProvider` implementation            |
+| Gemini as A2A client (@a2a tool)        | Experimental       | PR #3079, needs `enableAgents`                     |
+| Gemini as A2A server                    | Not available      | RFC proposed, unimplemented                        |
+| Gemini discovering vaultspec A2A agents | Supported          | Via `.gemini/agents/*.md` + `enableAgents`         |
+| Persistent Gemini team member           | Not supported      | Each task = new subprocess                         |
+| ADK vs a2a-sdk                          | a2a-sdk preferred  | ADK adds framework overhead vaultspec doesn't need |
+| Auth for local team                     | Unauthenticated OK | API keys for networked deployments                 |
 
 ## Sources
 

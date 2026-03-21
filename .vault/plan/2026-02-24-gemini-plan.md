@@ -1,8 +1,8 @@
 ---
 tags:
-  - "#plan"
-  - "#gemini"
-date: "2026-02-24"
+  - '#plan'
+  - '#gemini'
+date: '2026-02-24'
 ---
 
 # Gemini Plan

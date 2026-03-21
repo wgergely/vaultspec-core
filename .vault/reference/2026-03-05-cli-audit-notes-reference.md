@@ -1,3 +1,10 @@
+---
+date: 2026-03-05
+tags:
+  - '#reference'
+  - '#cli-architecture'
+---
+
 # CLI Audit Notes
 
 ## Commands with clear mandates

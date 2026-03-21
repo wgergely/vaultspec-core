@@ -1,13 +1,11 @@
 ---
 tags:
-  - "#research"
-  - "#install-cmds"
-  - "#provider-grounding"
-  - "#gemini"
-date: "2026-03-15"
+  - '#research'
+  - '#install-cmds'
+date: '2026-03-15'
 related:
-  - "[[2026-03-15-install-cmds-plan]]"
-  - "[[2026-03-15-claude-code-provider-research]]"
+  - '[[2026-03-15-install-cmds-plan]]'
+  - '[[2026-03-15-claude-code-provider-research]]'
 ---
 
 # Gemini CLI provider grounding research
@@ -95,27 +93,27 @@ geminicli.com on 2026-03-15.
 
 ## Capability matrix
 
-| Capability | Supported | Notes |
-|-----------|-----------|-------|
-| RULES | No (policies are TOML, not markdown rules) | `.gemini/policies/*.toml` |
-| SKILLS | Yes | `.gemini/skills/` or `.agents/skills/` alias |
-| AGENTS | Yes (experimental) | `.gemini/agents/*.md` |
-| ROOT_CONFIG | Yes | `GEMINI.md` at root, upward traversal |
-| SYSTEM | Yes | `.gemini/system.md` or `GEMINI_SYSTEM_MD` env |
-| HOOKS | Yes | In settings.json |
+| Capability  | Supported                                  | Notes                                         |
+| ----------- | ------------------------------------------ | --------------------------------------------- |
+| RULES       | No (policies are TOML, not markdown rules) | `.gemini/policies/*.toml`                     |
+| SKILLS      | Yes                                        | `.gemini/skills/` or `.agents/skills/` alias  |
+| AGENTS      | Yes (experimental)                         | `.gemini/agents/*.md`                         |
+| ROOT_CONFIG | Yes                                        | `GEMINI.md` at root, upward traversal         |
+| SYSTEM      | Yes                                        | `.gemini/system.md` or `GEMINI_SYSTEM_MD` env |
+| HOOKS       | Yes                                        | In settings.json                              |
 
 ## Path summary
 
-| Artifact | Project Path | User Path |
-|----------|-------------|-----------|
-| Root config | `./GEMINI.md` (upward traversal) | `~/.gemini/GEMINI.md` |
-| Policies | `.gemini/policies/*.toml` | `~/.gemini/policies/*.toml` |
-| Skills | `.gemini/skills/<name>/SKILL.md` OR `.agents/skills/<name>/SKILL.md` | `~/.gemini/skills/` OR `~/.agents/skills/` |
-| Agents | `.gemini/agents/*.md` | `~/.gemini/agents/*.md` |
-| System prompt | `.gemini/system.md` | N/A (env var) |
-| Hooks | `.gemini/settings.json` | `~/.gemini/settings.json` |
-| Settings | `.gemini/settings.json` | `~/.gemini/settings.json` |
-| Extensions | `.gemini/extensions/` | `~/.gemini/extensions/` |
+| Artifact      | Project Path                                                         | User Path                                  |
+| ------------- | -------------------------------------------------------------------- | ------------------------------------------ |
+| Root config   | `./GEMINI.md` (upward traversal)                                     | `~/.gemini/GEMINI.md`                      |
+| Policies      | `.gemini/policies/*.toml`                                            | `~/.gemini/policies/*.toml`                |
+| Skills        | `.gemini/skills/<name>/SKILL.md` OR `.agents/skills/<name>/SKILL.md` | `~/.gemini/skills/` OR `~/.agents/skills/` |
+| Agents        | `.gemini/agents/*.md`                                                | `~/.gemini/agents/*.md`                    |
+| System prompt | `.gemini/system.md`                                                  | N/A (env var)                              |
+| Hooks         | `.gemini/settings.json`                                              | `~/.gemini/settings.json`                  |
+| Settings      | `.gemini/settings.json`                                              | `~/.gemini/settings.json`                  |
+| Extensions    | `.gemini/extensions/`                                                | `~/.gemini/extensions/`                    |
 
 ## Known issues
 
@@ -136,8 +134,11 @@ identical skills would be loaded twice — once from each directory. This
 could cause duplicate context injection or unexpected precedence behavior.
 
 **Mitigation options:**
+
 - Only sync skills to `.agents/skills/` when both providers are installed
   (since it takes precedence anyway)
+
 - Skip `.gemini/skills/` sync entirely and always use `.agents/skills/`
+
 - Track co-installed providers and conditionally skip the lower-precedence
   path

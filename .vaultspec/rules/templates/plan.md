@@ -5,14 +5,14 @@
 # Feature tag (replace {feature} with your feature name, e.g., #editor-demo)
 # Additional tags may be appended below the required pair
 tags:
-  - "#plan"
-  - "#{feature}"
+  - '#plan'
+  - '#{feature}'
 # ISO date format (e.g., 2026-02-06)
-date: "{yyyy-mm-dd}"
+date: '{yyyy-mm-dd}'
 # Related documents as quoted wiki-links
 # (e.g., "[[2026-02-04-feature-adr]]")
 related:
-  - "[[{yyyy-mm-dd-*}]]"
+  - '[[{yyyy-mm-dd-*}]]'
 ---
 
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
@@ -36,11 +36,11 @@ Use numbered phases for complex features:
      track progress. -->
 
 - `{Phase 1}`
-    1. `{Step 1.1}`
-    2. `{Step 1.2}`
+  1. `{Step 1.1}`
+  1. `{Step 1.2}`
 - `{Phase 2}`
-    1. `{Step 2.1}`
-    2. `{Step 2.2}`
+  1. `{Step 2.1}`
+  1. `{Step 2.2}`
 
 Use tasks for simpler features:
 
@@ -62,4 +62,4 @@ fulfilled our mission.
 
 Example: "Run unit and integration tests (all pass). However, could not
 visually confirm that the feature was functional. Further work is required to
-implement features to enable better testing." Be honest  - tests can be cheated!
+implement features to enable better testing." Be honest - tests can be cheated!

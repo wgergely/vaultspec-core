@@ -1,10 +1,10 @@
 ---
 tags:
-  - "#exec"
-  - "#agent-removal"
-date: "2026-03-05"
+  - '#exec'
+  - '#agent-removal'
+date: '2026-03-05'
 related:
-  - "[[2026-03-05-agent-removal-plan]]"
+  - '[[2026-03-05-agent-removal-plan]]'
 ---
 
 # `agent-removal` `phase3` `step1`
@@ -18,6 +18,7 @@ Phase 3: Update Core Entry Points and Configuration. Cleaned up `__main__`, `spe
 ## Description
 
 Removed obsolete commands and namespaces from the CLI entry points:
+
 - Removed `team`, `server`, `subagent`, and `mcp` from `src/vaultspec/__main__.py`.
 - Removed `agents` command and related dispatch logic from `src/vaultspec/spec_cli.py`.
 - Updated `sync-all` to no longer sync agents.

@@ -4,10 +4,10 @@
 # Directory tag (hardcoded - DO NOT CHANGE - based on .vault/audit/ location)
 # Feature tag (replace mcp-cli-interface with your feature name, e.g., #editor-demo)
 tags:
-  - "#audit"
-  - "#mcp-cli-interface"
+  - '#audit'
+  - '#mcp-cli-interface'
 # ISO date format (e.g., 2026-02-06)
-date: "2026-03-21"
+date: '2026-03-21'
 # Related documents as quoted wiki-links
 # (e.g., "[[2026-02-04-feature-research]]")
 related: []
@@ -18,24 +18,9 @@ related: []
 
 # `mcp-cli-interface` audit: `mcp-facade-current-state`
 
-## Scope
+## `mcp-cli-interface` audit: `current-facade`
 
-<!-- What was audited and why -->
-
-## Findings
-
-<!-- Key findings organized by severity -->
-
-## Recommendations
-
-<!-- Actionable recommendations -->
-
-
-## Context
-
-# `mcp-cli-interface` audit: `current-facade`
-
-## Scope
+## Audit Scope
 
 Document the current MCP tool surface as implemented in
 `src/vaultspec_core/mcp_server/vault_tools.py` after the consolidation
@@ -48,10 +33,10 @@ target, favouring composability over exhaustive CLI parity.
 
 ## Current MCP Tool Surface (2 tools)
 
-| # | Tool | Domain | Read/Write | Annotations |
-|---|------|--------|------------|-------------|
-| 1 | `find` | vault | read-only | `readOnlyHint=True`, `idempotentHint=True`, `openWorldHint=False` |
-| 2 | `create` | vault | write | `readOnlyHint=False`, `destructiveHint=False`, `idempotentHint=True`, `openWorldHint=False` |
+| #   | Tool     | Domain | Read/Write | Annotations                                                                                 |
+| --- | -------- | ------ | ---------- | ------------------------------------------------------------------------------------------- |
+| 1   | `find`   | vault  | read-only  | `readOnlyHint=True`, `idempotentHint=True`, `openWorldHint=False`                           |
+| 2   | `create` | vault  | write      | `readOnlyHint=False`, `destructiveHint=False`, `idempotentHint=True`, `openWorldHint=False` |
 
 ## `find` - vault document discovery and feature listing
 
@@ -61,21 +46,21 @@ target, favouring composability over exhaustive CLI parity.
    `doc_count`, and graph `weight` from `VaultGraph.get_feature_rankings`.
    Pass `json=True` to include `status`, `types`, `earliest_date`, `has_plan`.
 
-2. **Document search** (any filter set) - returns documents matching
+1. **Document search** (any filter set) - returns documents matching
    `feature`, `type`, and/or `date`. Type defaults to
    `[adr, plan, research, reference]` - exec and audit excluded unless
    explicitly requested. Pass `body=True` to include full document content.
 
 ### Parameters
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `feature` | `str \| None` | `None` | Filter by feature tag |
-| `type` | `list[str] \| None` | `None` | Filter by doc type(s); defaults to adr/plan/research/reference |
-| `date` | `str \| None` | `None` | Filter by date |
-| `body` | `bool` | `False` | Include full document body in results |
-| `json` | `bool` | `False` | Include extended fields in feature listing mode |
-| `limit` | `int` | `20` | Max results returned |
+| Param     | Type                | Default | Notes                                                          |
+| --------- | ------------------- | ------- | -------------------------------------------------------------- |
+| `feature` | `str \| None`       | `None`  | Filter by feature tag                                          |
+| `type`    | `list[str] \| None` | `None`  | Filter by doc type(s); defaults to adr/plan/research/reference |
+| `date`    | `str \| None`       | `None`  | Filter by date                                                 |
+| `body`    | `bool`              | `False` | Include full document body in results                          |
+| `json`    | `bool`              | `False` | Include extended fields in feature listing mode                |
+| `limit`   | `int`               | `20`    | Max results returned                                           |
 
 ### Returns
 
@@ -90,13 +75,13 @@ Appends a `## Context` section if `content` is provided.
 
 ### Parameters
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `feature` | `str` | required | Feature tag (leading `#` stripped automatically) |
-| `type` | `str \| None` | `"research"` | Document type (must match a `DocType` enum value) |
-| `date` | `str \| None` | today | ISO date for filename and frontmatter |
-| `title` | `str \| None` | feature name | Slug used in filename and template |
-| `content` | `str \| None` | `None` | Extra context appended as `## Context` section |
+| Param     | Type          | Default      | Notes                                             |
+| --------- | ------------- | ------------ | ------------------------------------------------- |
+| `feature` | `str`         | required     | Feature tag (leading `#` stripped automatically)  |
+| `type`    | `str \| None` | `"research"` | Document type (must match a `DocType` enum value) |
+| `date`    | `str \| None` | today        | ISO date for filename and frontmatter             |
+| `title`   | `str \| None` | feature name | Slug used in filename and template                |
+| `content` | `str \| None` | `None`       | Extra context appended as `## Context` section    |
 
 ### Behaviour
 
@@ -150,5 +135,7 @@ vault exploration and document authoring without surface bloat.
 
 - No graph export tool (agents cannot inspect cross-feature relationships
   beyond weight scores)
+
 - No feature lifecycle view beyond what `find(json=True)` infers
+
 - `limit=20` default may truncate large vaults silently

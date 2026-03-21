@@ -1,14 +1,14 @@
 ---
-tags: ["#plan", "#vault-doctor-suite"]
-date: "2026-02-24"
+tags: ['#plan', '#vault-doctor-suite']
+date: '2026-02-24'
 related:
-  - "[[2026-02-24-vault-doctor-suite-adr]]"
-  - "[[2026-02-24-vault-doctor-suite-plan]]"
-  - "[[2026-02-24-vault-doctor-suite-p1-plan]]"
-  - "[[2026-02-24-vault-doctor-suite-p2-plan]]"
-  - "[[2026-02-24-vault-doctor-suite-p3-plan]]"
-  - "[[2026-02-24-vault-doctor-suite-p4-plan]]"
-  - "[[2026-02-24-vault-doctor-suite-p5-plan]]"
+  - '[[2026-02-24-vault-doctor-suite-adr]]'
+  - '[[2026-02-24-vault-doctor-suite-plan]]'
+  - '[[2026-02-24-vault-doctor-suite-p1-plan]]'
+  - '[[2026-02-24-vault-doctor-suite-p2-plan]]'
+  - '[[2026-02-24-vault-doctor-suite-p3-plan]]'
+  - '[[2026-02-24-vault-doctor-suite-p4-plan]]'
+  - '[[2026-02-24-vault-doctor-suite-p5-plan]]'
 ---
 
 # `vault-doctor-suite` P6 plan: Integration, Pre-commit Hooks, MCP Tool, and Docs
@@ -29,6 +29,7 @@ registered before the integration test can be meaningful.
 
 Runs `CheckRegistry.run(root_dir)` against the project's own `.vault/`
 directory (the live vault used throughout development). Asserts:
+
 - Runner completes without raising an exception.
 - Return value is `list[DoctorResult]`.
 - No `Severity.ERROR` results on the project vault in its committed state
@@ -42,6 +43,7 @@ triggers an ERROR, something is genuinely wrong.
 Two new hooks are added under the existing `local` repo block:
 
 ```yaml
+
 - id: vault-doctor
   name: Vault Doctor (drift + structure)
   entry: uv run python -m vaultspec vault doctor --severity error
@@ -86,12 +88,12 @@ format of `vault doctor --json`. Uses the `CheckRegistry` imported from
 
 Four files require changes:
 
-| File | Change |
-|---|---|
-| `.vaultspec/docs/cli-reference.md` | Remove `vault audit` section; add `vault doctor` full flag reference |
-| `.vaultspec/docs/concepts.md` | Add "Doctor Suite" concept section; describe check categories, severity model, and dry-run contract |
-| `AGENTS.md` | Replace `vault audit` entry with `vault doctor`; note `--category`, `--fix`, `--dry-run` |
-| `vault_cli.py` module docstring | Update command list: remove `audit`, add `doctor` |
+| File                               | Change                                                                                              |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `.vaultspec/docs/cli-reference.md` | Remove `vault audit` section; add `vault doctor` full flag reference                                |
+| `.vaultspec/docs/concepts.md`      | Add "Doctor Suite" concept section; describe check categories, severity model, and dry-run contract |
+| `AGENTS.md`                        | Replace `vault audit` entry with `vault doctor`; note `--category`, `--fix`, `--dry-run`            |
+| `vault_cli.py` module docstring    | Update command list: remove `audit`, add `doctor`                                                   |
 
 ## Tasks
 
@@ -105,28 +107,28 @@ Four files require changes:
 - Name: Full suite integration test — `CheckRegistry.run()` against project `.vault/`; assert no ERRORs
 - Step summary: `.vault/exec/2026-02-24-vault-doctor-suite/2026-02-24-vault-doctor-suite-p6-s1-exec.md`
 - Executing sub-agent: vaultspec-code-reviewer
-- References: [[2026-02-24-vault-doctor-suite-adr]], [[2026-02-24-vault-doctor-suite-p1-plan]], [[2026-02-24-vault-doctor-suite-p2-plan]], [[2026-02-24-vault-doctor-suite-p3-plan]], [[2026-02-24-vault-doctor-suite-p4-plan]], [[2026-02-24-vault-doctor-suite-p5-plan]]
+- References: \[[2026-02-24-vault-doctor-suite-adr]\], \[[2026-02-24-vault-doctor-suite-p1-plan]\], \[[2026-02-24-vault-doctor-suite-p2-plan]\], \[[2026-02-24-vault-doctor-suite-p3-plan]\], \[[2026-02-24-vault-doctor-suite-p4-plan]\], \[[2026-02-24-vault-doctor-suite-p5-plan]\]
 
----
+______________________________________________________________________
 
 - Name: Add `vault-doctor` and `vault-doctor-deep` pre-commit hooks to `.pre-commit-config.yaml`
 - Step summary: `.vault/exec/2026-02-24-vault-doctor-suite/2026-02-24-vault-doctor-suite-p6-s2-exec.md`
 - Executing sub-agent: vaultspec-standard-executor
-- References: [[2026-02-24-vault-doctor-suite-adr]], [[2026-02-24-vault-doctor-suite-p1-plan]]
+- References: \[[2026-02-24-vault-doctor-suite-adr]\], \[[2026-02-24-vault-doctor-suite-p1-plan]\]
 
----
+______________________________________________________________________
 
 - Name: Implement `vault_doctor` MCP tool in `mcp_server/vault_tools.py`
 - Step summary: `.vault/exec/2026-02-24-vault-doctor-suite/2026-02-24-vault-doctor-suite-p6-s3-exec.md`
 - Executing sub-agent: vaultspec-standard-executor
-- References: [[2026-02-24-vault-doctor-suite-adr]], [[2026-02-24-vault-doctor-suite-p1-plan]], [[2026-02-24-vault-doctor-suite-plan]]
+- References: \[[2026-02-24-vault-doctor-suite-adr]\], \[[2026-02-24-vault-doctor-suite-p1-plan]\], \[[2026-02-24-vault-doctor-suite-plan]\]
 
----
+______________________________________________________________________
 
 - Name: Update docs — `cli-reference.md`, `concepts.md`, `AGENTS.md`, `vault_cli.py` docstring
 - Step summary: `.vault/exec/2026-02-24-vault-doctor-suite/2026-02-24-vault-doctor-suite-p6-s4-exec.md`
 - Executing sub-agent: vaultspec-standard-executor
-- References: [[2026-02-24-vault-doctor-suite-adr]], [[2026-02-24-vault-doctor-suite-plan]]
+- References: \[[2026-02-24-vault-doctor-suite-adr]\], \[[2026-02-24-vault-doctor-suite-plan]\]
 
 ## Parallelization
 
@@ -138,21 +140,30 @@ parallel once S1 passes.
 
 - `python -m pytest src/vaultspec/doctor/tests/test_suite.py -v` exits 0 with
   all tests passing.
+
 - `CheckRegistry.run(root_dir=Path(".vault"))` on the project vault returns
   zero `Severity.ERROR` results.
+
 - `.pre-commit-config.yaml` contains both `vault-doctor` and `vault-doctor-deep`
   hook entries with correct `entry`, `types: [markdown]`, and
   `pass_filenames: true`.
+
 - `mcp_server/vault_tools.py` `register_tools` function registers at least
   one tool (`vault_doctor`) on the `FastMCP` instance.
+
 - `vault_doctor(categories=["drift"], severity="info")` returns a valid JSON-
   serialisable list (tested via `json.dumps` on the return value).
+
 - `vault_doctor(dry_run=True)` without `fix=True` raises or returns an error
   result — the dry-run guard from Phase 1 propagates through the MCP layer.
+
 - `.vaultspec/docs/cli-reference.md` no longer contains a `vault audit`
   section; it contains a `vault doctor` section with the full flag table.
+
 - `AGENTS.md` no longer references `vault audit` as an available tool.
+
 - `vault_cli.py` module docstring lists `doctor` as a command and does not list
   `audit`.
+
 - All existing tests (`graph/`, `verification/`, `hooks/`, `mcp_server/`) pass
   without regressions introduced by this phase.

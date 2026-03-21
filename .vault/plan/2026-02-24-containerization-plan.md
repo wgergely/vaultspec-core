@@ -1,8 +1,8 @@
 ---
 tags:
-  - "#plan"
-  - "#containerization"
-date: "2026-02-24"
+  - '#plan'
+  - '#containerization'
+date: '2026-02-24'
 ---
 
 # Containerization Plan

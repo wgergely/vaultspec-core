@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#research"
-  - "#pytest-e2e"
-date: "2026-02-21"
+  - '#research'
+  - '#pytest-e2e'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-pytest-e2e-observability-adr]]"
+  - '[[2026-02-21-pytest-e2e-observability-adr]]'
 ---
+
 # `pytest-e2e` research: observability for long-running A2A/E2E tests
 
 The protocol test suite (`src/vaultspec/protocol/`) contains 403 tests. 381 are
@@ -15,21 +16,24 @@ because vanilla pytest provides zero visibility while these E2E tests execute.
 
 ## Current Baseline
 
-| Component | Version | Notes |
-|-----------|---------|-------|
-| pytest | >=7.0.0 | No live logging configured |
-| pytest-asyncio | >=0.21.0 | `asyncio_mode = "auto"` |
-| pytest-timeout | >=2.3.0 | Only used via `@pytest.mark.timeout(N)` |
+| Component      | Version  | Notes                                   |
+| -------------- | -------- | --------------------------------------- |
+| pytest         | >=7.0.0  | No live logging configured              |
+| pytest-asyncio | >=0.21.0 | `asyncio_mode = "auto"`                 |
+| pytest-timeout | >=2.3.0  | Only used via `@pytest.mark.timeout(N)` |
 
 No `log_cli`, no `log_file`, no structured reporting configured.
 
 ## Core Problems
 
 - **P1 — No live output**: No way to see progress while 180s tests run.
+
 - **P2 — No debug logs on failure**: When a test times out, the stack dump is
   all you get. No application-level logging captured.
+
 - **P3 — Hang vs slow indistinguishable**: A test at 120s could be progressing
   or deadlocked. No heartbeat mechanism.
+
 - **P4 — No structured reports**: Test results lost on Windows thread-method
   timeout (kills the process, no XML/JSON output).
 
@@ -142,15 +146,15 @@ async server state (connection pools, ASGI transports).
 
 ### Tier 3: Evaluated and Rejected
 
-| Plugin | Reason for rejection |
-|--------|---------------------|
-| pytest-sugar | Hides test names until completion — *worse* for long tests |
-| pytest-subprocess | Fakes subprocess calls — violates no-mocking rule |
-| pytest-timeouts (plural) | Conflicts with pytest-timeout, less maintained |
-| pytest-xprocess | Only helps with server startup, not test-level observability |
-| pytest-monitor | Resource monitoring useful but orthogonal to core problems |
-| pytest-evals | Too specialized for LLM eval benchmarks, not test infra |
-| nox | Session manager, not a pytest replacement |
+| Plugin                   | Reason for rejection                                         |
+| ------------------------ | ------------------------------------------------------------ |
+| pytest-sugar             | Hides test names until completion — *worse* for long tests   |
+| pytest-subprocess        | Fakes subprocess calls — violates no-mocking rule            |
+| pytest-timeouts (plural) | Conflicts with pytest-timeout, less maintained               |
+| pytest-xprocess          | Only helps with server startup, not test-level observability |
+| pytest-monitor           | Resource monitoring useful but orthogonal to core problems   |
+| pytest-evals             | Too specialized for LLM eval benchmarks, not test infra      |
+| nox                      | Session manager, not a pytest replacement                    |
 
 ### Windows-Specific Considerations
 

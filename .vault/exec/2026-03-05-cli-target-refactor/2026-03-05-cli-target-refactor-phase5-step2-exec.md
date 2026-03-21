@@ -1,11 +1,11 @@
 ---
 tags:
-  - "#exec"
-  - "#cli-target-refactor"
-date: "2026-03-05"
+  - '#exec'
+  - '#cli-target-refactor'
+date: '2026-03-05'
 related:
-  - "[[2026-03-05-cli-target-refactor-plan]]"
-  - "[[2026-03-05-rag-migration-phase-1-plan]]"
+  - '[[2026-03-05-cli-target-refactor-plan]]'
+  - '[[2026-03-05-rag-migration-phase-1-plan]]'
 ---
 
 # `cli-target-refactor` `phase5` `step2`
@@ -20,9 +20,9 @@ Removed RAG (index, search) CLI commands and residue.
 
 - Removed `index` and `search` subcommands from `vault_cli.py` as the RAG backend has been migrated to an external repository.
 - Cleaned up RAG-related logic from `core/commands.py`:
-    - Removed `rag` module paths and categories.
-    - Removed `torch`, `lancedb`, and `sentence_transformers` dependency checks from `doctor_run` and `readiness_run`.
-    - Removed `.lance` directory presence checks.
+  - Removed `rag` module paths and categories.
+  - Removed `torch`, `lancedb`, and `sentence_transformers` dependency checks from `doctor_run` and `readiness_run`.
+  - Removed `.lance` directory presence checks.
 - Synchronized the test suite by removing RAG-related tests from `test_vault_cli.py`.
 
 ## Tests

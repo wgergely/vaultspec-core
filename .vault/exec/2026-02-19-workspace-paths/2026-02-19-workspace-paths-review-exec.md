@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#exec"
-  - "#workspace-paths"
-date: "2026-02-19"
+  - '#exec'
+  - '#workspace-paths'
+date: '2026-02-19'
 related:
-  - "[[2026-02-19-workspace-path-decoupling-adr]]"
-  - "[[2026-02-19-workspace-paths-implementation-plan]]"
+  - '[[2026-02-19-workspace-path-decoupling-adr]]'
+  - '[[2026-02-19-workspace-paths-implementation-plan]]'
 ---
+
 # `workspace-paths` code review
 
 **Status:** `REVISION REQUIRED`
@@ -32,11 +33,15 @@ related:
 - **[HIGH]** `cli.py:2249-2254` — `resolve_workspace()` called from `main()` without `framework_root`. When `--content-dir` is provided, EXPLICIT mode falls back to `fw_root = framework_root or (content_root / framework_dir_name)`, producing a nested path like `<content_dir>/.vaultspec` which is almost certainly wrong. The structurally-known `_FRAMEWORK_ROOT` from `_paths.py` is available as `_PATHS_LAYOUT.framework_root` but is not forwarded.
 
   ```python
+
   # cli.py main() — missing framework_root
+
   layout = resolve_workspace(
       root_override=args.root,
       content_override=getattr(args, "content_dir", None),
+
       # framework_root NOT passed — falls to content_root / ".vaultspec"
+
   )
   ```
 
@@ -68,27 +73,27 @@ related:
 
 ## ADR Deliverables Compliance
 
-| # | Deliverable | Status |
-|---|---|---|
-| 1 | `core/workspace.py` — all 5 symbols | PASS |
-| 2 | `core/config.py` — `content_dir` + registry | PASS |
-| 3 | `_paths.py` — two-step bootstrap | PASS |
-| 4 | `cli.py` — `init_paths(WorkspaceLayout)` + `--content-dir` | PASS (with HIGH caveat) |
-| 5 | `subagent.py`, `vault.py` — `--content-dir` | PASS (with HIGH caveat) |
-| 6 | `core/tests/test_workspace.py` — all 6 matrix rows | PASS (coverage gap noted) |
-| 7 | `requirements.txt` — aligned to pyproject.toml | PASS |
-| 8 | `extension.toml` — companion manifest | PASS (LOW concern) |
+| #   | Deliverable                                                | Status                    |
+| --- | ---------------------------------------------------------- | ------------------------- |
+| 1   | `core/workspace.py` — all 5 symbols                        | PASS                      |
+| 2   | `core/config.py` — `content_dir` + registry                | PASS                      |
+| 3   | `_paths.py` — two-step bootstrap                           | PASS                      |
+| 4   | `cli.py` — `init_paths(WorkspaceLayout)` + `--content-dir` | PASS (with HIGH caveat)   |
+| 5   | `subagent.py`, `vault.py` — `--content-dir`                | PASS (with HIGH caveat)   |
+| 6   | `core/tests/test_workspace.py` — all 6 matrix rows         | PASS (coverage gap noted) |
+| 7   | `requirements.txt` — aligned to pyproject.toml             | PASS                      |
+| 8   | `extension.toml` — companion manifest                      | PASS (LOW concern)        |
 
 ## Resolution Matrix Verification
 
-| ADR Row | Condition | Expected mode | Verified |
-|---|---|---|---|
-| 1 | Both CONTENT_DIR + ROOT_DIR set | EXPLICIT | PASS (workspace.py:291) |
-| 2 | Only ROOT_DIR set | STANDALONE | PASS (workspace.py:311) |
-| 3 | No env vars, classic git | STANDALONE | PASS (workspace.py:329-349) |
-| 4 | No env vars, container git (.gt/) | STANDALONE | PASS (workspace.py:140-156) |
-| 5 | No env vars, linked worktree (.git file) | STANDALONE | PASS (workspace.py:175-216) |
-| 6 | No env vars, no git | STANDALONE | PASS (workspace.py:352-380) |
+| ADR Row | Condition                                | Expected mode | Verified                    |
+| ------- | ---------------------------------------- | ------------- | --------------------------- |
+| 1       | Both CONTENT_DIR + ROOT_DIR set          | EXPLICIT      | PASS (workspace.py:291)     |
+| 2       | Only ROOT_DIR set                        | STANDALONE    | PASS (workspace.py:311)     |
+| 3       | No env vars, classic git                 | STANDALONE    | PASS (workspace.py:329-349) |
+| 4       | No env vars, container git (.gt/)        | STANDALONE    | PASS (workspace.py:140-156) |
+| 5       | No env vars, linked worktree (.git file) | STANDALONE    | PASS (workspace.py:175-216) |
+| 6       | No env vars, no git                      | STANDALONE    | PASS (workspace.py:352-380) |
 
 vault_root = output_root / ".vault" in ALL 6 rows: **PASS** (lines 302, 319, 344, 358, 375)
 
@@ -110,10 +115,10 @@ The two HIGH findings represent an architectural correctness gap: the `framework
 **Required fixes before merge:**
 
 1. In `cli.py` `main()` (line 2249): add `framework_root=_PATHS_LAYOUT.framework_root` to the `resolve_workspace()` call.
-2. In `subagent.py` `main()` (line 332): same fix.
-3. In `vault.py` `_resolve_root()` (line 203): same fix.
-4. Add a test case for EXPLICIT mode without `framework_root` to confirm the validation error message is actionable.
-5. Consider the `extension.toml` install command (LOW) before companion project integration.
+1. In `subagent.py` `main()` (line 332): same fix.
+1. In `vault.py` `_resolve_root()` (line 203): same fix.
+1. Add a test case for EXPLICIT mode without `framework_root` to confirm the validation error message is actionable.
+1. Consider the `extension.toml` install command (LOW) before companion project integration.
 
 Once the three `framework_root` forwarding fixes are applied, the implementation is architecturally sound and complete.
 

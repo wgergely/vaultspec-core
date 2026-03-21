@@ -1,12 +1,14 @@
 ---
 tags:
-  - "#adr"
-  - "#system-prompt"
-date: "2026-02-18"
+  - '#adr'
+  - '#system-prompt'
+date: '2026-02-18'
 related:
-  - "[[2026-02-18-system-prompt-architecture-research]]"
-  - "[[2026-02-17-bootstrap-prompt-adr]]"
+  - '[[2026-02-18-system-prompt-architecture-research]]'
+  - '[[2026-02-17-bootstrap-prompt-adr]]'
+  - '[[2026-02-18-system-prompt-restructure-plan]]'
 ---
+
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields outside the YAML frontmatter above -->
 
 # system-prompt adr: restructure system/ for tool-agnostic composition | (**status:** accepted)
@@ -27,26 +29,35 @@ rules, git workflow, or tone guidelines reach it.
 - Claude Code has `--append-system-prompt` for actual system prompt injection,
   but `.claude/rules/` is the persistent mechanism that integrates with the
   existing sync pipeline
+
 - Gemini CLI's SYSTEM.md assembly works but suffers from ordering issues
   (alphabetical sort places workflow routing last) and disproportionate content
   (shell examples consume ~40% of the prompt)
+
 - CLAUDE.md and `.claude/rules/` content is injected as `<system-reminder>` user
   context with a "may or may not be relevant" disclaimer (known issue #7571),
   not as actual system prompt -- this is a Claude Code platform limitation
+
 - Gemini's GEMINI.md context is concatenated into the actual `systemInstruction`
   API field -- fundamentally different from Claude's approach
+
 - The current "Jean-Claude" persona in base.md is tool-specific and conflicts
   with Claude Code's built-in identity
+
 - Shell tool examples in gemini.md are well-written but consume excessive
   tokens on every conversation turn regardless of task relevance
 
 ## Constraints
 
 - Cannot modify Claude Code's injection mechanism (platform constraint)
+
 - Must maintain backward compatibility with existing `cli.py` sync commands
+
 - Must not break the existing `pipeline: config` mechanism for framework.md
   and project.md
+
 - Assembly logic changes must not require manual intervention from users
+
 - All changes must pass the existing 87-test CLI test suite
 
 ## Implementation
@@ -59,6 +70,7 @@ rules, git workflow, or tone guidelines reach it.
   Replace all Gemini tool names with generic language or remove tool-specific
   instructions entirely. Remove `run_shell_command` -> "shell commands".
   Remove `save_memory`, `/help`, `/bug`, `read_file` references.
+
 - `operations-gemini.md` (`tool: gemini`): Move all Gemini-specific tool
   references here: `run_shell_command` usage details, `save_memory` guidance,
   `/help` and `/bug` commands, `read_file` reminders.
@@ -68,6 +80,7 @@ rules, git workflow, or tone guidelines reach it.
 - Remove "Jean-Claude" persona name from line 1. Replace with a generic
   identity or remove the identity statement entirely (each tool has its own
   built-in identity).
+
 - Move line 14 (`activate_skill` / `<activated_skill>` guidance) to `gemini.md`.
 
 **1c. Fix small defects:**
@@ -85,9 +98,11 @@ rules, git workflow, or tone guidelines reach it.
 - During `system sync`, if a ToolConfig has `rules_dir` but no `system_file`,
   generate behavioral rules into the rules directory from the shared system/
   parts.
+
 - Produce a single `vaultspec-system.builtin.md` rule file in `.claude/rules/`
   containing the assembled shared behavioral content (base.md + shared
   operations.md + workflow.md).
+
 - This rule file gets the `.builtin.md` suffix so it is managed by the sync
   engine (auto-updated, auto-pruned) and not confused with user-authored rules.
 
@@ -148,14 +163,18 @@ to maintain and reduces sync overhead.
 
 - **Breaking change to operations.md:** Existing content splits into two files.
   The sync engine handles this transparently -- old SYSTEM.md is regenerated.
+
 - **New generated artifact:** `.claude/rules/vaultspec-system.builtin.md` is a
   new file that will be created during `system sync`. It is gitignored (all
   `.claude/rules/` builtin files are generated artifacts).
+
 - **Shell example relocation:** Moving examples from gemini.md to skill files
   means they are only available when the skill is activated, not on every turn.
   This trades always-available reference for reduced per-turn token cost.
+
 - **Test updates required:** Tests that assert on operations.md content or
   SYSTEM.md assembly order will need updating.
+
 - **Disclaimer limitation:** Claude's behavioral rules will still carry the
   "may or may not be relevant" disclaimer. This is a Claude Code platform
   limitation that cannot be resolved at the vaultspec level. If Claude Code

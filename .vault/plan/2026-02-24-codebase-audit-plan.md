@@ -1,8 +1,8 @@
 ---
 tags:
-  - "#plan"
-  - "#codebase-audit"
-date: "2026-02-24"
+  - '#plan'
+  - '#codebase-audit'
+date: '2026-02-24'
 ---
 
 # Codebase-audit Plan

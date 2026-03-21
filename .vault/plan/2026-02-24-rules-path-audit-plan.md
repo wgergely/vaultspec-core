@@ -1,8 +1,8 @@
 ---
 tags:
-  - "#plan"
-  - "#rules-path-audit"
-date: "2026-02-24"
+  - '#plan'
+  - '#rules-path-audit'
+date: '2026-02-24'
 ---
 
 # Rules-path-audit Plan

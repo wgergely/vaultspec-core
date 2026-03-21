@@ -355,8 +355,8 @@ def resolve_workspace(
     git = discover_git(effective_cwd)
 
     if git is not None:
-        # Container/worktree mode: use container_root if available
-        root = git.container_root if git.container_root is not None else git.repo_root
+        # Prefer container_root, then worktree_root, then repo_root
+        root = git.container_root or git.worktree_root or git.repo_root
         root = _strip_unc(root)
         fw_root = framework_root or (root / framework_dir_name)
 

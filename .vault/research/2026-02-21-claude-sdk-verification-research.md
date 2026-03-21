@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#research"
-  - "#acp-claude-reliability"
-date: "2026-02-21"
+  - '#research'
+  - '#acp-claude-reliability'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-acp-claude-reliability-plan.md]]"
+  - '[[2026-02-21-acp-claude-reliability-plan]]'
 ---
+
 # Claude SDK Verification Findings
 
 ## 1. Options Mutability
@@ -22,5 +23,6 @@ The `acp-claude-code` reference uses `tool_use_error`. We can assume the Python 
 ## 3. Conclusion
 
 Proceed with the plan:
-*   Recreate client on permission change.
-*   Handle `tool_use_error` event.
+
+- Recreate client on permission change.
+- Handle `tool_use_error` event.

@@ -1,16 +1,17 @@
 ---
 tags:
-  - "#research"
-  - "#marketing-audit"
-date: "2026-02-18"
+  - '#research'
+  - '#marketing-audit'
+date: '2026-02-18'
 ---
+
 ## Marketing Audit: Packaging & Distribution Readiness
 
 ## Summary
 
 vaultspec 0.1.0 is in active early development. The packaging baseline is functional but far from release-ready. There is no PyPI publishing pipeline, no Docker strategy, no changelog, and the LICENSE file is effectively empty. The GPU-only requirement is a significant distribution constraint that is acknowledged in documentation but not enforced gracefully. The repo name/package name mismatch adds minor friction for first-time contributors.
 
----
+______________________________________________________________________
 
 ## 1. Installation Experience
 
@@ -29,7 +30,7 @@ vaultspec 0.1.0 is in active early development. The packaging baseline is functi
 - Either create or remove the `docs/` documentation links — broken links damage credibility.
 - Add a PyPI badge and installation section once the package is published.
 
----
+______________________________________________________________________
 
 ## 2. PyPI Readiness
 
@@ -38,12 +39,17 @@ vaultspec 0.1.0 is in active early development. The packaging baseline is functi
 **Gaps:**
 
 - `license = {file = "LICENSE"}` references an effectively empty LICENSE file. PyPI will reject or warn on this.
+
 - No `classifiers` array — PyPI search and filtering rely on trove classifiers (e.g., `Programming Language :: Python :: 3.13`, `License :: ...`, `Development Status :: 3 - Alpha`).
+
 - No `keywords` field for discoverability.
+
 - No `project.urls` table (Homepage, Documentation, Repository, Bug Tracker).
 
 - No `[tool.setuptools.packages.find]` or explicit `packages` config — setuptools may not correctly discover the nested `.vaultspec/lib/src` package layout, which is non-standard.
+
 - The package source layout (`src` under `.vaultspec/lib/`) is highly non-standard. setuptools will likely fail to package it correctly without explicit configuration.
+
 - No `MANIFEST.in` (less critical with setuptools + pyproject.toml, but notable).
 
 - Version `0.1.0` signals pre-release; should be accompanied by a `Development Status :: 3 - Alpha` classifier.
@@ -55,7 +61,7 @@ vaultspec 0.1.0 is in active early development. The packaging baseline is functi
 - Populate the LICENSE file before any publishing attempt.
 - Run `python -m build && twine check dist/*` locally to validate the package before publishing.
 
----
+______________________________________________________________________
 
 ## 3. CI/CD Pipeline
 
@@ -64,12 +70,17 @@ vaultspec 0.1.0 is in active early development. The packaging baseline is functi
 **Gaps:**
 
 - No publishing workflow (no `release.yml`, no `publish.yml`).
+
 - No version bumping automation (no use of `bump2version`, `commitizen`, or similar).
+
 - No GitHub Releases creation.
+
 - No changelog generation.
 
 - Lint step installs only `ruff` — `ty` (type checker) is in dev dependencies but not run in CI.
+
 - Unit tests install `.[dev]` but not `.[rag]`, so any unit test that imports RAG modules will fail in CI.
+
 - GPU tests are commented out entirely — no self-hosted runner is configured.
 
 **Recommendations:**
@@ -79,7 +90,7 @@ vaultspec 0.1.0 is in active early development. The packaging baseline is functi
 - Add `pytest --co -q` (collection-only) as a fast smoke test that catches import errors without requiring GPU.
 - Document or implement a strategy for GPU CI (self-hosted runner, or skip with a clear gap acknowledgment).
 
----
+______________________________________________________________________
 
 ## 4. Docker Strategy
 
@@ -92,6 +103,7 @@ vaultspec 0.1.0 is in active early development. The packaging baseline is functi
 - Install Python 3.13 (not in standard NVIDIA images — would require a custom layer or use of `nvidia/cuda` + `deadsnakes` PPA).
 
 - Install PyTorch with cu130 index URL.
+
 - GPU passthrough requires `--gpus all` at runtime (`docker run --gpus all ...`).
 
 **Gaps:** CUDA 13.0 is very recent (2025). Pre-built NVIDIA base images may not yet exist for this version. This needs verification against `nvcr.io` registry.
@@ -101,9 +113,10 @@ vaultspec 0.1.0 is in active early development. The packaging baseline is functi
 - A Docker image is a low-priority nice-to-have given the GPU complexity.
 
 - A higher-value investment: provide a `docker-compose.yml` with NVIDIA runtime configured as an example for users who want containerized deployments.
+
 - Ensure the `--extra-index-url` for PyTorch cu130 is prominently documented as a known friction point.
 
----
+______________________________________________________________________
 
 ## 5. Dependency Analysis
 
@@ -130,7 +143,7 @@ vaultspec 0.1.0 is in active early development. The packaging baseline is functi
 - Consider pinning upper bounds on critical SDK dependencies (`claude-agent-sdk<0.2`, etc.) to avoid silent breaking changes.
 - Add a warning at import time if torch is installed but CUDA is unavailable.
 
----
+______________________________________________________________________
 
 ## 6. GPU Requirement Communication
 
@@ -150,7 +163,7 @@ vaultspec 0.1.0 is in active early development. The packaging baseline is functi
 - Consider providing a `vaultspec check-gpu` CLI command that validates the environment before users attempt to build an index.
 - Consider making RAG an optional feature that degrades to keyword search on CPU — this would dramatically expand the addressable user base.
 
----
+______________________________________________________________________
 
 ## 7. Release Process
 
@@ -159,19 +172,21 @@ vaultspec 0.1.0 is in active early development. The packaging baseline is functi
 **Recommended Release Workflow:**
 
 1. Maintain a `CHANGELOG.md` following Keep a Changelog format (or use `git-cliff` for automated generation from conventional commits).
-2. Use `commitizen` or `bump2version` for version management.
 
-3. Tag releases as `v0.1.0`, `v0.2.0`, etc.
+1. Use `commitizen` or `bump2version` for version management.
 
-4. GitHub Actions `release.yml` triggered on tag push:
+1. Tag releases as `v0.1.0`, `v0.2.0`, etc.
+
+1. GitHub Actions `release.yml` triggered on tag push:
+
    - Run full test suite (excluding GPU tests unless self-hosted runner available).
    - Build: `python -m build`.
    - Publish to PyPI via OIDC trusted publisher (no API key needed).
    - Create GitHub Release with auto-generated release notes from CHANGELOG.
 
-5. Consider a separate pre-release channel (TestPyPI) for validation.
+1. Consider a separate pre-release channel (TestPyPI) for validation.
 
----
+______________________________________________________________________
 
 ## 8. Naming and Branding
 
@@ -182,7 +197,9 @@ vaultspec 0.1.0 is in active early development. The packaging baseline is functi
 - GitHub clone URL will be `git clone https://github.com/wgergely/task` — confusing to users who expect `vaultspec`.
 
 - GitHub search for "vaultspec" will not surface the repository by name.
+
 - PyPI package page will link to the `task` repository, which is dissonant.
+
 - Issue tracker URL mismatch causes confusion in bug reports and documentation.
 
 **Recommendations:**
@@ -191,7 +208,7 @@ vaultspec 0.1.0 is in active early development. The packaging baseline is functi
 - Update `project.urls` in `pyproject.toml` to point to the renamed repository.
 - Fill in the `<repository-url>` placeholder in README with the canonical URL.
 
----
+______________________________________________________________________
 
 ## 9. License
 
@@ -211,7 +228,7 @@ vaultspec 0.1.0 is in active early development. The packaging baseline is functi
 
 **Action Required:** Populate `LICENSE` with chosen license text before any release.
 
----
+______________________________________________________________________
 
 ## 10. Platform Support
 
@@ -231,22 +248,22 @@ vaultspec 0.1.0 is in active early development. The packaging baseline is functi
 - Consider adding macOS to CI for core (non-RAG) unit tests.
 - Verify PyTorch cu130 Windows wheel availability and document accordingly.
 
----
+______________________________________________________________________
 
 ## Priority Matrix
 
-| Priority | Action |
-|---|---|
-| **CRITICAL** | Populate LICENSE file |
-| **CRITICAL** | Document `--extra-index-url` in install instructions |
-| **HIGH** | Fix broken `docs/` links in README |
-| **HIGH** | Fill in `<repository-url>` placeholder |
-| **HIGH** | Add PyPI classifiers, keywords, project URLs |
-| **HIGH** | Fix setuptools package discovery for non-standard layout |
-| **HIGH** | Rename GitHub repo from `task` to `vaultspec` |
-| **MEDIUM** | Add `pip-audit` to CI |
-| **MEDIUM** | Add `ty` type-checking to CI |
-| **MEDIUM** | Create CHANGELOG.md |
-| **MEDIUM** | Add PyPI publishing workflow |
-| **LOW** | Docker strategy (GPU complexity makes this low-value near-term) |
-| **LOW** | CPU degradation path for RAG |
+| Priority     | Action                                                          |
+| ------------ | --------------------------------------------------------------- |
+| **CRITICAL** | Populate LICENSE file                                           |
+| **CRITICAL** | Document `--extra-index-url` in install instructions            |
+| **HIGH**     | Fix broken `docs/` links in README                              |
+| **HIGH**     | Fill in `<repository-url>` placeholder                          |
+| **HIGH**     | Add PyPI classifiers, keywords, project URLs                    |
+| **HIGH**     | Fix setuptools package discovery for non-standard layout        |
+| **HIGH**     | Rename GitHub repo from `task` to `vaultspec`                   |
+| **MEDIUM**   | Add `pip-audit` to CI                                           |
+| **MEDIUM**   | Add `ty` type-checking to CI                                    |
+| **MEDIUM**   | Create CHANGELOG.md                                             |
+| **MEDIUM**   | Add PyPI publishing workflow                                    |
+| **LOW**      | Docker strategy (GPU complexity makes this low-value near-term) |
+| **LOW**      | CPU degradation path for RAG                                    |

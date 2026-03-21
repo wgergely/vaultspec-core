@@ -75,13 +75,17 @@ For ongoing vault maintenance - fixing broken links, validating frontmatter, cle
 Everything under `.vaultspec/rules/` is yours to edit. The `spec` CLI group manages these resources without requiring you to touch files directly:
 
 ```bash
+
 # Add a custom rule
+
 vaultspec-core spec rules add --name my-project-conventions
 
 # Add a skill with a description
+
 vaultspec-core spec skills add --name my-deploy --description "Deploy to staging"
 
 # List what you have
+
 vaultspec-core spec rules list
 vaultspec-core spec skills list
 vaultspec-core spec agents list
@@ -107,10 +111,10 @@ The `vaultspec-mcp` server is an alternative integration path for MCP-capable cl
 
 ## Related Documentation
 
-| Document | What it covers |
-|---|---|
-| [Repository README](../README.md) | Project overview, installation, and getting started |
-| [CLI Reference](./CLI.md) | All commands, flags, and options for `vaultspec-core` |
-| [MCP Reference](./MCP.md) | MCP server tools, setup, and configuration |
+| Document                          | What it covers                                        |
+| --------------------------------- | ----------------------------------------------------- |
+| [Repository README](../README.md) | Project overview, installation, and getting started   |
+| [CLI Reference](./CLI.md)         | All commands, flags, and options for `vaultspec-core` |
+| [MCP Reference](./MCP.md)         | MCP server tools, setup, and configuration            |
 
 For bug reports and feature requests, open an issue on the [vaultspec-core issue tracker](https://github.com/wgergely/vaultspec-core/issues).

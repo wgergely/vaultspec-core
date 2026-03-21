@@ -1,8 +1,8 @@
 ---
 tags:
-  - "#plan"
-  - "#repo-manager-extension"
-date: "2026-02-24"
+  - '#plan'
+  - '#repo-manager-extension'
+date: '2026-02-24'
 ---
 
 # Repo-manager-extension Plan

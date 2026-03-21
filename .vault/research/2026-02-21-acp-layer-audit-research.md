@@ -1,19 +1,24 @@
 ---
 tags:
-  - "#research"
-  - "#acp"
-date: "2026-02-21"
+  - '#research'
+  - '#acp'
+date: '2026-02-21'
 ---
+
 # ACP Layer Audit
 
 ## File Map
 
 - **`__init__.py`** — Re-exports: ClaudeACPBridge, SessionLogger, SubagentClient,
   SubagentError, SubagentResult
+
 - **`types.py`** — SubagentError (Exception), SubagentResult (frozen dataclass:
   response_text, written_files, session_id)
+
 - **`claude_bridge.py`** — ACP Agent server, 994 lines (detailed below)
+
 - **`client.py`** — ACP Client implementation, 473 lines (detailed below)
+
 - **`sandbox.py`** — Shared can_use_tool sandbox callbacks
 
 ## ClaudeACPBridge (`claude_bridge.py`)
@@ -39,41 +44,54 @@ class _SessionState:
 ### Key Methods
 
 - **`on_connect(conn)`** — Stores conn reference for session_update callbacks
+
 - **`initialize()`** — Returns capabilities: load_session=True, fork/list/resume
+
 - **`_build_options()`** — Centralized option construction
+
 - **`new_session()`** — Creates ClaudeSDKClient, connects, creates persistent stream
-  iterator, stores _SessionState
+  iterator, stores \_SessionState
+
 - **`prompt()`** — Resets cancel flag, calls sdk_client.query(text), streams messages,
   maps to ACP updates; returns stop_reason
-- **`cancel()`** — Sets _cancelled flag, calls interrupt() + disconnect()
+
+- **`cancel()`** — Sets \_cancelled flag, calls interrupt() + disconnect()
+
 - **`authenticate()`** — No-op
+
 - **`load_session()`** — Reconnects SDK from stored state; **NOT conversation history**
+
 - **`resume_session()`** — Identical to load_session; same limitation
+
 - **`fork_session()`** — Clones config into new UUID; fresh SDK client
+
 - **`list_sessions()`** — In-memory only; filters by cwd; no pagination
-- **`set_session_mode()`** — Updates _mode, mutates _options via getattr
-- **`set_session_model()`** — Updates _model, mutates _options via getattr
+
+- **`set_session_mode()`** — Updates \_mode, mutates \_options via getattr
+
+- **`set_session_model()`** — Updates \_model, mutates \_options via getattr
 
 ### Streaming Pipeline
 
 SDK message types → ACP update types:
 
-| SDK Event | ACP Update |
-|-----------|------------|
-| `StreamEvent(content_block_start, tool_use)` | tracks `_block_index_to_tool[index]` |
-| `StreamEvent(content_block_delta, text_delta)` | `AgentMessageChunk` |
-| `StreamEvent(content_block_delta, thinking_delta)` | `AgentThoughtChunk` |
-| `StreamEvent(content_block_delta, input_json_delta)` | `ToolCallProgress(in_progress)` |
-| `AssistantMessage(ToolUseBlock)` | `ToolCallStart(pending)` + caches in `_pending_tools` |
-| `AssistantMessage(TextBlock/ThinkingBlock)` | **skipped** (already streamed) |
-| `UserMessage(parent_tool_use_id)` | `ToolCallProgress(completed/failed)` |
-| `SystemMessage` | `SessionInfoUpdate(title=subtype)` |
-| `ResultMessage` | `SessionInfoUpdate(title="Result: ...")` |
-| `MessageParseError` | caught, logged, skipped |
+| SDK Event                                            | ACP Update                                            |
+| ---------------------------------------------------- | ----------------------------------------------------- |
+| `StreamEvent(content_block_start, tool_use)`         | tracks `_block_index_to_tool[index]`                  |
+| `StreamEvent(content_block_delta, text_delta)`       | `AgentMessageChunk`                                   |
+| `StreamEvent(content_block_delta, thinking_delta)`   | `AgentThoughtChunk`                                   |
+| `StreamEvent(content_block_delta, input_json_delta)` | `ToolCallProgress(in_progress)`                       |
+| `AssistantMessage(ToolUseBlock)`                     | `ToolCallStart(pending)` + caches in `_pending_tools` |
+| `AssistantMessage(TextBlock/ThinkingBlock)`          | **skipped** (already streamed)                        |
+| `UserMessage(parent_tool_use_id)`                    | `ToolCallProgress(completed/failed)`                  |
+| `SystemMessage`                                      | `SessionInfoUpdate(title=subtype)`                    |
+| `ResultMessage`                                      | `SessionInfoUpdate(title="Result: ...")`              |
+| `MessageParseError`                                  | caught, logged, skipped                               |
 
 ### Configuration
 
 Supports full feature set via env vars and constructor:
+
 - max_turns, budget_usd, allowed_tools, disallowed_tools
 - effort, output_format, fallback_model, include_dirs
 - system_prompt (passed as `{"type": "preset", "preset": "claude_code", "append": ...}`)
@@ -85,16 +103,25 @@ Implements `acp.Client` protocol. Handles ACP messages FROM the bridge.
 ### Key Methods
 
 - **`request_permission()`** — Auto-approves ALL tool calls (selects first allow option)
+
 - **`session_update()`** — Routes ACP updates: AgentMessageChunk/AgentThoughtChunk →
   `_handle_content_chunk`; ToolCallStart → `on_tool_update` callback
+
 - **`_handle_content_chunk()`** — Accumulates `response_text`; fires callbacks
+
 - **`read_text_file()`** — Workspace-bounded file read with line/limit slicing
+
 - **`write_text_file()`** — In read-only mode, only allows writes to `.vault/`
+
 - **`create_terminal()`** — Blocked in read-only; Windows requires ProactorEventLoop;
   spawns subprocess with combined stdout+stderr
+
 - **`terminal_output()`** — Returns accumulated output, truncates to byte_limit (keeps tail)
+
 - **`wait_for_terminal_exit()`** — Awaits process + reader task
+
 - **`close()`** — Kills all tracked terminals (zombie prevention)
+
 - **`graceful_cancel()`** — Sends ACP cancel to conn before shutdown
 
 ## Issues Found
@@ -115,12 +142,14 @@ resumption get fresh conversations.
 ### 3. Streaming Loop Catches All Exceptions as "refusal"
 
 `claude_bridge.py:457-459`:
+
 ```python
 except Exception:
     logger.exception(...)
     stop_reason = "refusal"
     break
 ```
+
 Converts ALL streaming exceptions into "refusal". Network errors look identical to model
 refusal. Should differentiate.
 
@@ -161,6 +190,7 @@ All tests use real DI-injected recorders (`SDKClientRecorder`, `ConnRecorder`).
 No mocks. Fully compliant with no-mocking rule.
 
 Test coverage:
+
 - **`test_bridge_lifecycle.py`** — Session creation, load, fork, list, cancel
 - **`test_bridge_streaming.py`** — All message type → ACP update mappings
 - **`test_bridge_resilience.py`** — Error handling, disconnection, edge cases

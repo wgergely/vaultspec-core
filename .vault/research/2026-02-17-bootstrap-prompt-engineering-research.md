@@ -1,18 +1,19 @@
 ---
 tags:
-  - "#research"
-  - "#framework"
-date: "2026-02-17"
+  - '#research'
+  - '#framework'
+date: '2026-02-17'
 related:
-  - "[[2026-02-17-bootstrap-prompt-adr]]"
+  - '[[2026-02-17-bootstrap-prompt-adr]]'
 ---
+
 # Bootstrap Prompt Engineering Research
 
 **Date**: 2026-02-17
 **Author**: prompt-researcher agent
 **Purpose**: Authoritative research on designing a system/bootstrap prompt that cold-starts an LLM agent with zero prior knowledge of the vaultspec framework
 
----
+______________________________________________________________________
 
 ## Key Principles
 
@@ -42,8 +43,8 @@ Claude 4.x models follow instructions more precisely and literally than predeces
 Instruction hierarchy explicitly defines behavior when instructions at different priority levels conflict. The accepted model:
 
 1. **System instructions** (highest priority — developer/framework)
-2. **User instructions** (task-level directives)
-3. **Data/context** (retrieved information, tool outputs)
+1. **User instructions** (task-level directives)
+1. **Data/context** (retrieved information, tool outputs)
 
 OpenAI research shows models trained with hierarchical instruction awareness demonstrate up to 63% better resistance to instruction conflicts. (Source: [OpenAI - The Instruction Hierarchy](https://openai.com/index/the-instruction-hierarchy/), [ICLR 2025 Paper](https://proceedings.iclr.cc/paper_files/paper/2025/file/ea13534ee239bb3977795b8cc855bacc-Paper-Conference.pdf))
 
@@ -75,7 +76,7 @@ Don't dump everything into the prompt at once. Use lightweight identifiers (file
 
 For long-horizon tasks: use structured formats (JSON) for state data, freeform text for progress notes, and git for checkpointing. Each new context window should have a startup ritual: check state, review progress, then continue. (Source: [Anthropic - Effective Harnesses for Long-Running Agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents))
 
----
+______________________________________________________________________
 
 ## Sources
 
@@ -83,41 +84,41 @@ For long-horizon tasks: use structured formats (JSON) for state data, freeform t
 
 1. **[Anthropic - Claude 4 Prompting Best Practices](https://platform.claude.com/docs/en/docs/build-with-claude/prompt-engineering/claude-4-best-practices)** — Official best practices for Claude 4.x models covering instruction following, tool use, thinking, formatting, and migration guidance.
 
-2. **[Anthropic - Effective Context Engineering for AI Agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)** — Comprehensive guide on context window optimization: system prompts, tool design, data retrieval, long-horizon task management, compaction, sub-agent architectures.
+1. **[Anthropic - Effective Context Engineering for AI Agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)** — Comprehensive guide on context window optimization: system prompts, tool design, data retrieval, long-horizon task management, compaction, sub-agent architectures.
 
-3. **[Anthropic - Advanced Tool Use](https://www.anthropic.com/engineering/advanced-tool-use)** — Tool Search Tool, Programmatic Tool Calling, Tool Use Examples. Advanced patterns for large tool libraries and complex parameter handling.
+1. **[Anthropic - Advanced Tool Use](https://www.anthropic.com/engineering/advanced-tool-use)** — Tool Search Tool, Programmatic Tool Calling, Tool Use Examples. Advanced patterns for large tool libraries and complex parameter handling.
 
-4. **[Anthropic - Effective Harnesses for Long-Running Agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents)** — Dual-prompt architecture (initializer vs. coding agent), state management, multi-window workflows, feature-driven testing.
+1. **[Anthropic - Effective Harnesses for Long-Running Agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents)** — Dual-prompt architecture (initializer vs. coding agent), state management, multi-window workflows, feature-driven testing.
 
-5. **[Google - Gemini Prompting Strategies](https://ai.google.dev/gemini-api/docs/prompting-strategies)** — Official Gemini guide: system instructions, few-shot learning, prompt chaining, temperature settings, behavioral dimension configuration.
+1. **[Google - Gemini Prompting Strategies](https://ai.google.dev/gemini-api/docs/prompting-strategies)** — Official Gemini guide: system instructions, few-shot learning, prompt chaining, temperature settings, behavioral dimension configuration.
 
-6. **[OpenAI - GPT-4.1 Prompting Guide](https://developers.openai.com/cookbook/examples/gpt4-1_prompting_guide)** — Agentic tool use patterns, system prompt structure (role/objective/instructions/reasoning/output/examples), persistence reminders, tool definition best practices.
+1. **[OpenAI - GPT-4.1 Prompting Guide](https://developers.openai.com/cookbook/examples/gpt4-1_prompting_guide)** — Agentic tool use patterns, system prompt structure (role/objective/instructions/reasoning/output/examples), persistence reminders, tool definition best practices.
 
-7. **[OpenAI - GPT-5 Prompting Guide](https://cookbook.openai.com/examples/gpt-5/gpt-5_prompting_guide)** — Plan tasks thoroughly, provide tool preambles, use TODO tools for workflow tracking, define safe vs. unsafe actions.
+1. **[OpenAI - GPT-5 Prompting Guide](https://cookbook.openai.com/examples/gpt-5/gpt-5_prompting_guide)** — Plan tasks thoroughly, provide tool preambles, use TODO tools for workflow tracking, define safe vs. unsafe actions.
 
 ### Secondary (Research Papers)
 
-8. **[OpenAI - The Instruction Hierarchy](https://openai.com/index/the-instruction-hierarchy/)** — Training LLMs to prioritize privileged instructions. Up to 63% improvement in conflict resolution.
+1. **[OpenAI - The Instruction Hierarchy](https://openai.com/index/the-instruction-hierarchy/)** — Training LLMs to prioritize privileged instructions. Up to 63% improvement in conflict resolution.
 
-9. **[Does Prompt Formatting Have Any Impact on LLM Performance?](https://arxiv.org/html/2411.10541v1)** — Research showing format-dependent performance variation up to 40%, model-specific format preferences (GPT-3.5 prefers JSON, GPT-4 prefers Markdown).
+1. **[Does Prompt Formatting Have Any Impact on LLM Performance?](https://arxiv.org/html/2411.10541v1)** — Research showing format-dependent performance variation up to 40%, model-specific format preferences (GPT-3.5 prefers JSON, GPT-4 prefers Markdown).
 
-10. **[ICLR 2025 - Improving LLM Safety with Instruction Hierarchy](https://proceedings.iclr.cc/paper_files/paper/2025/file/ea13534ee239bb3977795b8cc855bacc-Paper-Conference.pdf)** — Instructional Segment Embedding (ISE) for distinguishing system/user/data instruction layers.
+1. **[ICLR 2025 - Improving LLM Safety with Instruction Hierarchy](https://proceedings.iclr.cc/paper_files/paper/2025/file/ea13534ee239bb3977795b8cc855bacc-Paper-Conference.pdf)** — Instructional Segment Embedding (ISE) for distinguishing system/user/data instruction layers.
 
 ### Tertiary (Framework & Community Sources)
 
-11. **[Context Engineering Secrets from Claude](https://01.me/en/2025/12/context-engineering-from-claude/)** — Deep dive on Anthropic's four pillars of context engineering, tool design principles, skills system patterns.
+1. **[Context Engineering Secrets from Claude](https://01.me/en/2025/12/context-engineering-from-claude/)** — Deep dive on Anthropic's four pillars of context engineering, tool design principles, skills system patterns.
 
-12. **[Claude Code System Prompts (GitHub)](https://github.com/Piebald-AI/claude-code-system-prompts)** — Complete extraction of Claude Code's system prompt, 18 built-in tool descriptions, sub-agent prompts, CLAUDE.md patterns.
+1. **[Claude Code System Prompts (GitHub)](https://github.com/Piebald-AI/claude-code-system-prompts)** — Complete extraction of Claude Code's system prompt, 18 built-in tool descriptions, sub-agent prompts, CLAUDE.md patterns.
 
-13. **[Claude Code Memory Documentation](https://code.claude.com/docs/en/memory)** — CLAUDE.md layering hierarchy, auto-memory system, context window management (190k tokens).
+1. **[Claude Code Memory Documentation](https://code.claude.com/docs/en/memory)** — CLAUDE.md layering hierarchy, auto-memory system, context window management (190k tokens).
 
-14. **[DataCamp - CrewAI vs LangGraph vs AutoGen](https://www.datacamp.com/tutorial/crewai-vs-langgraph-vs-autogen)** — Comparative analysis of multi-agent frameworks: role-based (CrewAI), graph-based (LangGraph), conversational (AutoGen) dispatch patterns.
+1. **[DataCamp - CrewAI vs LangGraph vs AutoGen](https://www.datacamp.com/tutorial/crewai-vs-langgraph-vs-autogen)** — Comparative analysis of multi-agent frameworks: role-based (CrewAI), graph-based (LangGraph), conversational (AutoGen) dispatch patterns.
 
-15. **[Intent Recognition and Auto-Routing in Multi-Agent Systems](https://gist.github.com/mkbctrl/a35764e99fe0c8e8c00b2358f55cd7fa)** — DAG-based intent classification, semantic routing, hybrid LLM+embedding approaches.
+1. **[Intent Recognition and Auto-Routing in Multi-Agent Systems](https://gist.github.com/mkbctrl/a35764e99fe0c8e8c00b2358f55cd7fa)** — DAG-based intent classification, semantic routing, hybrid LLM+embedding approaches.
 
-16. **[Anthropic Prompt Engineering Blog](https://claude.com/blog/best-practices-for-prompt-engineering)** — High-level best practices overview.
+1. **[Anthropic Prompt Engineering Blog](https://claude.com/blog/best-practices-for-prompt-engineering)** — High-level best practices overview.
 
----
+______________________________________________________________________
 
 ## Recommendations
 
@@ -127,23 +128,27 @@ Based on the converging guidance from all three providers, our bootstrap prompt 
 
 ```
 Layer 1: IDENTITY & PERSONA
+
   - What is vaultspec? (1-2 sentences)
   - Agent role and capabilities
   - Core behavioral constraints
 
 Layer 2: FRAMEWORK KNOWLEDGE
+
   - Pipeline phases (Research → Specify → Plan → Execute → Verify)
   - Available skills/agents and their purposes
   - Documentation artifact templates
   - Key file paths and conventions
 
 Layer 3: OPERATIONAL RULES
+
   - How to interpret user requests (intent → action mapping)
   - When to use which skill/agent
   - Output format requirements
   - Quality gates and verification steps
 
 Layer 4: DYNAMIC CONTEXT (loaded at runtime)
+
   - Current project state
   - Recently accessed files
   - Task-specific instructions
@@ -200,10 +205,10 @@ This aligns with Anthropic's finding that Claude generalizes better from motivat
 Based on cross-model research:
 
 1. **Use XML tags for section boundaries** — works across Claude (best), Gemini (good), GPT (good)
-2. **Use Markdown for content** — universally understood, token-efficient
-3. **Avoid model-specific features** in the bootstrap prompt (no Claude-specific prefill patterns, no Gemini-specific thinking_level)
-4. **Keep instructions clear and literal** — GPT-4.1+ follows literally; Claude 4.x follows precisely; Gemini 3 reduces need for micro-instructions
-5. **Test the prompt on each target model** before finalizing — performance can vary up to 40% based on formatting alone
+1. **Use Markdown for content** — universally understood, token-efficient
+1. **Avoid model-specific features** in the bootstrap prompt (no Claude-specific prefill patterns, no Gemini-specific thinking_level)
+1. **Keep instructions clear and literal** — GPT-4.1+ follows literally; Claude 4.x follows precisely; Gemini 3 reduces need for micro-instructions
+1. **Test the prompt on each target model** before finalizing — performance can vary up to 40% based on formatting alone
 
 ### R7: Agent Dispatch — Use the CrewAI Pattern (Role-Based Specialization)
 
@@ -229,10 +234,10 @@ Claude 4.6 and Gemini 3 are both MORE proactive than their predecessors. Anthrop
 Based on Anthropic's long-running agent harness research, include a standard startup sequence:
 
 1. Identify the current project root and working directory
-2. Check for existing state (progress files, git log, previous artifacts)
-3. Read the project's CLAUDE.md / rules files
-4. Determine current pipeline phase
-5. Then — and only then — engage with the user's request
+1. Check for existing state (progress files, git log, previous artifacts)
+1. Read the project's CLAUDE.md / rules files
+1. Determine current pipeline phase
+1. Then — and only then — engage with the user's request
 
 This prevents the "cold start" problem where agents make assumptions about project state.
 
@@ -246,7 +251,7 @@ For vaultspec, this means explicitly defining:
 - What actions require user confirmation (e.g., executing code, modifying production files)
 - When the agent should ask for clarification vs. proceed with best guess
 
----
+______________________________________________________________________
 
 ## Anti-Patterns to Avoid
 
@@ -313,7 +318,7 @@ For vaultspec, this means explicitly defining:
 **Why it fails**: Research shows up to 40% performance variation across models for the same prompt format.
 **Fix**: Test the bootstrap prompt on each target model. Maintain a model-specific adaptation layer if needed.
 
----
+______________________________________________________________________
 
 ## Framework-Specific Patterns Worth Emulating
 
@@ -341,19 +346,19 @@ For vaultspec, this means explicitly defining:
 - **Tool preamble**: Explain reasoning before each tool call.
 - **TODO tracking**: Agents maintain a structured task list for complex workflows.
 
----
+______________________________________________________________________
 
 ## Summary of Cross-Provider Consensus
 
 All three providers (Anthropic, Google, OpenAI) agree on these core principles:
 
 1. **Be explicit** — modern models follow instructions literally; vagueness produces vague output
-2. **Provide examples** — few-shot demonstrations outperform verbose rule descriptions
-3. **Structure with delimiters** — XML tags and/or Markdown headers separate instruction layers
-4. **Plan before acting** — agents should reason about approach before executing tools
-5. **Manage context carefully** — context rot is real; minimize, compress, and use progressive disclosure
-6. **Define clear boundaries** — what the agent should do, should not do, and when to ask for help
-7. **Test and iterate** — no prompt is perfect on first draft; measure and refine
+1. **Provide examples** — few-shot demonstrations outperform verbose rule descriptions
+1. **Structure with delimiters** — XML tags and/or Markdown headers separate instruction layers
+1. **Plan before acting** — agents should reason about approach before executing tools
+1. **Manage context carefully** — context rot is real; minimize, compress, and use progressive disclosure
+1. **Define clear boundaries** — what the agent should do, should not do, and when to ask for help
+1. **Test and iterate** — no prompt is perfect on first draft; measure and refine
 
 Where they disagree:
 

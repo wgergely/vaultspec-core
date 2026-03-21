@@ -5,14 +5,14 @@
 # Feature tag (replace {feature} with your feature name, e.g., #editor-demo)
 # Additional tags may be appended below the required pair
 tags:
-  - "#reference"
-  - "#{feature}"
+  - '#reference'
+  - '#{feature}'
 # ISO date format (e.g., 2026-02-06)
-date: "{yyyy-mm-dd}"
+date: '{yyyy-mm-dd}'
 # Related documents as quoted wiki-links
 # (e.g., "[[2026-02-04-feature-research]]")
 related:
-  - "[[{yyyy-mm-dd-*}]]"
+  - '[[{yyyy-mm-dd-*}]]'
 ---
 
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields

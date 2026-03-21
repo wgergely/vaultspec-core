@@ -1,14 +1,15 @@
 ---
 tags:
-  - "#adr"
-  - "#claude-acp-bidirectional"
-date: "2026-02-21"
+  - '#adr'
+  - '#claude-acp-bidirectional'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-claude-acp-bidirectional-reference]]"
-  - "[[2026-02-21-protocol-gap-analysis-research]]"
-  - "[[2026-02-21-acp-layer-audit-research]]"
-  - "[[2026-02-21-acp-ref-impl-research]]"
+  - '[[2026-02-21-claude-acp-bidirectional-reference]]'
+  - '[[2026-02-21-protocol-gap-analysis-research]]'
+  - '[[2026-02-21-acp-layer-audit-research]]'
+  - '[[2026-02-21-acp-ref-impl-research]]'
 ---
+
 # `claude-acp-bidirectional` adr: Multi-Turn Bidirectional Communication in Claude ACP Bridge | (**status:** `superseded`)
 
 **SUPERSEDED** — This ADR is fully superseded by
@@ -21,13 +22,13 @@ applicable. Do not implement any decisions from this document.
 
 The Claude ACP bridge (`src/vaultspec/protocol/acp/claude_bridge.py`) cannot sustain multi-turn conversations. Every `prompt()` call starts a fresh conversation context because we never extract Claude's native `session_id` from SDK messages and never pass it as a `resume` parameter on subsequent queries. The cancel mechanism is global (a single `self._cancelled` boolean), destructive (kills the entire SDK client), and contains async bugs (missing `await` on coroutines). Tool call events are emitted without `kind`, `content`, or `rawInput` fields, making rich client rendering impossible. TodoWrite tool calls are not intercepted for ACP plan updates. Several confirmed bugs -- dead stream references, stale dictionaries, non-standard stop reasons, and a no-op `on_connect()` in the client -- compound these issues.
 
-The [[2026-02-21-protocol-gap-analysis-research]] identified 19 findings across both protocol layers. This ADR addresses the 14 findings that apply to the ACP bridge specifically, organized into six architectural decisions.
+The \[[2026-02-21-protocol-gap-analysis-research]\] identified 19 findings across both protocol layers. This ADR addresses the 14 findings that apply to the ACP bridge specifically, organized into six architectural decisions.
 
 ## Considerations
 
 ### Reference Architecture
 
-The primary reference is `acp-claude-code` (github.com/Xuanwo/acp-claude-code, v0.8.0), a TypeScript ACP bridge for Claude Code with 235 stars. Full analysis in [[2026-02-21-acp-ref-impl-research]]. Key architectural patterns extracted in [[2026-02-21-claude-acp-bidirectional-reference]]:
+The primary reference is `acp-claude-code` (github.com/Xuanwo/acp-claude-code, v0.8.0), a TypeScript ACP bridge for Claude Code with 235 stars. Full analysis in \[[2026-02-21-acp-ref-impl-research]\]. Key architectural patterns extracted in \[[2026-02-21-claude-acp-bidirectional-reference]\]:
 
 - **Stateless `query()` per turn**: The reference creates a fresh `query()` invocation per `prompt()` call and achieves multi-turn via `resume: session.claudeSessionId`. Our Python SDK uses a persistent `ClaudeSDKClient` subprocess instead. Both approaches need `session_id` extraction, but ours also needs it for `load_session`/`resume_session` client recreation.
 
@@ -42,12 +43,12 @@ The primary reference is `acp-claude-code` (github.com/Xuanwo/acp-claude-code, v
 The Python `claude-agent-sdk` and TypeScript `@anthropic-ai/claude-code` SDK are architecturally different:
 
 - The TypeScript SDK exports a stateless `query()` function returning `AsyncIterable<SDKMessage>`. The Python SDK provides `ClaudeSDKClient` with a persistent subprocess, `connect()`, `query()`, and `receive_response()`.
-- The TypeScript SDK emits fine-grained types (`tool_use_start`, `tool_use_output`, `tool_use_error`, `text`). The Python SDK consolidates these into `StreamEvent`, `AssistantMessage`, `UserMessage`, and `ResultMessage`. The mapping is 1:1, but extraction requires different field access patterns (see reference audit, Section 3.3 in [[2026-02-21-claude-acp-bidirectional-reference]]).
+- The TypeScript SDK emits fine-grained types (`tool_use_start`, `tool_use_output`, `tool_use_error`, `text`). The Python SDK consolidates these into `StreamEvent`, `AssistantMessage`, `UserMessage`, and `ResultMessage`. The mapping is 1:1, but extraction requires different field access patterns (see reference audit, Section 3.3 in \[[2026-02-21-claude-acp-bidirectional-reference]\]).
 - Both SDKs carry `session_id` on `ResultMessage` and `StreamEvent` (Python SDK `types.py` lines 679, 691). Both SDKs support `resume` on `ClaudeAgentOptions` (Python SDK `types.py` line 725).
 
 ### Our Current Architecture
 
-Audited in [[2026-02-21-acp-layer-audit-research]]. Key issues:
+Audited in \[[2026-02-21-acp-layer-audit-research]\]. Key issues:
 
 - `_SessionState` (line 148-159) stores config but no Claude session ID, no per-session cancel state, no tool call content tracking.
 - `prompt()` (line 414-474) calls `self._sdk_client.query()` then iterates `receive_response()`. Never extracts `session_id`. Uses global `self._cancelled`. Returns non-standard `"refusal"` stop reason on errors.
@@ -73,7 +74,7 @@ Audited in [[2026-02-21-acp-layer-audit-research]]. Key issues:
 
 ## Implementation
 
-Six decisions, ordered by priority. Each references specific patterns from [[2026-02-21-claude-acp-bidirectional-reference]] and findings from [[2026-02-21-protocol-gap-analysis-research]].
+Six decisions, ordered by priority. Each references specific patterns from \[[2026-02-21-claude-acp-bidirectional-reference]\] and findings from \[[2026-02-21-protocol-gap-analysis-research]\].
 
 ### Decision 1: Session Resume via Claude Session ID
 

@@ -1,13 +1,14 @@
 ---
 tags:
-  - "#adr"
-  - "#protocol"
-date: "2026-02-15"
+  - '#adr'
+  - '#protocol'
+date: '2026-02-15'
 related:
-  - "[[2026-02-15-subagent-adr]]"
-  - "[[2026-02-07-a2a-research]]"
-  - "[[2026-02-07-protocol-architecture-research]]"
+  - '[[2026-02-15-subagent-adr]]'
+  - '[[2026-02-07-a2a-research]]'
+  - '[[2026-02-07-protocol-architecture-research]]'
 ---
+
 ## ADR: Cross-Agent Bidirectional Communication — Gemini and Claude via A2A
 
 ## Status
@@ -30,7 +31,7 @@ converging. No turnkey reference implementation of a Claude agent and a Gemini
 agent having a live A2A conversation has been published, but every structural
 prerequisite is in place.
 
----
+______________________________________________________________________
 
 ## Context
 
@@ -38,11 +39,11 @@ prerequisite is in place.
 
 Three protocols are relevant — and the naming is a source of real confusion:
 
-| Name | Full Name | Maintainer | Scope | Python Package | Status |
-|------|-----------|------------|-------|----------------|--------|
-| **ACP** (Zed) | Agent Client Protocol | Zed Industries / agentclientprotocol | Editor-to-agent (vertical) | `agent-client-protocol` v0.8.0 | Active, v0.10.8 |
-| **ACP** (IBM) | Agent Communication Protocol | IBM / i-am-bee | Agent-to-agent | (archived) | **Merged into A2A** (Aug 2025) |
-| **A2A** | Agent2Agent Protocol | Google → Linux Foundation | Agent-to-agent (horizontal) | `a2a-sdk` v0.3.22 | Active, v0.3.0 spec |
+| Name          | Full Name                    | Maintainer                           | Scope                       | Python Package                 | Status                         |
+| ------------- | ---------------------------- | ------------------------------------ | --------------------------- | ------------------------------ | ------------------------------ |
+| **ACP** (Zed) | Agent Client Protocol        | Zed Industries / agentclientprotocol | Editor-to-agent (vertical)  | `agent-client-protocol` v0.8.0 | Active, v0.10.8                |
+| **ACP** (IBM) | Agent Communication Protocol | IBM / i-am-bee                       | Agent-to-agent              | (archived)                     | **Merged into A2A** (Aug 2025) |
+| **A2A**       | Agent2Agent Protocol         | Google → Linux Foundation            | Agent-to-agent (horizontal) | `a2a-sdk` v0.3.22              | Active, v0.3.0 spec            |
 
 **Critical clarification**: Vaultspec uses **Zed's ACP** (`agent-client-protocol`
 package, `import acp`). This is the editor-to-agent protocol over JSON-RPC/stdio.
@@ -66,16 +67,16 @@ and Google co-founded the same body.
 
 ### Native Capabilities
 
-| Capability | Claude | Gemini |
-|---|---|---|
-| Speaks A2A natively | No | Yes (via Google ADK) |
-| Speaks Zed ACP natively | No (bridged via `ClaudeACPBridge`) | Yes (`--experimental-acp`) |
-| Speaks MCP (as client) | Yes | Yes |
-| Can be wrapped in A2A server | Yes (via `a2a-sdk` `AgentExecutor`) | N/A — native |
-| Intra-vendor multi-agent | Yes (Agent Teams, subagents) | Yes (ADK multi-agent) |
-| Cross-vendor multi-agent | Not native — bridge required | Not native — bridge required |
+| Capability                   | Claude                              | Gemini                       |
+| ---------------------------- | ----------------------------------- | ---------------------------- |
+| Speaks A2A natively          | No                                  | Yes (via Google ADK)         |
+| Speaks Zed ACP natively      | No (bridged via `ClaudeACPBridge`)  | Yes (`--experimental-acp`)   |
+| Speaks MCP (as client)       | Yes                                 | Yes                          |
+| Can be wrapped in A2A server | Yes (via `a2a-sdk` `AgentExecutor`) | N/A — native                 |
+| Intra-vendor multi-agent     | Yes (Agent Teams, subagents)        | Yes (ADK multi-agent)        |
+| Cross-vendor multi-agent     | Not native — bridge required        | Not native — bridge required |
 
----
+______________________________________________________________________
 
 ## Research Findings
 
@@ -85,8 +86,11 @@ The Agent Client Protocol (Zed) is explicitly scoped to editor↔agent:
 
 - **Fixed asymmetric roles**: `ClientSideConnection` vs `AgentSideConnection` — an
   agent cannot simultaneously be a client to another agent
+
 - **Stdio-only transport**: requires subprocess parent-child; no network peers
+
 - **No discovery**: no mechanism for agents to find each other
+
 - **No delegation**: no primitive for agent-to-agent coordination
 
 The `extMethod()`/`extNotification()` extension points could theoretically carry
@@ -102,26 +106,36 @@ A2A v0.3.0 provides everything needed:
 
 - **Agent Cards**: JSON capability manifests for agent discovery (identity, skills,
   auth schemes, supported bindings)
+
 - **11 RPC operations**: `SendMessage`, `SendStreamingMessage`, `GetTask`,
   `ListTasks`, `CancelTask`, `SubscribeToTask`, push notification CRUD,
   `GetExtendedAgentCard`
+
 - **Task lifecycle**: submitted → working → input-required → completed | failed |
   canceled | rejected
+
 - **Three transports**: HTTP+JSON/REST, gRPC, JSON-RPC 2.0 over HTTP (with SSE)
+
 - **Enterprise auth**: API keys, OAuth 2.0, OpenID Connect, Mutual TLS
+
 - **Opaque execution**: agents collaborate without exposing internals
+
 - **21.9k GitHub stars**, 5 language SDKs, Linux Foundation governance
 
 ### 3. Claude's Cross-Agent Position
 
 - **Claude Agent SDK**: Native subagent support (hierarchical parent→child only).
   No peer-to-peer. No A2A.
+
 - **Claude Code Agent Teams**: Peer-to-peer via `SendMessage` tool, but proprietary
   file-based protocol. Experimental. Intra-Claude only.
+
 - **MCP Connector**: Claude API has built-in MCP client — can consume tools from any
   MCP server. But Claude does NOT expose an MCP server interface for others.
+
 - **Agent Skills**: Open standard at agentskills.io. Capability description format,
   not a communication protocol. Adopted by AAIF.
+
 - **Bridge pattern**: Claude agents can be wrapped in A2A-compatible service layers.
   Anthropic published a webinar: "Deploying multi-agent systems using MCP and A2A
   with Claude on Vertex AI."
@@ -130,8 +144,11 @@ A2A v0.3.0 provides everything needed:
 
 - **Google ADK**: Native A2A support. Also supports Claude models via `Claude`
   wrapper class.
+
 - **Native ACP**: `gemini --experimental-acp` for editor integration.
+
 - **Agent Engine**: Supports deploying agents regardless of framework or model.
+
 - **A2A Agent Cards**: First-class concept in ADK.
 
 ### 5. How Bidirectional Communication Would Work
@@ -152,49 +169,53 @@ Each agent exposes an A2A Agent Card at a well-known URL. Discovery via Agent Ca
 fetch. Communication via `SendMessage` over HTTP with task lifecycle management.
 Streaming via SSE.
 
----
+______________________________________________________________________
 
 ## Vaultspec Architecture Readiness
 
 ### What's Already In Place
 
-| Asset | Location | Readiness |
-|-------|----------|-----------|
-| `a2a-sdk` v0.3.22 installed | pyproject.toml, .venv | Ready |
-| `TaskEngine.input_required` state | `orchestration/task_engine.py` | Maps to A2A `input-required` |
-| `ext_method`/`ext_notification` stubs | `acp/client.py`, `acp/claude_bridge.py` | Extension hooks present |
-| `ProcessSpec.mcp_servers` | `providers/base.py` | Agents can receive tool configs |
-| MCP dispatch pattern | `vs-subagent-mcp` | One-way agent→agent works today |
-| A2A research docs | `.vault/research/2026-02-07-a2a-*` | Prior research available |
-| `A2AStarletteApplication` | `a2a.server.apps` | Ready for HTTP server |
-| `AgentCard`, `AgentSkill` types | `a2a.types` | Ready for agent discovery |
+| Asset                                 | Location                                | Readiness                       |
+| ------------------------------------- | --------------------------------------- | ------------------------------- |
+| `a2a-sdk` v0.3.22 installed           | pyproject.toml, .venv                   | Ready                           |
+| `TaskEngine.input_required` state     | `orchestration/task_engine.py`          | Maps to A2A `input-required`    |
+| `ext_method`/`ext_notification` stubs | `acp/client.py`, `acp/claude_bridge.py` | Extension hooks present         |
+| `ProcessSpec.mcp_servers`             | `providers/base.py`                     | Agents can receive tool configs |
+| MCP dispatch pattern                  | `vs-subagent-mcp`                       | One-way agent→agent works today |
+| A2A research docs                     | `.vault/research/2026-02-07-a2a-*`      | Prior research available        |
+| `A2AStarletteApplication`             | `a2a.server.apps`                       | Ready for HTTP server           |
+| `AgentCard`, `AgentSkill` types       | `a2a.types`                             | Ready for agent discovery       |
 
 ### What Needs to Be Built
 
 1. **A2A `AgentExecutor` wrapper** for Claude agents (wraps `ClaudeACPBridge` or
    direct Agent SDK in an A2A server)
-2. **A2A Agent Card generation** for each vaultspec agent definition
-3. **Agent discovery/registry** — Agent Card hosting and lookup
-4. **A2A ↔ ACP bridge** in the orchestrator (orchestrator speaks ACP to agents
-   internally, A2A externally for peer communication)
-5. **Task state mapping**: A2A task states ↔ `TaskEngine` states
 
----
+1. **A2A Agent Card generation** for each vaultspec agent definition
+
+1. **Agent discovery/registry** — Agent Card hosting and lookup
+
+1. **A2A ↔ ACP bridge** in the orchestrator (orchestrator speaks ACP to agents
+   internally, A2A externally for peer communication)
+
+1. **Task state mapping**: A2A task states ↔ `TaskEngine` states
+
+______________________________________________________________________
 
 ## Feasibility Scorecard
 
-| Dimension | Score | Evidence |
-|---|---|---|
-| Protocol maturity | 7/10 | A2A v0.3.0 comprehensive but pre-1.0 |
-| SDK availability | 8/10 | `a2a-sdk` v0.3.22, ADK native, Claude Agent SDK |
-| Governance alignment | 10/10 | Anthropic + Google co-founded AAIF |
-| Cross-vendor design | 9/10 | A2A is explicitly vendor-neutral and opaque |
-| Public examples | 3/10 | No published Claude↔Gemini A2A reference |
-| Production maturity | 5/10 | Pre-1.0, ADK A2A is "experimental" |
-| Vaultspec readiness | 6/10 | Good hooks, `a2a-sdk` installed, migration needed |
-| **Overall** | **8/10** | **Engineering task, not research question** |
+| Dimension            | Score    | Evidence                                          |
+| -------------------- | -------- | ------------------------------------------------- |
+| Protocol maturity    | 7/10     | A2A v0.3.0 comprehensive but pre-1.0              |
+| SDK availability     | 8/10     | `a2a-sdk` v0.3.22, ADK native, Claude Agent SDK   |
+| Governance alignment | 10/10    | Anthropic + Google co-founded AAIF                |
+| Cross-vendor design  | 9/10     | A2A is explicitly vendor-neutral and opaque       |
+| Public examples      | 3/10     | No published Claude↔Gemini A2A reference          |
+| Production maturity  | 5/10     | Pre-1.0, ADK A2A is "experimental"                |
+| Vaultspec readiness  | 6/10     | Good hooks, `a2a-sdk` installed, migration needed |
+| **Overall**          | **8/10** | **Engineering task, not research question**       |
 
----
+______________________________________________________________________
 
 ## Installed Packages Audit
 
@@ -218,9 +239,12 @@ is installed but has zero import references in production code.
 
 - **`agent-client-protocol` is NOT deprecated**. It is Zed's editor↔agent protocol
   (v0.10.8, active development). It serves a different purpose than A2A.
+
 - **IBM's ACP IS deprecated** (merged into A2A). But we never used it.
+
 - **No migration from ACP→A2A is needed for current functionality**. The Zed ACP
   orchestrator↔agent communication pattern is correct and should be preserved.
+
 - **A2A is ADDITIVE** — it adds agent-to-agent on top of existing ACP
   orchestrator↔agent.
 
@@ -232,7 +256,7 @@ ACP  (orchestrator-to-agent) — keep as-is (Zed protocol, stdio)
 A2A  (agent-to-agent)     — add new layer (HTTP, agent cards)
 ```
 
----
+______________________________________________________________________
 
 ## Decision
 
@@ -246,9 +270,9 @@ is correct. No migration needed.
 Add A2A as a new layer for agent-to-agent communication:
 
 1. Implement `AgentExecutor` wrapper around vaultspec agents
-2. Generate Agent Cards from agent definition files
-3. Expose agents as A2A HTTP servers via `A2AStarletteApplication`
-4. Map `TaskEngine` states to A2A task lifecycle
+1. Generate Agent Cards from agent definition files
+1. Expose agents as A2A HTTP servers via `A2AStarletteApplication`
+1. Map `TaskEngine` states to A2A task lifecycle
 
 ### Long-term
 
@@ -258,17 +282,20 @@ Full MCP + ACP + A2A stack:
 - ACP for editor/orchestrator↔agent communication (stdio)
 - A2A for peer agent↔agent collaboration (HTTP)
 
----
+______________________________________________________________________
 
 ## Risks
 
 1. **A2A pre-1.0 instability**: v0.3.x may break before 1.0. Mitigated by thin
    wrapper layer isolating A2A from core logic.
-2. **No reference implementation**: First-mover risk building Claude↔Gemini A2A.
+
+1. **No reference implementation**: First-mover risk building Claude↔Gemini A2A.
    Mitigated by strong SDK availability on both sides.
-3. **Naming confusion**: "ACP" means two different things in the AI agent ecosystem.
+
+1. **Naming confusion**: "ACP" means two different things in the AI agent ecosystem.
    Mitigated by this ADR documenting the distinction.
-4. **Latency overhead**: A2A HTTP transport adds network latency vs stdio ACP.
+
+1. **Latency overhead**: A2A HTTP transport adds network latency vs stdio ACP.
    Acceptable for agent collaboration tasks.
 
 ## Sources

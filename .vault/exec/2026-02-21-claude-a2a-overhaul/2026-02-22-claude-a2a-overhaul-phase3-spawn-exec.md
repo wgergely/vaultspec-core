@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#exec"
-  - "#step-record"
-date: "2026-02-22"
+  - '#exec'
+  - '#step-record'
+date: '2026-02-22'
 related:
-  - "[[2026-02-21-claude-a2a-overhaul-impl-plan]]"
-  - "[[2026-02-21-claude-a2a-overhaul-adr]]"
+  - '[[2026-02-21-claude-a2a-overhaul-impl-plan]]'
+  - '[[2026-02-21-claude-a2a-overhaul-adr]]'
 ---
+
 # Phase 3: Process Spawning (ADR Decision 4)
 
 ## Changes

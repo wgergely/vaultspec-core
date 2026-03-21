@@ -1,13 +1,14 @@
 ---
 tags:
-  - "#research"
-  - "#french-novel-relay"
-date: "2026-02-19"
+  - '#research'
+  - '#french-novel-relay'
+date: '2026-02-19'
 related:
-  - "[[2026-02-15-cross-agent-adr]]"
-  - "[[2026-02-15-a2a-adr]]"
-  - "[[2026-02-07-a2a-research]]"
+  - '[[2026-02-15-cross-agent-adr]]'
+  - '[[2026-02-15-a2a-adr]]'
+  - '[[2026-02-07-a2a-research]]'
 ---
+
 # `french-novel-relay` research: 3-Turn Collaborative French Story Test via A2A
 
 Research into implementing a multi-agent collaborative French novel relay test
@@ -40,12 +41,12 @@ No test has Agent A's output meaningfully consumed and extended by Agent B.
 
 The Jean-Claude persona is deeply embedded as a test fixture identity:
 
-| Component | Location | Content |
-|---|---|---|
-| Identity fingerprint | `test_claude.py`, `test_gemini.py` | `"You are Jean-Claude, a helpful assistant."` — assert name in response |
-| Le Critique Pâtissier | `test_e2e_bridge.py` | Full persona: French pastry critic, writes about sentient baked goods |
-| French Baker | `test_mcp_protocol.py`, orchestration conftest | `"Bonjour! I am Jean-Claude, your French Baker."` — round-trip assertion |
-| Le Croissant Solitaire | `test-project/.vault/stories/` | 3 chapters + epilogue of French prose about Croustillant the croissant |
+| Component              | Location                                       | Content                                                                  |
+| ---------------------- | ---------------------------------------------- | ------------------------------------------------------------------------ |
+| Identity fingerprint   | `test_claude.py`, `test_gemini.py`             | `"You are Jean-Claude, a helpful assistant."` — assert name in response  |
+| Le Critique Pâtissier  | `test_e2e_bridge.py`                           | Full persona: French pastry critic, writes about sentient baked goods    |
+| French Baker           | `test_mcp_protocol.py`, orchestration conftest | `"Bonjour! I am Jean-Claude, your French Baker."` — round-trip assertion |
+| Le Croissant Solitaire | `test-project/.vault/stories/`                 | 3 chapters + epilogue of French prose about Croustillant the croissant   |
 
 The story corpus is rich: Ch1 (La Mélancolie de Croustillant), Ch2 (La Nuit et
 le Chat Philosophe), and Épilogue (Le Choix de Croustillant). All are in fluent
@@ -58,23 +59,31 @@ From `protocol/a2a/`:
 
 - **`create_app(executor, card)`** — wraps any `AgentExecutor` in a Starlette
   ASGI app with `DefaultRequestHandler` + `InMemoryTaskStore`
+
 - **`_send_message_payload(text)`** — builds JSON-RPC `message/send` requests
+
 - **`_build_client(executor, name, port)`** — creates in-process `httpx.AsyncClient`
   backed by `ASGITransport`
+
 - **`ClaudeA2AExecutor`** — real Claude via `claude-agent-sdk`, DI-injectable
   `client_factory` and `options_factory`
+
 - **`GeminiA2AExecutor`** — real Gemini via `run_subagent()`, DI-injectable
   `run_subagent` callable
+
 - **`PrefixExecutor(prefix)`** — deterministic test double, prepends string
+
 - **`EchoExecutor`** — returns `"Echo: {text}"`
 
 The gold standard pattern (from `TestGoldStandardBidirectional`):
+
 ```
 Step 1: Send message to Agent A → get response_text_a
 Step 2: Send f"Context: '{response_text_a}'. Your task: ..." to Agent B → get response_text_b
 ```
 
 This pattern trivially extends to 3 turns:
+
 ```
 Step 1: Agent A begins story → chapter_1
 Step 2: Agent B receives chapter_1, continues → chapter_2
@@ -86,7 +95,7 @@ Step 3: Agent A receives chapter_1 + chapter_2, finishes → epilogue
 #### Option A: In-Process Mock Relay (No LLM)
 
 A new `StoryRelayExecutor(AgentExecutor)` that appends a chapter marker and
-forwards the accumulated text. Deterministic, fast (<1s), no API cost.
+forwards the accumulated text. Deterministic, fast (\<1s), no API cost.
 
 ```python
 class StoryRelayExecutor(AgentExecutor):
@@ -119,16 +128,22 @@ Extend `TestGoldStandardBidirectional` to 3 turns with French story prompts.
 Jean-Claude persona injected via system prompt on both executors.
 
 ```python
+
 # Turn 1: Claude begins
+
 prompt_1 = (
     "Tu es Jean-Claude, critique pâtissier. Commence une histoire en français "
     "sur un croissant nommé Croustillant dans une boulangerie parisienne. "
     "Écris exactement un paragraphe (3-5 phrases). Termine par une situation "
     "de suspense. Réponds uniquement avec l'histoire, sans explication."
 )
+
 # Turn 2: Gemini continues
+
 prompt_2 = f"Voici le début d'une histoire:\n\n{chapter_1}\n\nContinue..."
+
 # Turn 3: Claude finishes
+
 prompt_3 = f"Voici l'histoire jusqu'ici:\n\n{chapter_1}\n\n{chapter_2}\n\nTermine..."
 ```
 
@@ -148,8 +163,7 @@ Two test classes in the same file:
    templates. Validates orchestration correctness, message chaining, task
    independence, and the relay pattern itself. Fast, no LLM.
 
-2. `TestFrenchNovelRelayLive` (`@pytest.mark.integration @pytest.mark.claude
-   @pytest.mark.gemini @pytest.mark.timeout(300)`) — 3-turn relay with real
+1. `TestFrenchNovelRelayLive` (`@pytest.mark.integration @pytest.mark.claude @pytest.mark.gemini @pytest.mark.timeout(300)`) — 3-turn relay with real
    `ClaudeA2AExecutor` and `GeminiA2AExecutor`. French story prompts with
    Jean-Claude persona. Validates real bidirectional creative collaboration.
 
@@ -162,11 +176,14 @@ For the live test, we need to validate that the output is actually French prose
 continuing a story (not just an echo or refusal). Options:
 
 **Minimal validation (recommended for initial implementation):**
+
 - Assert response is non-empty and exceeds minimum length (>100 chars)
+
 - Assert response contains at least one French indicator word from a set
-  (`{"le", "la", "les", "un", "une", "de", "du", "des", "et", "est", "dans",
-  "sur", "qui", "que", "pas", "avec", "pour", "son", "ses", "mais"}`)
+  (`{"le", "la", "les", "un", "une", "de", "du", "des", "et", "est", "dans", "sur", "qui", "que", "pas", "avec", "pour", "son", "ses", "mais"}`)
+
 - Assert response contains the character name "Croustillant" (continuity check)
+
 - Assert each subsequent chapter is distinct from prior chapters (no echo)
 
 **Why not use language detection libraries?** Adding `langdetect` or `lingua`
@@ -179,6 +196,7 @@ refusals, error messages, or empty responses.
 **New file:** `protocol/a2a/tests/test_french_novel_relay.py`
 
 **New in conftest.py:**
+
 - `StoryRelayExecutor` class (or inline in test file if small enough)
 - No new fixtures needed — existing `_build_client`, `_send_message_payload`,
   `_make_card` from the test module pattern are sufficient
@@ -190,6 +208,7 @@ supports the 3-turn pattern natively — it's just a test file.
 use 10050-10099).
 
 **Markers:**
+
 - Mock tests: `@pytest.mark.integration`
 - Live tests: `@pytest.mark.integration @pytest.mark.claude @pytest.mark.gemini`
 - Timeout: 300s for live (matching `TestGoldStandardBidirectional`)
@@ -197,15 +216,20 @@ use 10050-10099).
 ### 7. Story Prompt Design
 
 The prompts should be:
+
 - **In French** — to validate French output
+
 - **Constrained** — "exactly one paragraph, 3-5 sentences" to keep LLM costs
   down and responses predictable
+
 - **Anchored** — reference "Croustillant" by name for continuity validation
+
 - **Suspenseful** — each chapter ends with a hook for the next agent
 
 Example 3-turn prompt sequence:
 
 **Turn 1 (Claude begins):**
+
 > Tu es Jean-Claude, un critique pâtissier français avec un don pour l'écriture
 > dramatique. Commence une histoire en français sur un croissant nommé
 > Croustillant qui vit dans une boulangerie parisienne. Écris exactement un
@@ -213,6 +237,7 @@ Example 3-turn prompt sequence:
 > uniquement avec l'histoire.
 
 **Turn 2 (Gemini continues):**
+
 > Tu es Jean-Claude, un critique pâtissier français. Voici le début d'une
 > histoire écrite par un collègue:
 >
@@ -223,6 +248,7 @@ Example 3-turn prompt sequence:
 > de tension. Réponds uniquement avec la suite de l'histoire.
 
 **Turn 3 (Claude finishes):**
+
 > Tu es Jean-Claude, un critique pâtissier français. Voici une histoire en
 > deux parties écrite collaborativement:
 >
@@ -240,9 +266,11 @@ but makes three key advances:
 
 1. **3 turns instead of 2** — validates that the relay can continue beyond a
    single handoff
-2. **Creative content instead of tokens** — validates that agents produce
+
+1. **Creative content instead of tokens** — validates that agents produce
    meaningful output that builds on prior context, not just echo fingerprints
-3. **French language** — validates multilingual capability and adds a
+
+1. **French language** — validates multilingual capability and adds a
    distinctively memorable test identity
 
 It does NOT replace existing gold standard tests (which validate exact-match
@@ -250,14 +278,14 @@ tokens and are more deterministic). It complements them.
 
 ### 9. Risk Assessment
 
-| Risk | Likelihood | Mitigation |
-|---|---|---|
-| LLM refuses to write fiction | Low | Explicit persona + "Réponds uniquement avec l'histoire" |
-| LLM responds in English | Medium | French-word presence assertion; prompts are entirely in French |
-| Output too long / too short | Medium | Length bounds (100-2000 chars) in assertions |
-| Character name dropped | Low | Explicit prompt instruction + assertion |
-| API timeout | Medium | 300s timeout; `pytest.mark.timeout`; skip if CLIs absent |
-| Flaky output format | Medium | Minimal validation (no structural parsing) |
+| Risk                         | Likelihood | Mitigation                                                     |
+| ---------------------------- | ---------- | -------------------------------------------------------------- |
+| LLM refuses to write fiction | Low        | Explicit persona + "Réponds uniquement avec l'histoire"        |
+| LLM responds in English      | Medium     | French-word presence assertion; prompts are entirely in French |
+| Output too long / too short  | Medium     | Length bounds (100-2000 chars) in assertions                   |
+| Character name dropped       | Low        | Explicit prompt instruction + assertion                        |
+| API timeout                  | Medium     | 300s timeout; `pytest.mark.timeout`; skip if CLIs absent       |
+| Flaky output format          | Medium     | Minimal validation (no structural parsing)                     |
 
 ### 10. Recommendation
 

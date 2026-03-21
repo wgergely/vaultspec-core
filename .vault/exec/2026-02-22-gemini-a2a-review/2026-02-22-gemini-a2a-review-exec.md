@@ -1,16 +1,17 @@
 ---
 tags:
-  - "#exec"
-  - "#gemini-a2a-review"
-date: "2026-02-22"
+  - '#exec'
+  - '#gemini-a2a-review'
+date: '2026-02-22'
 related:
-  - "[[2026-02-15-a2a-adr]]"
-  - "[[2026-02-20-a2a-team-adr]]"
-  - "[[2026-02-21-gemini-provider-auth-strategy-adr]]"
-  - "[[2026-02-21-claude-a2a-overhaul-adr]]"
-  - "[[2026-02-20-a2a-team-gemini-research]]"
-  - "[[2026-02-21-gemini-bridge-auth-research]]"
+  - '[[2026-02-15-a2a-adr]]'
+  - '[[2026-02-20-a2a-team-adr]]'
+  - '[[2026-02-21-gemini-provider-auth-strategy-adr]]'
+  - '[[2026-02-21-claude-a2a-overhaul-adr]]'
+  - '[[2026-02-20-a2a-team-gemini-research]]'
+  - '[[2026-02-21-gemini-bridge-auth-research]]'
 ---
+
 # `gemini-a2a-review` code review
 
 **Status:** `REVISION REQUIRED`
@@ -112,9 +113,12 @@ related:
 
   **Recommendation:** Introduce a mechanism to cancel the in-flight `run_subagent()`
   call. Options include:
+
   - Wrapping the `run_subagent()` call in `asyncio.create_task()` and storing the
     task for cancellation.
+
   - Adding a cancel callback to `run_subagent()` that terminates the subprocess.
+
   - Using `asyncio.wait_for()` with an `asyncio.Event` that `cancel()` sets.
 
 - **[HIGH] No concurrency protection**
@@ -223,22 +227,22 @@ related:
 
 ## Feature Parity Matrix: Gemini vs. Claude A2A Executor
 
-| Feature | Claude | Gemini | Gap Severity |
-|---|---|---|---|
-| Basic execute (prompt -> result) | Yes | Yes | -- |
-| Error handling (exception -> failed task) | Yes | Yes | -- |
-| Cancel (emit canceled status) | Yes | Yes | -- |
-| Cancel (interrupt running subprocess) | Yes | No | HIGH |
-| Cancel (non-destructive, preserve session) | Yes | N/A | HIGH (no sessions) |
-| Retry on transient errors | Yes (3 attempts, exp backoff) | No | HIGH |
-| Session resume via context_id | Yes | No | HIGH |
-| Streaming progress events | Yes (throttled) | No | HIGH |
-| Rate-limit-specific handling | Yes (MessageParseError + error field) | No | HIGH |
-| Concurrency locks | Yes (asyncio.Lock) | No | MEDIUM |
-| Constructor DI for testing | Yes (client_factory, options_factory) | Yes (run_subagent) | -- |
-| Logging (info, debug, error) | Yes | Yes | -- |
-| Type annotations | Yes | Yes | -- |
-| Public API doc comments | Yes | Partial | MEDIUM |
+| Feature                                    | Claude                                | Gemini             | Gap Severity       |
+| ------------------------------------------ | ------------------------------------- | ------------------ | ------------------ |
+| Basic execute (prompt -> result)           | Yes                                   | Yes                | --                 |
+| Error handling (exception -> failed task)  | Yes                                   | Yes                | --                 |
+| Cancel (emit canceled status)              | Yes                                   | Yes                | --                 |
+| Cancel (interrupt running subprocess)      | Yes                                   | No                 | HIGH               |
+| Cancel (non-destructive, preserve session) | Yes                                   | N/A                | HIGH (no sessions) |
+| Retry on transient errors                  | Yes (3 attempts, exp backoff)         | No                 | HIGH               |
+| Session resume via context_id              | Yes                                   | No                 | HIGH               |
+| Streaming progress events                  | Yes (throttled)                       | No                 | HIGH               |
+| Rate-limit-specific handling               | Yes (MessageParseError + error field) | No                 | HIGH               |
+| Concurrency locks                          | Yes (asyncio.Lock)                    | No                 | MEDIUM             |
+| Constructor DI for testing                 | Yes (client_factory, options_factory) | Yes (run_subagent) | --                 |
+| Logging (info, debug, error)               | Yes                                   | Yes                | --                 |
+| Type annotations                           | Yes                                   | Yes                | --                 |
+| Public API doc comments                    | Yes                                   | Partial            | MEDIUM             |
 
 ## ADR Compliance Assessment
 
@@ -263,6 +267,7 @@ support. **Partially compliant -- retry gap.**
 The auth ADR specifies a three-state check in `GeminiProvider.prepare_process()`:
 API key path, OAuth refresh path, and missing-auth warning. The implementation at
 `gemini.py:277-301` implements all three states exactly as specified, including:
+
 - Debug log when `GEMINI_API_KEY` is present
 - OAuth token expiry check with proactive refresh via `_refresh_gemini_oauth_token()`
 - Atomic write-back via `os.replace()`
@@ -297,23 +302,27 @@ Claude counterpart.
 
 1. Add retry logic with configurable `max_retries` and `retry_base_delay`, matching
    the Claude executor's pattern. Classify retryable vs. non-retryable exceptions.
-2. Add cancel infrastructure: track the running task for interruption, add
+
+1. Add cancel infrastructure: track the running task for interruption, add
    `_cancel_events` dict, use `asyncio.wait_for()` or `asyncio.create_task()` to
    enable mid-execution cancellation.
-3. Add concurrency locks if any shared mutable state is introduced.
-4. Add a docstring to `cancel()` documenting its behavior.
+
+1. Add concurrency locks if any shared mutable state is introduced.
+
+1. Add a docstring to `cancel()` documenting its behavior.
 
 **Tracked separately (requires upstream changes):**
 
-5. Session resume: requires `run_subagent()` to accept `resume_session_id`. File a
+1. Session resume: requires `run_subagent()` to accept `resume_session_id`. File a
    follow-up work item.
-6. Streaming progress: requires either a callback interface in `run_subagent()` or
+
+1. Streaming progress: requires either a callback interface in `run_subagent()` or
    a background heartbeat timer. File a follow-up work item.
 
 **Nice-to-have:**
 
-7. Add test for `response_text=None` case.
-8. Add concurrent execution test.
+1. Add test for `response_text=None` case.
+1. Add concurrent execution test.
 
 ## Notes
 

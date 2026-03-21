@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#research"
-  - "#protocol"
-date: "2026-02-20"
+  - '#research'
+  - '#protocol'
+date: '2026-02-20'
 related:
-  - "[[2026-02-15-cross-agent-bidirectional-communication]]"
-  - "[[2026-02-07-a2a-protocol-reference]]"
+  - '[[2026-02-15-cross-agent-bidirectional-communication]]'
+  - '[[2026-02-07-a2a-protocol-reference]]'
 ---
+
 # `a2a-team` research: Claude Code Team API & Two-Way Agent Communication
 
 Investigation of the Claude Code team infrastructure tools (TaskCreate, TaskUpdate,
@@ -45,6 +46,7 @@ Updates task status, ownership, dependencies, and metadata:
 - `addBlocks` / `addBlockedBy`: establish inter-task dependency chains
 
 Key behaviors:
+
 - Tasks progress through: `pending` -> `in_progress` -> `completed`
 - `deleted` permanently removes a task
 - Dependency tracking: blocked tasks cannot be started until blockers resolve
@@ -63,13 +65,13 @@ blockedBy), and all metadata.
 
 The primary inter-agent communication mechanism. Five message types:
 
-| Type | Purpose | Key Fields |
-|------|---------|------------|
-| `message` | Direct message to a specific teammate | `recipient`, `content`, `summary` |
-| `broadcast` | Message all teammates simultaneously | `content`, `summary` |
-| `shutdown_request` | Ask a teammate to gracefully shut down | `recipient`, `content` |
-| `shutdown_response` | Teammate responds to shutdown request | `request_id`, `approve`, `content` |
-| `plan_approval_response` | Approve/reject teammate's plan | `request_id`, `recipient`, `approve`, `content` |
+| Type                     | Purpose                                | Key Fields                                      |
+| ------------------------ | -------------------------------------- | ----------------------------------------------- |
+| `message`                | Direct message to a specific teammate  | `recipient`, `content`, `summary`               |
+| `broadcast`              | Message all teammates simultaneously   | `content`, `summary`                            |
+| `shutdown_request`       | Ask a teammate to gracefully shut down | `recipient`, `content`                          |
+| `shutdown_response`      | Teammate responds to shutdown request  | `request_id`, `approve`, `content`              |
+| `plan_approval_response` | Approve/reject teammate's plan         | `request_id`, `recipient`, `approve`, `content` |
 
 Critical constraint: plain text output from agents is NOT visible to other team
 members. All inter-agent communication MUST go through SendMessage.
@@ -80,6 +82,7 @@ members. All inter-agent communication MUST go through SendMessage.
 
 The team lead creates background agents that run as separate Claude Code processes.
 Each agent:
+
 - Has a name (used for routing messages and task assignment)
 - Receives custom instructions via its agent definition
 - Operates in a configurable permission mode
@@ -88,6 +91,7 @@ Each agent:
 
 Agents persist in the background after completing assigned work. When idle, an agent
 can:
+
 - Call TaskList to find new unblocked, unowned tasks
 - Be assigned new tasks via TaskUpdate (setting `owner`)
 - Receive direct messages via SendMessage
@@ -99,16 +103,19 @@ tools, alerting the team lead that the agent is available.
 
 Agents persist across multiple task assignments within a session. The recommended
 workflow:
+
 1. Complete current task (mark `completed`)
-2. Call TaskList to find next available work
-3. Claim task via TaskUpdate (set `owner`, set `in_progress`)
-4. Execute and repeat
+1. Call TaskList to find next available work
+1. Claim task via TaskUpdate (set `owner`, set `in_progress`)
+1. Execute and repeat
 
 #### Shutdown
 
 Two shutdown mechanisms:
+
 - **Graceful**: team lead sends `shutdown_request`; teammate responds with
   `shutdown_response` (approve=true exits, approve=false continues with reason)
+
 - **Forced**: team lead can terminate background agents directly
 
 ### 3. Two-Way Communication
@@ -123,6 +130,7 @@ runtime.
 
 - **Team lead -> Teammate**: Direct messages, task assignments, shutdown requests,
   plan approvals/rejections
+
 - **Teammate -> Team lead**: Status updates, findings, questions, shutdown responses,
   plan approval requests
 
@@ -139,15 +147,16 @@ lead's conversation with the user. The user sees all inter-agent communication.
 
 Claude Code agents can operate in several permission modes:
 
-| Mode | Description |
-|------|-------------|
-| `default` | Standard permission prompting |
-| `acceptEdits` | Auto-approve file edits, prompt for other actions |
-| `bypassPermissions` | Skip all permission prompts (YOLO mode) |
-| `plan` | Plan-only mode; agent must get plan approved before executing |
-| `dontAsk` | Similar to bypass, agent proceeds without confirmation |
+| Mode                | Description                                                   |
+| ------------------- | ------------------------------------------------------------- |
+| `default`           | Standard permission prompting                                 |
+| `acceptEdits`       | Auto-approve file edits, prompt for other actions             |
+| `bypassPermissions` | Skip all permission prompts (YOLO mode)                       |
+| `plan`              | Plan-only mode; agent must get plan approved before executing |
+| `dontAsk`           | Similar to bypass, agent proceeds without confirmation        |
 
 For vaultspec, the most relevant modes are:
+
 - `read-write` (maps to `bypassPermissions` or `acceptEdits`)
 - `read-only` (restricts file writes to `.vault/` only)
 - `plan` (plan mode with `plan_mode_required` flag for approval gating)
@@ -161,14 +170,15 @@ team lead reviews via `plan_approval_response`, and only then can the agent proc
 
 The current `subagent.py` CLI provides:
 
-| Command | Description |
-|---------|-------------|
-| `run` | Execute a single sub-agent via ACP (one-shot or interactive) |
-| `serve` | Start the MCP server (`vs-subagent-mcp`) |
-| `a2a-serve` | Start an A2A HTTP server for a single agent |
-| `list` | List available agent definitions |
+| Command     | Description                                                  |
+| ----------- | ------------------------------------------------------------ |
+| `run`       | Execute a single sub-agent via ACP (one-shot or interactive) |
+| `serve`     | Start the MCP server (`vs-subagent-mcp`)                     |
+| `a2a-serve` | Start an A2A HTTP server for a single agent                  |
+| `list`      | List available agent definitions                             |
 
 The MCP server (`server.py`) exposes 5 tools:
+
 - `list_agents`: discover available agents
 - `dispatch_agent`: run a sub-agent asynchronously (returns taskId)
 - `get_task_status`: check task progress
@@ -180,28 +190,37 @@ The MCP server (`server.py`) exposes 5 tools:
 A formal team CLI would need these additional commands:
 
 **Team Lifecycle:**
+
 - `team create [--name NAME] [--members agent1,agent2,...]` - Create a named team
   with initial members. Must track team composition, assign roles (lead vs member),
   and establish a shared communication channel.
+
 - `team dissolve [--name NAME]` - Gracefully shut down all team members, collect
   final status, and archive team state.
+
 - `team status [--name NAME]` - Show team health: active members, their current
   tasks, idle status, message counts.
 
 **Member Management:**
+
 - `team add-member --agent NAME [--mode MODE] [--model MODEL]` - Spawn a new agent
   into an existing team. Must register it for message delivery and task assignment.
+
 - `team remove-member --agent NAME [--graceful]` - Remove a member with optional
   graceful shutdown.
 
 **Task Coordination:**
+
 - `team assign --agent NAME --task "description"` - Assign a task to a specific team
   member. Creates a TaskCreate + TaskUpdate(owner) in one step.
+
 - `team broadcast --message "text"` - Send a message to all team members.
 
 **Communication:**
+
 - `team message --to NAME --content "text"` - Send a direct message to a team
   member.
+
 - `team log [--agent NAME] [--since TIME]` - View communication log, filtered by
   agent or time range.
 
@@ -210,13 +229,13 @@ A formal team CLI would need these additional commands:
 1. **No team registry**: The current system dispatches agents individually with no
    concept of a persistent team. Each `dispatch_agent` call is independent.
 
-2. **No shared communication bus**: The MCP server has no message passing between
+1. **No shared communication bus**: The MCP server has no message passing between
    agents. Agents communicate only via file artifacts in `.vault/`.
 
-3. **No coordinated lifecycle**: No mechanism to spawn multiple agents that share
+1. **No coordinated lifecycle**: No mechanism to spawn multiple agents that share
    context, coordinate work, and shut down together.
 
-4. **No role differentiation**: All agents are peers. There is no team-lead / member
+1. **No role differentiation**: All agents are peers. There is no team-lead / member
    distinction in the dispatch model.
 
 ### 6. TaskEngine State Management Gaps
@@ -236,6 +255,7 @@ The `TaskEngine` in `task_engine.py` provides:
 **New Concepts Needed:**
 
 1. **Team Entity**: A first-class `Team` object that groups related tasks and agents:
+
    ```
    @dataclass
    class Team:
@@ -248,13 +268,15 @@ The `TaskEngine` in `task_engine.py` provides:
        shared_context: dict[str, Any]
    ```
 
-2. **Team-Scoped Task Registry**: Tasks belong to a team, not just an agent. Need:
+1. **Team-Scoped Task Registry**: Tasks belong to a team, not just an agent. Need:
+
    - `team_id` field on `SubagentTask`
    - Query: "all tasks for team X"
    - Query: "unassigned tasks in team X"
    - Dependency resolution within team scope
 
-3. **Member Status Tracking**: Beyond task status, need member-level state:
+1. **Member Status Tracking**: Beyond task status, need member-level state:
+
    ```
    class MemberStatus(StrEnum):
        SPAWNING = "spawning"
@@ -264,20 +286,23 @@ The `TaskEngine` in `task_engine.py` provides:
        TERMINATED = "terminated"
    ```
 
-4. **Message Bus**: An in-process message queue for inter-agent communication:
+1. **Message Bus**: An in-process message queue for inter-agent communication:
+
    - Per-agent inbox (asyncio.Queue)
    - Broadcast support (fan-out to all member queues)
    - Message history for auditability
    - Integration with SessionLogger for persistent logging
 
-5. **Coordinated Shutdown**: Team dissolution requires:
+1. **Coordinated Shutdown**: Team dissolution requires:
+
    - Send shutdown_request to all members
    - Wait for acknowledgments (with timeout)
    - Force-kill unresponsive members
    - Collect and archive final team state
    - Release all advisory locks
 
-6. **A2A State Mapping**: The current A2A TaskState enum needs mapping to team states:
+1. **A2A State Mapping**: The current A2A TaskState enum needs mapping to team states:
+
    ```
    A2A submitted  -> Team FORMING + member SPAWNING
    A2A working    -> Team ACTIVE + member WORKING
@@ -286,21 +311,22 @@ The `TaskEngine` in `task_engine.py` provides:
    A2A failed     -> Member error (team evaluates retry)
    ```
 
-### 7. Bridge Architecture: Claude Code Teams <-> A2A Protocol
+### 7. Bridge Architecture: Claude Code Teams \<-> A2A Protocol
 
 The Claude Code team API and A2A protocol solve similar problems at different layers.
 A bridge between them would enable:
 
-| Claude Code Concept | A2A Equivalent | Bridge Behavior |
-|---------------------|----------------|-----------------|
-| TaskCreate | A2A Task (submitted) | Create A2A task, map ID |
-| TaskUpdate(in_progress) | TaskState.working | Update A2A state |
-| TaskUpdate(completed) | TaskState.completed | Send A2A result |
-| SendMessage(message) | A2A Message/Part | Wrap as A2A TextPart |
-| SendMessage(broadcast) | Multi-target dispatch | Fan-out to A2A agents |
-| shutdown_request | A2A TaskState.canceled | Cancel A2A task |
+| Claude Code Concept     | A2A Equivalent         | Bridge Behavior         |
+| ----------------------- | ---------------------- | ----------------------- |
+| TaskCreate              | A2A Task (submitted)   | Create A2A task, map ID |
+| TaskUpdate(in_progress) | TaskState.working      | Update A2A state        |
+| TaskUpdate(completed)   | TaskState.completed    | Send A2A result         |
+| SendMessage(message)    | A2A Message/Part       | Wrap as A2A TextPart    |
+| SendMessage(broadcast)  | Multi-target dispatch  | Fan-out to A2A agents   |
+| shutdown_request        | A2A TaskState.canceled | Cancel A2A task         |
 
 The bridge would live in `protocol/a2a/` and implement both:
+
 - **Inbound**: A2A tasks -> Claude Code TaskCreate/SendMessage
 - **Outbound**: Claude Code task updates -> A2A state transitions
 
@@ -312,6 +338,7 @@ vaultspec infrastructure handles single-agent dispatch well via ACP/MCP but lack
 multi-agent coordination primitives needed for formal teams.
 
 Key gaps to fill:
+
 - Team entity and lifecycle management
 - Inter-agent message bus (beyond file-based coordination)
 - Team-scoped task registry with dependency tracking

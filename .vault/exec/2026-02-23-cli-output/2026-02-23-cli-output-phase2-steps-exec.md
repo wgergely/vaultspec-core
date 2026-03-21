@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#exec"
-  - "#cli-output"
-date: "2026-02-23"
+  - '#exec'
+  - '#cli-output'
+date: '2026-02-23'
 related:
-  - "[[2026-02-23-cli-output-plan]]"
-  - "[[2026-02-23-cli-output-architecture-adr]]"
+  - '[[2026-02-23-cli-output-plan]]'
+  - '[[2026-02-23-cli-output-architecture-adr]]'
 ---
+
 # `cli-output` `phase2` steps
 
 Fixed approximately 10 inconsistent call sites across 4 files, routing program
@@ -51,10 +52,11 @@ transport. No `Printer` instantiation.
 ## Tests
 
 288 tests passed across 4 suites:
+
 - CLI tests: 168 passed (excluding pre-existing `test_team_cli.py` import error)
 - Printer tests: 13 passed
 - Orchestration tests: 61 passed
 - Vaultcore tests: 46 passed
 
 Code review: PASS — no critical or high findings.
-See [[2026-02-23-cli-output-phase2-review]].
+See \[[2026-02-23-cli-output-phase2-review]\].

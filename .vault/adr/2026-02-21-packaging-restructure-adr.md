@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#adr"
-  - "#packaging-restructure"
-date: "2026-02-21"
+  - '#adr'
+  - '#packaging-restructure'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-packaging-restructure-research]]"
+  - '[[2026-02-21-packaging-restructure-research]]'
 ---
+
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 
@@ -37,7 +38,7 @@ Implementation proceeds in phases. This ADR's core scope is **Phase 1** (package
 
 ### Phase 1: Package layout + `uv`
 
-This phase is entirely mechanical. The research in [[2026-02-21-packaging-restructure-research]] confirmed no circular dependencies in the import graph and that `vaultcore` is the most-depended-on leaf package -- a safe foundation to migrate first.
+This phase is entirely mechanical. The research in \[[2026-02-21-packaging-restructure-research]\] confirmed no circular dependencies in the import graph and that `vaultcore` is the most-depended-on leaf package -- a safe foundation to migrate first.
 
 - Move `.vaultspec/lib/src/*` to `src/vaultspec/*`. All packages become `vaultspec.core`, `vaultspec.orchestration`, `vaultspec.protocol`, `vaultspec.vaultcore`, `vaultspec.rag`, `vaultspec.subagent_server`, `vaultspec.graph`, `vaultspec.metrics`, `vaultspec.verification`, `vaultspec.hooks`. The standalone `logging_config.py` becomes `vaultspec.logging_config`.
 - Move `.vaultspec/lib/scripts/` entry points into `src/vaultspec/` as proper modules: `cli.py` becomes `vaultspec.cli`, `vault.py` becomes `vaultspec.vault_cli`, `team.py` becomes `vaultspec.team_cli`, `subagent.py` becomes `vaultspec.subagent_cli`.
@@ -81,7 +82,7 @@ This phase is entirely mechanical. The research in [[2026-02-21-packaging-restru
 
 ## Rationale
 
-The research findings in [[2026-02-21-packaging-restructure-research]] provide strong evidence that this migration is safe and mechanical:
+The research findings in \[[2026-02-21-packaging-restructure-research]\] provide strong evidence that this migration is safe and mechanical:
 
 - **No circular dependencies** -- the import graph is a clean DAG with `vaultcore` at the bottom, `core` as a leaf, and `orchestration`/`subagent_server` at the top. Migration order is unambiguous.
 - **All CLI scripts are production-grade** -- no stubs, no dead code, no throwaway prototypes. Every script handler maps to a real feature. Nothing needs to be discarded.
@@ -93,6 +94,7 @@ The research findings in [[2026-02-21-packaging-restructure-research]] provide s
 ## Consequences
 
 **Positive**:
+
 - `python -m vaultspec` works out of the box.
 - `uv run vaultspec-mcp` replaces the raw script path in `mcp.json`.
 - No `sys.path` hacks anywhere -- `_paths.py` is deleted entirely.
@@ -102,12 +104,14 @@ The research findings in [[2026-02-21-packaging-restructure-research]] provide s
 - Entry points (`[project.scripts]`) are the standard mechanism for console scripts.
 
 **Negative**:
+
 - 149 import rewrites are mechanical but tedious and touch nearly every file. A single missed rewrite causes an `ImportError` at runtime.
 - All developers must switch to `uv sync --dev` for local development. The `sys.path` hack no longer works as a fallback.
 - `.vaultspec/lib/` loses its scripts directory and becomes config-only. Any tooling or documentation referencing `.vaultspec/lib/scripts/` must be updated.
 - The `hatchling` build backend is a new dependency in the build chain, though it is well-maintained and widely adopted.
 
 **Future work**:
+
 - ~30 MCP tools to implement across Phases 3-5, each requiring its own API design ADR.
 - RAG tools need background task patterns (GPU-bound, long-running) -- likely extending the existing `dispatch_agent` task model.
 - Team tools need A2A async handling with proper timeout and error semantics.

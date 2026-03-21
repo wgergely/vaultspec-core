@@ -107,17 +107,17 @@ def test_fix_surface_covers_all_autofixable_targets() -> None:
     assert "_dev-fix target='all':" in justfile
     assert "uv run ruff format src tests" in justfile
     assert "uv run ruff check --fix src tests" in justfile
-    assert '@taplo/cli fmt "$(pwd)"/*.toml' in justfile
-    assert "markdownlint-cli" in justfile
-    assert "--config .markdownlint.json --fix" in justfile
+    assert "taplo fmt" in justfile
+    assert "pymarkdown" in justfile
+    assert ".pymarkdown.json" in justfile
     assert "vault check all --fix" in justfile
 
 
-def test_markdown_lint_uses_markdownlint() -> None:
+def test_markdown_lint_uses_pymarkdown() -> None:
     justfile = _read("justfile")
-    assert "npx --yes markdownlint-cli" in justfile
-    assert "--config .markdownlint.json" in justfile
-    assert ".vaultspec/ .vault/ README.md" in justfile
+    assert "pymarkdown" in justfile
+    assert "--config .pymarkdown.json" in justfile
+    assert "README.md" in justfile
 
 
 def test_ci_workflow_calls_just_for_quality_gates() -> None:
@@ -134,16 +134,16 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
 
     expected_runs = {
         "lint-and-type": {
-            "just sync dependencies",
-            "just check lint",
-            "just check type",
-            "just check toml",
-            "just check links",
-            "just check markdown",
+            "just dev deps sync",
+            "just dev lint python",
+            "just dev lint type",
+            "just dev lint toml",
+            "just dev lint links",
+            "just dev lint markdown",
         },
-        "tests": {"just sync dependencies", "just test python"},
-        "vault-audit": {"just sync dependencies", "just check vault"},
-        "dependency-audit": {"just sync dependencies", "just check dependencies"},
+        "tests": {"just dev deps sync", "just dev test python"},
+        "vault-audit": {"just dev deps sync", "just prod vault check all"},
+        "dependency-audit": {"just dev deps sync", "just dev audit deps"},
     }
 
     for job_name, expected in expected_runs.items():
@@ -161,13 +161,14 @@ def test_ci_workflow_uses_actionlint() -> None:
     assert "docker://rhysd/actionlint:latest" in used_actions
 
 
-def test_ci_workflow_installs_node_and_lychee_for_config_and_link_checks() -> None:
+def test_ci_workflow_installs_native_lint_tools() -> None:
     ci = _load_yaml(".github/workflows/ci.yml")
     jobs = ci["jobs"]
     steps = jobs["lint-and-type"]["steps"]
     used_actions = {step.get("uses") for step in steps if "uses" in step}
-    assert "actions/setup-node@v4" in used_actions
     assert "taiki-e/install-action@v2" in used_actions
+    # Node.js is no longer required - taplo and pymarkdown are native
+    assert "actions/setup-node@v4" not in used_actions
 
 
 def test_docker_workflow_builds_and_smokes_on_pr() -> None:
@@ -176,7 +177,7 @@ def test_docker_workflow_builds_and_smokes_on_pr() -> None:
     assert "docker-build" in jobs, "Docker workflow missing PR build job"
     steps = jobs["docker-build"]["steps"]
     run_commands = [step.get("run") for step in steps if "run" in step]
-    assert "just test docker" in run_commands
+    assert "just dev test docker" in run_commands
 
 
 def test_docker_publish_workflow_uses_standard_registry_actions() -> None:

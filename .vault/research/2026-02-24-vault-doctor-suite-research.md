@@ -1,8 +1,8 @@
 ---
 tags:
-  - "#research"
-  - "#vault-doctor-suite"
-date: "2026-02-24"
+  - '#research'
+  - '#vault-doctor-suite'
+date: '2026-02-24'
 related: []
 ---
 
@@ -49,6 +49,7 @@ staged markdown files.
 
 - `get_invalid_links()` — wikilinks pointing to non-existent documents (already implemented but
   **not wired into `--verify`**)
+
 - `get_orphaned()` — documents with zero incoming links (already implemented but **not wired
   into `--verify`**)
 
@@ -56,14 +57,14 @@ staged markdown files.
 
 Six repair actions exist, all applied in-place with no dry-run option:
 
-| Action | Trigger | Repair |
-|---|---|---|
-| `add_tags` | `tags` field absent | Insert empty list |
-| `add_doc_type_tag` | No directory tag | Infer from directory and insert |
-| `add_feature_tag` | Only one tag | Append `#uncategorized` |
-| `add_date` | `date` field absent | Set to today's date |
-| `rename_suffix` | Suffix wrong for directory | Rename file |
-| `add_date_prefix` | No date prefix | Prepend today's date |
+| Action             | Trigger                    | Repair                          |
+| ------------------ | -------------------------- | ------------------------------- |
+| `add_tags`         | `tags` field absent        | Insert empty list               |
+| `add_doc_type_tag` | No directory tag           | Infer from directory and insert |
+| `add_feature_tag`  | Only one tag               | Append `#uncategorized`         |
+| `add_date`         | `date` field absent        | Set to today's date             |
+| `rename_suffix`    | Suffix wrong for directory | Rename file                     |
+| `add_date_prefix`  | No date prefix             | Prepend today's date            |
 
 A dry-run pattern is established in `sync_files()` / `sync_skills()` (accepting `dry_run: bool`)
 but has **not been extended to `fix_violations()`**.
@@ -95,10 +96,13 @@ check the _documentary chain_ within a feature:
 
 - **Plan → ADR**: A plan with no linked ADR is a chain break. The architectural rationale is
   undocumented.
+
 - **ADR → Research**: An ADR with no linked research is a chain break. The decision lacks
   evidence.
+
 - **Exec → Plan**: An exec log with no linked plan in its `related` field is a chain break.
   (Templates mandate this link but it is not currently verified.)
+
 - **Unlinked research/reference**: Research or reference documents not referenced by any plan or
   ADR are effectively orphaned knowledge.
 
@@ -109,18 +113,18 @@ However they represent documentary drift that accumulates silently.
 
 Several frontmatter formatting issues pass current validation undetected:
 
-| Drift Class | Description | Current Status |
-|---|---|---|
-| Filename date ≠ frontmatter date | `2026-02-10-foo-plan.md` has `date: "2026-02-11"` | Not checked |
-| Filename feature ≠ tag feature | `2026-02-10-bar-plan.md` has `#baz` feature tag | Not checked |
-| Unquoted date | YAML parses `date: 2026-02-18` as a date object, not a string | Not checked |
-| CRLF line endings | Windows-style line endings corrupt frontmatter parsing | Not checked |
-| Extra/unknown fields | `summary:`, `status:`, `author:` in frontmatter — outside schema | Not checked |
-| Duplicate tags | `tags: ["#plan", "#plan", "#foo"]` | Not checked |
-| Tags as scalar | `tags: "#plan"` instead of a list | Parser may silently handle |
-| Trailing whitespace in tag values | `"#plan "` (space before closing quote) | Not checked |
-| BOM characters | Partially handled in `fix_violations` but not in `--verify` | Partial |
-| Missing `related` field | Field absent entirely vs present as empty list | Not normalized |
+| Drift Class                       | Description                                                      | Current Status             |
+| --------------------------------- | ---------------------------------------------------------------- | -------------------------- |
+| Filename date ≠ frontmatter date  | `2026-02-10-foo-plan.md` has `date: "2026-02-11"`                | Not checked                |
+| Filename feature ≠ tag feature    | `2026-02-10-bar-plan.md` has `#baz` feature tag                  | Not checked                |
+| Unquoted date                     | YAML parses `date: 2026-02-18` as a date object, not a string    | Not checked                |
+| CRLF line endings                 | Windows-style line endings corrupt frontmatter parsing           | Not checked                |
+| Extra/unknown fields              | `summary:`, `status:`, `author:` in frontmatter — outside schema | Not checked                |
+| Duplicate tags                    | `tags: ["#plan", "#plan", "#foo"]`                               | Not checked                |
+| Tags as scalar                    | `tags: "#plan"` instead of a list                                | Parser may silently handle |
+| Trailing whitespace in tag values | `"#plan "` (space before closing quote)                          | Not checked                |
+| BOM characters                    | Partially handled in `fix_violations` but not in `--verify`      | Partial                    |
+| Missing `related` field           | Field absent entirely vs present as empty list                   | Not normalized             |
 
 #### Gap F — Feature Coverage Audit
 
@@ -196,20 +200,20 @@ existing callers.
 
 ### 7. Summary of New Check Domains
 
-| Domain | Gap | Check Type | Fixable |
-|---|---|---|---|
-| Dry-run fix safety | A | Infrastructure | N/A |
-| Broken wikilinks in verify | B | Error | Advisory only |
-| Orphans in verify | C | Warning | No (requires human judgment) |
-| Exec → Plan chain | D | Error | Advisory only |
-| Plan → ADR chain | D | Warning | Advisory only |
-| ADR → Research chain | D | Warning | Advisory only |
-| Filename/frontmatter date drift | E | Error | Yes (rename or update field) |
-| Filename/frontmatter feature drift | E | Error | Yes (rename or update field) |
-| Unquoted date | E | Warning | Yes (rewrite frontmatter) |
-| CRLF endings | E | Warning | Yes (normalize to LF) |
-| Extra fields | E | Info | Advisory only |
-| Duplicate tags | E | Error | Yes (deduplicate) |
-| BOM in verify | E | Warning | Yes (strip BOM) |
-| Feature coverage matrix | F | Info | No |
-| Chain traversal / cycles | G | Warning | Advisory only |
+| Domain                             | Gap | Check Type     | Fixable                      |
+| ---------------------------------- | --- | -------------- | ---------------------------- |
+| Dry-run fix safety                 | A   | Infrastructure | N/A                          |
+| Broken wikilinks in verify         | B   | Error          | Advisory only                |
+| Orphans in verify                  | C   | Warning        | No (requires human judgment) |
+| Exec → Plan chain                  | D   | Error          | Advisory only                |
+| Plan → ADR chain                   | D   | Warning        | Advisory only                |
+| ADR → Research chain               | D   | Warning        | Advisory only                |
+| Filename/frontmatter date drift    | E   | Error          | Yes (rename or update field) |
+| Filename/frontmatter feature drift | E   | Error          | Yes (rename or update field) |
+| Unquoted date                      | E   | Warning        | Yes (rewrite frontmatter)    |
+| CRLF endings                       | E   | Warning        | Yes (normalize to LF)        |
+| Extra fields                       | E   | Info           | Advisory only                |
+| Duplicate tags                     | E   | Error          | Yes (deduplicate)            |
+| BOM in verify                      | E   | Warning        | Yes (strip BOM)              |
+| Feature coverage matrix            | F   | Info           | No                           |
+| Chain traversal / cycles           | G   | Warning        | Advisory only                |

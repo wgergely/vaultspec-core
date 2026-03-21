@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#research"
-  - "#pip-install-deployment"
-date: "2026-02-23"
+  - '#research'
+  - '#pip-install-deployment'
+date: '2026-02-23'
 related:
-  - "[[2026-02-21-packaging-restructure-research]]"
-  - "[[2026-02-19-workspace-path-decoupling-research]]"
+  - '[[2026-02-21-packaging-restructure-research]]'
+  - '[[2026-02-19-workspace-path-decoupling-research]]'
 ---
+
 # `pip-install-deployment` research: `pip-install-vs-source-deployment`
 
 Audit of vaultspec's behavior when installed as a pip package into a target
@@ -40,26 +41,26 @@ installation path.
 
 **Line-by-line Inventory:**
 
-| File:Line | Path Expression | Classification | Notes |
-|---|---|---|---|
-| `config/workspace.py:346` | `Path.cwd()` | SAFE | Runtime cwd, not package path |
-| `config/workspace.py:416` | `discover_git(effective_cwd)` | SAFE | Walks up from cwd to find `.git` |
-| `config/workspace.py:423-424` | `root / framework_dir_name` | SAFE | Derives from git root or cwd |
-| `config/workspace.py:454` | `root / framework_dir_name` | SAFE | Last-resort: cwd + `.vaultspec` |
-| `config/config.py:141` | `Path.cwd` (default factory) | SAFE | Default for `root_dir` config field |
-| `core/types.py:66-74` | Module globals (`Path()`) | SAFE | Placeholders, overwritten by `init_paths()` |
-| `core/types.py:117-125` | `root / ...`, `content / ...` | SAFE | All relative to workspace layout |
-| `core/types.py:148-180` | `root / claude_dir / ...` etc. | SAFE | Tool config paths derived from layout |
-| `spec_cli.py:66-67` | `get_default_layout()`, `init_paths()` | SAFE | Resolves workspace at CLI entry |
-| `subagent_cli.py:356` | `resolve_args_workspace(args, ...)` | SAFE | Resolves workspace at CLI entry |
-| `vault_cli.py:145` | `resolve_args_workspace(args, ...)` | SAFE | Resolves workspace at CLI entry |
-| `team_cli.py:476-477` | `get_default_layout()`, `resolve_args_workspace()` | SAFE | Same pattern |
-| `mcp_server/app.py:96-97` | `cfg.mcp_root_dir` | SAFE | Env-var driven, not package-relative |
-| `mcp_server/subagent_tools.py:100-104` | `root_dir`, `CONTENT_ROOT`, `AGENTS_DIR` | SAFE | Set via `initialize_server()` |
-| `orchestration/subagent.py:141-144` | `content_root / "rules" / "agents"` | SAFE | From workspace layout |
-| `cli_common.py:68-73` | `get_version()` reads `pyproject.toml` | FRAGILE | See below |
-| `core/commands.py:61-64` | `ROOT_DIR / "src" / "vaultspec"` | BROKEN | Hardcoded `src/` path for test runner |
-| `core/commands.py:22-33` | `MODULE_PATHS` dict with `src/vaultspec/...` | BROKEN | Hardcoded `src/` paths |
+| File:Line                              | Path Expression                                    | Classification | Notes                                       |
+| -------------------------------------- | -------------------------------------------------- | -------------- | ------------------------------------------- |
+| `config/workspace.py:346`              | `Path.cwd()`                                       | SAFE           | Runtime cwd, not package path               |
+| `config/workspace.py:416`              | `discover_git(effective_cwd)`                      | SAFE           | Walks up from cwd to find `.git`            |
+| `config/workspace.py:423-424`          | `root / framework_dir_name`                        | SAFE           | Derives from git root or cwd                |
+| `config/workspace.py:454`              | `root / framework_dir_name`                        | SAFE           | Last-resort: cwd + `.vaultspec`             |
+| `config/config.py:141`                 | `Path.cwd` (default factory)                       | SAFE           | Default for `root_dir` config field         |
+| `core/types.py:66-74`                  | Module globals (`Path()`)                          | SAFE           | Placeholders, overwritten by `init_paths()` |
+| `core/types.py:117-125`                | `root / ...`, `content / ...`                      | SAFE           | All relative to workspace layout            |
+| `core/types.py:148-180`                | `root / claude_dir / ...` etc.                     | SAFE           | Tool config paths derived from layout       |
+| `spec_cli.py:66-67`                    | `get_default_layout()`, `init_paths()`             | SAFE           | Resolves workspace at CLI entry             |
+| `subagent_cli.py:356`                  | `resolve_args_workspace(args, ...)`                | SAFE           | Resolves workspace at CLI entry             |
+| `vault_cli.py:145`                     | `resolve_args_workspace(args, ...)`                | SAFE           | Resolves workspace at CLI entry             |
+| `team_cli.py:476-477`                  | `get_default_layout()`, `resolve_args_workspace()` | SAFE           | Same pattern                                |
+| `mcp_server/app.py:96-97`              | `cfg.mcp_root_dir`                                 | SAFE           | Env-var driven, not package-relative        |
+| `mcp_server/subagent_tools.py:100-104` | `root_dir`, `CONTENT_ROOT`, `AGENTS_DIR`           | SAFE           | Set via `initialize_server()`               |
+| `orchestration/subagent.py:141-144`    | `content_root / "rules" / "agents"`                | SAFE           | From workspace layout                       |
+| `cli_common.py:68-73`                  | `get_version()` reads `pyproject.toml`             | FRAGILE        | See below                                   |
+| `core/commands.py:61-64`               | `ROOT_DIR / "src" / "vaultspec"`                   | BROKEN         | Hardcoded `src/` path for test runner       |
+| `core/commands.py:22-33`               | `MODULE_PATHS` dict with `src/vaultspec/...`       | BROKEN         | Hardcoded `src/` paths                      |
 
 **FRAGILE: `cli_common.py:get_version()` (line 57-73)**
 
@@ -113,12 +114,14 @@ locate test paths via `importlib.resources` or package metadata.
   all resource management paths, all MCP server paths, all orchestration paths.
   The architecture correctly resolves paths from runtime context (cwd, git, env
   vars) rather than package location.
+
 - **FRAGILE (1)**: `get_version()` in `cli_common.py` -- returns wrong version
   or `"unknown"` when pip-installed.
+
 - **BROKEN (2)**: `test_run()` and `MODULE_PATHS` in `core/commands.py` --
   hardcode `src/` layout paths that do not exist when pip-installed.
 
----
+______________________________________________________________________
 
 ### Q2: MCP Server Configuration
 
@@ -151,8 +154,10 @@ This design is **SAFE** because:
 
 - The `vaultspec-mcp` console_scripts entry point will be available on `PATH`
   after `pip install`.
+
 - The server correctly requires explicit root via environment variable rather
   than deriving it from package location.
+
 - The `initialize_server()` function at `subagent_tools.py:75-115` sets up
   `ROOT_DIR`, `CONTENT_ROOT`, and `AGENTS_DIR` from the provided root, then
   defaults `CONTENT_ROOT` to `root_dir / framework_dir` (i.e.,
@@ -169,14 +174,21 @@ add `.mcp.json` scaffolding to `vaultspec init`.
 **MCP Server Startup Trace:**
 
 1. Claude invokes `vaultspec-mcp` (console_scripts entry point).
-2. `mcp_server/app.py:main()` runs.
-3. Reads `VaultSpecConfig.from_environment()` -- picks up `VAULTSPEC_MCP_ROOT_DIR`.
-4. Validates root is set, calls `initialize_server(root_dir=root_dir, ...)`.
-5. `initialize_server()` sets `ROOT_DIR`, `CONTENT_ROOT = root_dir / ".vaultspec"`,
+
+1. `mcp_server/app.py:main()` runs.
+
+1. Reads `VaultSpecConfig.from_environment()` -- picks up `VAULTSPEC_MCP_ROOT_DIR`.
+
+1. Validates root is set, calls `initialize_server(root_dir=root_dir, ...)`.
+
+1. `initialize_server()` sets `ROOT_DIR`, `CONTENT_ROOT = root_dir / ".vaultspec"`,
    `AGENTS_DIR = CONTENT_ROOT / "rules" / "agents"`.
-6. `set_team_root_dir(root_dir)` configures team tools.
-7. `create_server()` builds the FastMCP instance, registers tools.
-8. `mcp.run()` starts stdio transport.
+
+1. `set_team_root_dir(root_dir)` configures team tools.
+
+1. `create_server()` builds the FastMCP instance, registers tools.
+
+1. `mcp.run()` starts stdio transport.
 
 All steps use runtime-provided paths. **No package-relative assumptions.**
 
@@ -193,7 +205,7 @@ if sys.platform == "win32":
 
 This is standard and works regardless of installation mode. No issue.
 
----
+______________________________________________________________________
 
 ### Q3: CLI Entry Point Design
 
@@ -227,18 +239,20 @@ whether invoked as `vaultspec`, `python -m vaultspec`, or from source.
 
 The current design defines 5 entry points:
 
-| Entry Point | Module | Purpose |
-|---|---|---|
-| `vaultspec` | `vaultspec.__main__:main` | Unified CLI router |
-| `vaultspec-mcp` | `vaultspec.mcp_server.app:main` | MCP stdio server |
-| `vaultspec-vault` | `vaultspec.vault_cli:main` | Vault document management |
-| `vaultspec-team` | `vaultspec.team_cli:main` | Team lifecycle |
-| `vaultspec-subagent` | `vaultspec.subagent_cli:main` | Subagent dispatch |
+| Entry Point          | Module                          | Purpose                   |
+| -------------------- | ------------------------------- | ------------------------- |
+| `vaultspec`          | `vaultspec.__main__:main`       | Unified CLI router        |
+| `vaultspec-mcp`      | `vaultspec.mcp_server.app:main` | MCP stdio server          |
+| `vaultspec-vault`    | `vaultspec.vault_cli:main`      | Vault document management |
+| `vaultspec-team`     | `vaultspec.team_cli:main`       | Team lifecycle            |
+| `vaultspec-subagent` | `vaultspec.subagent_cli:main`   | Subagent dispatch         |
 
 The unified `vaultspec` CLI already routes to all four namespaces:
 
 ```python
+
 # __main__.py
+
 NAMESPACES = {
     "vault": ...,
     "team": ...,
@@ -258,6 +272,7 @@ value of separate entry points is:
   `.mcp.json` needs a single executable command. `vaultspec mcp` could also
   serve this purpose, but `vaultspec-mcp` is a cleaner invocation for external
   tool configuration.
+
 - `vaultspec-vault`, `vaultspec-team`, `vaultspec-subagent` add convenience
   but no functional capability beyond `vaultspec vault`, `vaultspec team`,
   `vaultspec subagent`.
@@ -318,7 +333,7 @@ exist, `WorkspaceError` is raised at `spec_cli.py` import time, making
 needs to be handled before workspace resolution, or workspace resolution needs
 a "lenient" mode that skips validation when the target command is `init`.
 
----
+______________________________________________________________________
 
 ## Summary of All Issues
 
@@ -329,24 +344,24 @@ a "lenient" mode that skips validation when the target command is `init`.
    projects without `.vaultspec/`, preventing the `init` command from ever
    running. This is the most critical deployment issue.
 
-2. **`vaultspec test` hardcodes `src/` layout** (`core/commands.py:22-33`,
+1. **`vaultspec test` hardcodes `src/` layout** (`core/commands.py:22-33`,
    `core/commands.py:61-64`). Test paths reference `src/vaultspec/...` which
    does not exist in pip-installed deployments. Low priority since this is a
    developer-facing command.
 
 ### FRAGILE
 
-3. **`get_version()` reads wrong `pyproject.toml`** (`cli_common.py:57-73`).
+1. **`get_version()` reads wrong `pyproject.toml`** (`cli_common.py:57-73`).
    Returns the target project's version or `"unknown"` instead of vaultspec's
    version. Should use `importlib.metadata.version("vaultspec")`.
 
 ### GAPS
 
-4. **No `.mcp.json` scaffolding in `vaultspec init`**
+1. **No `.mcp.json` scaffolding in `vaultspec init`**
    (`core/commands.py:148-208`). Users must manually create `.mcp.json` to
    enable the MCP server integration. This should be part of the init scaffold.
 
-5. **Redundant entry points** (`pyproject.toml` console_scripts). The three
+1. **Redundant entry points** (`pyproject.toml` console_scripts). The three
    namespace entry points (`vaultspec-vault`, `vaultspec-team`,
    `vaultspec-subagent`) duplicate what the unified `vaultspec` CLI already
    provides. Consider removing them for a cleaner install surface.

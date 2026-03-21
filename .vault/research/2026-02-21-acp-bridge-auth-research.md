@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#research"
-  - "#acp-bridge-auth"
-date: "2026-02-21"
+  - '#research'
+  - '#acp-bridge-auth'
+date: '2026-02-21'
 related:
-  - "[[2026-02-20-team-mcp-integration-research]]"
-  - "[[2026-02-07-acp-research]]"
+  - '[[2026-02-20-team-mcp-integration-research]]'
+  - '[[2026-02-07-acp-research]]'
 ---
+
 # `acp-bridge-auth` research: Claude SDK child-process authentication failure
 
 Investigation into `acp.exceptions.RequestError: Verify your account to continue` raised
@@ -23,7 +24,8 @@ Two-level spawn:
 
 1. **Parent (Claude Code)** → `spawn_agent_process()` → **Bridge process**
    (`python -m vaultspec.protocol.acp.claude_bridge`)
-2. **Bridge process** → `ClaudeSDKClient.connect()` → **`claude.exe`** (innermost subprocess)
+
+1. **Bridge process** → `ClaudeSDKClient.connect()` → **`claude.exe`** (innermost subprocess)
 
 The bridge is an ACP Agent server (JSON-RPC over stdin/stdout). It wraps `ClaudeSDKClient`
 which spawns the actual `claude` binary.
@@ -37,7 +39,9 @@ checks the bundled binary **first**, then `shutil.which("claude")`.
 The bridge overrides this correctly:
 
 ```python
+
 # claude_bridge.py:252
+
 self._cli_path: str | None = shutil.which("claude")
 ```
 
@@ -65,8 +69,8 @@ environment.
 ### Authentication lookup order (child `claude` binary)
 
 1. `CLAUDE_CODE_OAUTH_TOKEN` env var
-2. `ANTHROPIC_API_KEY` env var
-3. `~/.claude/.credentials.json` (OAuth tokens from interactive login)
+1. `ANTHROPIC_API_KEY` env var
+1. `~/.claude/.credentials.json` (OAuth tokens from interactive login)
 
 The parent session sets **none** of these in its env — it relies on `.credentials.json`.
 The child inherits the same env, reads `.credentials.json`, and fails when the
@@ -82,6 +86,7 @@ The child inherits the same env, reads `.credentials.json`, and fails when the
 - `subscriptionType`: `max`
 
 The child `claude` process reads the file, finds the token, but:
+
 - If the token is expired, the CLI cannot refresh it without a browser
 - `CLAUDE_CODE_ENTRYPOINT=sdk-py` suppresses the interactive auth flow
 - The CLI surfaces the error as `"Verify your account to continue"` via stream-json output
@@ -93,7 +98,9 @@ The child `claude` process reads the file, finds the token, but:
 injects it as `CLAUDE_CODE_OAUTH_TOKEN` before spawning the bridge:
 
 ```python
+
 # providers/claude.py
+
 if "CLAUDE_CODE_OAUTH_TOKEN" not in env and "ANTHROPIC_API_KEY" not in env:
     token = _load_claude_oauth_token()
     if token:
@@ -108,8 +115,10 @@ known limitation — see open work below.
 
 - `accessToken` is short-lived (~1h). If the token has already expired by the time
   `prepare_process()` runs, the child will still fail.
+
 - A more robust fix requires proactive token refresh using the `refreshToken` field,
   hitting Anthropic's OAuth token endpoint before injecting the access token.
+
 - `ANTHROPIC_API_KEY` (long-lived) is the most reliable alternative, but the user
   authenticates via Max subscription OAuth, not API key.
 
@@ -125,6 +134,7 @@ based.
 
 - Token refresh logic: on `expiresAt` approaching, read `refreshToken` and call
   Anthropic's token refresh endpoint to get a fresh `accessToken` before injecting it.
+
 - Consider `claude setup-token` as a one-time setup that produces a long-lived
   `CLAUDE_CODE_OAUTH_TOKEN` stored in `.env` or a secrets manager, decoupling subagent
   auth from session-scoped access tokens entirely.

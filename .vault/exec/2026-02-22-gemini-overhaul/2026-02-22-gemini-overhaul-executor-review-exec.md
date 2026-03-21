@@ -1,13 +1,14 @@
 ---
 tags:
-  - "#exec"
-  - "#gemini-overhaul"
-date: "2026-02-22"
+  - '#exec'
+  - '#gemini-overhaul'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-gemini-overhaul-adr]]"
-  - "[[2026-02-22-gemini-a2a-review]]"
-  - "[[2026-02-21-claude-a2a-overhaul-adr]]"
+  - '[[2026-02-22-gemini-overhaul-adr]]'
+  - '[[2026-02-22-gemini-a2a-review]]'
+  - '[[2026-02-21-claude-a2a-overhaul-adr]]'
 ---
+
 # `gemini-overhaul` code review -- Phase 2: A2A Executor Hardening (Decision 5)
 
 **Status:** `PASS`
@@ -103,36 +104,36 @@ None.
 
 Cross-referencing against all findings from `[[2026-02-22-gemini-a2a-review]]`:
 
-| Finding | Severity | Status | Resolution |
-|---------|----------|--------|------------|
-| No retry on transient errors | HIGH | RESOLVED | Bounded retry with exponential backoff (Decision 5a). `max_retries=3`, `retry_base_delay=1.0`, exception classification via `_is_retryable()`. |
-| No streaming progress events | HIGH | RESOLVED | Heartbeat background task emitting `TaskState.working` every 5 seconds (Decision 5b). |
-| No session resume via context_id | HIGH | RESOLVED | Infrastructure built: `_session_ids` dict with `_session_ids_lock`, stores `result.session_id` keyed by `context_id` (Decision 5e). Full resume deferred to upstream `run_subagent()` changes. |
-| Cancel is a no-op | HIGH | RESOLVED | Cancel sets event, cancels asyncio task, emits `updater.cancel()` (Decision 5c). Running subprocess is terminated via `asyncio.Task.cancel()`. |
-| No concurrency protection | HIGH | RESOLVED | `_tasks_lock` protects `_running_tasks` and `_cancel_events`. `_session_ids_lock` protects `_session_ids` (Decision 5d). |
-| No docstring on cancel() | MEDIUM | RESOLVED | Docstring added at lines 264-268. |
-| No concurrent execution test | MEDIUM | RESOLVED | `TestGeminiA2AExecutorConcurrency::test_concurrent_execution` added. |
-| No None response_text test | MEDIUM | RESOLVED | `TestGeminiA2AExecutorSessionResume::test_none_response_text` added. |
+| Finding                          | Severity | Status   | Resolution                                                                                                                                                                                     |
+| -------------------------------- | -------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No retry on transient errors     | HIGH     | RESOLVED | Bounded retry with exponential backoff (Decision 5a). `max_retries=3`, `retry_base_delay=1.0`, exception classification via `_is_retryable()`.                                                 |
+| No streaming progress events     | HIGH     | RESOLVED | Heartbeat background task emitting `TaskState.working` every 5 seconds (Decision 5b).                                                                                                          |
+| No session resume via context_id | HIGH     | RESOLVED | Infrastructure built: `_session_ids` dict with `_session_ids_lock`, stores `result.session_id` keyed by `context_id` (Decision 5e). Full resume deferred to upstream `run_subagent()` changes. |
+| Cancel is a no-op                | HIGH     | RESOLVED | Cancel sets event, cancels asyncio task, emits `updater.cancel()` (Decision 5c). Running subprocess is terminated via `asyncio.Task.cancel()`.                                                 |
+| No concurrency protection        | HIGH     | RESOLVED | `_tasks_lock` protects `_running_tasks` and `_cancel_events`. `_session_ids_lock` protects `_session_ids` (Decision 5d).                                                                       |
+| No docstring on cancel()         | MEDIUM   | RESOLVED | Docstring added at lines 264-268.                                                                                                                                                              |
+| No concurrent execution test     | MEDIUM   | RESOLVED | `TestGeminiA2AExecutorConcurrency::test_concurrent_execution` added.                                                                                                                           |
+| No None response_text test       | MEDIUM   | RESOLVED | `TestGeminiA2AExecutorSessionResume::test_none_response_text` added.                                                                                                                           |
 
 All 8 findings from the pre-hardening review are resolved.
 
 ## Feature Parity Matrix: Gemini vs. Claude A2A Executor (Post-Hardening)
 
-| Feature | Claude | Gemini | Gap |
-|---------|--------|--------|-----|
-| Basic execute (prompt -> result) | Yes | Yes | -- |
-| Error handling (exception -> failed task) | Yes | Yes | -- |
-| Cancel (emit canceled status) | Yes | Yes | -- |
-| Cancel (interrupt running task) | Yes (SDK interrupt) | Yes (asyncio.Task.cancel) | Equivalent |
-| Retry on transient errors | Yes (rate-limit focus) | Yes (broader: OSError, ConnectionError, string patterns) | Gemini is broader |
-| Session resume infrastructure | Yes (active: passes `resume=session_id`) | Yes (passive: stores session_id, awaits upstream) | Partial -- see note |
-| Streaming progress events | Yes (throttled, per-message) | Yes (heartbeat, periodic) | Architectural diff |
-| Concurrency locks | Yes (partial: `_clients_lock`, `_session_ids_lock`) | Yes (full: `_tasks_lock`, `_session_ids_lock`) | Gemini is more disciplined |
-| Cancel-aware backoff | No (`asyncio.sleep`) | Yes (`asyncio.wait_for` on cancel event) | Gemini is better |
-| Constructor DI for testing | Yes | Yes | -- |
-| Logging (info, debug, error) | Yes | Yes | -- |
-| Type annotations | Yes | Yes | -- |
-| Public API doc comments | Yes | Yes | -- |
+| Feature                                   | Claude                                              | Gemini                                                   | Gap                        |
+| ----------------------------------------- | --------------------------------------------------- | -------------------------------------------------------- | -------------------------- |
+| Basic execute (prompt -> result)          | Yes                                                 | Yes                                                      | --                         |
+| Error handling (exception -> failed task) | Yes                                                 | Yes                                                      | --                         |
+| Cancel (emit canceled status)             | Yes                                                 | Yes                                                      | --                         |
+| Cancel (interrupt running task)           | Yes (SDK interrupt)                                 | Yes (asyncio.Task.cancel)                                | Equivalent                 |
+| Retry on transient errors                 | Yes (rate-limit focus)                              | Yes (broader: OSError, ConnectionError, string patterns) | Gemini is broader          |
+| Session resume infrastructure             | Yes (active: passes `resume=session_id`)            | Yes (passive: stores session_id, awaits upstream)        | Partial -- see note        |
+| Streaming progress events                 | Yes (throttled, per-message)                        | Yes (heartbeat, periodic)                                | Architectural diff         |
+| Concurrency locks                         | Yes (partial: `_clients_lock`, `_session_ids_lock`) | Yes (full: `_tasks_lock`, `_session_ids_lock`)           | Gemini is more disciplined |
+| Cancel-aware backoff                      | No (`asyncio.sleep`)                                | Yes (`asyncio.wait_for` on cancel event)                 | Gemini is better           |
+| Constructor DI for testing                | Yes                                                 | Yes                                                      | --                         |
+| Logging (info, debug, error)              | Yes                                                 | Yes                                                      | --                         |
+| Type annotations                          | Yes                                                 | Yes                                                      | --                         |
+| Public API doc comments                   | Yes                                                 | Yes                                                      | --                         |
 
 **Session resume note**: The Claude executor actively passes `resume=session_id` to the SDK because `ClaudeAgentOptions` supports it. The Gemini executor stores the session_id but cannot pass it to `run_subagent()` yet because that function does not accept a `resume_session_id` parameter. This is an expected limitation documented in ADR Decision 5e.
 
@@ -140,28 +141,28 @@ All 8 findings from the pre-hardening review are resolved.
 
 ### Original Tests (5): All present and passing
 
-| Test | Status |
-|------|--------|
-| `test_gemini_executor_completes_successfully` | PASS |
-| `test_gemini_executor_handles_error` | PASS |
-| `test_gemini_executor_cancel` | PASS |
-| `test_gemini_executor_empty_response` | PASS |
-| `test_gemini_executor_custom_params` | PASS |
+| Test                                          | Status |
+| --------------------------------------------- | ------ |
+| `test_gemini_executor_completes_successfully` | PASS   |
+| `test_gemini_executor_handles_error`          | PASS   |
+| `test_gemini_executor_cancel`                 | PASS   |
+| `test_gemini_executor_empty_response`         | PASS   |
+| `test_gemini_executor_custom_params`          | PASS   |
 
 ### New Tests (10): All passing
 
-| Test | Decision | What it covers |
-|------|----------|----------------|
-| `test_retry_on_transient_error_then_success` | 5a | ConnectionError retries then succeeds |
-| `test_retry_exhaustion_fails` | 5a | max_retries exhausted -> failed |
-| `test_non_retryable_error_fails_immediately` | 5a | FileNotFoundError -> no retry |
-| `test_rate_limit_string_triggers_retry` | 5a | String pattern "rate_limit" -> retryable |
-| `test_cancel_during_execute` | 5c | Cancel interrupts running task |
-| `test_heartbeat_emits_working_events` | 5b | Heartbeat fires during slow task |
-| `test_concurrent_execution` | 5d | Two concurrent executions complete |
-| `test_session_id_stored_by_context` | 5e | session_id stored by context_id |
-| `test_none_session_id_not_stored` | 5e | None session_id not stored |
-| `test_none_response_text` | 5e (bonus) | None response_text -> "Done" fallback |
+| Test                                         | Decision   | What it covers                           |
+| -------------------------------------------- | ---------- | ---------------------------------------- |
+| `test_retry_on_transient_error_then_success` | 5a         | ConnectionError retries then succeeds    |
+| `test_retry_exhaustion_fails`                | 5a         | max_retries exhausted -> failed          |
+| `test_non_retryable_error_fails_immediately` | 5a         | FileNotFoundError -> no retry            |
+| `test_rate_limit_string_triggers_retry`      | 5a         | String pattern "rate_limit" -> retryable |
+| `test_cancel_during_execute`                 | 5c         | Cancel interrupts running task           |
+| `test_heartbeat_emits_working_events`        | 5b         | Heartbeat fires during slow task         |
+| `test_concurrent_execution`                  | 5d         | Two concurrent executions complete       |
+| `test_session_id_stored_by_context`          | 5e         | session_id stored by context_id          |
+| `test_none_session_id_not_stored`            | 5e         | None session_id not stored               |
+| `test_none_response_text`                    | 5e (bonus) | None response_text -> "Done" fallback    |
 
 ### Test Quality
 
@@ -197,6 +198,6 @@ The Gemini executor hardening goes slightly beyond matching the Claude executor 
 
 1. **Lock discipline**: The Gemini executor protects `_cancel_events` under `_tasks_lock`, while the Claude executor accesses `_cancel_events` without any lock. This is technically more correct for concurrent access safety.
 
-2. **Cancel-aware backoff**: The Gemini executor uses `asyncio.wait_for(cancel_event.wait(), timeout=delay)` during retry backoff, so a cancel signal during backoff is responded to immediately rather than waiting for the full delay to expire. The Claude executor uses plain `asyncio.sleep(delay)`.
+1. **Cancel-aware backoff**: The Gemini executor uses `asyncio.wait_for(cancel_event.wait(), timeout=delay)` during retry backoff, so a cancel signal during backoff is responded to immediately rather than waiting for the full delay to expire. The Claude executor uses plain `asyncio.sleep(delay)`.
 
 Both differences are positive deviations from the gold standard and represent legitimate improvements that could be backported to the Claude executor in future work.

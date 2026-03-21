@@ -1,16 +1,17 @@
 ---
 tags:
-  - "#exec"
-  - "#gemini-acp-bridge"
-date: "2026-02-22"
+  - '#exec'
+  - '#gemini-acp-bridge'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-gemini-acp-bridge-plan]]"
-  - "[[2026-02-22-gemini-overhaul-adr]]"
-  - "[[2026-02-22-gemini-acp-bridge-review]]"
-  - "[[2026-02-22-gemini-overhaul-reference]]"
-  - "[[2026-02-22-gemini-acp-audit-research]]"
-  - "[[2026-02-22-gemini-acp-audit-expanded]]"
+  - '[[2026-02-22-gemini-acp-bridge-plan]]'
+  - '[[2026-02-22-gemini-overhaul-adr]]'
+  - '[[2026-02-22-gemini-acp-bridge-review]]'
+  - '[[2026-02-22-gemini-overhaul-reference]]'
+  - '[[2026-02-22-gemini-acp-audit-research]]'
+  - '[[2026-02-22-gemini-acp-audit-expanded]]'
 ---
+
 # `gemini-acp-bridge` code review (post-rewrite)
 
 **Status:** `PASS`
@@ -34,6 +35,7 @@ src/vaultspec/protocol/acp/tests/test_gemini_bridge.py  25 passed in 0.17s
 ```
 
 Test breakdown by category:
+
 - Lifecycle: 8 tests (initialize, new_session, prompt, cancel, cancel-during-prompt, authenticate, close, no-get-config)
 - Normalization: 5 tests (tool kind mapping, diff generation, content accumulation, TodoWrite-to-plan, TodoWrite progress suppression)
 - Session management: 12 tests (list_sessions, list_sessions_filter, fork, fork_unknown, load_alive, load_dead, load_unknown, resume, set_mode, set_model, ext_method, ext_notification)
@@ -62,23 +64,23 @@ Replaced elements verified:
 
 All 15 methods verified present with correct signatures:
 
-| Method | Line | Signature | Status |
-|--------|------|-----------|--------|
-| `on_connect` | 347 | `(self, conn: Any) -> None` | Present |
-| `initialize` | 353 | `(self, protocol_version, client_capabilities, client_info, **kwargs) -> InitializeResponse` | Present |
-| `new_session` | 484 | `(self, cwd, mcp_servers, **kwargs) -> NewSessionResponse` | Present |
-| `prompt` | 504 | `(self, prompt, session_id, **kwargs) -> PromptResponse` | Present |
-| `cancel` | 633 | `(self, session_id, **kwargs) -> None` | Present |
-| `authenticate` | 650 | `(self, method_id: str, **kwargs) -> AuthenticateResponse or None` | Present |
-| `load_session` | 663 | `(self, cwd, session_id, mcp_servers, **kwargs) -> LoadSessionResponse or None` | Present |
-| `resume_session` | 718 | `(self, cwd, session_id, mcp_servers, **kwargs) -> ResumeSessionResponse` | Present |
-| `list_sessions` | 735 | `(self, cursor, cwd, **kwargs) -> ListSessionsResponse` | Present |
-| `fork_session` | 758 | `(self, cwd, session_id, mcp_servers, **kwargs) -> ForkSessionResponse` | Present |
-| `set_session_mode` | 789 | `(self, mode_id, session_id, **kwargs) -> None` | Present |
-| `set_session_model` | 802 | `(self, model_id, session_id, **kwargs) -> None` | Present |
-| `set_config_option` | 815 | `(self, config_id, session_id, value, **_kwargs) -> None` | Present |
-| `ext_method` | 826 | `(self, method, params) -> dict[str, Any]` | Present |
-| `ext_notification` | 833 | `(self, method, params) -> None` | Present |
+| Method              | Line | Signature                                                                                    | Status  |
+| ------------------- | ---- | -------------------------------------------------------------------------------------------- | ------- |
+| `on_connect`        | 347  | `(self, conn: Any) -> None`                                                                  | Present |
+| `initialize`        | 353  | `(self, protocol_version, client_capabilities, client_info, **kwargs) -> InitializeResponse` | Present |
+| `new_session`       | 484  | `(self, cwd, mcp_servers, **kwargs) -> NewSessionResponse`                                   | Present |
+| `prompt`            | 504  | `(self, prompt, session_id, **kwargs) -> PromptResponse`                                     | Present |
+| `cancel`            | 633  | `(self, session_id, **kwargs) -> None`                                                       | Present |
+| `authenticate`      | 650  | `(self, method_id: str, **kwargs) -> AuthenticateResponse or None`                           | Present |
+| `load_session`      | 663  | `(self, cwd, session_id, mcp_servers, **kwargs) -> LoadSessionResponse or None`              | Present |
+| `resume_session`    | 718  | `(self, cwd, session_id, mcp_servers, **kwargs) -> ResumeSessionResponse`                    | Present |
+| `list_sessions`     | 735  | `(self, cursor, cwd, **kwargs) -> ListSessionsResponse`                                      | Present |
+| `fork_session`      | 758  | `(self, cwd, session_id, mcp_servers, **kwargs) -> ForkSessionResponse`                      | Present |
+| `set_session_mode`  | 789  | `(self, mode_id, session_id, **kwargs) -> None`                                              | Present |
+| `set_session_model` | 802  | `(self, model_id, session_id, **kwargs) -> None`                                             | Present |
+| `set_config_option` | 815  | `(self, config_id, session_id, value, **_kwargs) -> None`                                    | Present |
+| `ext_method`        | 826  | `(self, method, params) -> dict[str, Any]`                                                   | Present |
+| `ext_notification`  | 833  | `(self, method, params) -> None`                                                             | Present |
 
 Capability declaration matches ADR spec:
 
@@ -105,12 +107,12 @@ No `McpCapabilities` -- correct per ADR rationale.
 Spawn flow in `_spawn_child_session()` (lines 381-469) verified:
 
 1. CLI resolution via `shutil.which("gemini")` with `gemini_path` override -- correct.
-2. `FileNotFoundError` raised with actionable message if CLI not found -- correct.
-3. Args built correctly: `--experimental-acp`, `--model`, optional `--sandbox`, `--allowed-tools`, `--approval-mode`, `--output-format`.
-4. Spawn via `self._spawn_fn(proxy_client, gemini_path, *args, cwd=cwd)` using `AsyncExitStack` -- correct.
-5. Background tasks tracked: proxy worker task and stderr reader both added to `state.background_tasks`.
-6. ACP handshake performed: `child_conn.initialize()` then `child_conn.new_session()`.
-7. No `os.environ.copy()`, no synchronous `subprocess.run`, no Windows `cmd.exe` workaround.
+1. `FileNotFoundError` raised with actionable message if CLI not found -- correct.
+1. Args built correctly: `--experimental-acp`, `--model`, optional `--sandbox`, `--allowed-tools`, `--approval-mode`, `--output-format`.
+1. Spawn via `self._spawn_fn(proxy_client, gemini_path, *args, cwd=cwd)` using `AsyncExitStack` -- correct.
+1. Background tasks tracked: proxy worker task and stderr reader both added to `state.background_tasks`.
+1. ACP handshake performed: `child_conn.initialize()` then `child_conn.new_session()`.
+1. No `os.environ.copy()`, no synchronous `subprocess.run`, no Windows `cmd.exe` workaround.
 
 ### Decision 4: Session Resume -- COMPLIANT
 
@@ -152,25 +154,25 @@ Test DI verified:
 
 Checklist cross-referencing all CRITICAL and HIGH findings from `[[2026-02-22-gemini-acp-bridge-review]]`:
 
-| ID | Severity | Issue | Status |
-|----|----------|-------|--------|
-| F-01 | CRITICAL | `McpCapabilities` NameError | RESOLVED -- removed entirely, not imported or referenced |
-| F-02 | CRITICAL | `authenticate()` missing `method_id` | RESOLVED -- signature is `(self, method_id: str, **kwargs)` at line 650 |
-| F-03 | CRITICAL | All tests fail at fixture setup (`spawn_fn` not accepted) | RESOLVED -- constructor accepts `spawn_fn`, all 25 tests pass |
-| F-04 | CRITICAL | Missing 9/15 protocol methods | RESOLVED -- all 15 methods implemented |
-| F-05 | HIGH | No DI mechanism for subprocess spawning | RESOLVED -- `spawn_fn` parameter with default |
-| F-06 | HIGH | `prepare_process` not updated (out of scope for Phase 1) | N/A -- Phase 1 is bridge rewrite only; provider integration is separate |
-| F-07 | HIGH | `GeminiACPBridge` not exported from `__init__.py` | RESOLVED -- exported in `__init__.py` line 5, in `__all__` line 10 |
-| F-08 | HIGH | No session persistence in executor (out of scope for Phase 1) | N/A -- executor hardening is Decision 5, separate phase |
-| F-09 | HIGH | `SessionCapabilities` advertises `fork=None, list=None, resume=None` | RESOLVED -- uses `SessionForkCapabilities()`, `SessionListCapabilities()`, `SessionResumeCapabilities()` |
-| F-10 | HIGH | 17 unused imports | RESOLVED -- only 2 minor unused imports remain (see LOW findings below) |
-| F-11 | MEDIUM | `subprocess` imported inside function body | RESOLVED -- `subprocess` no longer imported at all |
-| F-12 | MEDIUM | Fire-and-forget `asyncio.create_task` without tracking | RESOLVED -- tasks tracked in `_SessionState.background_tasks`, cleaned up in `_cleanup_session()` |
-| F-13 | MEDIUM | `GeminiProxyClient._worker` infinite loop without clean shutdown | RESOLVED -- worker task returned by `start()`, tracked in background_tasks, cancelled on cleanup |
-| F-14 | MEDIUM | `TodoWrite` silently dropped | RESOLVED -- converted to `AgentPlanUpdate` with `PlanEntry` objects (lines 575-598) |
-| F-15 | MEDIUM | Prompt serialization sends raw pydantic models | RESOLVED -- prompt passed directly to child via `child_conn.prompt()` (line 521-523), no manual serialization |
-| F-17 | LOW | No doc comments on public methods | RESOLVED -- all public methods have docstrings |
-| F-18 | LOW | Constructor differs from Claude bridge DI pattern | RESOLVED -- follows DI pattern with `spawn_fn` and env-var config |
+| ID   | Severity | Issue                                                                | Status                                                                                                        |
+| ---- | -------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| F-01 | CRITICAL | `McpCapabilities` NameError                                          | RESOLVED -- removed entirely, not imported or referenced                                                      |
+| F-02 | CRITICAL | `authenticate()` missing `method_id`                                 | RESOLVED -- signature is `(self, method_id: str, **kwargs)` at line 650                                       |
+| F-03 | CRITICAL | All tests fail at fixture setup (`spawn_fn` not accepted)            | RESOLVED -- constructor accepts `spawn_fn`, all 25 tests pass                                                 |
+| F-04 | CRITICAL | Missing 9/15 protocol methods                                        | RESOLVED -- all 15 methods implemented                                                                        |
+| F-05 | HIGH     | No DI mechanism for subprocess spawning                              | RESOLVED -- `spawn_fn` parameter with default                                                                 |
+| F-06 | HIGH     | `prepare_process` not updated (out of scope for Phase 1)             | N/A -- Phase 1 is bridge rewrite only; provider integration is separate                                       |
+| F-07 | HIGH     | `GeminiACPBridge` not exported from `__init__.py`                    | RESOLVED -- exported in `__init__.py` line 5, in `__all__` line 10                                            |
+| F-08 | HIGH     | No session persistence in executor (out of scope for Phase 1)        | N/A -- executor hardening is Decision 5, separate phase                                                       |
+| F-09 | HIGH     | `SessionCapabilities` advertises `fork=None, list=None, resume=None` | RESOLVED -- uses `SessionForkCapabilities()`, `SessionListCapabilities()`, `SessionResumeCapabilities()`      |
+| F-10 | HIGH     | 17 unused imports                                                    | RESOLVED -- only 2 minor unused imports remain (see LOW findings below)                                       |
+| F-11 | MEDIUM   | `subprocess` imported inside function body                           | RESOLVED -- `subprocess` no longer imported at all                                                            |
+| F-12 | MEDIUM   | Fire-and-forget `asyncio.create_task` without tracking               | RESOLVED -- tasks tracked in `_SessionState.background_tasks`, cleaned up in `_cleanup_session()`             |
+| F-13 | MEDIUM   | `GeminiProxyClient._worker` infinite loop without clean shutdown     | RESOLVED -- worker task returned by `start()`, tracked in background_tasks, cancelled on cleanup              |
+| F-14 | MEDIUM   | `TodoWrite` silently dropped                                         | RESOLVED -- converted to `AgentPlanUpdate` with `PlanEntry` objects (lines 575-598)                           |
+| F-15 | MEDIUM   | Prompt serialization sends raw pydantic models                       | RESOLVED -- prompt passed directly to child via `child_conn.prompt()` (line 521-523), no manual serialization |
+| F-17 | LOW      | No doc comments on public methods                                    | RESOLVED -- all public methods have docstrings                                                                |
+| F-18 | LOW      | Constructor differs from Claude bridge DI pattern                    | RESOLVED -- follows DI pattern with `spawn_fn` and env-var config                                             |
 
 ## Findings
 
@@ -193,6 +195,7 @@ No CRITICAL or HIGH issues found.
 The test suite provides good coverage of the critical paths:
 
 **Well covered:**
+
 - Initialize with capability verification
 - New session with flag passthrough
 - Prompt proxying to child connection
@@ -207,6 +210,7 @@ The test suite provides good coverage of the critical paths:
 - Set mode, set model, ext_method, ext_notification
 
 **Not explicitly covered but acceptable:**
+
 - `_cleanup_session()` task cancellation -- exercised indirectly through `close()` and `load_session` (dead child respawn)
 - `GeminiProxyClient` proxy methods (`request_permission`, `read_text_file`, etc.) -- pass-through to `bridge._conn`, would require deeper integration tests
 - `main()` entry point -- CLI integration, not unit-testable

@@ -1,10 +1,10 @@
 ---
-tags: ["#plan", "#vault-doctor-suite"]
-date: "2026-02-24"
+tags: ['#plan', '#vault-doctor-suite']
+date: '2026-02-24'
 related:
-  - "[[2026-02-24-vault-doctor-suite-adr]]"
-  - "[[2026-02-24-vault-doctor-suite-plan]]"
-  - "[[2026-02-24-vault-doctor-suite-p1-plan]]"
+  - '[[2026-02-24-vault-doctor-suite-adr]]'
+  - '[[2026-02-24-vault-doctor-suite-plan]]'
+  - '[[2026-02-24-vault-doctor-suite-p1-plan]]'
 ---
 
 # `vault-doctor-suite` P3 plan: Chain Integrity Checks
@@ -22,12 +22,12 @@ can be executed in parallel with those phases once Phase 1 is complete.
 
 A new module `src/vaultspec/doctor/checks/chain.py` implements four checks:
 
-| Check name | Severity | Fixable | Description |
-|---|---|---|---|
-| `exec-plan-link` | ERROR | No | Exec `related` must contain a valid plan wikilink |
-| `plan-adr-link` | WARNING | No | Plan should have at least one linked ADR |
-| `adr-research-link` | WARNING | No | ADR should have at least one linked research |
-| `feature-plan-coverage` | ERROR | No | Every feature tag must have a plan (wraps `verify_vertical_integrity`) |
+| Check name              | Severity | Fixable | Description                                                            |
+| ----------------------- | -------- | ------- | ---------------------------------------------------------------------- |
+| `exec-plan-link`        | ERROR    | No      | Exec `related` must contain a valid plan wikilink                      |
+| `plan-adr-link`         | WARNING  | No      | Plan should have at least one linked ADR                               |
+| `adr-research-link`     | WARNING  | No      | ADR should have at least one linked research                           |
+| `feature-plan-coverage` | ERROR    | No      | Every feature tag must have a plan (wraps `verify_vertical_integrity`) |
 
 All four checks accept `input_paths: list[Path] | None`. For path-scoped runs,
 each check walks only the relevant document set (exec docs, plan docs, etc.)
@@ -60,35 +60,35 @@ advisory: they surface gaps but cannot repair a missing document.
 - Name: Implement `check_exec_plan_link` — ERROR when exec `related` has no valid plan link
 - Step summary: `.vault/exec/2026-02-24-vault-doctor-suite/2026-02-24-vault-doctor-suite-p3-s1-exec.md`
 - Executing sub-agent: vaultspec-complex-executor
-- References: [[2026-02-24-vault-doctor-suite-adr]], [[2026-02-24-vault-doctor-suite-p1-plan]], [[2026-02-24-vault-doctor-suite-plan]]
+- References: \[[2026-02-24-vault-doctor-suite-adr]\], \[[2026-02-24-vault-doctor-suite-p1-plan]\], \[[2026-02-24-vault-doctor-suite-plan]\]
 
----
+______________________________________________________________________
 
 - Name: Implement `check_plan_adr_link` — WARNING when plan `related` has no valid ADR link
 - Step summary: `.vault/exec/2026-02-24-vault-doctor-suite/2026-02-24-vault-doctor-suite-p3-s2-exec.md`
 - Executing sub-agent: vaultspec-complex-executor
-- References: [[2026-02-24-vault-doctor-suite-adr]], [[2026-02-24-vault-doctor-suite-p3-s1-exec]]
+- References: \[[2026-02-24-vault-doctor-suite-adr]\], \[[2026-02-24-vault-doctor-suite-p3-s1-exec]\]
 
----
+______________________________________________________________________
 
 - Name: Implement `check_adr_research_link` — WARNING when ADR `related` has no valid research link
 - Step summary: `.vault/exec/2026-02-24-vault-doctor-suite/2026-02-24-vault-doctor-suite-p3-s3-exec.md`
 - Executing sub-agent: vaultspec-complex-executor
-- References: [[2026-02-24-vault-doctor-suite-adr]], [[2026-02-24-vault-doctor-suite-p3-s2-exec]]
+- References: \[[2026-02-24-vault-doctor-suite-adr]\], \[[2026-02-24-vault-doctor-suite-p3-s2-exec]\]
 
----
+______________________________________________________________________
 
 - Name: Implement `feature-plan-coverage` — wrap `verify_vertical_integrity()` as CHAIN check
 - Step summary: `.vault/exec/2026-02-24-vault-doctor-suite/2026-02-24-vault-doctor-suite-p3-s4-exec.md`
 - Executing sub-agent: vaultspec-standard-executor
-- References: [[2026-02-24-vault-doctor-suite-adr]], [[2026-02-24-vault-doctor-suite-p1-plan]], [[2026-02-24-vault-doctor-suite-p3-s3-exec]]
+- References: \[[2026-02-24-vault-doctor-suite-adr]\], \[[2026-02-24-vault-doctor-suite-p1-plan]\], \[[2026-02-24-vault-doctor-suite-p3-s3-exec]\]
 
----
+______________________________________________________________________
 
 - Name: Register chain checks in `CheckRegistry`; write `test_chain.py` unit tests
 - Step summary: `.vault/exec/2026-02-24-vault-doctor-suite/2026-02-24-vault-doctor-suite-p3-s5-exec.md`
 - Executing sub-agent: vaultspec-code-reviewer
-- References: [[2026-02-24-vault-doctor-suite-adr]], [[2026-02-24-vault-doctor-suite-p3-s1-exec]], [[2026-02-24-vault-doctor-suite-p3-s2-exec]], [[2026-02-24-vault-doctor-suite-p3-s3-exec]], [[2026-02-24-vault-doctor-suite-p3-s4-exec]]
+- References: \[[2026-02-24-vault-doctor-suite-adr]\], \[[2026-02-24-vault-doctor-suite-p3-s1-exec]\], \[[2026-02-24-vault-doctor-suite-p3-s2-exec]\], \[[2026-02-24-vault-doctor-suite-p3-s3-exec]\], \[[2026-02-24-vault-doctor-suite-p3-s4-exec]\]
 
 ## Parallelization
 
@@ -101,21 +101,28 @@ in sequence. S5 is strictly dependent on S1–S4.
 - `vaultspec vault doctor --category chain` against a fixture vault containing
   an exec doc whose `related` field has no plan wikilink → at least one
   `Severity.ERROR` result with `check = "exec-plan-link"`.
+
 - `vaultspec vault doctor --category chain` against a fixture vault containing
   a plan doc whose `related` field has no ADR wikilink → at least one
   `Severity.WARNING` result with `check = "plan-adr-link"`.
+
 - `vaultspec vault doctor --category chain` against a fixture vault containing
   an ADR doc whose `related` field has no research wikilink → at least one
   `Severity.WARNING` result with `check = "adr-research-link"`.
+
 - `vaultspec vault doctor --category chain` against a fixture vault with a fully
   linked chain (exec → plan → ADR → research) → zero chain results for those
   docs.
+
 - `feature-plan-coverage` wraps `verify_vertical_integrity()` correctly: a
   feature tag with no plan document emits `Severity.ERROR` with
   `check = "feature-plan-coverage"`.
+
 - `--input` scoping: chain break in file A, `--input file_B` → zero results
   for file B (filter works for exec-plan-link and plan-adr-link checks).
+
 - `fix_available = False` on all four chain check results (no fixes are
   implemented in this phase).
+
 - No regressions in `src/vaultspec/verification/tests/` (the wrapped function
   is not modified, only re-exported through the doctor layer).

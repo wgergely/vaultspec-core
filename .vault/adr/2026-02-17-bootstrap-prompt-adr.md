@@ -1,11 +1,13 @@
 ---
 tags:
-  - "#adr"
-  - "#framework"
-date: "2026-02-17"
+  - '#adr'
+  - '#framework'
+date: '2026-02-17'
 related:
-  - "[[2026-02-17-bootstrap-prompt-engineering-research]]"
+  - '[[2026-02-17-bootstrap-prompt-engineering-research]]'
+  - '[[2026-02-17-framework-plan]]'
 ---
+
 # bootstrap-prompt adr: framework bootstrap prompt redesign | (**status:** accepted)
 
 ## Problem Statement
@@ -63,6 +65,7 @@ The bootstrap prompt will use this XML-structured layout:
 <pipeline>
   Table: Phase | Skill | Artifact | Requires
   5 rows (Research, Specify, Plan, Execute, Verify)
+
   + 1 row for Reference (optional sub-phase)
   + 1 row for Curate (maintenance)
   Trivial-task exemption line
@@ -86,34 +89,34 @@ The bootstrap prompt will use this XML-structured layout:
 
 From the prompt engineering research:
 
-| Principle | How Applied |
-|-----------|------------|
-| P1: Context engineering > prompt engineering | Minimal high-signal tokens; progressive disclosure for details |
-| P2: Be explicit and direct | Agent-role-centric identity; direct skill references |
-| P3: Provide motivation, not just rules | Identity explains WHY (auditable artifacts, governed development) |
-| P4: Structured formatting | XML section boundaries + Markdown content |
-| P5: Layered hierarchy | Identity -> Pipeline -> Dispatch -> Conventions |
-| P8: Few-shot > exhaustive rules | Decision table as implicit few-shot; no edge-case trees |
-| P9: Positive instructions | "Use judgment based on scope" not "Do NOT use pipeline for..." |
-| P11: Progressive disclosure | Dispatch details deferred to skill files |
+| Principle                                    | How Applied                                                       |
+| -------------------------------------------- | ----------------------------------------------------------------- |
+| P1: Context engineering > prompt engineering | Minimal high-signal tokens; progressive disclosure for details    |
+| P2: Be explicit and direct                   | Agent-role-centric identity; direct skill references              |
+| P3: Provide motivation, not just rules       | Identity explains WHY (auditable artifacts, governed development) |
+| P4: Structured formatting                    | XML section boundaries + Markdown content                         |
+| P5: Layered hierarchy                        | Identity -> Pipeline -> Dispatch -> Conventions                   |
+| P8: Few-shot > exhaustive rules              | Decision table as implicit few-shot; no edge-case trees           |
+| P9: Positive instructions                    | "Use judgment based on scope" not "Do NOT use pipeline for..."    |
+| P11: Progressive disclosure                  | Dispatch details deferred to skill files                          |
 
 ## Anti-Patterns Avoided
 
-| Anti-Pattern | How Avoided |
-|--------------|------------|
-| AP1: Context dumping | ~2,000 token budget; details in skill/agent/template files |
-| AP4: Over-specifying edge cases | Decision table, not if-else tree |
-| AP5: Burying critical info | Identity and pipeline are the first two sections |
-| AP6: ALL-CAPS aggressive language | Calm, direct language throughout |
-| AP8: Vague tool descriptions | Each skill explicitly named with purpose |
+| Anti-Pattern                      | How Avoided                                                |
+| --------------------------------- | ---------------------------------------------------------- |
+| AP1: Context dumping              | ~2,000 token budget; details in skill/agent/template files |
+| AP4: Over-specifying edge cases   | Decision table, not if-else tree                           |
+| AP5: Burying critical info        | Identity and pipeline are the first two sections           |
+| AP6: ALL-CAPS aggressive language | Calm, direct language throughout                           |
+| AP8: Vague tool descriptions      | Each skill explicitly named with purpose                   |
 
 ## Integration Plan
 
 1. The new bootstrap content replaces the body of `.vaultspec/FRAMEWORK.md`
-2. `cli.py config sync` continues to serialize it into `system_framework` YAML frontmatter
-3. No changes needed to `_generate_config()` — the pipeline is format-agnostic
-4. `PROJECT.md` remains as the user-editable companion (body content in generated files)
-5. Backward-compat warnings for `INTERNAL.md` -> `FRAMEWORK.md` rename remain unchanged
+1. `cli.py config sync` continues to serialize it into `system_framework` YAML frontmatter
+1. No changes needed to `_generate_config()` — the pipeline is format-agnostic
+1. `PROJECT.md` remains as the user-editable companion (body content in generated files)
+1. Backward-compat warnings for `INTERNAL.md` -> `FRAMEWORK.md` rename remain unchanged
 
 ## Consequences
 

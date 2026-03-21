@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#research"
-  - "#acp-claude-multimodal"
-date: "2026-02-21"
+  - '#research'
+  - '#acp-claude-multimodal'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-acp-claude-multimodal-plan.md]]"
+  - '[[2026-02-21-acp-claude-multimodal-plan]]'
 ---
+
 # Claude SDK Query Signature Findings
 
 ## 1. Signature Inspection
@@ -17,8 +18,9 @@ Output: `(self, prompt: str | collections.abc.AsyncIterable[dict[str, typing.Any
 ## 2. Analysis
 
 The `query` method accepts:
-1.  `str`: A simple text prompt.
-2.  `AsyncIterable[dict[str, Any]]`: A stream of raw message dicts.
+
+1. `str`: A simple text prompt.
+1. `AsyncIterable[dict[str, Any]]`: A stream of raw message dicts.
 
 It does **not** explicitly list `list[dict]` or `UserMessage` in the type hint, but typically `AsyncIterable` covers lists (if synchronous iterables are accepted or if it handles conversion). However, the type hint specifically says `AsyncIterable`.
 
@@ -36,12 +38,14 @@ If we want to pass images, we likely need to construct a `dict` representing the
 We cannot just pass a list of blocks. We must pass an **async iterable of message dicts**.
 
 We need a helper:
+
 ```python
 async def _make_message_stream(message_dict):
     yield message_dict
 ```
 
 And then call:
+
 ```python
 await sdk_client.query(_make_message_stream(user_message))
 ```

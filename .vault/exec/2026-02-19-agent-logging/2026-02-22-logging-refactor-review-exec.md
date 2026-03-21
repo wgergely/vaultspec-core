@@ -1,26 +1,40 @@
 ---
 tags:
-  - "#exec"
-  - "#uncategorized"
-date: "2026-02-22"
----
-﻿---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
-# Directory tag (hardcoded - DO NOT CHANGE - based on .vault/exec/ location)
-# Feature tag (replace {feature} with your feature name, e.g., #editor-demo)
-tags:
-  - "#exec"
-  - "#agent-logging"
-# ISO date format (e.g., 2026-02-06)
-date: "2026-02-22"
-# Related documents as quoted wiki-links
-# (e.g., "[[2026-02-04-feature-plan]]")
-related:
-  - "[[2026-02-19-agent-logging-p1-plan]]"
+  - '#exec'
+  - '#uncategorized'
+date: '2026-02-22'
 ---
 
-# `#agent-logging` code review
+﻿---
+
+# ALLOWED TAGS - DO NOT REMOVE
+
+## REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
+
+## Directory tag (hardcoded - DO NOT CHANGE - based on .vault/exec/ location)
+
+## Feature tag (replace {feature} with your feature name, e.g., #editor-demo)
+
+tags:
+
+- "#exec"
+- "#agent-logging"
+
+## ISO date format (e.g., 2026-02-06)
+
+date: "2026-02-22"
+
+## Related documents as quoted wiki-links
+
+## (e.g., "\[[2026-02-04-feature-plan]\]")
+
+related:
+
+- "\[[2026-02-19-agent-logging-p1-plan]\]"
+
+______________________________________________________________________
+
+## `#agent-logging` code review
 
 <!-- STATUS MUST BE ONE OF: PASS | FAIL | REVISION REQUIRED -->
 

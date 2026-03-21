@@ -1,8 +1,8 @@
 ---
 tags:
-  - "#plan"
-  - "#code-health"
-date: "2026-02-24"
+  - '#plan'
+  - '#code-health'
+date: '2026-02-24'
 ---
 
 # Code-health Plan

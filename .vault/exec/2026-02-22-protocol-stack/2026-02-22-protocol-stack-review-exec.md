@@ -1,14 +1,15 @@
 ---
 tags:
-  - "#exec"
-  - "#protocol-stack"
-date: "2026-02-22"
+  - '#exec'
+  - '#protocol-stack'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-protocol-stack-deep-audit-plan]]"
-  - "[[2026-02-22-protocol-stack-deep-audit-adr]]"
-  - "[[2026-02-22-protocol-stack-deep-audit-summary]]"
-  - "[[2026-02-22-protocol-stack-deep-audit-research]]"
+  - '[[2026-02-22-protocol-stack-deep-audit-plan]]'
+  - '[[2026-02-22-protocol-stack-deep-audit-adr]]'
+  - '[[2026-02-22-protocol-stack-deep-audit-summary]]'
+  - '[[2026-02-22-protocol-stack-deep-audit-research]]'
 ---
+
 # `protocol-stack` code review
 
 **Status:** `REVISION REQUIRED`

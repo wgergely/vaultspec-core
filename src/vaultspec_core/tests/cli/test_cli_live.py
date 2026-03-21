@@ -422,7 +422,7 @@ class TestUninstall:
 
 class TestSpecRules:
     def test_add_show_remove_lifecycle(self, cli, project):
-        # add
+        # add -- use a unique name to avoid collisions with builtins
         result = _run(
             cli,
             project,
@@ -430,15 +430,17 @@ class TestSpecRules:
             "rules",
             "add",
             "--name",
-            "live-test",
+            "lifecycle-test-rule",
             input="Live rule body",
         )
         assert result.exit_code == 0
-        rule_path = project / ".vaultspec" / "rules" / "rules" / "live-test.md"
+        rule_path = (
+            project / ".vaultspec" / "rules" / "rules" / "lifecycle-test-rule.md"
+        )
         assert rule_path.exists()
 
         # show
-        result = _run(cli, project, "spec", "rules", "show", "live-test")
+        result = _run(cli, project, "spec", "rules", "show", "lifecycle-test-rule")
         assert result.exit_code == 0
         assert "Live rule body" in result.output
 
@@ -449,7 +451,7 @@ class TestSpecRules:
             "spec",
             "rules",
             "remove",
-            "live-test",
+            "lifecycle-test-rule",
             "--force",
         )
         assert result.exit_code == 0
@@ -696,6 +698,11 @@ class TestVaultAdd:
     @pytest.mark.parametrize("doc_type", _DOC_TYPES)
     def test_add_doc_type(self, cli, project, doc_type):
         feat = f"live-{doc_type}"
+        # exec requires research -> ADR -> plan to exist first
+        if doc_type == "exec":
+            for prereq in ("research", "adr", "plan"):
+                pre = _run(cli, project, "vault", "add", prereq, "--feature", feat)
+                assert pre.exit_code == 0, f"prereq {prereq} failed: {pre.output}"
         result = _run(cli, project, "vault", "add", doc_type, "--feature", feat)
         assert result.exit_code == 0
 

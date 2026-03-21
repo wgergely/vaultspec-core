@@ -1,13 +1,14 @@
 ---
 tags:
-  - "#research"
-  - "#protocol-audit"
-date: "2026-02-21"
+  - '#research'
+  - '#protocol-audit'
+date: '2026-02-21'
 related:
-  - "[[2026-02-20-a2a-team-protocol-research]]"
-  - "[[2026-02-07-protocol-architecture-research]]"
-  - "[[2026-02-07-protocol-review-research]]"
+  - '[[2026-02-20-a2a-team-protocol-research]]'
+  - '[[2026-02-07-protocol-architecture-research]]'
+  - '[[2026-02-07-protocol-review-research]]'
 ---
+
 # Protocol Layer Audit: Four-Path Agent Communication Stack
 
 Comprehensive audit of vaultspec's four independent protocol paths for
@@ -19,12 +20,12 @@ process boundaries, and cross-cutting fragility concerns.
 Vaultspec uses two protocol stacks (ACP and A2A) crossed with two providers
 (Claude and Gemini), yielding four distinct code paths:
 
-| Path | Entry Point | Transport | Process Boundaries |
-|------|------------|-----------|-------------------|
-| Claude ACP | `run_subagent()` → `ClaudeACPBridge` | ACP over stdin/stdout | 4 |
-| Gemini ACP | `run_subagent()` → `gemini` CLI | ACP over stdin/stdout | 2 |
-| Claude A2A | `ClaudeA2AExecutor.execute()` | A2A over HTTP → SDK | 3 |
-| Gemini A2A | `GeminiA2AExecutor.execute()` → `run_subagent()` | A2A over HTTP → ACP | 3 |
+| Path       | Entry Point                                      | Transport             | Process Boundaries |
+| ---------- | ------------------------------------------------ | --------------------- | ------------------ |
+| Claude ACP | `run_subagent()` → `ClaudeACPBridge`             | ACP over stdin/stdout | 4                  |
+| Gemini ACP | `run_subagent()` → `gemini` CLI                  | ACP over stdin/stdout | 2                  |
+| Claude A2A | `ClaudeA2AExecutor.execute()`                    | A2A over HTTP → SDK   | 3                  |
+| Gemini A2A | `GeminiA2AExecutor.execute()` → `run_subagent()` | A2A over HTTP → ACP   | 3                  |
 
 ## Findings
 
@@ -86,6 +87,7 @@ propagated a specific error type, `run_subagent` wraps everything into
 **Streaming fidelity:** The bridge does extensive streaming translation
 (`_emit_stream_event`, `_emit_assistant`, `_emit_user_message`,
 `_emit_system_message`, `_emit_result`) covering:
+
 - `content_block_start` → tool use tracking (`_block_index_to_tool`)
 - `content_block_delta` → text_delta, thinking_delta, input_json_delta
 - `AssistantMessage` → `AgentMessageChunk`, `AgentThoughtChunk`, `ToolCallStart`
@@ -122,6 +124,7 @@ over stdin/stdout) → Google Gemini API. Two process boundaries.
 **Key architectural advantage:** No bridge process. The Gemini CLI speaks ACP
 natively, eliminating an entire Python intermediary and the `claude-agent-sdk`
 parsing layer. This means:
+
 - No `MessageParseError` vulnerability
 - No `SubprocessCLITransport` indirection
 - Rate limits handled by the CLI itself
@@ -182,6 +185,7 @@ except MessageParseError as exc:
 ```
 
 This is the only path that:
+
 - Catches `MessageParseError` specifically (imported from `claude_agent_sdk._errors`)
 - Detects rate limits by string-matching the exception message
 - Raises a descriptive `RuntimeError` for rate limits (propagates to `updater.failed()`)
@@ -240,11 +244,13 @@ Three process boundaries.
 
 **Double wrapping:** This is A2A-over-ACP. The executor calls `run_subagent()`
 which goes through the entire ACP lifecycle:
+
 1. A2A `TaskUpdater` state management (`start_work`, `add_artifact`, `complete`/`failed`)
-2. `run_subagent()` lifecycle (provider selection, agent loading, process spec, ACP handshake)
-3. Gemini CLI native ACP
+1. `run_subagent()` lifecycle (provider selection, agent loading, process spec, ACP handshake)
+1. Gemini CLI native ACP
 
 Errors must propagate through both protocol layers. A failure in the Gemini CLI:
+
 - Propagates via ACP protocol to `SubagentClient`
 - Gets wrapped in `SubagentError` by `run_subagent()`
 - Gets caught by `GeminiA2AExecutor`'s `except Exception`
@@ -275,12 +281,12 @@ is acknowledged at the A2A level but not propagated to the ACP level.
 
 ### Error Handling Consistency
 
-| Path | parse_message crash | Rate limit | Generic error | Error preserved? |
-|------|-------------------|------------|---------------|-----------------|
-| Claude ACP | → "refusal" | → "refusal" | → "refusal" | No |
-| Gemini ACP | N/A | CLI handles | → SubagentError | Partially |
-| Claude A2A | → skip (continue) | → RuntimeError | → updater.failed(str(e)) | Yes |
-| Gemini A2A | N/A | CLI handles | → updater.failed(str(e)) | Yes |
+| Path       | parse_message crash | Rate limit     | Generic error            | Error preserved? |
+| ---------- | ------------------- | -------------- | ------------------------ | ---------------- |
+| Claude ACP | → "refusal"         | → "refusal"    | → "refusal"              | No               |
+| Gemini ACP | N/A                 | CLI handles    | → SubagentError          | Partially        |
+| Claude A2A | → skip (continue)   | → RuntimeError | → updater.failed(str(e)) | Yes              |
+| Gemini A2A | N/A                 | CLI handles    | → updater.failed(str(e)) | Yes              |
 
 The Claude ACP path is the weakest. All three error categories collapse
 into `stop_reason = "refusal"` with no recovery path. The Claude A2A path
@@ -309,53 +315,57 @@ specifically; other unknown events are logged and skipped.
 
 ### Rate Limit Handling
 
-| Path | Detection | Behavior | Recovery |
-|------|-----------|----------|----------|
-| Claude ACP | None | Becomes "refusal" | None — caller cannot retry |
-| Gemini ACP | CLI internal | CLI retries or fails | ACP error if CLI gives up |
-| Claude A2A | String match on MessageParseError | RuntimeError raised | Caller sees "rate limited" in error |
-| Gemini A2A | CLI internal (via ACP) | CLI retries or fails | SubagentError wrapping |
+| Path       | Detection                         | Behavior             | Recovery                            |
+| ---------- | --------------------------------- | -------------------- | ----------------------------------- |
+| Claude ACP | None                              | Becomes "refusal"    | None — caller cannot retry          |
+| Gemini ACP | CLI internal                      | CLI retries or fails | ACP error if CLI gives up           |
+| Claude A2A | String match on MessageParseError | RuntimeError raised  | Caller sees "rate limited" in error |
+| Gemini A2A | CLI internal (via ACP)            | CLI retries or fails | SubagentError wrapping              |
 
 ### Process Boundary Failure Modes
 
 **Claude ACP (4 boundaries):**
+
 1. Orchestrator → Bridge: bridge process crash → `SubagentError`
-2. Bridge → SDK: SDK initialization failure → bridge catches, returns "refusal"
-3. SDK → CLI: Node.js process crash → SDK raises → bridge catches
-4. CLI → API: HTTP errors → CLI event → SDK parse → bridge
+1. Bridge → SDK: SDK initialization failure → bridge catches, returns "refusal"
+1. SDK → CLI: Node.js process crash → SDK raises → bridge catches
+1. CLI → API: HTTP errors → CLI event → SDK parse → bridge
 
 Each boundary is a potential failure point. The bridge's bare `except Exception`
 collapses all of them into one undifferentiated signal.
 
 **Gemini ACP (2 boundaries):**
+
 1. Orchestrator → CLI: CLI process crash → ACP protocol error
-2. CLI → API: HTTP errors → CLI handles or propagates via ACP
+1. CLI → API: HTTP errors → CLI handles or propagates via ACP
 
 Simpler stack means fewer failure modes and cleaner error propagation.
 
 **Claude A2A (3 boundaries):**
+
 1. HTTP → Executor: Starlette handles HTTP errors
-2. Executor → CLI: Same SDK→CLI stack as ACP but with better exception handling
-3. CLI → API: Same as above
+1. Executor → CLI: Same SDK→CLI stack as ACP but with better exception handling
+1. CLI → API: Same as above
 
 One fewer boundary than Claude ACP (no bridge process). The executor IS the
 bridge, running in-process.
 
 **Gemini A2A (3 boundaries):**
+
 1. HTTP → Executor: Starlette handles HTTP errors
-2. Executor → CLI: Via `run_subagent()` → ACP
-3. CLI → API: Gemini CLI handles
+1. Executor → CLI: Via `run_subagent()` → ACP
+1. CLI → API: Gemini CLI handles
 
 Double-wrapped but the inner ACP layer is clean (native Gemini ACP).
 
 ### Streaming Event Translation Fidelity
 
-| Path | Text | Thinking | Tool calls | Tool results | Partial streaming |
-|------|------|----------|------------|-------------|-------------------|
-| Claude ACP | Full | Full | Full | Full | Full (deltas) |
-| Gemini ACP | Full (native) | N/A | Full (native) | Full (native) | Full (native) |
-| Claude A2A | Text only | Dropped | Dropped | Dropped | None (batch) |
-| Gemini A2A | Via ACP | N/A | Via ACP | Via ACP | Via ACP |
+| Path       | Text          | Thinking | Tool calls    | Tool results  | Partial streaming |
+| ---------- | ------------- | -------- | ------------- | ------------- | ----------------- |
+| Claude ACP | Full          | Full     | Full          | Full          | Full (deltas)     |
+| Gemini ACP | Full (native) | N/A      | Full (native) | Full (native) | Full (native)     |
+| Claude A2A | Text only     | Dropped  | Dropped       | Dropped       | None (batch)      |
+| Gemini A2A | Via ACP       | N/A      | Via ACP       | Via ACP       | Via ACP           |
 
 Claude A2A is the most lossy — it only collects `TextBlock` content and
 discards thinking, tool use, and streaming events. This is by design (A2A
@@ -364,10 +374,10 @@ are limited compared to the ACP path.
 
 ### Authentication Handling
 
-| Path | Mechanism | Proactive refresh | Fallback |
-|------|-----------|-------------------|----------|
+| Path           | Mechanism                                      | Proactive refresh  | Fallback                    |
+| -------------- | ---------------------------------------------- | ------------------ | --------------------------- |
 | Claude ACP/A2A | OAuth token from `~/.claude/.credentials.json` | Yes (5-min buffer) | `ANTHROPIC_API_KEY` env var |
-| Gemini ACP/A2A | OAuth from `~/.gemini/oauth_creds.json` | Yes (5-min buffer) | `GEMINI_API_KEY` env var |
+| Gemini ACP/A2A | OAuth from `~/.gemini/oauth_creds.json`        | Yes (5-min buffer) | `GEMINI_API_KEY` env var    |
 
 Both providers have proactive token refresh with atomic credential write-back.
 Claude's refresh is in `ClaudeProvider` (`_load_claude_oauth_token`). Gemini's
@@ -378,6 +388,7 @@ credentials gracefully with warnings.
 
 Both stacks share `protocol/sandbox.py` as the single source of truth for
 sandboxing callbacks. The `_make_sandbox_callback()` function is used by:
+
 - Claude ACP bridge (`claude_bridge.py` via direct import)
 - Claude A2A executor (`claude_executor.py` via `executors/base.py` re-export)
 - A2A base (`executors/base.py` re-exports for both executors)
@@ -391,21 +402,26 @@ is done by the CLI, not by vaultspec code.
 ## Risk Assessment
 
 **High risk:**
+
 - Claude ACP `except Exception` → "refusal" mapping. Rate limits, transient
   errors, and SDK bugs are all indistinguishable from actual refusals. This
   will mislead callers and prevent any retry logic.
 
 **Medium risk:**
+
 - Gemini A2A cancellation gap: `cancel()` doesn't propagate to the underlying
   `run_subagent()` call. Long-running Gemini tasks may continue consuming
   resources after A2A cancellation.
+
 - Process tree cleanup on Windows: `_kill_process_tree()` depends on
   `taskkill` which may fail for elevated processes.
 
 **Low risk:**
+
 - Claude A2A string-matching `"rate_limit_event"` in exception messages is
   fragile — SDK internal error messages may change. But it's currently the
   only working rate limit detection.
+
 - `claude-agent-sdk` imports from `_errors` (private module) — API stability
   not guaranteed.
 

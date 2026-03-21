@@ -1,10 +1,17 @@
 ---
 tags:
-  - "#adr"
-  - "#vault-doctor-suite"
-date: "2026-02-24"
+  - '#adr'
+  - '#vault-doctor-suite'
+date: '2026-02-24'
 related:
-  - "[[2026-02-24-vault-doctor-suite-research]]"
+  - '[[2026-02-24-vault-doctor-suite-research]]'
+  - '[[2026-02-24-vault-doctor-suite-p1-plan]]'
+  - '[[2026-02-24-vault-doctor-suite-p2-plan]]'
+  - '[[2026-02-24-vault-doctor-suite-p3-plan]]'
+  - '[[2026-02-24-vault-doctor-suite-p4-plan]]'
+  - '[[2026-02-24-vault-doctor-suite-p5-plan]]'
+  - '[[2026-02-24-vault-doctor-suite-p6-plan]]'
+  - '[[2026-02-24-vault-doctor-suite-plan]]'
 ---
 
 # `vault-doctor-suite` adr: Vault Doctor Suite Architecture | (**status:** `accepted`)
@@ -77,11 +84,11 @@ src/vaultspec/doctor/
 
 ### Three-Mode Contract
 
-| Mode | Invocation | Reads | Writes | Output |
-|---|---|---|---|---|
-| **report** (default) | `vault doctor` | yes | no | issue list |
-| **preview** | `vault doctor --fix --dry-run` | yes | no | what *would* change |
-| **modify** | `vault doctor --fix` | yes | yes | issue list + applied changes |
+| Mode                 | Invocation                     | Reads | Writes | Output                       |
+| -------------------- | ------------------------------ | ----- | ------ | ---------------------------- |
+| **report** (default) | `vault doctor`                 | yes   | no     | issue list                   |
+| **preview**          | `vault doctor --fix --dry-run` | yes   | no     | what *would* change          |
+| **modify**           | `vault doctor --fix`           | yes   | yes    | issue list + applied changes |
 
 `--dry-run` is only meaningful with `--fix`. Without `--fix`, `--dry-run` is rejected with an
 error. The default mode is always safe — no writes without `--fix`.
@@ -129,11 +136,11 @@ Every fix function accepts `dry_run: bool`. When `dry_run=True`:
 
 ### Severity Model
 
-| Severity | Meaning | Pre-commit behavior |
-|---|---|---|
-| `ERROR` | Structural violation — breaks parsing or chain integrity | Fail (exit 1) |
-| `WARNING` | Advisory drift — valid but inconsistent | Pass by default, configurable |
-| `INFO` | Informational — coverage gaps, style suggestions | Pass always |
+| Severity  | Meaning                                                  | Pre-commit behavior           |
+| --------- | -------------------------------------------------------- | ----------------------------- |
+| `ERROR`   | Structural violation — breaks parsing or chain integrity | Fail (exit 1)                 |
+| `WARNING` | Advisory drift — valid but inconsistent                  | Pass by default, configurable |
+| `INFO`    | Informational — coverage gaps, style suggestions         | Pass always                   |
 
 Pre-commit integration uses `--severity error` by default.
 
@@ -164,46 +171,46 @@ pre-commit hooks (`pass_filenames: true`). `--input` / `-i` is useful for script
 
 #### STRUCTURE (fast, delegates to existing)
 
-| Check | Severity | Fixable | Notes |
-|---|---|---|---|
-| `unsupported-dirs` | ERROR | No | Delegates to `verify_vault_structure` |
-| `stray-files` | WARNING | No | Files in `.vault/` root |
+| Check              | Severity | Fixable | Notes                                 |
+| ------------------ | -------- | ------- | ------------------------------------- |
+| `unsupported-dirs` | ERROR    | No      | Delegates to `verify_vault_structure` |
+| `stray-files`      | WARNING  | No      | Files in `.vault/` root               |
 
 #### LINKS (requires graph construction)
 
-| Check | Severity | Fixable | Notes |
-|---|---|---|---|
-| `broken-wikilinks` | ERROR | No | `get_invalid_links()` wired into doctor |
-| `orphaned-docs` | WARNING | No | `get_orphaned()` wired into doctor |
-| `malformed-related` | ERROR | Yes | `related` entries not in `[[wikilink]]` format |
+| Check               | Severity | Fixable | Notes                                          |
+| ------------------- | -------- | ------- | ---------------------------------------------- |
+| `broken-wikilinks`  | ERROR    | No      | `get_invalid_links()` wired into doctor        |
+| `orphaned-docs`     | WARNING  | No      | `get_orphaned()` wired into doctor             |
+| `malformed-related` | ERROR    | Yes     | `related` entries not in `[[wikilink]]` format |
 
 #### CHAIN (requires graph + doc-type awareness)
 
-| Check | Severity | Fixable | Notes |
-|---|---|---|---|
-| `exec-plan-link` | ERROR | No | Exec `related` must contain a valid plan wikilink |
-| `plan-adr-link` | WARNING | No | Plan should have at least one linked ADR |
-| `adr-research-link` | WARNING | No | ADR should have at least one linked research |
-| `feature-plan-coverage` | ERROR | No | Every feature tag must have a plan (existing check) |
+| Check                   | Severity | Fixable | Notes                                               |
+| ----------------------- | -------- | ------- | --------------------------------------------------- |
+| `exec-plan-link`        | ERROR    | No      | Exec `related` must contain a valid plan wikilink   |
+| `plan-adr-link`         | WARNING  | No      | Plan should have at least one linked ADR            |
+| `adr-research-link`     | WARNING  | No      | ADR should have at least one linked research        |
+| `feature-plan-coverage` | ERROR    | No      | Every feature tag must have a plan (existing check) |
 
 #### DRIFT (per-file, no graph needed)
 
-| Check | Severity | Fixable | Notes |
-|---|---|---|---|
-| `filename-date-drift` | ERROR | Yes | Filename date ≠ frontmatter date field |
-| `filename-feature-drift` | ERROR | Yes | Filename feature ≠ feature tag |
-| `unquoted-date` | WARNING | Yes | `date: 2026-02-18` (YAML date object) |
-| `crlf-endings` | WARNING | Yes | Windows line endings in frontmatter |
-| `duplicate-tags` | ERROR | Yes | Same tag appears more than once |
-| `bom-detected` | WARNING | Yes | BOM character at file start |
-| `extra-fields` | INFO | No | Frontmatter fields outside schema |
-| `missing-related-field` | INFO | Yes | `related` absent; normalize to empty list |
+| Check                    | Severity | Fixable | Notes                                     |
+| ------------------------ | -------- | ------- | ----------------------------------------- |
+| `filename-date-drift`    | ERROR    | Yes     | Filename date ≠ frontmatter date field    |
+| `filename-feature-drift` | ERROR    | Yes     | Filename feature ≠ feature tag            |
+| `unquoted-date`          | WARNING  | Yes     | `date: 2026-02-18` (YAML date object)     |
+| `crlf-endings`           | WARNING  | Yes     | Windows line endings in frontmatter       |
+| `duplicate-tags`         | ERROR    | Yes     | Same tag appears more than once           |
+| `bom-detected`           | WARNING  | Yes     | BOM character at file start               |
+| `extra-fields`           | INFO     | No      | Frontmatter fields outside schema         |
+| `missing-related-field`  | INFO     | Yes     | `related` absent; normalize to empty list |
 
 #### COVERAGE (aggregate, no graph needed)
 
-| Check | Severity | Fixable | Notes |
-|---|---|---|---|
-| `feature-coverage-matrix` | INFO | No | Per-feature doc-type presence/absence report |
+| Check                     | Severity | Fixable | Notes                                        |
+| ------------------------- | -------- | ------- | -------------------------------------------- |
+| `feature-coverage-matrix` | INFO     | No      | Per-feature doc-type presence/absence report |
 
 ### Pre-commit Hook Integration
 
@@ -211,6 +218,7 @@ pre-commit hooks (`pass_filenames: true`). `--input` / `-i` is useful for script
 staged filenames as positional args and doctor scopes all checks to those files only:
 
 ```yaml
+
 - id: vault-doctor
   name: Vault Doctor
   entry: uv run python -m vaultspec vault doctor --severity error
@@ -222,6 +230,7 @@ staged filenames as positional args and doctor scopes all checks to those files 
 For the heavier chain and link checks (opt-in):
 
 ```yaml
+
 - id: vault-doctor-deep
   name: Vault Doctor (chain + links)
   entry: uv run python -m vaultspec vault doctor --category chain --category links --severity error
@@ -237,9 +246,11 @@ Both hooks are opt-in via the consuming project's `.pre-commit-config.yaml`.
 A `--filenames` shortcut flag was considered for the hook use case. It is not added because:
 
 1. `--category drift` already covers all filename-related checks (date drift, feature drift).
-2. The hook scoping problem is solved by `--input` / positional file args — the hook passes exactly
+
+1. The hook scoping problem is solved by `--input` / positional file args — the hook passes exactly
    the changed files and doctor restricts results to those files regardless of check category.
-3. Adding check-type aliases (`--filenames`, `--links`) would duplicate `--category` with worse
+
+1. Adding check-type aliases (`--filenames`, `--links`) would duplicate `--category` with worse
    naming and fragment the interface.
 
 ### Relationship to `vaultspec doctor`
@@ -253,13 +264,17 @@ vault content health. The namespace distinction (`doctor` vs `vault doctor`) kee
 Option 2 (dedicated `vault doctor` command) is chosen because:
 
 1. `vault audit` is removed — there is no legacy interface to preserve or be compatible with.
-2. A registered-check architecture allows the suite to grow without modifying the CLI surface.
+
+1. A registered-check architecture allows the suite to grow without modifying the CLI surface.
    New check domains are Python files in `doctor/checks/`, not new flags.
-3. The severity model is essential for pre-commit integration. A threshold parameter solves the
+
+1. The severity model is essential for pre-commit integration. A threshold parameter solves the
    WARNING-blocks-all-commits vs WARNING-is-invisible problem cleanly.
-4. Dry-run must be a first-class contract. Centralising it in `safe_writer.py` ensures every
+
+1. Dry-run must be a first-class contract. Centralising it in `safe_writer.py` ensures every
    current and future fix respects the pattern.
-5. `--input` / positional file args replace the need for a separate fast hook command or special
+
+1. `--input` / positional file args replace the need for a separate fast hook command or special
    category shortcut flags. One command, scoped by the caller.
 
 ## Consequences
@@ -277,8 +292,11 @@ Option 2 (dedicated `vault doctor` command) is chosen because:
 ### Negative / Trade-offs
 
 - New `doctor/` module and `vault doctor` CLI add surface area to document and test
+
 - Graph construction is required for LINKS and CHAIN categories — adds ~50–200ms for large vaults
+
 - Advisory-only checks (chain breaks without auto-fix) require human action; the suite reports
   but cannot repair missing documents
+
 - `--input` scoping for aggregate checks (chain, coverage) still builds the full graph — file
   scoping filters results, not graph construction

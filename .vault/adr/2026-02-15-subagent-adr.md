@@ -1,9 +1,10 @@
 ---
 tags:
-  - "#adr"
-  - "#protocol"
-date: "2026-02-15"
+  - '#adr'
+  - '#protocol'
+date: '2026-02-15'
 ---
+
 ## ADR: Subagent Architecture Refactor — Protocol Convergence
 
 ## Status
@@ -45,13 +46,13 @@ Key components:
 
 ### Technology Landscape (February 2026)
 
-| Technology | Protocol | Language | Claude Support | Gemini Support |
-|---|---|---|---|---|
-| ACP (native) | JSON-RPC stdio | Any | No | Yes (`--experimental-acp`) |
-| `claude-agent-sdk` | Subprocess JSON-lines | Python | Yes (bundled CLI) | No |
-| `@zed-industries/claude-code-acp` | ACP bridge | Node.js/TypeScript | Yes (wraps SDK) | N/A |
-| Claude headless mode | `--output-format stream-json` | Raw subprocess | Yes | No |
-| Claude Code Teams | File-based JSON | Claude CLI processes | Yes (experimental) | No |
+| Technology                        | Protocol                      | Language             | Claude Support     | Gemini Support             |
+| --------------------------------- | ----------------------------- | -------------------- | ------------------ | -------------------------- |
+| ACP (native)                      | JSON-RPC stdio                | Any                  | No                 | Yes (`--experimental-acp`) |
+| `claude-agent-sdk`                | Subprocess JSON-lines         | Python               | Yes (bundled CLI)  | No                         |
+| `@zed-industries/claude-code-acp` | ACP bridge                    | Node.js/TypeScript   | Yes (wraps SDK)    | N/A                        |
+| Claude headless mode              | `--output-format stream-json` | Raw subprocess       | Yes                | No                         |
+| Claude Code Teams                 | File-based JSON               | Claude CLI processes | Yes (experimental) | No                         |
 
 ### Additional Constraints
 
@@ -80,7 +81,9 @@ run_subagent()
 **Implementation sketch:**
 
 ```python
+
 # New file: protocol/claude_sdk/adapter.py
+
 from claude_agent_sdk import ClaudeSDKClient
 
 class ClaudeSubagentAdapter:
@@ -90,6 +93,7 @@ class ClaudeSubagentAdapter:
         self.client = ClaudeSDKClient()
         self.root_dir = root_dir
         self.model = model
+
         # ...
 
     async def run(self, prompt: str) -> SubagentResult:
@@ -145,7 +149,9 @@ def prepare_process(self, ...):
         executable="npx",
         args=["@zed-industries/claude-code-acp", "--model", model],
         env=env,
+
         # ...
+
     )
 ```
 
@@ -182,7 +188,9 @@ run_subagent()
 **Implementation sketch:**
 
 ```python
+
 # Claude: claude -p --output-format stream-json --model <model>
+
 # Gemini: gemini-cli --print --json (hypothetical; Gemini has no equivalent)
 
 class SubprocessAgent:
@@ -192,7 +200,9 @@ class SubprocessAgent:
         )
         proc.stdin.write(prompt.encode())
         proc.stdin.close()
+
         # Parse stream-json events...
+
 ```
 
 **Pros:**
@@ -235,11 +245,14 @@ class AgentRunner(abc.ABC):
 
 class ACPRunner(AgentRunner):
     """Existing ACP flow, extracted from run_subagent()."""
+
     # Wraps spawn_agent_process + SubagentClient
 
 class SDKRunner(AgentRunner):
     """Claude-agent-sdk flow."""
+
     # Wraps ClaudeSDKClient with SubagentResult mapping
+
 ```
 
 **Pros:**
@@ -275,22 +288,24 @@ run_subagent()
 
 **Core translation mapping** (from Zed bridge analysis):
 
-| ACP Method (incoming) | Bridge Action | SDK Call |
-|---|---|---|
-| `initialize` | Return capabilities | N/A (static response) |
-| `session/new` | Create SDK client, set cwd/model/permissions | `ClaudeSDKClient()` + configure |
-| `session/prompt` | Forward prompt text | `client.query()` + iterate `receive_messages()` |
-| `session/cancel` | Abort stream | Close SDK stream |
-| `session/update` (outgoing) | Map SDK events → ACP notifications | SDK `assistant`/`tool_use`/`result` → `AgentMessageChunk`/`ToolCallStart`/etc. |
-| `fs/read_text_file` | Delegate to ACP client | Client handles (SubagentClient) |
-| `fs/write_text_file` | Delegate to ACP client | Client handles (SubagentClient) |
-| `terminal/*` | Delegate to ACP client | Client handles (SubagentClient) |
-| Permission requests | Map SDK `can_use_tool` → ACP `request_permission` | Callback bridge |
+| ACP Method (incoming)       | Bridge Action                                     | SDK Call                                                                       |
+| --------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `initialize`                | Return capabilities                               | N/A (static response)                                                          |
+| `session/new`               | Create SDK client, set cwd/model/permissions      | `ClaudeSDKClient()` + configure                                                |
+| `session/prompt`            | Forward prompt text                               | `client.query()` + iterate `receive_messages()`                                |
+| `session/cancel`            | Abort stream                                      | Close SDK stream                                                               |
+| `session/update` (outgoing) | Map SDK events → ACP notifications                | SDK `assistant`/`tool_use`/`result` → `AgentMessageChunk`/`ToolCallStart`/etc. |
+| `fs/read_text_file`         | Delegate to ACP client                            | Client handles (SubagentClient)                                                |
+| `fs/write_text_file`        | Delegate to ACP client                            | Client handles (SubagentClient)                                                |
+| `terminal/*`                | Delegate to ACP client                            | Client handles (SubagentClient)                                                |
+| Permission requests         | Map SDK `can_use_tool` → ACP `request_permission` | Callback bridge                                                                |
 
 **Implementation sketch:**
 
 ```python
+
 # New file: protocol/acp/claude_bridge.py (~1750 LOC total)
+
 import asyncio
 import json
 import sys
@@ -320,8 +335,11 @@ class ClaudeACPBridge:
     async def handle_session_new(self, params: dict) -> dict:
         session_id = str(uuid.uuid4())
         self.sdk_client = ClaudeSDKClient()
+
         # Configure from params: cwd, model, permissions
+
         # Start MCP servers and inject as tools (vault_search, vault_get, etc.)
+
         mcp_servers = params.get("mcpServers", [])
         mcp_tools = await self._start_mcp_servers(mcp_servers)
         self.sessions[session_id] = SDKSession(
@@ -334,6 +352,7 @@ class ClaudeACPBridge:
         prompt_text = extract_text(params["prompt"])
 
         # Stream SDK responses → emit ACP session/update notifications
+
         async for event in session.client.query_stream(prompt=prompt_text):
             acp_update = self._map_sdk_event_to_acp(event)
             self._send_notification("session/update", acp_update)
@@ -364,7 +383,9 @@ class ClaudeACPBridge:
         await asyncio.get_event_loop().connect_read_pipe(
             lambda: asyncio.StreamReaderProtocol(reader), sys.stdin.buffer
         )
+
         # ... standard JSON-RPC dispatch loop
+
 ```
 
 **What the bridge replaces vs. preserves:**
@@ -405,19 +426,19 @@ class ClaudeACPBridge:
 
 ## Evaluation Matrix
 
-| Criterion | Weight | A (Dual) | B (Node Bridge) | C (Raw) | D (SDK+Interface) | **E (Py Bridge)** |
-|---|---|---|---|---|---|---|
-| Maintenance burden | High | Medium | Low | High | Medium | **Medium** |
-| Dependency count | Medium | +1 (SDK) | +1 (Node.js) | -1 (ACP) | +1 (SDK) | **+1 (SDK)** |
-| Claude correctness | Critical | Yes | Yes | Yes | Yes | **Yes** |
-| Gemini correctness | Critical | Yes | Yes | Partial | Yes | **Yes** |
-| Feature parity | High | Low | High | Low | Medium | **High** |
-| Python-only | Hard | Yes | **No** | Yes | Yes | **Yes** |
-| SubagentClient reuse | High | No (Claude) | Yes | No | No (Claude) | **Yes (both)** |
-| Code change size | Low | Medium | Small | Large | Medium | **Large (~2000 LOC)** |
-| Future-proofing | High | Good | Risky | Poor | Good | **Good** |
-| Testability | Medium | Medium | Low | Medium | High | **High** |
-| Sandboxing parity | High | Partial | Full | None | Partial | **Full** |
+| Criterion            | Weight   | A (Dual)    | B (Node Bridge) | C (Raw)  | D (SDK+Interface) | **E (Py Bridge)**     |
+| -------------------- | -------- | ----------- | --------------- | -------- | ----------------- | --------------------- |
+| Maintenance burden   | High     | Medium      | Low             | High     | Medium            | **Medium**            |
+| Dependency count     | Medium   | +1 (SDK)    | +1 (Node.js)    | -1 (ACP) | +1 (SDK)          | **+1 (SDK)**          |
+| Claude correctness   | Critical | Yes         | Yes             | Yes      | Yes               | **Yes**               |
+| Gemini correctness   | Critical | Yes         | Yes             | Partial  | Yes               | **Yes**               |
+| Feature parity       | High     | Low         | High            | Low      | Medium            | **High**              |
+| Python-only          | Hard     | Yes         | **No**          | Yes      | Yes               | **Yes**               |
+| SubagentClient reuse | High     | No (Claude) | Yes             | No       | No (Claude)       | **Yes (both)**        |
+| Code change size     | Low      | Medium      | Small           | Large    | Medium            | **Large (~2000 LOC)** |
+| Future-proofing      | High     | Good        | Risky           | Poor     | Good              | **Good**              |
+| Testability          | Medium   | Medium      | Low             | Medium   | High              | **High**              |
+| Sandboxing parity    | High     | Partial     | Full            | None     | Partial           | **Full**              |
 
 ## Recommendation
 
@@ -429,13 +450,13 @@ Given the confirmed constraints (Python-only, Gemini must-have, claude-agent-sdk
 
 1. **Unified protocol — the decisive advantage**: Both Claude and Gemini speak ACP. `run_subagent()`, `spawn_agent_process`, and `SubagentClient` work identically for both. No `if provider == "claude"` branches anywhere in orchestration. This is the only option (besides the eliminated Option B) that achieves true protocol convergence.
 
-2. **SubagentClient works unchanged for both providers**: The 450-line `SubagentClient` with file sandboxing (`read-only` mode restricts writes to `.vault/`), terminal management, permission handling, and session logging serves Claude exactly as it serves Gemini. Option D would lose this for Claude.
+1. **SubagentClient works unchanged for both providers**: The 450-line `SubagentClient` with file sandboxing (`read-only` mode restricts writes to `.vault/`), terminal management, permission handling, and session logging serves Claude exactly as it serves Gemini. Option D would lose this for Claude.
 
-3. **Proven design, not speculative**: The Zed TypeScript bridge is production code with a clear 1:1 mapping to Python. The translation is mechanical — no protocol design decisions required.
+1. **Proven design, not speculative**: The Zed TypeScript bridge is production code with a clear 1:1 mapping to Python. The translation is mechanical — no protocol design decisions required.
 
-4. **Python-only**: Satisfies the hard constraint.
+1. **Python-only**: Satisfies the hard constraint.
 
-5. **Sandboxing parity**: In Options A and D, Claude's file writes are controlled by SDK permission modes — coarser than `SubagentClient.write_text_file()` which enforces `.vault/`-only writes. Option E preserves this fine-grained sandboxing because all file I/O goes through `SubagentClient`.
+1. **Sandboxing parity**: In Options A and D, Claude's file writes are controlled by SDK permission modes — coarser than `SubagentClient.write_text_file()` which enforces `.vault/`-only writes. Option E preserves this fine-grained sandboxing because all file I/O goes through `SubagentClient`.
 
 ### Why not Option D?
 
@@ -455,34 +476,34 @@ The primary risk — ~2000 lines of new bridge code (including MCP tool injectio
 ### Phase 1: JSON-RPC Transport Layer
 
 1. Create `protocol/acp/jsonrpc.py` — ~200 lines
-2. Implement async stdin/stdout JSON-RPC reader/writer
-3. Support both requests (with `id`) and notifications (without `id`)
-4. Unit test with mock stdio
+1. Implement async stdin/stdout JSON-RPC reader/writer
+1. Support both requests (with `id`) and notifications (without `id`)
+1. Unit test with mock stdio
 
 ### Phase 2: SDK-to-ACP Event Mapper
 
 1. Create `protocol/acp/claude_bridge.py` — core bridge module
-2. Implement `_map_sdk_event_to_acp()` for all SDK event types:
+1. Implement `_map_sdk_event_to_acp()` for all SDK event types:
    - `assistant` → `AgentMessageChunk`
    - `tool_use` → `ToolCallStart`
    - `tool_result` → `ToolCallProgress`
    - `init` → `SessionInfoUpdate`
    - `result` → final response
-3. Implement `handle_initialize()`, `handle_session_new()`, `handle_session_prompt()`, `handle_session_cancel()`
-4. Unit test event mapping in isolation (no subprocess needed)
+1. Implement `handle_initialize()`, `handle_session_new()`, `handle_session_prompt()`, `handle_session_cancel()`
+1. Unit test event mapping in isolation (no subprocess needed)
 
 ### Phase 3: Permission, File I/O, and MCP Tool Injection
 
 1. Implement `can_use_tool` callback in SDK → ACP `request_permission` round-trip
-2. Wire file I/O ACP methods to delegate back through the SubagentClient (the bridge acts as ACP server; SubagentClient is ACP client — file ops flow: Claude SDK → bridge → ACP notification → SubagentClient)
-3. Terminal management delegation (same pattern)
-4. Implement MCP server lifecycle management:
+1. Wire file I/O ACP methods to delegate back through the SubagentClient (the bridge acts as ACP server; SubagentClient is ACP client — file ops flow: Claude SDK → bridge → ACP notification → SubagentClient)
+1. Terminal management delegation (same pattern)
+1. Implement MCP server lifecycle management:
    - Accept `mcpServers` config from `session/new` params
    - Start MCP servers as subprocesses (vault_search, vault_get, vault_list, vault_related, vault_status, vault_index)
    - Register MCP tools with `claude-agent-sdk` via its in-process tool injection API
    - Route tool call results back through ACP protocol
    - Shut down MCP servers on `session/cancel`
-5. Add `claude-agent-sdk` to `pyproject.toml`
+1. Add `claude-agent-sdk` to `pyproject.toml`
 
 ### Phase 4: Wire Up ClaudeProvider
 
@@ -493,21 +514,25 @@ The primary risk — ~2000 lines of new bridge code (including MCP tool injectio
        executable=sys.executable,
        args=["-m", "protocol.acp.claude_bridge", "--model", model],
        env=env,
+
        # ...
+
    )
    ```
 
-2. No changes to `run_subagent()`, `SubagentClient`, or `GeminiProvider`
-3. **Verify**: Claude subagent works end-to-end via ACP bridge
-4. **Verify**: Gemini subagent still works (should be untouched)
+1. No changes to `run_subagent()`, `SubagentClient`, or `GeminiProvider`
+
+1. **Verify**: Claude subagent works end-to-end via ACP bridge
+
+1. **Verify**: Gemini subagent still works (should be untouched)
 
 ### Phase 5: Integration Testing and Cleanup
 
 1. Add integration tests: spawn bridge, send ACP handshake, verify responses
-2. Test `read-only` mode sandboxing works for Claude (via SubagentClient)
-3. Test multi-turn interactive sessions through bridge
-4. Remove dead code (`args=["mcp", "serve"]`)
-5. Update documentation
+1. Test `read-only` mode sandboxing works for Claude (via SubagentClient)
+1. Test multi-turn interactive sessions through bridge
+1. Remove dead code (`args=["mcp", "serve"]`)
+1. Update documentation
 
 ## Consequences
 
@@ -546,11 +571,14 @@ The primary risk — ~2000 lines of new bridge code (including MCP tool injectio
 ## Resolved Questions
 
 1. **Node.js tolerance**: Python-only is a hard constraint. Eliminates Option B.
-2. **Gemini priority**: Must-have. Both providers required.
-3. **SDK dependency appetite**: `claude-agent-sdk` is acceptable as a production dependency.
 
-4. **Bridge scope**: YES — the bridge will support MCP tool injection. Claude subagents must have access to vault MCP tools (vault_search, vault_get, vault_list, vault_related, vault_status, vault_index) in-process. Subagent-driven development is the core purpose of vaultspec; agents need full vault access.
-5. **Fallback strategy**: Option D (SDK-primary with unified interface). It preserves the subagent architecture even if ACP bridging proves too costly. Option A (dual-protocol) adds too much complexity for the core use case.
+1. **Gemini priority**: Must-have. Both providers required.
+
+1. **SDK dependency appetite**: `claude-agent-sdk` is acceptable as a production dependency.
+
+1. **Bridge scope**: YES — the bridge will support MCP tool injection. Claude subagents must have access to vault MCP tools (vault_search, vault_get, vault_list, vault_related, vault_status, vault_index) in-process. Subagent-driven development is the core purpose of vaultspec; agents need full vault access.
+
+1. **Fallback strategy**: Option D (SDK-primary with unified interface). It preserves the subagent architecture even if ACP bridging proves too costly. Option A (dual-protocol) adds too much complexity for the core use case.
 
 ## References
 

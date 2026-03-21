@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#adr"
-  - "#gemini-acp-bridge"
-date: "2026-02-22"
+  - '#adr'
+  - '#gemini-acp-bridge'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-gemini-acp-audit-expanded]]"
-  - "[[2026-02-21-claude-acp-bidirectional-adr]]"
+  - '[[2026-02-22-gemini-acp-audit-expanded]]'
+  - '[[2026-02-21-claude-acp-bidirectional-adr]]'
 ---
+
 # ADR: `gemini-acp-bridge` — Gemini ACP Protocol Normalization & Session Parity
 
 ## Status
@@ -23,9 +24,9 @@ The VaultSpec ecosystem requires feature parity between Claude and Gemini provid
 This direct execution creates several architectural gaps:
 
 1. **Session Persistence**: No mechanism to `resume` sessions across tasks, which breaks multi-turn A2A coordination.
-2. **Planning Interception**: Missing conversion of `TodoWrite` tool calls to `AgentPlanUpdate` notifications (the "Planning" UI in Zed).
-3. **Tool Normalization**: Inconsistent `ToolKind` mapping and missing structured content (e.g., diffs for file edits).
-4. **Testability**: The lack of a Python-controlled bridge prevents the use of the rigorous ACP test suite established for Claude.
+1. **Planning Interception**: Missing conversion of `TodoWrite` tool calls to `AgentPlanUpdate` notifications (the "Planning" UI in Zed).
+1. **Tool Normalization**: Inconsistent `ToolKind` mapping and missing structured content (e.g., diffs for file edits).
+1. **Testability**: The lack of a Python-controlled bridge prevents the use of the rigorous ACP test suite established for Claude.
 
 ## Decision
 
@@ -34,10 +35,10 @@ We will implement `src/vaultspec/protocol/acp/gemini_bridge.py`, a Python-based 
 ### Architectural Requirements
 
 1. **Bridge Pattern**: The bridge will implement the ACP `Agent` interface, wrapping the `gemini` CLI (or `google-generativeai` SDK if necessary) to provide a stable, normalized protocol stream.
-2. **Session Management**: Implement `_SessionState` to track and persist session configuration and history, enabling `resume_session` and `load_session` parity with Claude.
-3. **TodoWrite Interception**: Intercept tool calls representing planning/thinking (matching Claude's `TodoWrite` semantics) and emit `AgentPlanUpdate` notifications.
-4. **Tool Kind Mapping**: Use the same keyword-based mapping as `claude_bridge.py` to ensure consistent UI iconography.
-5. **Provider Integration**: Update `GeminiProvider.prepare_process` to spawn the Python bridge instead of the raw CLI.
+1. **Session Management**: Implement `_SessionState` to track and persist session configuration and history, enabling `resume_session` and `load_session` parity with Claude.
+1. **TodoWrite Interception**: Intercept tool calls representing planning/thinking (matching Claude's `TodoWrite` semantics) and emit `AgentPlanUpdate` notifications.
+1. **Tool Kind Mapping**: Use the same keyword-based mapping as `claude_bridge.py` to ensure consistent UI iconography.
+1. **Provider Integration**: Update `GeminiProvider.prepare_process` to spawn the Python bridge instead of the raw CLI.
 
 ## Rationale
 
@@ -58,6 +59,6 @@ A dedicated bridge layer is the only way to achieve protocol normalization witho
 
 ## References
 
-- [[2026-02-22-gemini-acp-audit-expanded]]
-- [[2026-02-21-claude-acp-bidirectional-adr]]
+- \[[2026-02-22-gemini-acp-audit-expanded]\]
+- \[[2026-02-21-claude-acp-bidirectional-adr]\]
 - [A2A Protocol Specification](https://a2a-protocol.org)
