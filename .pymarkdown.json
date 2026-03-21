@@ -1,0 +1,16 @@
+{
+  "extensions": {
+    "front-matter": { "enabled": true }
+  },
+  "plugins": {
+    "md012": { "enabled": false },
+    "md013": { "enabled": false },
+    "md018": { "enabled": false },
+    "md024": { "siblings_only": true },
+    "md033": { "allowed_elements": "p,img,br,!--,![CDATA[,!DOCTYPE,tag,key,value,path,feature,yyyy-mm-dd,title,type" },
+    "md034": { "enabled": false },
+    "md036": { "enabled": false },
+    "md040": { "enabled": false },
+    "md041": { "enabled": false }
+  }
+}

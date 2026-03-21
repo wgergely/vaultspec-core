@@ -51,4 +51,13 @@ repos:
         language: system
         pass_filenames: true
         types: [markdown]
+        exclude: ^test-project/
+
+      - id: pymarkdown
+        name: Lint Markdown style (pymarkdown)
+        entry: uv run --no-sync pymarkdown --config .pymarkdown.json scan
+        language: system
+        pass_filenames: true
+        types: [markdown]
+        exclude: ^test-project/
 

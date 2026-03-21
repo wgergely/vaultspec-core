@@ -102,7 +102,7 @@ Audit the behavioral and semantic differences between --root and --content-dir i
 
 - **Issue:** The names --root and --content-dir are counter-intuitive and do not clearly convey their actual effects on the backend workspace layout.
 - **Detail:**
-  - --root resolves to WorkspaceLayout.output_root. It sets the base directory for the .vault output (where the agent writes artifacts: dr/, exec/, plan/, etc.) and acts as the execution workspace root.
+  - --root resolves to WorkspaceLayout.output_root. It sets the base directory for the .vault output (where the agent writes artifacts: dr/, exec/, plan/, etc.) and acts as the execution workspace root.
   - --content-dir resolves to WorkspaceLayout.content_root. This dictates the source of the aultspec configuration and governance framework (the location of .vaultspec/rules/, .vaultspec/agents/, etc.).
   - A user calling --root likely expects it to override the *entire project root*, but instead, it splits the layout: output goes to --root, while .vaultspec configuration still tries to load from cwd (unless --content-dir is also overridden).
 - **Triage:** Medium - Highly confusing for users trying to target a remote or alternate project folder for operations.
@@ -166,7 +166,7 @@ Audit the current aultspec init behavior regarding provider scaffolding (.gemin
 - **Issue:** The current init_run command only scaffolds .vaultspec/ and .vault/. It does not natively bootstrap provider directories.
 - **Detail:** In src/vaultspec/core/commands.py, init_run manually creates arrays of subdirectories for .vaultspec and .vault, and seeds a .mcp.json. The provider directories (e.g., .gemini/rules/, .agents/rules/) are only created lazily *if* the user manually runs aultspec sync-all.
 - **Triage:** Medium - Breaks user expectations. init should explicitly create provider stubs to signal immediate readiness.
-- **Proposed Action:** Implement --providers flags on init (e.g., --providers=gemini,claude,agents, default ll). init_run should trigger a baseline scaffolding loop for the selected providers, fetching their paths from \_t.TOOL_CONFIGS.
+- **Proposed Action:** Implement --providers flags on init (e.g., --providers=gemini,claude,agents, default ll). init_run should trigger a baseline scaffolding loop for the selected providers, fetching their paths from \_t.TOOL_CONFIGS.
 
 #### 15. [Confirmed] Gemini CLI Duplicate Rule Loading
 
@@ -204,7 +204,7 @@ Audit the init_run logic against the newly proposed ADR, specifically focusing o
 #### 17. [Detected] Missing Directory Injection in Tool Configs
 
 - **Issue:** The base \_create_tool_cfg helper in src/vaultspec/core/types.py hardcodes the sub-directories (
-  ules, gents, skills) that need to be created.
+  ules, gents, skills) that need to be created.
 
 - **Detail:** To implement the ADR where init creates .gemini/rules/, .claude/rules/, etc., the system needs a unified way to retrieve the exact paths to scaffold without duplicating the logic currently locked inside the sync_files loops.
 
@@ -217,14 +217,14 @@ ______________________________________________________________________
 ### Scope
 
 Audit the
-ules_sync, skills_sync, and gents_sync loops to confirm the exact injection point for the "skip Gemini if Antigravity is active" logic proposed in the ADR.
+ules_sync, skills_sync, and gents_sync loops to confirm the exact injection point for the "skip Gemini if Antigravity is active" logic proposed in the ADR.
 
 ### Findings
 
 #### 18. [Detected] Blind Iteration in Sync Loops
 
 - **Issue:** All sync functions (
-  ules_sync, gents_sync, skills_sync, system_sync, config_sync) in src/vaultspec/core/ blindly iterate over \_t.TOOL_CONFIGS.items() without any cross-provider awareness.
+  ules_sync, gents_sync, skills_sync, system_sync, config_sync) in src/vaultspec/core/ blindly iterate over \_t.TOOL_CONFIGS.items() without any cross-provider awareness.
 
 - **Detail:** For example, in src/vaultspec/core/rules.py:144: or tool_type, cfg in \_t.TOOL_CONFIGS.items():.
 
@@ -244,10 +244,10 @@ Audit the aultspec mcp command initialization regarding its dependency on VAULT
 #### 19. [Detected] Orphaned Env Var Dependency
 
 - **Issue:** src/vaultspec/mcp_server/app.py requires VAULTSPEC_MCP_ROOT_DIR to run. If we transition to --target globally, this specific environment variable becomes an orphaned concept, diverging from the rest of the CLI.
-- **Detail:** Currently, init_run hardcodes "env": {"VAULTSPEC_MCP_ROOT_DIR": str(\_t.ROOT_DIR.resolve())} into the generated .mcp.json. The pp.py script then relies strictly on this variable because it bypasses rgparse completely.
+- **Detail:** Currently, init_run hardcodes "env": {"VAULTSPEC_MCP_ROOT_DIR": str(\_t.ROOT_DIR.resolve())} into the generated .mcp.json. The pp.py script then relies strictly on this variable because it bypasses rgparse completely.
 - **Triage:** Medium - Creates unnecessary fragmentation in the environment variables schema.
 - **Proposed Action:**
-  1. Add standard rgparse integration to aultspec mcp so it can accept the new --target flag directly.
+  1. Add standard rgparse integration to aultspec mcp so it can accept the new --target flag directly.
   1. Deprecate VAULTSPEC_MCP_ROOT_DIR entirely. Have mcp_server/app.py use the globally resolved WorkspaceLayout.output_root (derived from --target) just like every other command.
   1. Update init_run to generate the .mcp.json using the command array \["vaultspec", "--target", "<path>", "mcp"\] instead of injecting environment variables.
 
@@ -267,7 +267,7 @@ Audit the existing pytest test suites to determine the blast radius of replacing
   un_vault and
   un_spec with the --root flag.
 
-- **Detail:** Files like ests/cli/test_vault_cli.py, ests/cli/test_spec_cli.py, and ests/protocol/conftest.py rely heavily on injecting isolated tmp paths via the --root flag. For example, ests/protocol/conftest.py spins up the MCP server using rgs: ["-m", "vaultspec.subagent_cli", "--root", str(tmp_path), "serve"].
+- **Detail:** Files like ests/cli/test_vault_cli.py, ests/cli/test_spec_cli.py, and ests/protocol/conftest.py rely heavily on injecting isolated tmp paths via the --root flag. For example, ests/protocol/conftest.py spins up the MCP server using rgs: ["-m", "vaultspec.subagent_cli", "--root", str(tmp_path), "serve"].
 
 - **Triage:** High - The ADR implementation will instantly fail CI/CD if these tests are not migrated concurrently.
 
@@ -288,12 +288,12 @@ Audit the A2A protocol provider implementations (gemini.py, claude.py) to determ
 - **Issue:** The GeminiProvider and ClaudeProvider explicitly construct subprocess command arrays containing the --root flag when starting child A2A servers.
 
 - **Detail:** In src/vaultspec/protocol/providers/gemini.py:464 and claude.py:350, the start_server logic yields:
-  rgs=["-m", "vaultspec", "subagent", "--root", str(root_dir), "a2a-serve", ...]
+  rgs=["-m", "vaultspec", "subagent", "--root", str(root_dir), "a2a-serve", ...]
   If the root spec_cli argument parser replaces --root with --target, these backend daemon spawns will instantly crash with unrecognized arguments: --root during system operations.
 
 - **Triage:** Critical - Changing the global flag immediately breaks the provider abstraction layer, disabling all multi-agent team operations.
 
-- **Proposed Action:** The refactoring effort must update the rgs array in both gemini.py and claude.py (and any other A2A providers like ntigravity.py if they exist) to use --target.
+- **Proposed Action:** The refactoring effort must update the rgs array in both gemini.py and claude.py (and any other A2A providers like ntigravity.py if they exist) to use --target.
 
 #### 22. [Detected] Environment Variable Schema Drift
 
@@ -324,41 +324,41 @@ Synthesize the cumulative blast radius of removing the --root and --content-dir 
 
   1. **CLI Layer:** Update cli_common.py to remove --root and --content-dir, introducing --target. Apply --target globally to all sub-parsers by fixing the parents=[common_parser] argparse issue found in Cycle 1.
 
-  1. **Integration Layer (MCP):** Add a proper rgparse wrapper to aultspec mcp so it maps --target directly to the mcp_root_dir config, deprecating the standalone VAULTSPEC_MCP_ROOT_DIR env var.
+  1. **Integration Layer (MCP):** Add a proper rgparse wrapper to aultspec mcp so it maps --target directly to the mcp_root_dir config, deprecating the standalone VAULTSPEC_MCP_ROOT_DIR env var.
 
   1. **Integration Layer (Providers):** Update gemini.py and claude.py to inject VAULTSPEC_TARGET_DIR instead of VAULTSPEC_ROOT_DIR, and change their A2A server spawn arguments from "--root" to "--target".
 
   1. **Test Layer:** Run a global regex replace across the ests/ and src/vaultspec/tests/ folders for "--root" -> "--target" and validate.
 
-## Cycle 12: Audit Task Scoping Correction (gent-removal Pre-requisite)
+## Cycle 12: Audit Task Scoping Correction (gent-removal Pre-requisite)
 
 ### Scope
 
-Acknowledge the execution of \[[2026-03-05-agent-removal-plan]\]. This major refactoring completely strips the aultspec core repository of agent-management logic, the A2A protocol, and related CLI/MCP tools, migrating them to the external aultspec-a2a package. The scope of this audit loop must be immediately updated to ignore all agent-related codebase findings, as any code referencing eam, server, subagent, 2a, and .agents is scheduled for immediate deletion.
+Acknowledge the execution of \[[2026-03-05-agent-removal-plan]\]. This major refactoring completely strips the aultspec core repository of agent-management logic, the A2A protocol, and related CLI/MCP tools, migrating them to the external aultspec-a2a package. The scope of this audit loop must be immediately updated to ignore all agent-related codebase findings, as any code referencing eam, server, subagent, 2a, and .agents is scheduled for immediate deletion.
 
 ### Findings
 
 #### 25. [Corrected] Cycle 10 and 11 Invalidation
 
 - **Issue:** Findings #21 (Provider Process Spawns) and parts of #23 (Test Suite Executables) are no longer relevant blockers for the --target refactor.
-- **Detail:** The aultspec team, aultspec server, and aultspec subagent CLIs, alongside the A2A spawning methods inside gemini.py and claude.py, are explicitly slated for deletion in Phase 1 and Phase 2 of the gent-removal plan. We do not need to rewrite their --root usages to --target because the code itself will cease to exist.
-- **Triage:** Closed/Irrelevant - The gent-removal plan will completely destroy the problematic abstraction layers identified in Cycles 10 and 11.
+- **Detail:** The aultspec team, aultspec server, and aultspec subagent CLIs, alongside the A2A spawning methods inside gemini.py and claude.py, are explicitly slated for deletion in Phase 1 and Phase 2 of the gent-removal plan. We do not need to rewrite their --root usages to --target because the code itself will cease to exist.
+- **Triage:** Closed/Irrelevant - The gent-removal plan will completely destroy the problematic abstraction layers identified in Cycles 10 and 11.
 
 #### 26. [Detected] --providers Scaffolding Re-evaluation
 
-- **Issue:** The previously proposed aultspec init --providers flag (Finding #14) needs to be carefully aligned with the post-gent-removal world.
+- **Issue:** The previously proposed aultspec init --providers flag (Finding #14) needs to be carefully aligned with the post-gent-removal world.
 - **Detail:** With the .agents (Antigravity) and A2A mechanisms removed from the core repo, init will primarily focus on scaffolding .vaultspec, .vault, and .gemini/.claude rule directories. If aultspec-a2a introduces its own rules or folders in the future, the core initialization hook might need an extensible hook system rather than hardcoding .agents scaffolding in the core commands.py.
 - **Triage:** Low - The core refactor should proceed with --providers=all, but note that "all" now strictly means gemini and claude, and no longer includes the A2A sub-agent tooling paths unless explicitly re-introduced by the external package.
 
 #### 27. [Recommendation] Migration Sequencing Adjustment
 
-- **Execution Constraint:** The --target refactoring plan MUST be executed **after** the gent-removal plan has successfully completed Phase 4 (Verification). Attempting to refactor --root to --target while aultspec-complex-executor is concurrently gutting __main__.py, config.py, and cli_common.py will guarantee severe merge conflicts and execution failures.
+- **Execution Constraint:** The --target refactoring plan MUST be executed **after** the gent-removal plan has successfully completed Phase 4 (Verification). Attempting to refactor --root to --target while aultspec-complex-executor is concurrently gutting __main__.py, config.py, and cli_common.py will guarantee severe merge conflicts and execution failures.
 
 ## Cycle 13: Core CLI Extensibility & Surviving Subcommands
 
 ### Scope
 
-Audit the surviving CLI modules post-gent-removal (specifically ault_cli.py, spec_cli.py, and hooks_cli) to verify how they integrate with the unified --target paradigm and identify any lingering .cwd() dependencies that might override explicit targeting.
+Audit the surviving CLI modules post-gent-removal (specifically ault_cli.py, spec_cli.py, and hooks_cli) to verify how they integrate with the unified --target paradigm and identify any lingering .cwd() dependencies that might override explicit targeting.
 
 ### Findings
 
@@ -382,9 +382,9 @@ ules_sync / skills_sync Paths
 
 #### 30. [Detected] Inconsistent --version Handling
 
-- **Issue:** The --version flag is handled manually in __main__.py via if sys.argv[1] in ("-V", "--version"):, bypassing rgparse.
-- **Detail:** cli_common.py defines --version inside dd_common_args(), but because __main__.py intercepts it first, the standard argparse version action is never reached. This leads to duplicate definitions and inconsistent help menus across the surviving subcommands.
-- **Triage:** Low - A minor cleanliness issue, but standardizing on Python's built-in parser.add_argument("--version", action="version", version=...) inside cli_common.py will allow rgparse to handle version outputs uniformly across all root parsers.
+- **Issue:** The --version flag is handled manually in __main__.py via if sys.argv[1] in ("-V", "--version"):, bypassing rgparse.
+- **Detail:** cli_common.py defines --version inside dd_common_args(), but because __main__.py intercepts it first, the standard argparse version action is never reached. This leads to duplicate definitions and inconsistent help menus across the surviving subcommands.
+- **Triage:** Low - A minor cleanliness issue, but standardizing on Python's built-in parser.add_argument("--version", action="version", version=...) inside cli_common.py will allow rgparse to handle version outputs uniformly across all root parsers.
 
 ## Cycle 14: Final Review & Task Handoff Preparation
 
@@ -398,15 +398,15 @@ Finalize the audit loop by reviewing the aggregated findings across the 13 cycle
 
 - **Status:** All core paths regarding --target vs --root / --content-dir have been mapped.
 - **Status:** Argparse inheritance failures, early execution intercepts, module-level side effects, and initialization blind spots have been identified and triaged.
-- **Status:** Scope has been successfully recalibrated post-gent-removal to ensure no time is wasted refactoring obsolete A2A/subagent logic.
+- **Status:** Scope has been successfully recalibrated post-gent-removal to ensure no time is wasted refactoring obsolete A2A/subagent logic.
 
 #### 32. [Actionable Output] Translation to Vaultspec Plan
 
 - **Issue:** The raw audit document (.vault/audit/2026-03-05-cli-architecture-audit.md) is highly detailed but not formatted as an executable .vault/plan/ artifact.
 - **Proposed Action:** The engineering agent must synthesize this audit into a sequential 2026-03-05-cli-target-refactor-plan.md. The plan must mandate the following strict sequence (as outlined in Finding #27):
-  1. Wait for gent-removal execution to finish.
+  1. Wait for gent-removal execution to finish.
   1. **Phase 1: Config Layer Overhaul** (workspace.py, config.py deprecating root/content for target).
-  1. **Phase 2: CLI Engine Refactor** (cli_common.py, __main__.py removing early intercepts, fixing rgparse inheritance, migrating module-level loads into main()).
+  1. **Phase 2: CLI Engine Refactor** (cli_common.py, __main__.py removing early intercepts, fixing rgparse inheritance, migrating module-level loads into main()).
   1. **Phase 3: Initialization Upgrade** (commands.py updating init_run to properly scaffold --providers including .gemini and .claude, resolving the chicken-and-egg config issue).
   1. **Phase 4: Test Suite Synchronization** (Global string replacement of --root to --target in tests).
 
@@ -418,22 +418,22 @@ ______________________________________________________________________
 
 ### Scope
 
-Audit the ests/ directory to identify remaining sub-agent or A2A mock logic that might survive the gent-removal plan and still contain hardcoded --root or --content-dir paths that need to be migrated to --target.
+Audit the ests/ directory to identify remaining sub-agent or A2A mock logic that might survive the gent-removal plan and still contain hardcoded --root or --content-dir paths that need to be migrated to --target.
 
 ### Findings
 
 #### 33. [Detected] aultspec-mcp Testing Mocks
 
 - **Issue:** Even with A2A logic removed, aultspec-mcp is a core utility that requires rigorous testing. The test suite spins up the MCP server via subprocess for integration testing.
-- **Detail:** The gent-removal plan specifies "Phase 4: Clean up Test Suite - Delete A2A and agent tests." However, aultspec-mcp is explicitly kept (as noted in "Ensure the MCP server starts correctly"). If the tests for aultspec-mcp use --root to isolate their execution environment, they will break when --target is introduced.
+- **Detail:** The gent-removal plan specifies "Phase 4: Clean up Test Suite - Delete A2A and agent tests." However, aultspec-mcp is explicitly kept (as noted in "Ensure the MCP server starts correctly"). If the tests for aultspec-mcp use --root to isolate their execution environment, they will break when --target is introduced.
 - **Triage:** High - We must ensure that the aultspec-mcp test fixtures (e.g., in est_mcp_config.py or conftest.py) are properly migrated to use --target and that they do not rely on deprecated .agents directories.
 - **Proposed Action:** When executing the global search-and-replace for --root -> --target in Phase 4 of the refactor plan, explicitly verify the aultspec-mcp test fixtures and ensure they still pass.
 
 #### 34. [Detected] TOOL_CONFIGS Test Validation
 
 - **Issue:** Tests validating TOOL_CONFIGS generation (e.g., ests/cli/test_spec_cli.py) currently assert the creation of .vaultspec/rules/agents directories.
-- **Detail:** After gent-removal, the .agents (Antigravity) tool config will be deleted. Any tests asserting the existence of these directories will fail.
-- **Triage:** Medium - This is primarily a cleanup task for the gent-removal plan, but the --target refactor must be aware of it so it doesn't try to re-introduce or test for deprecated .agents paths when verifying the new --target behavior.
+- **Detail:** After gent-removal, the .agents (Antigravity) tool config will be deleted. Any tests asserting the existence of these directories will fail.
+- **Triage:** Medium - This is primarily a cleanup task for the gent-removal plan, but the --target refactor must be aware of it so it doesn't try to re-introduce or test for deprecated .agents paths when verifying the new --target behavior.
 - **Proposed Action:** Ensure the --target refactor tests only assert the creation of the core .vaultspec, .vault, .gemini, and .claude directories.
 
 ## Cycle 16: Vault Core Dependencies on Root Directory
@@ -468,22 +468,22 @@ Audit src/vaultspec/vaultcore and src/vaultspec/vault_cli.py to ensure that core
 
 ### Scope
 
-Audit the ests/ directory to identify remaining sub-agent or A2A mock logic that might survive the gent-removal plan and still contain hardcoded --root or --content-dir paths that need to be migrated to --target.
+Audit the ests/ directory to identify remaining sub-agent or A2A mock logic that might survive the gent-removal plan and still contain hardcoded --root or --content-dir paths that need to be migrated to --target.
 
 ### Findings
 
 #### 33. [Detected] aultspec-mcp Testing Mocks
 
 - **Issue:** Even with A2A logic removed, aultspec-mcp is a core utility that requires rigorous testing. The test suite spins up the MCP server via subprocess for integration testing.
-- **Detail:** The gent-removal plan specifies "Phase 4: Clean up Test Suite - Delete A2A and agent tests." However, aultspec-mcp is explicitly kept (as noted in "Ensure the MCP server starts correctly"). If the tests for aultspec-mcp use --root to isolate their execution environment, they will break when --target is introduced.
+- **Detail:** The gent-removal plan specifies "Phase 4: Clean up Test Suite - Delete A2A and agent tests." However, aultspec-mcp is explicitly kept (as noted in "Ensure the MCP server starts correctly"). If the tests for aultspec-mcp use --root to isolate their execution environment, they will break when --target is introduced.
 - **Triage:** High - We must ensure that the aultspec-mcp test fixtures (e.g., in est_mcp_config.py or conftest.py) are properly migrated to use --target and that they do not rely on deprecated .agents directories.
 - **Proposed Action:** When executing the global search-and-replace for --root -> --target in Phase 4 of the refactor plan, explicitly verify the aultspec-mcp test fixtures and ensure they still pass.
 
 #### 34. [Detected] TOOL_CONFIGS Test Validation
 
 - **Issue:** Tests validating TOOL_CONFIGS generation (e.g., ests/cli/test_spec_cli.py) currently assert the creation of .vaultspec/rules/agents directories.
-- **Detail:** After gent-removal, the .agents (Antigravity) tool config will be deleted. Any tests asserting the existence of these directories will fail.
-- **Triage:** Medium - This is primarily a cleanup task for the gent-removal plan, but the --target refactor must be aware of it so it doesn't try to re-introduce or test for deprecated .agents paths when verifying the new --target behavior.
+- **Detail:** After gent-removal, the .agents (Antigravity) tool config will be deleted. Any tests asserting the existence of these directories will fail.
+- **Triage:** Medium - This is primarily a cleanup task for the gent-removal plan, but the --target refactor must be aware of it so it doesn't try to re-introduce or test for deprecated .agents paths when verifying the new --target behavior.
 - **Proposed Action:** Ensure the --target refactor tests only assert the creation of the core .vaultspec, .vault, .gemini, and .claude directories.
 
 ______________________________________________________________________
@@ -529,9 +529,9 @@ Translate findings into a final checklist for aultspec-writer.
 #### 38. [Recommendation] Translation to Vaultspec Plan
 
 - **Action:** aultspec-writer must construct .vault/plan/2026-03-05-cli-target-refactor-plan.md using the following execution sequence:
-  1. Wait for gent-removal to finish.
+  1. Wait for gent-removal to finish.
   1. **Phase 1: Config Layer Overhaul** (workspace.py, config.py deprecating root/content for target).
-  1. **Phase 2: CLI Engine Refactor** (cli_common.py, __main__.py removing early intercepts, fixing rgparse inheritance, migrating module-level loads into main()).
+  1. **Phase 2: CLI Engine Refactor** (cli_common.py, __main__.py removing early intercepts, fixing rgparse inheritance, migrating module-level loads into main()).
   1. **Phase 3: Initialization Upgrade** (commands.py updating init_run to properly scaffold --providers including .gemini and .claude, resolving the chicken-and-egg config issue).
   1. **Phase 4: Hooks Path Correction** (hooks/engine.py to enforce --target isolation on subprocesses).
   1. **Phase 5: Test Suite Synchronization** (Global string replacement of --root to --target in surviving tests, verifying mcp_server mocks).
@@ -725,13 +725,13 @@ Audit every active, surviving subcommand mapped in aultspec to ensure that stan
 
 ### Findings
 
-#### 54. [Detected] Command Handlers Missing rgs.target Usage
+#### 54. [Detected] Command Handlers Missing rgs.target Usage
 
-- **Issue:** Even if rgparse exposes --target globally, not all commands explicitly pass or use the namespace resolution in their internal routines.
+- **Issue:** Even if rgparse exposes --target globally, not all commands explicitly pass or use the namespace resolution in their internal routines.
 
 - **Detail:** Most spec_cli.py subcommands (e.g.,
   ules_list,
-  ules_sync) don't actually read rgs.target from the parser; they rely on the side-effect of cli_common.resolve_args_workspace(args, ...) modifying the global \_t.ROOT_DIR state behind the scenes. This implicit state injection is technically functional but opaque.
+  ules_sync) don't actually read rgs.target from the parser; they rely on the side-effect of cli_common.resolve_args_workspace(args, ...) modifying the global \_t.ROOT_DIR state behind the scenes. This implicit state injection is technically functional but opaque.
 
 - **Triage:** Low - Functional, but poor architecture.
 
@@ -740,10 +740,10 @@ Audit every active, surviving subcommand mapped in aultspec to ensure that stan
 
 #### 55. [Detected] Missing Target Argument in mcp_server
 
-- **Issue:** mcp_server/app.py has no rgparse configuration whatsoever.
-- **Detail:** As briefly noted in Cycle 8, if a user tries aultspec mcp --target /some/repo, the script __main__.py routes this to mcp_server.app.main(). Since pp.py does not use rgparse, it will completely ignore the --target flag in sys.argv, falling back to the VAULTSPEC_MCP_ROOT_DIR environment variable, or crashing.
+- **Issue:** mcp_server/app.py has no rgparse configuration whatsoever.
+- **Detail:** As briefly noted in Cycle 8, if a user tries aultspec mcp --target /some/repo, the script __main__.py routes this to mcp_server.app.main(). Since pp.py does not use rgparse, it will completely ignore the --target flag in sys.argv, falling back to the VAULTSPEC_MCP_ROOT_DIR environment variable, or crashing.
 - **Triage:** High - Breaks interface consistency entirely.
-- **Proposed Action:** mcp_server/app.py must be wrapped in a standard rgparse setup that utilizes cli_common.add_common_args. It must parse the --target flag, resolve the workspace, and pass the resolved WorkspaceLayout.target_dir directly to the initialize_server() function.
+- **Proposed Action:** mcp_server/app.py must be wrapped in a standard rgparse setup that utilizes cli_common.add_common_args. It must parse the --target flag, resolve the workspace, and pass the resolved WorkspaceLayout.target_dir directly to the initialize_server() function.
 
 #### 56. [Detected] ault_cli.py Local Root Re-Parsing
 
@@ -761,7 +761,7 @@ Audit every active, surviving subcommand mapped in aultspec to ensure that stan
 
 ### Scope
 
-Audit the specific interactions of ault_cli.py (udit, create, index, search) to ensure they perfectly honor a non-cwd --target flag, focusing specifically on file writes (create) and LanceDB operations (index, search).
+Audit the specific interactions of ault_cli.py (udit, create, index, search) to ensure they perfectly honor a non-cwd --target flag, focusing specifically on file writes (create) and LanceDB operations (index, search).
 
 ### Findings
 
@@ -788,26 +788,26 @@ Audit the specific interactions of ault_cli.py (udit, create, index, search) t
 ### Scope
 
 Audit the sync-all and individual
-ules sync, gents sync, skills sync, system sync, and config sync commands to ensure their interface consistently handles the new --target paradigm without unintended side effects.
+ules sync, gents sync, skills sync, system sync, and config sync commands to ensure their interface consistently handles the new --target paradigm without unintended side effects.
 
 ### Findings
 
 #### 59. [Detected] Redundant Sync Commands Post-Removal
 
-- **Issue:** With the removal of .agents (Antigravity) and the A2A toolings via gent-removal, the command aultspec agents sync becomes largely obsolete, as there will be no .agents directory to push configurations into.
+- **Issue:** With the removal of .agents (Antigravity) and the A2A toolings via gent-removal, the command aultspec agents sync becomes largely obsolete, as there will be no .agents directory to push configurations into.
 
-- **Detail:** The sync-all command in spec_cli.py triggers gents_sync,
-  ules_sync, skills_sync, etc. If the configuration engine strips the .agents pathing out, gents_sync will iterate over an empty list of targets and do nothing.
+- **Detail:** The sync-all command in spec_cli.py triggers gents_sync,
+  ules_sync, skills_sync, etc. If the configuration engine strips the .agents pathing out, gents_sync will iterate over an empty list of targets and do nothing.
 
 - **Triage:** Low - Functional, but confusing UX. A user running aultspec agents list or aultspec agents sync will see no action.
 
-- **Proposed Action:** While removing the gents commands is technically part of the gent-removal scope, the --target refactor should verify that sync-all does not crash if a user specifies a target that happens to be completely missing expected agent directories.
+- **Proposed Action:** While removing the gents commands is technically part of the gent-removal scope, the --target refactor should verify that sync-all does not crash if a user specifies a target that happens to be completely missing expected agent directories.
 
 #### 60. [Detected] aultspec doctor Hardcoded Path Checking
 
 - **Issue:** Does aultspec doctor hardcode checks for .vaultspec/rules/agents?
-- **Detail:** As found in Cycle 20 (Finding #39) regarding test files, commands.py:doctor_run evaluates the "Framework Structure" and "Agent Coverage". The doctor command currently explicitly counts \*.md files in w_dir / "rules" / "agents" to assign an gent_score.
-- **Triage:** High (UX) - If the --target refactor is applied after gent-removal, doctor will permanently assign a low readiness score ("1/5 - No agents") to perfectly healthy repositories because it is explicitly looking for a deprecated feature.
+- **Detail:** As found in Cycle 20 (Finding #39) regarding test files, commands.py:doctor_run evaluates the "Framework Structure" and "Agent Coverage". The doctor command currently explicitly counts \*.md files in w_dir / "rules" / "agents" to assign an gent_score.
+- **Triage:** High (UX) - If the --target refactor is applied after gent-removal, doctor will permanently assign a low readiness score ("1/5 - No agents") to perfectly healthy repositories because it is explicitly looking for a deprecated feature.
 - **Proposed Action:** The --target refactor must remove the "Agent Coverage" metric logic from doctor_run entirely, or replace it with a generalized "Tool Configuration" metric that evaluates the generic rules directories instead.
 
 ## Cycle 28: Output Formatting and Verbosity Consistency
@@ -821,7 +821,7 @@ Audit how the CLI handles output formatting, specifically the interaction betwee
 #### 61. [Detected] printer.py vs logging Duality
 
 - **Issue:** The CLI uses both logger (from Python's logging module) and a custom Printer class (in src/vaultspec/printer.py) to emit output.
-- **Detail:** Subcommands like doctor and init use rgs.printer.out() heavily, while operations like sync use logger.info() or logger.warning(). The Printer object respects the --quiet flag (silencing .out() and .err()), but it operates completely independently of the logging framework.
+- **Detail:** Subcommands like doctor and init use rgs.printer.out() heavily, while operations like sync use logger.info() or logger.warning(). The Printer object respects the --quiet flag (silencing .out() and .err()), but it operates completely independently of the logging framework.
 - **Triage:** Medium - This duality means that a user running --quiet will silence printer outputs but might still see logger.warning or logger.error messages depending on how logging_config.py interprets the quiet flag. Conversely, --verbose might increase logger output but has no effect on Printer.
 - **Proposed Action:** The --target refactor is a good opportunity to evaluate if Printer should just be a wrapper around logger with a specific formatting, or if cli_common.setup_logging should explicitly bind the Printer instance to the log level to ensure --quiet, --verbose, and --debug affect *all* CLI output uniformly.
 
@@ -850,7 +850,7 @@ Audit how unhandled exceptions are caught and displayed at the highest execution
 - **Issue:** Unhandled exceptions in the CLI are caught by a generic try/except block in __main__.py, which explicitly prints the exception string to sys.stderr and swallows the traceback, ignoring the --debug flag.
 - **Detail:** At src/vaultspec/__main__.py:122 and 132, the code catches (ImportError, Exception) as exc: and just executes print(f"Error: {exc}", file=sys.stderr). If the user passes --debug expecting to see why a subcommand failed, they get zero traceback information, making the CLI incredibly hostile to debugging.
 - **Triage:** High (UX/DevEx) - The --debug flag must be universally respected. If a command crashes, --debug should emit the full stack trace.
-- **Proposed Action:** Refactor __main__.py to import and utilize the cli_error_handler context manager from src/vaultspec/cli_common.py, which is explicitly designed to handle unhandled exceptions cleanly and print tracebacks if the debug flag is present. Since --debug might not be parsed by rgparse at the __main__.py intercept layer yet, __main__.py should at least check sys.argv for --debug to pass into the handler, or better yet, push the exception handling down into the respective main() functions where the parsed arguments are available.
+- **Proposed Action:** Refactor __main__.py to import and utilize the cli_error_handler context manager from src/vaultspec/cli_common.py, which is explicitly designed to handle unhandled exceptions cleanly and print tracebacks if the debug flag is present. Since --debug might not be parsed by rgparse at the __main__.py intercept layer yet, __main__.py should at least check sys.argv for --debug to pass into the handler, or better yet, push the exception handling down into the respective main() functions where the parsed arguments are available.
 
 ## Cycle 30: Unused Global Error Handling
 
@@ -888,41 +888,41 @@ Audit the hooks/engine.py subprocess logic and any remaining external integratio
 
 #### 66. [Detected] MCP Server Environment Inheritance
 
-- **Issue:** As identified in Finding 19, aultspec-mcp is launched via .mcp.json by IDEs (like Claude Desktop). If init creates .mcp.json using CLI args (rgs: ["vaultspec", "--target", "/foo", "mcp"]), the IDE launches the server directly. However, does mcp_server spawn any further child processes that need this context?
-- **Detail:** A quick review of mcp_server indicates it primarily serves tools over stdio and executes python functions (e.g., calling aultcore). It does not typically spawn detached subprocesses post-gent-removal.
+- **Issue:** As identified in Finding 19, aultspec-mcp is launched via .mcp.json by IDEs (like Claude Desktop). If init creates .mcp.json using CLI args (rgs: ["vaultspec", "--target", "/foo", "mcp"]), the IDE launches the server directly. However, does mcp_server spawn any further child processes that need this context?
+- **Detail:** A quick review of mcp_server indicates it primarily serves tools over stdio and executes python functions (e.g., calling aultcore). It does not typically spawn detached subprocesses post-gent-removal.
 - **Triage:** Clear/No-Issue - mcp_server internal function calls will safely respect \_t.ROOT_DIR initialized at startup.
 
 ## Cycle 32: sys.argv Manipulation Fragility
 
 ### Scope
 
-Audit how sys.argv is modified in the early execution pipelines before hand-off to rgparse, which could potentially misroute or mangle flags like --target.
+Audit how sys.argv is modified in the early execution pipelines before hand-off to rgparse, which could potentially misroute or mangle flags like --target.
 
 ### Findings
 
 #### 67. [Detected] Unsafe sys.argv Rewrite in __main__.py
 
-- **Issue:** When routing namespace commands, __main__.py literally rewrites the system arguments to fake the program name for rgparse.
+- **Issue:** When routing namespace commands, __main__.py literally rewrites the system arguments to fake the program name for rgparse.
 
-- **Detail:** In __main__.py:104, it does sys.argv = \[f"vaultspec {first_arg}", \*sys.argv[2:]\]. This attempts to merge the binary name and the first argument so rgparse prints usage: vaultspec vault ... instead of usage: python ....
+- **Detail:** In __main__.py:104, it does sys.argv = \[f"vaultspec {first_arg}", \*sys.argv[2:]\]. This attempts to merge the binary name and the first argument so rgparse prints usage: vaultspec vault ... instead of usage: python ....
   However, if a user specifies --target *before* the subcommand (e.g., aultspec --target /foo vault audit), sys.argv[1] is --target, NOT ault. The naive string matching (irst_arg = sys.argv[1]) totally collapses.
 
 - **Triage:** Critical - The early intercept architecture assumes positional subcommands *always* come first. Standard CLI design allows global flags *before* subcommands. This breaks the --target refactor fundamentally if users type naturally.
 
-- **Proposed Action:** The --target refactor in Phase 2 MUST eliminate __main__.py string-matching routing. It must use a unified root rgparse.ArgumentParser that defines the global flags, creates subparsers for the namespaces (ault,
-  ules, hooks, mcp, etc.), and uses set_defaults(func=...) to route execution, allowing rgparse to handle flag positioning dynamically.
+- **Proposed Action:** The --target refactor in Phase 2 MUST eliminate __main__.py string-matching routing. It must use a unified root rgparse.ArgumentParser that defines the global flags, creates subparsers for the namespaces (ault,
+  ules, hooks, mcp, etc.), and uses set_defaults(func=...) to route execution, allowing rgparse to handle flag positioning dynamically.
 
 ## Cycle 33: Argparse Global vs Subcommand Flag Binding
 
 ### Scope
 
-Investigate the specific architectural mechanics required to resolve the sys.argv string-matching failure identified in Cycle 32. Specifically, audit how rgparse needs to be structured to support aultspec --target /foo vault audit versus aultspec vault --target /foo audit.
+Investigate the specific architectural mechanics required to resolve the sys.argv string-matching failure identified in Cycle 32. Specifically, audit how rgparse needs to be structured to support aultspec --target /foo vault audit versus aultspec vault --target /foo audit.
 
 ### Findings
 
 #### 68. [Detected] Argparse Interleaved Parsing Requirement
 
-- **Issue:** To safely implement global --target, rgparse must use parse_known_args() or a strictly interleaved parser hierarchy to allow the global parser to intercept flags regardless of where the user places them.
+- **Issue:** To safely implement global --target, rgparse must use parse_known_args() or a strictly interleaved parser hierarchy to allow the global parser to intercept flags regardless of where the user places them.
 - **Detail:** Currently, cli_common.add_common_args(parser) is called on each *individual* sub-parser (ault_cli.py, spec_cli.py). This means --root is bound to the sub-command level (e.g., aultspec vault --root /foo audit), but passing it *before* the subcommand (aultspec --root /foo vault) causes the root string-matcher in __main__.py to crash.
 - **Triage:** High - Moving to a unified root parser (as suggested in Finding #67) requires careful merging of the ault_cli, spec_cli, and hooks parsers into a single tree.
 - **Proposed Action:** In Phase 2 of the execution plan, instruct the engineer to:
@@ -936,17 +936,17 @@ Investigate the specific architectural mechanics required to resolve the sys.arg
 
 ### Scope
 
-In response to the critical sys.argv string-matching flaws identified in Cycle 32/33, research the Python ecosystem to determine if a third-party module (such as click or yper) is already available in the project to handle complex, multi-layered argument parsing natively, avoiding the need to "reinvent the wheel" with fragile rgparse workarounds.
+In response to the critical sys.argv string-matching flaws identified in Cycle 32/33, research the Python ecosystem to determine if a third-party module (such as click or yper) is already available in the project to handle complex, multi-layered argument parsing natively, avoiding the need to "reinvent the wheel" with fragile rgparse workarounds.
 
 ### Findings
 
 #### 69. [Detected] click is Currently Installed
 
-- **Issue:** The standard library rgparse struggles inherently with nested subcommands and interleaved global flags (e.g., aultspec --target /foo vault audit), requiring complex workarounds like parse_known_args() or parent-parser inheritance chains.
+- **Issue:** The standard library rgparse struggles inherently with nested subcommands and interleaved global flags (e.g., aultspec --target /foo vault audit), requiring complex workarounds like parse_known_args() or parent-parser inheritance chains.
 - **Detail:** An audit of the project dependencies via uv pip list reveals that click (version 8.3.1) is already installed in the virtual environment. click is the industry standard for Python CLI applications precisely because it natively supports deeply nested command groups, inherited context objects (ideal for WorkspaceLayout), and interleaved options without resorting to sys.argv hacking.
 - **Triage:** Strategic - If the project is already paying the dependency cost for click (likely pulled in via uvicorn or yper/ y), refactoring the CLI layer to use click would permanently resolve Findings 6-9, 29-30, and 67-68 in one unified sweep.
 - **Proposed Action:** The engineering team must evaluate a strategic pivot:
-  - **Option A (Incremental):** Stick with rgparse. Build the unified master tree utilizing parents=[common_parser] as outlined in Cycle 33. This keeps the framework stdlib only (if click is just an accidental transitive dependency), but requires meticulous manual wiring.
+  - **Option A (Incremental):** Stick with rgparse. Build the unified master tree utilizing parents=[common_parser] as outlined in Cycle 33. This keeps the framework stdlib only (if click is just an accidental transitive dependency), but requires meticulous manual wiring.
   - **Option B (Architectural Pivot):** Adopt click. Convert ault_cli, spec_cli, and hooks_cli into @click.group() decorators. This natively supports --target as a global option evaluated before the subcommand, passes the resolved WorkspaceLayout down via click.Context.obj, and automatically handles --help and --version universally.
 
 #### 70. [Detected] aultspec Stdlib Policy Conflict
@@ -954,7 +954,7 @@ In response to the critical sys.argv string-matching flaws identified in Cycle 3
 - **Issue:** Does aultspec have a strict "no external dependencies" policy for its core?
 - **Detail:** The docstring at the top of src/vaultspec/config/workspace.py states: **Stdlib only** -- no external dependencies. If this architectural mandate applies to the entire CLI entrypoint layer, then migrating to click violates core design principles.
 - **Triage:** High (Policy vs Ergonomics) - We cannot blindly recommend click without confirming the project's dependency constraints.
-- **Proposed Action:** If the stdlib only rule is absolute, the implementation MUST proceed with the unified rgparse tree (Option A). If the CLI is allowed to use dependencies (since pydantic, httpx, etc., are in the env), Option B is vastly superior. The plan should document both paths and defer to the human engineer or ADR for final selection.
+- **Proposed Action:** If the stdlib only rule is absolute, the implementation MUST proceed with the unified rgparse tree (Option A). If the CLI is allowed to use dependencies (since pydantic, httpx, etc., are in the env), Option B is vastly superior. The plan should document both paths and defer to the human engineer or ADR for final selection.
 
 ## Cycle 35: Re-evaluation of External Dependencies Policy
 
@@ -973,7 +973,7 @@ Investigate the actual project dependencies (pyproject.toml) against the **Stdli
 
 - **Triage:** Architectural Pivot - The "stdlib only" rule strictly applies to *just* the workspace.py discovery file (likely to ensure early bootstrap path discovery doesn't fail before pydantic loads). It does *not* apply to the broader CLI interface.
 
-- **Proposed Action:** Since the project already aggressively utilizes external dependencies, there is no structural reason we cannot introduce click or yper to fix the deeply flawed CLI parsing layer. However, click is currently *not* in pyproject.toml (it was installed transitively by uvicorn). The implementation plan should formally propose adding yper (which builds on click but integrates natively with pydantic and Python 3 type hints, matching the repository's modern style) to completely replace rgparse, permanently solving Findings 6-9, 29-30, and 67-68.
+- **Proposed Action:** Since the project already aggressively utilizes external dependencies, there is no structural reason we cannot introduce click or yper to fix the deeply flawed CLI parsing layer. However, click is currently *not* in pyproject.toml (it was installed transitively by uvicorn). The implementation plan should formally propose adding yper (which builds on click but integrates natively with pydantic and Python 3 type hints, matching the repository's modern style) to completely replace rgparse, permanently solving Findings 6-9, 29-30, and 67-68.
 
 #### 72. [Detected] Orphaned CLI Dependencies
 
@@ -1015,7 +1015,7 @@ Audit the impact of the newly accepted 2026-03-05-cli-engine-typer-adr.md on the
 - **Detail:** The Typer ADR mandates deprecating printer.py in favor of
   ich.
 
-- **Triage:** High - To prevent a fractured codebase, the execution plan must explicitly instruct the engineering agent to delete src/vaultspec/printer.py and replace all calls to rgs.printer.out() with
+- **Triage:** High - To prevent a fractured codebase, the execution plan must explicitly instruct the engineering agent to delete src/vaultspec/printer.py and replace all calls to rgs.printer.out() with
   ich.print() or yper.echo().
 
 #### 75. [Recommendation] Actionable Hand-off Update (Final Plan Generation)
@@ -1023,7 +1023,7 @@ Audit the impact of the newly accepted 2026-03-05-cli-engine-typer-adr.md on the
 - **Action:** The aultspec-writer agent's task is now significantly expanded. The .vault/plan/2026-03-05-cli-target-refactor-plan.md must now encompass BOTH the --target path refactoring AND the yper migration simultaneously, as the yper migration is the designated architectural solution for the --target routing bugs.
   The sequence must be:
 
-  1. Wait for gent-removal.
+  1. Wait for gent-removal.
 
   1. **Phase 1: Config Layer Overhaul** (workspace.py renaming, config.py deprecations).
 
@@ -1040,18 +1040,18 @@ Audit the impact of the newly accepted 2026-03-05-cli-engine-typer-adr.md on the
 
 ### Scope
 
-Audit the core business logic files (src/vaultspec/core/\*.py) to identify where rgparse.Namespace is hardcoded as a type hint or expected payload, as this tightly couples the core engine to the rgparse CLI layer, violating separation of concerns and blocking the Typer migration.
+Audit the core business logic files (src/vaultspec/core/\*.py) to identify where rgparse.Namespace is hardcoded as a type hint or expected payload, as this tightly couples the core engine to the rgparse CLI layer, violating separation of concerns and blocking the Typer migration.
 
 ### Findings
 
-#### 76. [Detected] Core Logic Tightly Coupled to rgparse.Namespace
+#### 76. [Detected] Core Logic Tightly Coupled to rgparse.Namespace
 
-- **Issue:** Every single function in src/vaultspec/core/ (e.g., commands.py, gents.py, config_gen.py,
+- **Issue:** Every single function in src/vaultspec/core/ (e.g., commands.py, gents.py, config_gen.py,
   ules.py, skills.py, system.py,
   esources.py) uses def function_name(args: argparse.Namespace) -> None: as its signature.
 
 - **Detail:** The core execution functions (like init_run, doctor_run,
-  ules_sync) expect an rgparse.Namespace object. They actively use getattr(args, "dry_run", False) or access properties like rgs.force and rgs.printer directly. Typer uses standard python function arguments (e.g., def rules_sync(dry_run: bool = False, prune: bool = False):), not a generic namespace object.
+  ules_sync) expect an rgparse.Namespace object. They actively use getattr(args, "dry_run", False) or access properties like rgs.force and rgs.printer directly. Typer uses standard python function arguments (e.g., def rules_sync(dry_run: bool = False, prune: bool = False):), not a generic namespace object.
 
 - **Triage:** Critical - If the CLI is ported to Typer, the core functions will instantly break unless they are refactored to accept explicit kwargs or a Pydantic settings model.
 
@@ -1063,7 +1063,7 @@ Audit the core business logic files (src/vaultspec/core/\*.py) to identify where
 
 #### 77. [Detected] ault_cli.py Internal Coupling
 
-- **Issue:** The aultcore handlers (e.g., handle_create, handle_audit in src/vaultspec/vault_cli.py) also rely on rgparse.Namespace.
+- **Issue:** The aultcore handlers (e.g., handle_create, handle_audit in src/vaultspec/vault_cli.py) also rely on rgparse.Namespace.
 - **Detail:** While these are technically part of the CLI layer, their signatures must be unpacked into native Typer @app.command() arguments.
 - **Triage:** Medium - Standard refactoring task during the Typer port, but essential to document to ensure the executing agent knows to unpack the namespace.
 
@@ -1077,7 +1077,7 @@ Audit the codebase for usages of the printer.py module to fully define the scope
 
 #### 78. [Detected] ault_cli.py JSON Output Dependency
 
-- **Issue:** src/vaultspec/vault_cli.py relies heavily on rgs.printer.out_json() for the --json flags on udit, eatures, and erify commands.
+- **Issue:** src/vaultspec/vault_cli.py relies heavily on rgs.printer.out_json() for the --json flags on udit, eatures, and erify commands.
 
 - **Detail:** If printer.py is deleted, the Typer migration must provide a 1:1 replacement for structured JSON serialization to stdout.
 
@@ -1104,10 +1104,10 @@ Audit src/vaultspec/mcp_server/app.py and its surrounding tool registries to ide
 
 #### 80. [Detected] aultspec-mcp Lifespan and Initialization Fragility
 
-- **Issue:** The MCP server uses FastMCP, which relies on synccontextmanager lifespans (e.g., \_lifespan in pp.py). Currently, initialize_server() and configuration loading happens *outside* of this lifespan, manually orchestrated inside def main():.
+- **Issue:** The MCP server uses FastMCP, which relies on synccontextmanager lifespans (e.g., \_lifespan in pp.py). Currently, initialize_server() and configuration loading happens *outside* of this lifespan, manually orchestrated inside def main():.
 
 - **Detail:** In src/vaultspec/mcp_server/app.py, main() calls configure_logging(), get_config(), validates cfg.mcp_root_dir, manually calls initialize_server(), and *then* calls mcp.run_stdio_async().
-  When the CLI is refactored to Typer, aultspec mcp will become a @app.command() function. If the Typer context is not cleanly passed into the MCP server initialization, or if pp.py attempts to re-initialize logging over Typer's global logging setup, it will create conflicts.
+  When the CLI is refactored to Typer, aultspec mcp will become a @app.command() function. If the Typer context is not cleanly passed into the MCP server initialization, or if pp.py attempts to re-initialize logging over Typer's global logging setup, it will create conflicts.
 
 - **Triage:** Medium - Requires careful boundary management during the port.
 
@@ -1118,7 +1118,7 @@ Audit src/vaultspec/mcp_server/app.py and its surrounding tool registries to ide
 - **Issue:** src/vaultspec/mcp_server/app.py:80 calls
   egister_team_tools(mcp).
 
-- **Detail:** The gent-removal plan deletes the eam concept entirely.
+- **Detail:** The gent-removal plan deletes the eam concept entirely.
 
 - **Triage:** Low - Expected cleanup, but must be explicitly documented so the Typer migration doesn't try to port or maintain dead MCP endpoints.
 
@@ -1180,14 +1180,14 @@ aise typer.Exit() architecture, particularly in testing environments.
 
 ### Scope
 
-Aggregate the critical additions from Cycles 37-41 to finalize the exact handoff instructions for the aultspec-writer agent, ensuring the Typer integration handles logging constraints, sys.exit deprecation, and rgparse type removal perfectly.
+Aggregate the critical additions from Cycles 37-41 to finalize the exact handoff instructions for the aultspec-writer agent, ensuring the Typer integration handles logging constraints, sys.exit deprecation, and rgparse type removal perfectly.
 
 ### Findings
 
 #### 86. [Recommendation] Expanded Execution Sequence
 
 - **Action:** The final handoff checklist for .vault/plan/2026-03-05-cli-target-refactor-plan.md must be updated with the following explicit constraints:
-  1. Wait for gent-removal to finish.
+  1. Wait for gent-removal to finish.
 
   1. **Phase 1: Config Layer Overhaul**
 
@@ -1204,7 +1204,7 @@ Aggregate the critical additions from Cycles 37-41 to finalize the exact handoff
 
   1. **Phase 3: Subcommand Porting & Type Stripping**
 
-     - Remove rgparse.Namespace from all core/\*.py signatures and replace with kwargs.
+     - Remove rgparse.Namespace from all core/\*.py signatures and replace with kwargs.
 
      - Delete printer.py and replace .out() with
        ich.print().
@@ -1244,7 +1244,7 @@ Audit explicit usages of sys.stdout and sys.stderr outside of standard logging p
 #### 88. [Detected] Unsafe print() in config_gen.py
 
 - **Issue:** While sys.stdout isn't explicitly imported, raw print() statements might be used.
-- **Detail:** A manual review of src/vaultspec/core/config_gen.py (which handles the config show command) and src/vaultspec/core/system.py (system show) reveals they use raw print(f"...") instead of rgs.printer.out() or logger.info().
+- **Detail:** A manual review of src/vaultspec/core/config_gen.py (which handles the config show command) and src/vaultspec/core/system.py (system show) reveals they use raw print(f"...") instead of rgs.printer.out() or logger.info().
 - **Triage:** Medium - Raw print() statements bypass Typer's stream management. While fine for standard CLI usage, they cannot be easily redirected or captured natively by Typer's context if the application scales.
 - **Proposed Action:** The execution plan (Phase 3) must replace all raw print() statements in src/vaultspec/core/config_gen.py and src/vaultspec/core/system.py with yper.echo().
 
@@ -1258,16 +1258,12 @@ Following Finding #88, audit the entirety of src/vaultspec/core/ to identify all
 
 #### 89. [Detected] Systemic print() Bleed
 
-- **Issue:** The raw Python print() function is systematically used across src/vaultspec/core/ for CLI output instead of using the injected rgs.printer or the logger.
+- **Issue:** The raw Python print() function is systematically used across src/vaultspec/core/ for CLI output instead of using the injected rgs.printer or the logger.
 - **Detail:** A repository-wide regex search reveals raw print() statements heavily polluting:
-  - gents.py (gents list)
+  - agents.py (agents list)
   - config_gen.py (config show)
-
-## esources.py ( esource_show)
-
-ules.py (
-ules list)
-
+  - resources.py (resource_show)
+  - rules.py (rules list)
 - skills.py (skills list)
 - sync.py (various list/sync operations)
 - system.py (system show)
@@ -1288,14 +1284,14 @@ Synthesize the final layer of Typer-related IO bugs into the actionable hand-off
 
 - **Action:** To permanently resolve the --quiet bypass, printer.py duality, and MCP stdio blackhole, the .vault/plan/2026-03-05-cli-target-refactor-plan.md must be updated with this strict Phase 3 mandate:
   - **Phase 3: Subcommand Porting, IO Governance & Type Stripping**
-    - Refactor src/vaultspec/core/\*.py: Replace rgs: argparse.Namespace with typed kwargs.
+    - Refactor src/vaultspec/core/\*.py: Replace rgs: argparse.Namespace with typed kwargs.
 
     - Delete printer.py.
 
-    - **IO Purge:** Run a global regex to replace print(...) and rgs.printer.out(...) with yper.echo(...) or
+    - **IO Purge:** Run a global regex to replace print(...) and rgs.printer.out(...) with yper.echo(...) or
       ich.print(...) across the entire core/ folder.
 
-    - Replace rgs.printer.out_json(data) with yper.echo(json.dumps(data)).
+    - Replace rgs.printer.out_json(data) with yper.echo(json.dumps(data)).
 
     - Convert raw sys.exit() calls to
       aise typer.Exit().
@@ -1355,7 +1351,7 @@ Following up on Cycle 46, audit the dependencies mapped to logging_config.py to 
 
 - **Issue:** Currently, most CLI execution points (like ault_cli.main() and spec_cli.main()) never import logging_config directly; they call setup_logging(args) inside cli_common.py, which acts as the delegate wrapper.
 
-- **Detail:** This centralization is good, but cli_common.setup_logging dynamically switches between a plain handler (if rgs.quiet is true) and standard config. As discovered in Cycle 46, this creates a state machine where
+- **Detail:** This centralization is good, but cli_common.setup_logging dynamically switches between a plain handler (if rgs.quiet is true) and standard config. As discovered in Cycle 46, this creates a state machine where
   eset_logging() must be explicitly tracked.
 
 - **Triage:** Clear/No-Issue - The centralization in cli_common.py makes it straightforward to rewrite this single function to initialize Typer's global get_console() context.
@@ -1363,7 +1359,7 @@ Following up on Cycle 46, audit the dependencies mapped to logging_config.py to 
 #### 95. [Detected] Test Suite Logging Mocks
 
 - **Issue:** src/vaultspec/tests/cli/test_vault_cli.py directly imports and mutates logging.getLogger().level.
-- **Detail:** The tests currently assert that setup_logging correctly sets the root logger level (e.g., ssert logging.getLogger().level == logging.DEBUG).
+- **Detail:** The tests currently assert that setup_logging correctly sets the root logger level (e.g., ssert logging.getLogger().level == logging.DEBUG).
 - **Triage:** Low - When the CLI migrates to Typer and uses a centralized Typer callback to initialize logging, these test assertions will still pass as long as the underlying python logging.getLogger().setLevel(...) mechanism is preserved under the hood of the Typer integration.
 
 ______________________________________________________________________
@@ -1374,20 +1370,20 @@ ______________________________________________________________________
 
 ### Scope
 
-Audit how the core rgparse options (e.g., --dry-run, --force, --prune) are validated and defaulted in spec_cli.py and ault_cli.py. This will identify logic that must be carefully translated to Typer Option() definitions to ensure behavior remains identical.
+Audit how the core rgparse options (e.g., --dry-run, --force, --prune) are validated and defaulted in spec_cli.py and ault_cli.py. This will identify logic that must be carefully translated to Typer Option() definitions to ensure behavior remains identical.
 
 ### Findings
 
 #### 96. [Detected] Silent Defaults for Boolean Flags
 
-- **Issue:** Many rgparse.ArgumentParser calls define flags using ction="store_true". When a user does *not* supply the flag, rgparse stores False (usually), but the core logic handles this loosely via getattr(args, "dry_run", False).
+- **Issue:** Many rgparse.ArgumentParser calls define flags using ction="store_true". When a user does *not* supply the flag, rgparse stores False (usually), but the core logic handles this loosely via getattr(args, "dry_run", False).
 
 - **Detail:** For example, in src/vaultspec/spec_cli.py, --dry-run and --prune are defined globally on sync commands. The core functions (
   ules_sync, skills_sync) explicitly use getattr to extract them. Typer requires explicit default assignments in the function signature (e.g., dry_run: bool = typer.Option(False, "--dry-run")).
 
 - **Triage:** Medium - If the Typer port simply specifies dry_run: bool without the yper.Option(False) wrapper, Typer will treat the boolean as a *required* argument, breaking the CLI flow.
 
-- **Proposed Action:** The execution plan (Phase 3) must mandate that ALL boolean flags ported from rgparse are explicitly declared as ool = typer.Option(False, "--flag-name") to guarantee optionality.
+- **Proposed Action:** The execution plan (Phase 3) must mandate that ALL boolean flags ported from rgparse are explicitly declared as ool = typer.Option(False, "--flag-name") to guarantee optionality.
 
 #### 97. [Detected] Redundant Validation in aultcore
 
@@ -1427,10 +1423,10 @@ Audit how asynchronous operations (like MCP integrations or HTTP network calls i
 
 #### 100. [Detected] Typer Async Incompatibility
 
-- **Issue:** Typer (and Click) does not natively support sync def command functions. If an @app.command() is decorated with sync def, Typer will crash or fail to await it.
-- **Detail:** The aultspec core commands (like ault_cli.py, spec_cli.py) are currently purely synchronous, but mcp_server/app.py:main is synchronous and explicitly triggers an async lifecycle using syncio.set_event_loop_policy and mcp.run_stdio_async(). Furthermore, if hooks or aultcore ever require async execution, the CLI boundary will shatter.
-- **Triage:** High - When porting mcp_server/app.py:main to a Typer command (@app.command() def mcp_cmd(...)), the function MUST remain a synchronous wrapper (def mcp_cmd) that internally calls syncio.run(...) or uses the existing cli_common.run_async() helper.
-- **Proposed Action:** The execution plan (Phase 3) must explicitly warn the engineer NOT to make the Typer commands sync def. They must use src/vaultspec/cli_common.py:run_async to bridge the synchronous CLI input to any async backend engines.
+- **Issue:** Typer (and Click) does not natively support sync def command functions. If an @app.command() is decorated with sync def, Typer will crash or fail to await it.
+- **Detail:** The aultspec core commands (like ault_cli.py, spec_cli.py) are currently purely synchronous, but mcp_server/app.py:main is synchronous and explicitly triggers an async lifecycle using syncio.set_event_loop_policy and mcp.run_stdio_async(). Furthermore, if hooks or aultcore ever require async execution, the CLI boundary will shatter.
+- **Triage:** High - When porting mcp_server/app.py:main to a Typer command (@app.command() def mcp_cmd(...)), the function MUST remain a synchronous wrapper (def mcp_cmd) that internally calls syncio.run(...) or uses the existing cli_common.run_async() helper.
+- **Proposed Action:** The execution plan (Phase 3) must explicitly warn the engineer NOT to make the Typer commands sync def. They must use src/vaultspec/cli_common.py:run_async to bridge the synchronous CLI input to any async backend engines.
 
 ______________________________________________________________________
 
@@ -1446,7 +1442,7 @@ Audit any modules interacting directly with os.environ outside of the central sr
 
 #### 101. [Detected] Unsafe Editor Resolution
 
-- **Issue:** src/vaultspec/core/resources.py reads os.environ.get("EDITOR", "vim") to launch text editors for the dd and edit commands.
+- **Issue:** src/vaultspec/core/resources.py reads os.environ.get("EDITOR", "vim") to launch text editors for the dd and edit commands.
 
 - **Detail:** While standard for Unix tools to fallback to the $EDITOR environment variable, the VaultSpecConfig definition in config.py (Finding 49 shows the registry) already defines VAULTSPEC_EDITOR (which defaults to "zed -w"). If
   esources.py checks os.environ.get("EDITOR") directly, it ignores the central configuration paradigm.
@@ -1496,8 +1492,8 @@ Aggregate the final edge-case findings from Cycles 51-52 regarding environment i
 #### 104. [Validation] sys.argv Eradication
 
 - **Issue:** Are there any hidden sys.argv hacks outside of __main__.py that would defeat the Typer migration?
-- **Detail:** A final audit of sys.argv usage reveals it is only present in __main__.py (the router hack we are deleting), ault_cli.py (a default parameter rgv: list[str] | None = None mapping to sys.argv[1:] for tests), and est_hooks.py (mocking).
-- **Triage:** Clear/No-Issue - The codebase is structurally clean enough to rip out rgparse and replace it entirely with Typer without uncovering hidden command-line hacks deep in the business logic.
+- **Detail:** A final audit of sys.argv usage reveals it is only present in __main__.py (the router hack we are deleting), ault_cli.py (a default parameter rgv: list[str] | None = None mapping to sys.argv[1:] for tests), and est_hooks.py (mocking).
+- **Triage:** Clear/No-Issue - The codebase is structurally clean enough to rip out rgparse and replace it entirely with Typer without uncovering hidden command-line hacks deep in the business logic.
 
 #### 105. [Recommendation] Complete Plan Structure
 
@@ -1512,14 +1508,14 @@ Aggregate the final edge-case findings from Cycles 51-52 regarding environment i
 
 ### Scope
 
-Audit the repository state specifically for blocking issues created by other concurrent agent tasks (gent-removal) that might prevent aultspec-writer or the CLI tools from functioning during the drafting phase.
+Audit the repository state specifically for blocking issues created by other concurrent agent tasks (gent-removal) that might prevent aultspec-writer or the CLI tools from functioning during the drafting phase.
 
 ### Findings
 
-#### 106. [Detected] gent-removal Branch Breakage
+#### 106. [Detected] gent-removal Branch Breakage
 
-- **Issue:** The repository is currently in a broken state due to the gent-removal refactoring.
-- **Detail:** The aultspec CLI currently fails to launch entirely. Attempting to run aultspec subagent run --agent vaultspec-writer throws ImportError: cannot import name 'AGENTS_SRC_DIR' from 'vaultspec.core.types'. This indicates that the gent-removal plan was executed partially or sloppily by the previous execution agent. They deleted AGENTS_SRC_DIR from core/types.py but failed to clean up the import statements in core/__init__.py.
+- **Issue:** The repository is currently in a broken state due to the gent-removal refactoring.
+- **Detail:** The aultspec CLI currently fails to launch entirely. Attempting to run aultspec subagent run --agent vaultspec-writer throws ImportError: cannot import name 'AGENTS_SRC_DIR' from 'vaultspec.core.types'. This indicates that the gent-removal plan was executed partially or sloppily by the previous execution agent. They deleted AGENTS_SRC_DIR from core/types.py but failed to clean up the import statements in core/__init__.py.
 - **Triage:** Critical Blocker - We cannot dispatch the aultspec-writer agent using the native aultspec subagent command because the framework itself is broken.
 - **Proposed Action:** We must either pause and fix the ImportError manually (so the CLI boots), OR we must manually write the .vault/plan/2026-03-05-cli-target-refactor-plan.md artifact using standard file writing tools instead of relying on the broken aultspec-writer subagent to do it for us.
 
@@ -1527,7 +1523,7 @@ Audit the repository state specifically for blocking issues created by other con
 
 ### Scope
 
-Audit the broken state of the repository caused by the gent-removal plan and identify all remaining "ghost" references to AGENTS and other deleted concepts that are causing the current ImportError and AttributeError.
+Audit the broken state of the repository caused by the gent-removal plan and identify all remaining "ghost" references to AGENTS and other deleted concepts that are causing the current ImportError and AttributeError.
 
 ### Findings
 
@@ -1541,28 +1537,28 @@ Audit the broken state of the repository caused by the gent-removal plan and id
 - **Triage:** Critical Blocker - The framework is non-functional.
 - **Proposed Action:** (Immediately added to Phase 0 of the plan)
   - Remove AGENTS_SRC_DIR from src/vaultspec/core/__init__.py.
-  - Delete the gents_dir line from src/vaultspec/core/types.py:\_create_tool_cfg.
+  - Delete the gents_dir line from src/vaultspec/core/types.py:\_create_tool_cfg.
   - Remove the Tool.AGENTS checks from src/vaultspec/core/rules.py:transform_rule.
 
 #### 108. [Detected] Ghost Orchestration Imports
 
 - **Issue:** src/vaultspec/core/types.py still contains a get_providers() function that attempts to import from ..protocol.providers.
-- **Detail:** While protocol still exists, the gent-removal plan is supposed to strip orchestration. If get_providers remains in core, it maintains a heavy dependency link to the protocol layer.
+- **Detail:** While protocol still exists, the gent-removal plan is supposed to strip orchestration. If get_providers remains in core, it maintains a heavy dependency link to the protocol layer.
 - **Triage:** Medium - Cleanliness.
 - **Proposed Action:** Ensure get_providers is moved or deleted if no longer needed by the core framework post-removal.
 
 #### 109. [Detected] SyncResult and ToolConfig Cleanup
 
-- **Issue:** ToolConfig in src/vaultspec/core/types.py still has an gents_dir: Path | None attribute.
+- **Issue:** ToolConfig in src/vaultspec/core/types.py still has an gents_dir: Path | None attribute.
 - **Detail:** Since agents are removed, this attribute is dead code.
 - **Triage:** Medium - Dead code.
-- **Proposed Action:** Remove gents_dir from the ToolConfig dataclass definition in src/vaultspec/core/types.py.
+- **Proposed Action:** Remove gents_dir from the ToolConfig dataclass definition in src/vaultspec/core/types.py.
 
 ## Cycle 56: Comprehensive Ghost Reference Cleanup (Post-Agent-Removal)
 
 ### Scope
 
-Audit the entire codebase for soft references to gent, subagent, eam, and 2a concepts that were missed by the gent-removal plan. These stragglers pollute docstrings, error messages, logic branches, and metrics, creating a "zombie" architecture that confuses the new target-based system.
+Audit the entire codebase for soft references to gent, subagent, eam, and 2a concepts that were missed by the gent-removal plan. These stragglers pollute docstrings, error messages, logic branches, and metrics, creating a "zombie" architecture that confuses the new target-based system.
 
 ### Findings
 
@@ -1576,7 +1572,7 @@ Audit the entire codebase for soft references to gent, subagent, eam, and 2a c
 
 - **Triage:** High (UX) - Users will receive incorrect readiness scores based on a deleted feature.
 
-- **Proposed Action:** Completely strip the gent_coverage dimension from src/vaultspec/core/commands.py:readiness_run.
+- **Proposed Action:** Completely strip the gent_coverage dimension from src/vaultspec/core/commands.py:readiness_run.
 
 #### 111. [Detected] Residual Tool.AGENTS Logic in config_gen.py
 
@@ -1603,7 +1599,7 @@ esources.py
 
 #### 113. [Detected] Config Singleton Stale Entries
 
-- **Issue:** VaultSpecConfig in config.py and its related tests in est_config.py still carry gent_mode, 2a_default_port, and 2a_host.
+- **Issue:** VaultSpecConfig in config.py and its related tests in est_config.py still carry gent_mode, 2a_default_port, and 2a_host.
 - **Detail:** These variables are no longer used by any surviving module.
 - **Triage:** Medium - Registry bloat.
 - **Proposed Action:** Purge all agent and A2A variables from CONFIG_REGISTRY in src/vaultspec/config/config.py and delete corresponding tests in ests/config/test_config.py.
@@ -1621,13 +1617,13 @@ esources.py
 
 ### Scope
 
-Audit the ests/ and src/vaultspec/tests/ directories to identify all zombie test files, fixtures, and assertions related to gent, subagent, eam, and 2a concepts that were missed by the gent-removal plan.
+Audit the ests/ and src/vaultspec/tests/ directories to identify all zombie test files, fixtures, and assertions related to gent, subagent, eam, and 2a concepts that were missed by the gent-removal plan.
 
 ### Findings
 
 #### 115. [Detected] Massive Zombie Test Files
 
-- **Issue:** Several high-level functional test files were completely overlooked by the gent-removal plan.
+- **Issue:** Several high-level functional test files were completely overlooked by the gent-removal plan.
 - **Detail:**
   - src/vaultspec/tests/cli/test_team_cli.py (Functional team CLI tests)
   - src/vaultspec/tests/cli/test_subagent_cli.py (Subagent CLI flag tests)
@@ -1638,15 +1634,15 @@ Audit the ests/ and src/vaultspec/tests/ directories to identify all zombie test
 #### 116. [Detected] Infested conftest.py and Fixtures
 
 - **Issue:** ests/protocol/conftest.py and src/vaultspec/tests/cli/conftest.py are full of agent-related directory scaffolding and server spawning logic.
-- **Detail:** ests/protocol/conftest.py contains an gent_spawner fixture and echo_agent_def / state_agent_def helpers.
+- **Detail:** ests/protocol/conftest.py contains an gent_spawner fixture and echo_agent_def / state_agent_def helpers.
 - **Triage:** High - These fixtures are expensive and initialize a "zombie" workspace structure during every test run.
-- **Proposed Action:** Completely strip gent_spawner and all gent_def helpers from ests/protocol/conftest.py.
+- **Proposed Action:** Completely strip gent_spawner and all gent_def helpers from ests/protocol/conftest.py.
 
 #### 117. [Detected] Residual Assertions in Core Sync Tests
 
 - **Issue:** est_sync_collect.py and est_sync_incremental.py still contain hundreds of lines of code testing agent transformations and multi-pass syncs for agents.
 - **Detail:** These files assert things like coder.md being synced to .claude/agents/.
-- **Triage:** High - These tests will crash because the gents_sync command and AGENTS enum are being deleted.
+- **Triage:** High - These tests will crash because the gents_sync command and AGENTS enum are being deleted.
 - **Proposed Action:** Perform a surgical deletion of all TestCollectAgents, TestTransformAgent, and TestIncrementalAgents classes across the est_sync\_\*.py files.
 
 #### 118. [Detected] Namespace Routing Tests Stale
@@ -1667,7 +1663,7 @@ Audit the src/vaultspec/protocol/ directory to identify semantic inconsistencies
 
 - **Issue:** The core interface for executing models is still called AgentProvider, and its output is SubagentResult.
 - **Detail:** Classes like ClaudeProvider(AgentProvider) and GeminiProvider(AgentProvider) exist.
-- **Triage:** Medium - While functional, keeping the name AgentProvider while deleting the gent command and orchestration creates an confusing internal API.
+- **Triage:** Medium - While functional, keeping the name AgentProvider while deleting the gent command and orchestration creates an confusing internal API.
 - **Proposed Action:** (As part of the general semantic renaming in the ADR)
   - Rename AgentProvider to ExecutionProvider or ToolProvider.
   - Rename SubagentResult to ExecutionResult.

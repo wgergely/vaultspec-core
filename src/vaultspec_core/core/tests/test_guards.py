@@ -1,6 +1,5 @@
 """Tests for dev-repo protection guard."""
 
-
 import pytest
 
 from vaultspec_core.core.guards import (
