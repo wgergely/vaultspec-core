@@ -9,6 +9,7 @@ WORKDIR /app
 RUN adduser --disabled-password --gecos "" appuser
 
 COPY pyproject.toml README.md LICENSE ./
+COPY .vaultspec ./.vaultspec
 COPY src ./src
 
 RUN python -m pip install --no-cache-dir .
