@@ -51,10 +51,11 @@ version-file = "src/vaultspec_core/_version.py"
 
 **Alternatives considered:**
 
-- `release-please` (Google) - automates release PRs from conventional commits;
-  strong but requires strict commit discipline
-- `python-semantic-release` - similar to release-please; analyzes commits,
-  bumps, tags, publishes
+- **`release-please`** (Google) - see section 10 for deep analysis. Automates
+  release PRs from conventional commits. Killer feature: PR-based review gate
+  before any release ships. Conflicts with `hatch-vcs` (see section 10.2).
+- `python-semantic-release` - similar to release-please but Python-native;
+  direct push model (no PR review gate)
 - `bump2version` / `bump-my-version` - file-based version bumping; declining
   adoption
 
@@ -86,14 +87,94 @@ all platforms. Both should always be published. Verification via
 
 ### 3. trusted publishing and ci/cd pipeline
 
-**Current state:** existing `publish.yml` has correct OIDC setup
-(`id-token: write`, `pypi` environment, `pypa/gh-action-pypi-publish`) but
-lacks CI gating, TestPyPI staging, and version validation.
+**Current state:** existing `publish.yml` uses `pypa/gh-action-pypi-publish`
+with OIDC setup. Should be replaced with `uv publish` for a fully uv-native
+pipeline.
+
+**`uv publish` (recommended replacement for `pypa/gh-action-pypi-publish`):**
+
+`uv publish` is the native uv command for uploading packages to PyPI. It
+supports OIDC trusted publishing out of the box, making it a drop-in
+replacement for the pypa action with a simpler workflow.
+
+Key flags (verified against docs.astral.sh/uv):
+
+- `--trusted-publishing always` - forces OIDC; fails if not in supported CI
+- `--publish-url <URL>` - target index URL (or use `--index` with pyproject.toml
+  config). Default: `https://upload.pypi.org/legacy/`
+- `--check-url <URL>` - verifies existing files in registry before upload;
+  skips identical files, handles raced parallel uploads
+- `--token` / `UV_PUBLISH_TOKEN` - API token auth (not needed with trusted
+  publishing)
+- `--no-attestations` / `UV_PUBLISH_NO_ATTESTATIONS` - disables attestation
+  uploads. Note: `uv publish` does NOT generate attestations itself;
+  attestations must be created separately and placed as
+  `.publish.attestation` files alongside distributions (PEP 740)
+- `--index <name>` - publish to a named index defined in `pyproject.toml`
+
+**TestPyPI via pyproject.toml index config:**
+
+```toml
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true
+```
+
+Then: `uv publish --index testpypi --trusted-publishing always`
+
+Or directly: `uv publish --publish-url https://test.pypi.org/legacy/ --check-url https://test.pypi.org/simple/ --trusted-publishing always`
+
+**Astral's canonical reference workflow** (from
+`astral-sh/trusted-publishing-examples`):
+
+```yaml
+name: Release
+on:
+  push:
+    tags:
+      - v*
+jobs:
+  pypi:
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - run: uv python install 3.13
+      - run: uv build
+      - run: uv run --isolated --no-project --with dist/*.whl tests/smoke_test.py
+      - run: uv run --isolated --no-project --with dist/*.tar.gz tests/smoke_test.py
+      - run: uv publish
+```
+
+Key observations from the reference workflow:
+
+- No `--trusted-publishing` flag needed - uv auto-detects OIDC environment
+- Smoke tests the built wheel AND sdist before publishing
+- No `twine check` - replaced by the smoke test pattern
+- `uv python install 3.13` ensures consistent Python version
+
+**Advantages of `uv publish` over `pypa/gh-action-pypi-publish`:**
+
+- Single tool for build + publish (no separate action)
+- Simpler workflow YAML
+- Faster (Rust-native)
+- `--check-url` handles idempotent re-uploads gracefully
+
+**Disadvantage:** `uv publish` does not generate Sigstore attestations. The
+pypa action has `attestations: true` for this. If attestations are desired,
+either use the pypa action or generate attestations separately.
 
 **Recommended multi-stage pipeline:**
 
 ```
-CI (lint + test) -> build -> verify -> publish-testpypi -> publish-pypi -> github-release
+CI (lint + test) -> build + smoke test -> publish-testpypi -> publish-pypi -> github-release
 ```
 
 Key patterns:
@@ -104,8 +185,8 @@ Key patterns:
   `actions/download-artifact@v4` to pass dist artifacts between jobs
 - **GitHub Environments:** `testpypi` and `pypi` environments provide
   deployment protection rules (required reviewers, wait timers)
-- **Attestations:** enable `attestations: true` in `pypa/gh-action-pypi-publish`
-  for Sigstore-based supply chain signing (zero-cost, zero-friction)
+- **Smoke tests replace twine check:** Astral's pattern of installing the
+  built artifact and running a smoke test is more thorough than `twine check`
 
 **TestPyPI setup:** separate trusted publisher on test.pypi.org with a
 `testpypi` environment. Useful for pre-release validation.
@@ -258,7 +339,211 @@ platform-specific binaries. This gives `pip install ruff` native performance
 without separate binary downloads. However, this requires rewriting the tool
 in Rust/C - not applicable for a pure Python project.
 
-### 9. gaps in current setup
+### 9. pyapp - standalone binary via hatch ecosystem
+
+**PyApp** (by Ofek Lev, author of Hatch/Hatchling) is a Rust bootstrapper
+that wraps Python applications as standalone executables. It is part of the
+Hatch ecosystem and the modern alternative to PyInstaller/Nuitka for
+hatchling-based projects.
+
+**How it works:**
+
+- PyApp is a Rust crate compiled with `cargo build`
+- At build time, configure via environment variables (`PYAPP_PROJECT_NAME`,
+  `PYAPP_PROJECT_VERSION`, etc.)
+- The resulting binary is a thin Rust launcher that either embeds or
+  downloads a Python distribution (`python-build-standalone` - same ones uv
+  uses) at first run
+- At runtime, it creates an isolated Python environment, installs the package
+  via pip or uv, then invokes the entry point
+- Subsequent runs reuse the cached environment
+
+**Key configuration (environment variables at build time):**
+
+| Variable                   | Purpose                     | Example                                      |
+| -------------------------- | --------------------------- | -------------------------------------------- |
+| `PYAPP_PROJECT_NAME`       | PyPI package name           | `vaultspec-core`                             |
+| `PYAPP_PROJECT_VERSION`    | Version to install          | `0.2.0`                                      |
+| `PYAPP_PROJECT_PATH`       | Embed a local wheel/sdist   | `dist/vaultspec_core-0.2.0-py3-none-any.whl` |
+| `PYAPP_PYTHON_VERSION`     | Python version to bundle    | `3.13`                                       |
+| `PYAPP_EXEC_MODULE`        | Module to run (`python -m`) | `vaultspec_core`                             |
+| `PYAPP_EXEC_SPEC`          | Object reference            | `vaultspec_core.__main__:main`               |
+| `PYAPP_DISTRIBUTION_EMBED` | Embed Python in binary      | `true`                                       |
+| `PYAPP_UV_ENABLED`         | Use uv instead of pip       | `true`                                       |
+| `PYAPP_SELF_COMMAND`       | Enable self-update commands | `self`                                       |
+| `PYAPP_PROJECT_FEATURES`   | Optional extras             | `mcp,server`                                 |
+
+**Comparison to PyInstaller/Nuitka:**
+
+| Aspect            | PyApp                          | PyInstaller           | Nuitka     |
+| ----------------- | ------------------------------ | --------------------- | ---------- |
+| Build tool        | Rust (cargo)                   | Python                | C compiler |
+| Binary size       | Small launcher (~5 MB)         | 80-120 MB             | 50-80 MB   |
+| First-run latency | Downloads Python + installs    | None                  | None       |
+| Fully offline     | Only with `DISTRIBUTION_EMBED` | Yes                   | Yes        |
+| Self-update       | Built-in                       | No                    | No         |
+| All packages work | Yes (uses real pip/uv)         | Most (hook-dependent) | Most       |
+| CI complexity     | Needs Rust toolchain           | Low                   | Medium     |
+
+**For vaultspec-core:** PyApp with `PYAPP_UV_ENABLED=true` and
+`PYAPP_DISTRIBUTION_EMBED=true` produces a self-contained binary that uses uv
+for fast package installation. The self-update feature (`PYAPP_SELF_COMMAND`)
+is a significant advantage over PyInstaller. Main trade-off: requires Rust
+toolchain in CI.
+
+**CI matrix for PyApp builds:**
+
+```yaml
+strategy:
+  matrix:
+    include:
+      - target: x86_64-unknown-linux-gnu
+        os: ubuntu-latest
+      - target: x86_64-apple-darwin
+        os: macos-13
+      - target: aarch64-apple-darwin
+        os: macos-latest
+      - target: x86_64-pc-windows-msvc
+        os: windows-latest
+steps:
+  - uses: actions/checkout@v5
+  - uses: dtolnay/rust-toolchain@stable
+    with:
+      targets: ${{ matrix.target }}
+  - uses: astral-sh/setup-uv@v6
+  - run: uv build
+  - env:
+      PYAPP_PROJECT_PATH: dist/vaultspec_core-*.whl
+      PYAPP_PYTHON_VERSION: "3.13"
+      PYAPP_EXEC_MODULE: vaultspec_core
+      PYAPP_UV_ENABLED: "true"
+      PYAPP_DISTRIBUTION_EMBED: "true"
+    run: cargo install pyapp --force && cargo build --release --target ${{ matrix.target }}
+```
+
+**Status:** actively maintained by Ofek Lev. Used by Hatch itself for
+standalone distribution. Dual-licensed Apache-2.0/MIT.
+
+### 10. release-please - automated release management
+
+**release-please** (Google) provides PR-based release automation. Its killer
+feature is the human review gate: it opens a Release PR that you merge when
+ready, rather than publishing automatically.
+
+**How it works:**
+
+- Runs on every push to main, analyzes Conventional Commit messages
+- Opens/updates a single "Release PR" containing: version bump, CHANGELOG.md
+  update, manifest update
+- When you merge the Release PR, it creates a GitHub Release with a git tag
+- Downstream publish jobs gate on `release_created` output
+
+**10.1 Conventional Commits requirement:**
+
+- `feat:` triggers minor bump, appears in changelog
+- `fix:` triggers patch bump, appears in changelog
+- `feat!:` or `BREAKING CHANGE:` footer triggers major bump
+- Other prefixes (`chore:`, `docs:`, `ci:`, `refactor:`) are parsed but
+  hidden from changelog by default
+- Non-conventional commits are silently ignored (lenient, not strict)
+- Minimum discipline: use `feat:` and `fix:` for user-facing changes
+- Squash-merge PRs and edit the squash message to be conventional - this is
+  the most common workflow
+
+**10.2 Conflict with hatch-vcs:**
+
+`hatch-vcs` and `release-please` are **mutually exclusive** for version
+management:
+
+- `hatch-vcs` derives version dynamically from git tags at build time
+- `release-please` writes version into files (pyproject.toml) and commits
+  the change in the Release PR
+
+**If using release-please:** drop `hatch-vcs`, keep static `version` in
+pyproject.toml, let release-please bump it via its `python` release type.
+Use `importlib.metadata.version("vaultspec-core")` for runtime version access.
+
+**10.3 Integration with `uv publish`:**
+
+```yaml
+name: Release
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: google-github-actions/release-please-action@v4
+        id: release
+        with:
+          release-type: python
+  publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - run: uv build
+      - run: uv publish
+```
+
+**10.4 Configuration files:**
+
+`release-please-config.json`:
+
+```json
+{
+  "release-type": "python",
+  "packages": {
+    ".": {
+      "package-name": "vaultspec-core",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true
+    }
+  }
+}
+```
+
+`.release-please-manifest.json`:
+
+```json
+{
+  ".": "0.1.0"
+}
+```
+
+**10.5 Comparison matrix:**
+
+| Aspect               | release-please            | hatch-vcs + manual tag | git-cliff + manual tag            |
+| -------------------- | ------------------------- | ---------------------- | --------------------------------- |
+| Automation           | Full (PR + tag + release) | None                   | Changelog only                    |
+| Human gate           | Yes (merge PR to release) | No                     | No                                |
+| Changelog            | Auto-generated            | Manual                 | Auto-generated (better templates) |
+| Version source       | Files in repo             | Git tags               | Git tags                          |
+| Setup complexity     | Medium (2 JSON + Action)  | Low                    | Low                               |
+| Conventional commits | Required (but lenient)    | Not needed             | Recommended                       |
+
+**10.6 Recommendation:**
+
+For a project transitioning from no release process, release-please offers
+the best value: automatic changelog, version bumping, and a human review gate
+before anything ships. The main costs are adopting conventional commits
+(lightweight - just `feat:` and `fix:`) and dropping `hatch-vcs` in favor of
+static versioning managed by release-please.
+
+### 11. gaps in current setup
 
 Based on the existing `publish.yml` and \[[2026-03-21-cli-release-readiness-audit]\]:
 
@@ -276,33 +561,75 @@ Based on the existing `publish.yml` and \[[2026-03-21-cli-release-readiness-audi
 
 ## Synthesis and Recommendation
 
-**Phase 1 - Foundation (immediate priority):**
+### Key architectural decision: versioning strategy
 
-- Switch to `hatch-vcs` for dynamic versioning from git tags
-- Extract CI into reusable workflow (`ci-reusable.yml` with `on: workflow_call`)
-- Full multi-stage publish pipeline:
+Two viable paths exist. The ADR must choose one:
+
+**Option A: release-please + static version + `uv publish`**
+
+- release-please owns versioning (bumps `pyproject.toml` via Release PR)
+- Conventional commits required (lightweight - `feat:` and `fix:`)
+- Auto-generated CHANGELOG.md
+- Human review gate before every release
+- Publish triggers on `release_created` output, not tag push
+- No `hatch-vcs` dependency
+
+**Option B: hatch-vcs + manual tagging + `uv publish`**
+
+- Version derived from git tags at build time
+- No commit discipline required
+- No automatic changelog (use GitHub's `generate_release_notes` or `git-cliff`)
+- Developer manually creates tags: `git tag v0.2.0 && git push --tags`
+- Publish triggers on tag push (`v*`)
+- Simpler setup, more manual process
+
+**Recommendation:** Option A (release-please) for a project intending to have
+users and a public release cadence. The PR review gate and auto-changelog
+justify the lightweight conventional commit overhead.
+
+### Phased implementation
+
+**Phase 1 - uv-native release pipeline:**
+
+- Adopt release-please for version management and changelog
+  - `release-please-config.json` + `.release-please-manifest.json`
+  - Static `version` in pyproject.toml (drop `hatch-vcs` plan)
+  - Conventional commits for `feat:` / `fix:` / `feat!:`
+- Extract CI into reusable workflow (`ci-reusable.yml` with
+  `on: workflow_call`)
+- Replace `pypa/gh-action-pypi-publish` with `uv publish`:
   - CI gate (lint + test via reusable workflow, `needs:` dependency)
   - Build step (`uv build`) with artifact upload
-  - Build verification (`uvx twine check dist/*`)
-  - TestPyPI publish (separate `testpypi` environment + trusted publisher)
-  - PyPI publish (existing `pypi` environment, trusted publishing via OIDC)
-  - GitHub Release creation (`softprops/action-gh-release@v2`) with
-    auto-generated notes and dist artifacts attached
-- Enable Sigstore attestations (`attestations: true` in publish action)
-- Create `.github/release.yml` for categorized changelog labels
-- Register trusted publishers on both pypi.org and test.pypi.org
+  - Smoke test pattern (install built wheel + sdist, run smoke test)
+  - PyPI publish via `uv publish` with OIDC trusted publishing
+  - GitHub Release created by release-please on PR merge
+- Register trusted publisher on pypi.org (environment: `pypi`)
+- Create `.github/release.yml` for categorized release note labels
 - Document install methods: `uv tool install vaultspec-core` /
   `pipx install vaultspec-core`
+- Add smoke test script (`tests/smoke_test.py`) following Astral's pattern
 
-**Phase 2 - Standalone binaries:**
+**Phase 2 - Standalone binaries (PyApp):**
 
-- Add PyInstaller/Nuitka matrix build to publish workflow
-- Attach platform binaries to GitHub Releases
+- Add PyApp matrix build to release workflow (requires Rust toolchain in CI)
+- Configure: `PYAPP_UV_ENABLED=true`, `PYAPP_DISTRIBUTION_EMBED=true`,
+  `PYAPP_EXEC_MODULE=vaultspec_core`, `PYAPP_SELF_COMMAND=self`
+- Build targets: linux-x86_64, macos-x86_64, macos-aarch64, windows-x86_64
+- Attach platform binaries to GitHub Releases with checksums
 - Create install script (`curl | sh` pattern)
-- Validate pydantic-core Rust extension bundling
 
 **Phase 3 - Package managers:**
 
 - Create Scoop bucket with manifest pointing to GH Release binaries
 - Create Homebrew tap (Python formula initially, binary formula after Phase 2)
 - Evaluate Chocolatey/winget based on user demand
+
+### Open questions for ADR
+
+- TestPyPI stage: include in Phase 1 or defer? Adds pipeline complexity
+  for a pure-Python package where smoke tests may be sufficient.
+- Attestations: `uv publish` does not generate Sigstore attestations.
+  Use `pypa/gh-action-pypi-publish` alongside `uv publish` for attestation,
+  or skip attestations until uv adds support?
+- Two entry points (`vaultspec-core`, `vaultspec-mcp`): should PyApp Phase 2
+  produce two binaries or unify under a single binary?
