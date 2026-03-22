@@ -4,10 +4,10 @@ Complete command reference for `vaultspec-core`. See the [framework manual](./RE
 
 ## Entry Points
 
-| Command          | Description                                                |
-| ---------------- | ---------------------------------------------------------- |
-| `vaultspec-core` | Workspace management, vault operations, resource sync      |
-| `vaultspec-mcp`  | stdio MCP server (documented in [MCP reference](./MCP.md)) |
+| Command                                   | Description                                                |
+| ----------------------------------------- | ---------------------------------------------------------- |
+| `vaultspec-core`                          | Workspace management, vault operations, resource sync      |
+| `python -m vaultspec_core.mcp_server.app` | stdio MCP server (documented in [MCP reference](./MCP.md)) |
 
 ## Global Options
 

@@ -107,7 +107,7 @@ The `vault` CLI group manages documents in `.vault/` - creating from templates, 
 
 ## MCP Integration
 
-The `vaultspec-mcp` server is an alternative integration path for MCP-capable clients like Claude Code. It exposes vault discovery and document creation over stdio transport without requiring file-based sync. `vaultspec-core install` scaffolds an `.mcp.json` automatically. See the [MCP reference](./MCP.md) for setup and tool documentation.
+The MCP server is an alternative integration path for MCP-capable clients like Claude Code. It exposes vault discovery and document creation over stdio transport without requiring file-based sync. `vaultspec-core install` scaffolds an `.mcp.json` that invokes the server via `uv run python -m vaultspec_core.mcp_server.app` (module invocation avoids binary locking on Windows). See the [MCP reference](./MCP.md) for setup and tool documentation.
 
 ## Related Documentation
 

@@ -16,7 +16,7 @@ mcp = "vaultspec_core.mcp_server.app:main"
 
 [provides]
 content_types = ["rules", "skills", "system", "templates"]
-mcp = ["vaultspec-mcp"]
+mcp = ["vaultspec_core.mcp_server.app"]
 
 [outputs]
 claude_dir = ".claude"

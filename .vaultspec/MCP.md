@@ -11,7 +11,7 @@
   "mcpServers": {
     "vaultspec-core": {
       "command": "uv",
-      "args": ["run", "vaultspec-mcp"]
+      "args": ["run", "python", "-m", "vaultspec_core.mcp_server.app"]
     }
   }
 }
@@ -19,17 +19,7 @@
 
 The server resolves its workspace from the current working directory by default. IDE-integrated MCP clients (Claude Code, Cursor) set the working directory to the project root, so this works without additional configuration.
 
-If `vaultspec-mcp` is on `PATH`, replace the `uv run` invocation with a direct command:
-
-```json
-{
-  "mcpServers": {
-    "vaultspec-core": {
-      "command": "vaultspec-mcp"
-    }
-  }
-}
-```
+This invocation uses module-based execution (`python -m`) rather than the `vaultspec-mcp` console script entry point. On Windows, MCP clients lock the `.exe` binary in `.venv/Scripts/`, which blocks `uv sync` and other package operations. Module invocation avoids this entirely.
 
 For standalone setups where the working directory isn't the workspace, set `VAULTSPEC_TARGET_DIR` to an absolute path:
 
@@ -37,7 +27,8 @@ For standalone setups where the working directory isn't the workspace, set `VAUL
 {
   "mcpServers": {
     "vaultspec-core": {
-      "command": "vaultspec-mcp",
+      "command": "uv",
+      "args": ["run", "python", "-m", "vaultspec_core.mcp_server.app"],
       "env": {
         "VAULTSPEC_TARGET_DIR": "/path/to/workspace"
       }
