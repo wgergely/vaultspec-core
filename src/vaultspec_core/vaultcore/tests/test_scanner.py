@@ -5,12 +5,15 @@ Covers :func:`~vaultspec_core.vaultcore.scanner.scan_vault` (file discovery,
 (directory-based classification) against the bundled test-project fixture.
 """
 
-import pytest
+from pathlib import Path
 
-from tests.constants import TEST_PROJECT
+import pytest
 
 from ...config import reset_config
 from .. import DocType, get_doc_type, scan_vault
+
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+TEST_PROJECT = _REPO_ROOT / "test-project"
 
 pytestmark = [pytest.mark.unit]
 

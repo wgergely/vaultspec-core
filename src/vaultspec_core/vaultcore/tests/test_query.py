@@ -1,8 +1,8 @@
 """Tests for vault query engine."""
 
-import pytest
+from pathlib import Path
 
-from tests.constants import TEST_PROJECT
+import pytest
 
 from ...config import reset_config
 from ..query import (
@@ -11,6 +11,9 @@ from ..query import (
     list_documents,
     list_feature_details,
 )
+
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+TEST_PROJECT = _REPO_ROOT / "test-project"
 
 pytestmark = [pytest.mark.unit]
 

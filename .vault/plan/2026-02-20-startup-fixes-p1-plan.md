@@ -7,6 +7,7 @@ related:
   - '[[2026-02-20-containerization-research]]'
   - '[[2026-02-12-rag-mcp-api-adr]]'
   - '[[2026-02-12-rag-embeddings-adr]]'
+  - '[[2026-02-20-startup-fixes-adr]]'
 ---
 
 # `startup-fixes` `p1` plan

@@ -8,7 +8,7 @@ date: 2026-03-21
 # CLI Grounding Research: Contract vs Implementation
 
 Date: 2026-03-16
-Reference: [cli-contract.md](cli-contract.md)
+Reference: [cli-contract.md](2026-03-21-cli-contract.md)
 
 This document maps every drift, gap, and redundancy between the binding contract and the current implementation across both the Python CLI and the justfile.
 

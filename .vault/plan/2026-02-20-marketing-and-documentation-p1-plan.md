@@ -5,6 +5,7 @@ tags:
 date: '2026-02-20'
 related:
   - '[[2026-02-20-marketing-and-documentation-research]]'
+  - '[[2026-02-20-marketing-and-documentation-adr]]'
 ---
 
 # `marketing-and-documentation` `phase1` plan
