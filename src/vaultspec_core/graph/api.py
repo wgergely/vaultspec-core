@@ -350,11 +350,12 @@ class VaultGraph:
         # Pass 2: extract links -> edges
         for name, node in self.nodes.items():
             try:
-                content = node.path.read_text(encoding="utf-8")
-                metadata, body = parse_vault_metadata(content)
-
-                links = extract_wiki_links(body)
-                links.update(extract_related_links(metadata.related))
+                links = extract_wiki_links(node.body)
+                links.update(
+                    extract_related_links(
+                        node.frontmatter.get("related", []),
+                    ),
+                )
 
                 resolved_targets: set[str] = set()
                 for target in links:
@@ -531,15 +532,33 @@ class VaultGraph:
         )[:limit]
 
     def get_orphaned(self) -> list[str]:
-        """Return document names with no incoming links.
+        """Return document names that are truly isolated from the graph.
+
+        A node is orphaned only when it has **no connections at all** --
+        no incoming links, no outgoing links, and no sibling documents
+        sharing the same feature tag.  Documents that link out to a plan
+        or ADR (common for exec records) are connected and therefore not
+        orphans.
 
         Returns:
-            Sorted list of orphan names (excludes ``readme``).
+            Sorted list of genuinely isolated node names
+            (excludes ``readme``).
         """
+        # Pre-compute which features have more than one document.
+        # A node sharing a feature tag with at least one other node is
+        # implicitly connected through that feature cluster.
+        feature_sizes: dict[str, int] = {}
+        for node in self.nodes.values():
+            if node.feature:
+                feature_sizes[node.feature] = feature_sizes.get(node.feature, 0) + 1
+
         return sorted(
             name
             for name, node in self.nodes.items()
-            if not node.in_links and name.lower() != "readme"
+            if name.lower() != "readme"
+            and not node.in_links
+            and not node.out_links
+            and (not node.feature or feature_sizes.get(node.feature, 0) <= 1)
         )
 
     def get_invalid_links(self) -> list[tuple[str, str]]:
@@ -690,9 +709,7 @@ class VaultGraph:
             total_words += node.word_count
 
         # --- networkx orphan / invalid ---
-        orphan_count = sum(
-            1 for n in nodes.values() if not n.in_links and n.name.lower() != "readme"
-        )
+        orphan_count = len(self.get_orphaned())
         invalid_count = sum(1 for src, _tgt in self._invalid_links if src in nodes)
 
         # --- networkx connected components ---

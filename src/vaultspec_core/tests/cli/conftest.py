@@ -111,19 +111,36 @@ def _isolate_state():
     """
     from vaultspec_core.cli._target import reset as reset_target
     from vaultspec_core.console import reset_console
+    from vaultspec_core.core.types import _workspace_ctx
 
-    # Snapshot current context.
+    # Snapshot current context via token so we can restore to the exact
+    # prior state - including "unset" when no context existed.
     try:
-        saved_ctx = _t.get_context()
+        current = _workspace_ctx.get()
+        token = _workspace_ctx.set(current)  # identity set to obtain token
     except LookupError:
-        saved_ctx = None
+        # No context set - set a throwaway value to get a resettable token
+        # whose reset() will restore the "no value" state.
+        _sentinel = Path(".")
+        token = _workspace_ctx.set(
+            _t.WorkspaceContext(
+                root_dir=_sentinel,
+                target_dir=_sentinel,
+                rules_src_dir=_sentinel,
+                skills_src_dir=_sentinel,
+                agents_src_dir=_sentinel,
+                system_src_dir=_sentinel,
+                templates_dir=_sentinel,
+                hooks_dir=_sentinel,
+            )
+        )
+
     reset_console()
     reset_target()
 
     yield
 
-    # Restore original context.
-    if saved_ctx is not None:
-        _t.set_context(saved_ctx)
+    # Restore original context (including "unset" if that was the prior state).
+    _workspace_ctx.reset(token)
     reset_console()
     reset_target()

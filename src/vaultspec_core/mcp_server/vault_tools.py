@@ -11,6 +11,7 @@ before serving the MCP endpoint.
 
 from __future__ import annotations
 
+import contextvars
 import datetime
 import functools
 import logging
@@ -36,21 +37,19 @@ __all__ = ["register_tools"]
 def _isolated_context(
     fn: Callable[..., Coroutine[Any, Any, Any]],
 ) -> Callable[..., Coroutine[Any, Any, Any]]:
-    """Wrap an async tool handler so it snapshots the workspace context.
+    """Wrap an async tool handler so it runs in a copied context.
 
-    Each invocation captures the current :class:`WorkspaceContext` and
-    restores it after completion, preventing mutations from leaking
-    between concurrent MCP requests.
+    Each invocation snapshots all :mod:`contextvars` state via
+    :func:`contextvars.copy_context` and invokes the handler inside that
+    snapshot.  This prevents mutations from leaking between concurrent
+    MCP requests without the race-prone manual save/restore pattern.
     """
-    from ..core.types import get_context, set_context
 
     @functools.wraps(fn)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        snapshot = get_context()
-        try:
-            return await fn(*args, **kwargs)
-        finally:
-            set_context(snapshot)
+        ctx_copy = contextvars.copy_context()
+        coro = ctx_copy.run(fn, *args, **kwargs)
+        return await coro
 
     return wrapper
 
