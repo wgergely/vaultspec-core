@@ -48,6 +48,8 @@ and release-please details.
   - Create `.github/workflows/release-please.yml`
   - Trigger: `on: push: branches: [main]`
   - Permissions: `contents: write`, `pull-requests: write`
+  - Concurrency: `group: release-please` (no `cancel-in-progress` -
+    serialize runs)
   - Single job running `google-github-actions/release-please-action@v4`
     with `config-file: release-please-config.json` and
     `manifest-file: .release-please-manifest.json` (no inline
@@ -58,16 +60,23 @@ and release-please details.
 
   - Replace `.github/workflows/publish.yml`
   - Trigger: `on: release: types: [published]`
+  - Concurrency: `group: publish` (no `cancel-in-progress` - serialize
+    publishes)
   - Three jobs chained via `needs:`:
-    - **build**: checkout, `astral-sh/setup-uv`, `uv build`, upload
+    - **build**: checkout, `astral-sh/setup-uv@v7`, `uv build`, upload
       `dist/` via `actions/upload-artifact@v4`
     - **smoke-test**: checkout repo (for `tests/smoke_test.py`),
-      `astral-sh/setup-uv`, download dist artifacts, install wheel in
+      `astral-sh/setup-uv@v7`, download dist artifacts, install wheel in
       isolated env (`uv run --isolated --no-project --with dist/*.whl`),
       install sdist similarly, run `tests/smoke_test.py` against each
     - **publish-pypi**: download artifacts, `uv publish` with
-      `permissions: id-token: write` and `environment: name: pypi`
+      job-level `permissions: { id-token: write, contents: read }`
+      (job-level replaces top-level, so both must be explicit) and
+      `environment: name: pypi`
   - Top-level `permissions: contents: read`
+  - Pin all actions to same versions as ci.yml (`actions/checkout@v4`,
+    `astral-sh/setup-uv@v7`, `actions/upload-artifact@v4`,
+    `actions/download-artifact@v4`)
 
 - **Task 4: smoke test script**
 
@@ -76,19 +85,27 @@ and release-please details.
   - Test 2: `importlib.metadata.version("vaultspec-core")` returns a
     non-empty string
   - Test 3: `vaultspec_core.mcp_server.app.create_server()` returns a
-    `FastMCP` instance
+    `FastMCP` instance (wrap in try/except with clear error - import-time
+    side effects from `register_vault_tools` may fail in bare CI env)
   - Test 4: subprocess `vaultspec-core --version` exits 0
   - Test 5: subprocess `vaultspec-core --help` exits 0 and output contains
     expected command names
   - Script exits non-zero on any failure (used as CI gate)
 
-- **Task 5: actionlint validation**
+- **Task 5: `.github/release.yml` for release note categories**
+
+  - Add `.github/release.yml` with label-based changelog categories
+    (Breaking Changes, Features, Bug Fixes, Maintenance)
+  - Supplementary to release-please's CHANGELOG.md - provides
+    categorization for manual GitHub Release note generation
+
+- **Task 6: actionlint validation**
 
   - Run `actionlint` against all workflow files to catch syntax errors
     before push
   - Verify the new workflows pass the existing `workflow-lint` CI job
 
-- **Task 6: commit, push, verify**
+- **Task 7: commit, push, verify**
 
   - Commit all new and modified files with a conventional commit message
     (`feat: add release pipeline with release-please and uv publish`)
@@ -96,12 +113,23 @@ and release-please details.
   - Verify CI passes on the PR (lint, type, tests, vault audit, workflow
     lint, dep audit)
 
+- **Task 8: document manual prerequisites (post-merge)**
+
+  - PyPI trusted publisher: register on pypi.org with owner=`wgergely`,
+    repo=`vaultspec-core`, workflow=`publish.yml`, environment=`pypi`
+  - GitHub `pypi` environment: create in repo Settings > Environments with:
+    - Required reviewers (at least 1)
+    - Deployment branch restriction to `main` only
+  - GitHub branch protection on `main`: required status checks must include
+    CI jobs (prerequisite for the three-workflow security model)
+
 ## Parallelization
 
-Tasks 1-2 (release-please config + workflow) and Task 4 (smoke test) are
-independent and can be implemented in parallel. Task 3 (publish workflow)
-depends on Task 4 (references the smoke test script). Tasks 5-6 are
-sequential and run after all others.
+Tasks 1-2 (release-please config + workflow), Task 4 (smoke test), and
+Task 5 (release.yml) are independent and can be implemented in parallel.
+Task 3 (publish workflow) depends on Task 4 (references the smoke test
+script). Tasks 6-7 are sequential and run after all others. Task 8 is
+post-merge manual work.
 
 ## Verification
 
