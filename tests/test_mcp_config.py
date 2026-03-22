@@ -29,11 +29,11 @@ class TestMcpConfig:
         server = data["mcpServers"]["vaultspec-core"]
         assert server["command"] == "uv"
 
-    def test_args_include_run(self):
+    def test_args_use_module_invocation(self):
         data = json.loads((PROJECT_ROOT / ".mcp.json").read_text())
         server = data["mcpServers"]["vaultspec-core"]
-        assert "run" in server["args"]
-        assert "vaultspec-mcp" in server["args"]
+        expected = ["run", "python", "-m", "vaultspec_core.mcp_server.app"]
+        assert server["args"] == expected
 
     def test_no_hardcoded_env(self):
         data = json.loads((PROJECT_ROOT / ".mcp.json").read_text())

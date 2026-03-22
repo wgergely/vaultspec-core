@@ -31,7 +31,8 @@ def test_init_run_scaffolds_antigravity_workspace_layout() -> None:
         mcp_config = json.loads((tmp_path / ".mcp.json").read_text(encoding="utf-8"))
         server = mcp_config["mcpServers"]["vaultspec-core"]
         assert server["command"] == "uv"
-        assert server["args"] == ["run", "vaultspec-mcp"]
+        expected = ["run", "python", "-m", "vaultspec_core.mcp_server.app"]
+        assert server["args"] == expected
     finally:
         reset_config()
         shutil.rmtree(tmp_path, ignore_errors=True)

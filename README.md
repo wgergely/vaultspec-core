@@ -28,7 +28,7 @@ vaultspec-core structures AI-assisted development into a repeatable pipeline cen
 Two entry points ship with the framework:
 
 - **`vaultspec-core`** is the CLI that manages your workspace - installing, syncing, and validating framework resources. See the [CLI reference](./.vaultspec/CLI.md) for the full command surface.
-- **`vaultspec-mcp`** is an [MCP](https://modelcontextprotocol.io/) server that exposes vault discovery and document creation to MCP-capable clients like Claude Code. See the [MCP reference](./.vaultspec/MCP.md) for setup and tool documentation.
+- **MCP server** exposes vault discovery and document creation to MCP-capable clients like Claude Code. Invoked via `uv run python -m vaultspec_core.mcp_server.app` (a `vaultspec-mcp` console script is also installed but module invocation is preferred to avoid binary locking on Windows). See the [MCP reference](./.vaultspec/MCP.md) for setup and tool documentation.
 
 The [framework manual](./.vaultspec/README.md) walks through the development workflow and explains how to customize rules, skills, agents, and system prompts.
 

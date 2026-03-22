@@ -177,7 +177,12 @@ def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[tuple[str
             "mcpServers": {
                 "vaultspec-core": {
                     "command": "uv",
-                    "args": ["run", "vaultspec-mcp"],
+                    "args": [
+                        "run",
+                        "python",
+                        "-m",
+                        "vaultspec_core.mcp_server.app",
+                    ],
                 }
             }
         }
