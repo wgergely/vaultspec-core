@@ -407,6 +407,7 @@ def _print_metrics(
         n, c = m.max_out_degree
         table.add_row("Max out-degree", f"{c}  ({n})")
     table.add_row("Orphans", str(m.orphan_count))
+    table.add_row("Phantoms", str(m.phantom_count))
     table.add_row("Invalid links", str(m.invalid_link_count))
     table.add_row("Components", str(m.connected_components))
 

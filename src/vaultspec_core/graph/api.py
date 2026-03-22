@@ -899,7 +899,12 @@ class VaultGraph:
 
                 for target in sorted(node.out_links):
                     target_node = self.nodes.get(target)
-                    if target_node:
+                    if target_node and target_node.phantom:
+                        node_branch.add(
+                            f"[dim]-> {target}[/dim]  "
+                            f"[yellow italic](not created)[/yellow italic]"
+                        )
+                    elif target_node:
                         dt_val = (
                             target_node.doc_type.value if target_node.doc_type else "?"
                         )
