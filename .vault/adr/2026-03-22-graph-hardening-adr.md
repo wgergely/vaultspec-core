@@ -14,7 +14,7 @@ related:
 The vault graph silently drops 151 edges to non-existent targets. No checker
 reports dangling wiki-links. Obsidian shows them as "not created" nodes -
 the CLI shows `links: clean`. A healthy vault must have **zero dangling
-links** - every `wiki-link` must resolve to a real document.
+links** - every `[[wiki-link]]` must resolve to a real document.
 
 ## Considerations
 

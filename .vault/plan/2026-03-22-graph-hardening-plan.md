@@ -94,7 +94,7 @@ Per \[[2026-03-22-graph-hardening-adr]\] decisions 1-6:
   1. The checker iterates `graph.get_invalid_links()`. For each
      `(source, target)` pair, emit an ERROR-severity `CheckDiagnostic`
      with the source document path and the unresolved target name.
-  1. With `--fix`, remove the dangling `target` entry from the source
+  1. With `--fix`, remove the dangling `[[target]]` entry from the source
      document's `related:` frontmatter field. Do not remove body-text
      wiki-links (too risky - body links may be intentional prose
      references).
