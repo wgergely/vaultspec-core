@@ -9,14 +9,13 @@
 
 ______________________________________________________________________
 
-## A research and decision driven framework for your coding agents - with a paper trail.
+## A research and decision driven framework for your coding agents - with a paper trail
 
 Vaultspec is a spec-driven development rulebook for your AI coders. It enforces a structured pipeline around AI-assisted development - research, decide, plan, execute, review - and provides tools to manage the document storage.
 
 Each stage produces durable markdown artifacts in your repository that allow collaborating agents to share context and you to track development progress.
 
 ______________________________________________________________________
-
 
 ## How it works
 
