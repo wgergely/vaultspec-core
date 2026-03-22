@@ -65,7 +65,7 @@ class DocNode:
     metadata so that consumers never need to re-read the filesystem.
 
     Attributes:
-        path: Filesystem path to the document file.
+        path: Filesystem path to the document file, or ``None`` for phantoms.
         name: Document stem (filename without extension), used as graph key.
         doc_type: Categorised document type from vault folder location.
         feature: Feature tag (without ``#`` prefix), or ``None``.
@@ -77,9 +77,11 @@ class DocNode:
         word_count: Approximate word count of the body.
         out_links: Names of documents this document links to.
         in_links: Names of documents that link to this document.
+        phantom: ``True`` for unresolved wiki-link targets that have no
+            backing file.  Mirrors Obsidian's "not created" node concept.
     """
 
-    path: pathlib.Path
+    path: pathlib.Path | None
     name: str
     doc_type: DocType | None = None
     feature: str | None = None
@@ -91,6 +93,7 @@ class DocNode:
     word_count: int = 0
     out_links: set[str] = field(default_factory=set)
     in_links: set[str] = field(default_factory=set)
+    phantom: bool = False
 
     def to_nx_attrs(self) -> dict[str, Any]:
         """Return a networkx-compatible node attribute dict.
@@ -105,7 +108,7 @@ class DocNode:
         """
         return {
             "name": self.name,
-            "path": str(self.path),
+            "path": str(self.path) if self.path else None,
             "doc_type": (self.doc_type.value if self.doc_type else None),
             "feature": self.feature,
             "date": self.date,
@@ -115,6 +118,7 @@ class DocNode:
             "word_count": self.word_count,
             "out_links": sorted(self.out_links),
             "in_links": sorted(self.in_links),
+            "phantom": self.phantom,
         }
 
 
@@ -347,8 +351,13 @@ class VaultGraph:
             sum(1 for v in self._stem_index.values() if len(v) > 1),
         )
 
-        # Pass 2: extract links -> edges
-        for name, node in self.nodes.items():
+        # Pass 2: extract links -> edges.  Unresolved targets become
+        # phantom nodes so the graph mirrors Obsidian's "not created"
+        # link model.  Iterate over a snapshot of the real-node keys
+        # because the dict grows as phantoms are added.
+        real_node_keys = list(self.nodes.keys())
+        for name in real_node_keys:
+            node = self.nodes[name]
             try:
                 links = extract_wiki_links(node.body)
                 links.update(
@@ -368,7 +377,24 @@ class VaultGraph:
                     if target_key in self.nodes:
                         self.nodes[target_key].in_links.add(name)
                         self._digraph.add_edge(name, target_key)
+                        if self.nodes[target_key].phantom:
+                            self._invalid_links.append(
+                                (name, target_key),
+                            )
                     else:
+                        # Create a phantom node (deduplicated).
+                        phantom = DocNode(
+                            path=None,
+                            name=target_key,
+                            phantom=True,
+                        )
+                        self.nodes[target_key] = phantom
+                        self._digraph.add_node(
+                            target_key,
+                            **phantom.to_nx_attrs(),
+                        )
+                        phantom.in_links.add(name)
+                        self._digraph.add_edge(name, target_key)
                         self._invalid_links.append(
                             (name, target_key),
                         )
@@ -555,7 +581,8 @@ class VaultGraph:
         return sorted(
             name
             for name, node in self.nodes.items()
-            if name.lower() != "readme"
+            if not node.phantom
+            and name.lower() != "readme"
             and not node.in_links
             and not node.out_links
             and (not node.feature or feature_sizes.get(node.feature, 0) <= 1)
@@ -609,6 +636,8 @@ class VaultGraph:
 
         snapshot: VaultSnapshot = {}
         for node in self.nodes.values():
+            if node.phantom or node.path is None:
+                continue
             raw_related = node.frontmatter.get("related", [])
             if not isinstance(raw_related, list):
                 raw_related = []
@@ -799,7 +828,7 @@ class VaultGraph:
             )
             self._add_typed_nodes(feat_branch, feat_nodes)
 
-        untagged = [n for n in self.nodes.values() if not n.feature]
+        untagged = [n for n in self.nodes.values() if not n.feature and not n.phantom]
         if untagged:
             branch = root.add(
                 "[bold yellow](untagged)[/bold yellow]"

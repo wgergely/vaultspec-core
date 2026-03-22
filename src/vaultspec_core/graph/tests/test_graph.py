@@ -118,7 +118,8 @@ class TestVaultGraphBuilding:
 
         file_count = sum(1 for _ in scan_vault(vault_root))
         graph = VaultGraph(vault_root)
-        assert len(graph.nodes) == file_count
+        real_count = sum(1 for n in graph.nodes.values() if not n.phantom)
+        assert real_count == file_count
 
     def test_colliding_stems_get_qualified_keys(self, vault_root):
         graph = VaultGraph(vault_root)

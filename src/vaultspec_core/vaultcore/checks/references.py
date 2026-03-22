@@ -240,7 +240,7 @@ def check_schema(
                 ).append(_node)
 
     for _name, node in sorted(graph.nodes.items()):
-        if not node.doc_type:
+        if not node.doc_type or node.path is None:
             continue
 
         # Apply filters
