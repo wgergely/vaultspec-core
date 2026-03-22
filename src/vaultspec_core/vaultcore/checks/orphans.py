@@ -1,4 +1,4 @@
-"""Check for orphaned vault documents with no incoming wiki-links."""
+"""Check for truly isolated vault documents with no graph connections."""
 
 from __future__ import annotations
 
@@ -21,12 +21,15 @@ def check_orphans(
     graph: VaultGraph,
     feature: str | None = None,
 ) -> CheckResult:
-    """Find documents with no incoming wiki-links.
+    """Find documents that are completely isolated from the vault graph.
 
-    Delegates orphan detection to
-    :meth:`~vaultspec_core.graph.VaultGraph.get_orphaned`. Unreachable
-    documents are flagged as WARNING-severity diagnostics; each diagnostic
-    includes outgoing link targets as a suggested starting point.
+    A document is orphaned only when it has no incoming links, no outgoing
+    links, and no sibling documents sharing the same feature tag.  Exec
+    records and summaries that link out to their parent plan are connected
+    and therefore not orphans.
+
+    Delegates detection to
+    :meth:`~vaultspec_core.graph.VaultGraph.get_orphaned`.
 
     Args:
         root_dir: Project root directory.
@@ -53,16 +56,13 @@ def check_orphans(
         doc_type_str = node.doc_type.value if node.doc_type else "unknown"
         rel_path = node.path.relative_to(root_dir)
 
-        suggestion = ""
-        if node.out_links:
-            suggestion = f"Links out to: {', '.join(sorted(node.out_links)[:3])}"
-
         result.diagnostics.append(
             CheckDiagnostic(
                 path=rel_path,
-                message=f"Orphaned {doc_type_str} document  - no incoming links",
+                message=(
+                    f"Isolated {doc_type_str} document - no links or feature siblings"
+                ),
                 severity=Severity.WARNING,
-                fix_description=suggestion or None,
             )
         )
 

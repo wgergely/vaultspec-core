@@ -138,7 +138,7 @@ class GraphMetrics:
         max_out_degree: Highest outgoing edge count (with node name).
         in_degree_centrality: ``nx.in_degree_centrality`` scores.
         betweenness_centrality: ``nx.betweenness_centrality`` scores.
-        orphan_count: Nodes with zero incoming edges.
+        orphan_count: Truly isolated nodes (no links and no feature siblings).
         invalid_link_count: Edges pointing to non-existent targets.
         connected_components: Weakly connected components via networkx.
         nodes_by_type: Document count per ``DocType``.
