@@ -142,8 +142,9 @@ class GraphMetrics:
         max_out_degree: Highest outgoing edge count (with node name).
         in_degree_centrality: ``nx.in_degree_centrality`` scores.
         betweenness_centrality: ``nx.betweenness_centrality`` scores.
+        phantom_count: Number of phantom (unresolved) nodes in the graph.
         orphan_count: Truly isolated nodes (no links and no feature siblings).
-        invalid_link_count: Edges pointing to non-existent targets.
+        invalid_link_count: Edges pointing to phantom (unresolved) targets.
         connected_components: Weakly connected components via networkx.
         nodes_by_type: Document count per ``DocType``.
         nodes_by_feature: Document count per feature tag.
@@ -164,6 +165,7 @@ class GraphMetrics:
     betweenness_centrality: dict[str, float] = field(
         default_factory=dict,
     )
+    phantom_count: int = 0
     orphan_count: int = 0
     invalid_link_count: int = 0
     connected_components: int = 0
@@ -516,7 +518,7 @@ class VaultGraph:
         Returns:
             ``(name, in_link_count)`` tuples sorted descending.
         """
-        filtered = list(self.nodes.values())
+        filtered = [n for n in self.nodes.values() if not n.phantom]
 
         if doc_type:
             filtered = [n for n in filtered if n.doc_type == doc_type]
@@ -546,6 +548,8 @@ class VaultGraph:
         """
         scores: dict[str, int] = {}
         for node in self.nodes.values():
+            if node.phantom:
+                continue
             score = len(node.in_links)
             for tag in node.tags:
                 if not DocType.from_tag(tag):
@@ -607,7 +611,7 @@ class VaultGraph:
             List of :class:`DocNode` instances sorted by ``(date, name)``.
         """
         tag = f"#{feature}" if not feature.startswith("#") else feature
-        nodes = [n for n in self.nodes.values() if tag in n.tags]
+        nodes = [n for n in self.nodes.values() if not n.phantom and tag in n.tags]
         return sorted(
             nodes,
             key=lambda n: (n.date or "", n.name),
@@ -617,7 +621,7 @@ class VaultGraph:
         """Return a sorted list of all feature names in the graph."""
         features: set[str] = set()
         for node in self.nodes.values():
-            if node.feature:
+            if not node.phantom and node.feature:
                 features.add(node.feature)
         return sorted(features)
 
@@ -704,12 +708,20 @@ class VaultGraph:
         n_nodes = g.number_of_nodes()
         n_edges = g.number_of_edges()
 
-        # --- networkx degree analysis ---
+        # --- networkx degree analysis (exclude phantoms) ---
         max_in: tuple[str, int] = ("", 0)
         max_out: tuple[str, int] = ("", 0)
         if n_nodes:
-            in_degs = dict(g.in_degree())
-            out_degs = dict(g.out_degree())
+            in_degs = {
+                k: v
+                for k, v in g.in_degree()
+                if k not in self.nodes or not self.nodes[k].phantom
+            }
+            out_degs = {
+                k: v
+                for k, v in g.out_degree()
+                if k not in self.nodes or not self.nodes[k].phantom
+            }
             if in_degs:
                 top = max(in_degs, key=lambda k: in_degs[k])
                 max_in = (top, in_degs[top])
@@ -724,12 +736,16 @@ class VaultGraph:
             in_cent = _top_n(nx.in_degree_centrality(g))
             btwn_cent = _top_n(nx.betweenness_centrality(g))
 
-        # --- feature / type counts ---
+        # --- feature / type counts (excludes phantoms) ---
         features: set[str] = set()
         by_type: dict[str, int] = {}
         by_feature: dict[str, int] = {}
         total_words = 0
+        phantom_count = 0
         for node in nodes.values():
+            if node.phantom:
+                phantom_count += 1
+                continue
             if node.feature:
                 features.add(node.feature)
                 by_feature[node.feature] = by_feature.get(node.feature, 0) + 1
@@ -739,7 +755,11 @@ class VaultGraph:
 
         # --- networkx orphan / invalid ---
         orphan_count = len(self.get_orphaned())
-        invalid_count = sum(1 for src, _tgt in self._invalid_links if src in nodes)
+        invalid_count = sum(
+            1
+            for src, tgt in self._invalid_links
+            if src in nodes and tgt in self.nodes and self.nodes[tgt].phantom
+        )
 
         # --- networkx connected components ---
         try:
@@ -748,7 +768,7 @@ class VaultGraph:
             components = 0
 
         return GraphMetrics(
-            total_nodes=n_nodes,
+            total_nodes=n_nodes - phantom_count,
             total_edges=n_edges,
             total_features=len(features),
             total_words=total_words,
@@ -759,6 +779,7 @@ class VaultGraph:
             max_out_degree=max_out,
             in_degree_centrality=in_cent,
             betweenness_centrality=btwn_cent,
+            phantom_count=phantom_count,
             orphan_count=orphan_count,
             invalid_link_count=invalid_count,
             connected_components=components,
