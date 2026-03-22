@@ -22,7 +22,7 @@ ERROR-severity diagnostics and wired it into the check suite and CLI.
     ERROR diagnostic per `(source, target)` pair.
   - Feature filter: skips sources that lack the requested feature tag.
   - `--fix` support: `_remove_related_entries()` parses the YAML frontmatter
-    and removes `target` lines from the `related:` list block only.
+    and removes `[[target]]` lines from the `related:` list block only.
     Body wiki-links are left untouched.
   - `supports_fix=True`, check name `"dangling"`.
 
