@@ -59,7 +59,9 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
-.ruff_cache/
+.pytest*/
+.ruff*/
+.uv*/
 cover/
 test-events.jsonl
 
@@ -165,9 +167,11 @@ cython_debug/
 
 # Claude Code
 .claude/
+CLAUDE.md
 
 # Gemini CLI
 .gemini/
+GEMINI.md
 
 # Antigravity
 .agent/
