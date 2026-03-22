@@ -511,6 +511,32 @@ def cmd_check_all(
         raise typer.Exit(code=1)
 
 
+@check_app.command("dangling")
+def cmd_check_dangling(
+    fix: Annotated[
+        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+    ] = False,
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    target: TargetOption = None,
+) -> None:
+    """Find wiki-links in related: frontmatter that resolve to no document."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
+    from vaultspec_core.vaultcore.checks import check_dangling
+
+    graph = VaultGraph(_get_ctx().target_dir)
+    result = check_dangling(
+        _get_ctx().target_dir, graph=graph, feature=feature, fix=fix
+    )
+    _render_and_exit(result, verbose)
+
+
 @check_app.command("orphans")
 def cmd_check_orphans(
     fix: Annotated[
