@@ -566,7 +566,7 @@ def uninstall_run(
     import shutil
 
     from .guards import guard_dev_repo
-    from .manifest import providers_sharing_dir, remove_provider
+    from .manifest import providers_sharing_dir, providers_sharing_file, remove_provider
 
     guard_dev_repo(path)
 
@@ -601,7 +601,18 @@ def uninstall_run(
 
     removed: list[tuple[str, str]] = []  # (path, label)
 
-    # Map directory names → component owner (for skip filtering)
+    # Map directory names → component owners (for skip filtering).
+    # .agents/ is shared by antigravity, gemini, and codex (all place
+    # skills there via init_paths), so it must be preserved when any of
+    # its owners is skipped.
+    _dir_owners: dict[str, list[str]] = {
+        ".vaultspec": ["core"],
+        ".vault": ["vault"],
+        ".claude": ["claude"],
+        ".gemini": ["gemini"],
+        ".agents": ["antigravity", "gemini", "codex"],
+        ".codex": ["codex"],
+    }
     dir_labels: dict[str, str] = {
         ".vaultspec": "core",
         ".vault": "vault",
@@ -643,10 +654,13 @@ def uninstall_run(
         ]
 
         for d in managed_dirs:
-            owner = dir_labels.get(d.name, "")
-            if owner in skip:
-                logger.info("Skipping %s (--skip %s)", d.name, owner)
+            owners = _dir_owners.get(d.name, [])
+            # Preserve directory if any of its owners is in the skip set
+            if owners and any(o in skip for o in owners):
+                skipped = [o for o in owners if o in skip]
+                logger.info("Skipping %s (--skip %s)", d.name, ", ".join(skipped))
                 continue
+            owner = dir_labels.get(d.name, "")
             if d.exists():
                 if not dry_run:
                     shutil.rmtree(d)
@@ -688,6 +702,15 @@ def uninstall_run(
 
             for f in files:
                 if not f.exists():
+                    continue
+                # Check if another installed provider still needs this file
+                sharing = providers_sharing_file(path, f, exclude=effective_provider)
+                if sharing:
+                    logger.info(
+                        "Preserving %s (still used by: %s)",
+                        f.relative_to(path),
+                        ", ".join(sorted(sharing)),
+                    )
                     continue
                 if not dry_run:
                     f.unlink()

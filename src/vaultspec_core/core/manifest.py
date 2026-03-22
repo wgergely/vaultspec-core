@@ -93,6 +93,35 @@ def remove_provider(target: Path, name: str) -> set[str]:
     return current
 
 
+def providers_sharing_file(
+    target: Path, filepath: Path, exclude: str | None = None
+) -> set[str]:
+    """Return installed providers whose config files overlap with *filepath*.
+
+    Checks each installed provider's ``ToolConfig`` to see if any of its
+    config files match *filepath*.  The *exclude* provider (typically the
+    one being uninstalled) is omitted from the result.
+    """
+    from . import types as _t
+
+    installed = read_manifest(target)
+    if exclude:
+        installed.discard(exclude)
+
+    sharing: set[str] = set()
+    for tool in Tool:
+        if tool.value not in installed:
+            continue
+        cfg = _t.get_context().tool_configs.get(tool)
+        if cfg is None:
+            continue
+        for f in (cfg.config_file, cfg.rule_ref_config_file, cfg.native_config_file):
+            if f is not None and f == filepath:
+                sharing.add(tool.value)
+                break
+    return sharing
+
+
 def providers_sharing_dir(
     target: Path, directory: Path, exclude: str | None = None
 ) -> set[str]:

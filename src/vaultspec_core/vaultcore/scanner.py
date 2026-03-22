@@ -46,9 +46,9 @@ def scan_vault(root_dir: pathlib.Path) -> Iterator[pathlib.Path]:
 
     file_count = 0
     for path in docs_dir.rglob("*.md"):
-        # Skip internal config
-        if ".obsidian" in path.parts:
-            logger.debug("Skipping .obsidian file: %s", path)
+        # Skip internal config and archived documents
+        if ".obsidian" in path.parts or "_archive" in path.parts:
+            logger.debug("Skipping excluded path: %s", path)
             continue
         file_count += 1
         yield path
