@@ -34,10 +34,12 @@ and release-please details.
 
 - **Task 1: release-please configuration**
 
-  - Add `release-please-config.json` at repo root with `release-type: python`,
-    `package-name: vaultspec-core`, `bump-minor-pre-major: true`,
-    `bump-patch-for-minor-pre-major: true`, and changelog section mappings
-    for `feat`, `fix`, `perf`, `deps`
+  - Add `release-please-config.json` at repo root using manifest mode
+    (config files are the single source of truth - no inline `release-type`
+    input in the workflow). Settings inside `packages.".":`:
+    `release-type: python`, `package-name: vaultspec-core`,
+    `bump-minor-pre-major: true`, `bump-patch-for-minor-pre-major: true`,
+    and `changelog-sections` mappings for `feat`, `fix`, `perf`
   - Add `.release-please-manifest.json` at repo root with `{ ".": "0.1.0" }`
     to seed the current version
 
@@ -47,7 +49,9 @@ and release-please details.
   - Trigger: `on: push: branches: [main]`
   - Permissions: `contents: write`, `pull-requests: write`
   - Single job running `google-github-actions/release-please-action@v4`
-    with `release-type: python`
+    with `config-file: release-please-config.json` and
+    `manifest-file: .release-please-manifest.json` (no inline
+    `release-type` - config files own all settings)
   - Validate with `actionlint` (already part of CI lint suite)
 
 - **Task 3: publish workflow**
@@ -57,9 +61,10 @@ and release-please details.
   - Three jobs chained via `needs:`:
     - **build**: checkout, `astral-sh/setup-uv`, `uv build`, upload
       `dist/` via `actions/upload-artifact@v4`
-    - **smoke-test**: download artifacts, install wheel in isolated env
-      (`uv run --isolated --no-project --with dist/*.whl`), install sdist
-      similarly, run `tests/smoke_test.py` against each
+    - **smoke-test**: checkout repo (for `tests/smoke_test.py`),
+      `astral-sh/setup-uv`, download dist artifacts, install wheel in
+      isolated env (`uv run --isolated --no-project --with dist/*.whl`),
+      install sdist similarly, run `tests/smoke_test.py` against each
     - **publish-pypi**: download artifacts, `uv publish` with
       `permissions: id-token: write` and `environment: name: pypi`
   - Top-level `permissions: contents: read`

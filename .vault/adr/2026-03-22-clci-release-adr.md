@@ -82,8 +82,10 @@ so a dedicated binary is cleaner than subcommand routing.
   automatically - no reusable workflow extraction needed.
 - `release-please.yml` (new) - triggers on `push: branches: [main]`.
   Runs `google-github-actions/release-please-action@v4` with
-  `release-type: python`. Creates/updates the Release PR. When the Release
-  PR merges, release-please creates a GitHub Release with a git tag.
+  `config-file` and `manifest-file` inputs pointing to the repo-root
+  config files (no inline `release-type` - manifest mode only).
+  Creates/updates the Release PR. When the Release PR merges,
+  release-please creates a GitHub Release with a git tag.
 - `publish.yml` (replace existing) - triggers on
   `on: release: types: [published]`. Builds, smoke tests, and publishes to
   PyPI. Completely decoupled from release-please - it just reacts to the
