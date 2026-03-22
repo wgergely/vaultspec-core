@@ -1,11 +1,5 @@
 # vaultspec-core
 
-<p align="center">
-  <img src="rsc/svg/vaultspec-agent-ok.svg" alt="vaultspec agent status icon" width="180" />
-</p>
-
-<p align="center">
-
 [![Python](https://img.shields.io/badge/python-3.13%2B-blue.svg)](./pyproject.toml)
 [![CI](https://github.com/wgergely/vaultspec-core/actions/workflows/ci.yml/badge.svg)](https://github.com/wgergely/vaultspec-core/actions/workflows/ci.yml)
 [![Docker](https://github.com/wgergely/vaultspec-core/actions/workflows/docker.yml/badge.svg)](https://github.com/wgergely/vaultspec-core/actions/workflows/docker.yml)
@@ -13,19 +7,16 @@
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
-</p>
-
-***Give your AI a structured process and a paper trail - so every decision gets made once, recorded, and built on.***
-
 ______________________________________________________________________
 
-## A research and decision driven framework for your coding agents
+## A research and decision driven framework for your coding agents - with a paper trail.
 
 Vaultspec is a spec-driven development rulebook for your AI coders. It enforces a structured pipeline around AI-assisted development - research, decide, plan, execute, review - and provides tools to manage the document storage.
 
 Each stage produces durable markdown artifacts in your repository that allow collaborating agents to share context and you to track development progress.
 
 ______________________________________________________________________
+
 
 ## How it works
 
