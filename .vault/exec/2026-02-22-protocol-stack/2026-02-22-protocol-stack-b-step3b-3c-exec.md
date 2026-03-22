@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#protocol-stack"
-date: "2026-02-22"
+  - '#exec'
+  - '#protocol-stack'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-protocol-stack-deep-audit-plan]]"
+  - '[[2026-02-22-protocol-stack-deep-audit-plan]]'
 ---
+
 # `protocol-stack` Track B `Steps 3b-3c`
 
 Refactored blocking team tools to async and added relay_output + get_team_task_status.

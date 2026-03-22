@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#exec"
-  - "#marketing-and-documentation"
-date: "2026-02-20"
+  - '#exec'
+  - '#marketing-and-documentation'
+date: '2026-02-20'
 related:
-  - "[[2026-02-20-marketing-and-documentation-p1-plan]]"
-  - "[[2026-02-20-marketing-and-documentation-p1-review]]"
+  - '[[2026-02-20-marketing-and-documentation-p1-plan]]'
+  - '[[2026-02-20-marketing-and-documentation-p1-review]]'
 ---
+
 # `marketing-and-documentation` `phase1` summary
 
 Restructured all documentation from a root-level `docs/` tree into three
@@ -28,14 +29,17 @@ framework in production. All operational documentation was moved to
 
 **Step 1 (Phase 2 in plan order):** Created three sub-chapters under
 `.vaultspec/docs/`:
+
 - `concepts.md` — tutorial-first (worked `/health` endpoint example with sample
   artifact output at each phase) followed by the SDD methodology reference,
   agents/skills/rules explanation, protocol stack, and Mermaid diagrams.
   Sourced from `docs/tutorials/first-governed-feature.md` + `docs/concepts.md`.
+
 - `cli-reference.md` — all three CLIs (`cli.py`, `vault.py`, `subagent.py`)
   plus a `## Configuration Reference` appendix consolidating all
   `VAULTSPEC_*` env vars. Sourced from `docs/cli-reference.md` +
   `docs/configuration.md`.
+
 - `search-guide.md` — hybrid retrieval pipeline, filter syntax, GPU
   requirements, incremental indexing, and performance data. Config table
   removed; replaced with a link to `cli-reference.md#configuration-reference`.
@@ -50,9 +54,12 @@ framework in production. All operational documentation was moved to
 Removed `docs/tutorials/`, `docs/blog/`, `docs/guides/`, `docs/`.
 
 **Step 3 (Phase 3 in plan order):** Three targeted edits to `README.md`:
+
 - Added `cli.py doctor` as first post-install verification command.
+
 - Added `## Worked Example` section showing 5 skill invocations and artifact
   paths, with link to `concepts.md` for the full tutorial.
+
 - Updated Documentation links from `docs/*.md` to `.vaultspec/docs/*.md`;
   collapsed four links to three (getting-started retired; configuration folded
   into cli-reference).
@@ -65,8 +72,10 @@ one-line descriptions. No existing content modified.
 
 Code review (`[[2026-02-20-marketing-and-documentation-p1-review]]`) passed
 after two minor revisions:
+
 - `README.md` Project Structure block updated: `docs/` entry replaced with
   `.vaultspec/docs/` to reflect the deleted directory.
+
 - `concepts.md` sample plan task replaced: stale `docs/api.md` reference
   replaced with `tests/test_health_integration.py`.
 

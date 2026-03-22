@@ -1,12 +1,11 @@
-"""Resolve vaultspec workspace topology and validate the resulting layout.
+"""Workspace topology resolution and layout validation for vaultspec.
 
-This module determines how a target directory maps to the active workspace,
-including `.vault/`, `.vaultspec/`, and related roots across standalone,
-explicit, git, worktree, and container modes.
-
-Usage:
-    Call `resolve_workspace(...)` to obtain a validated `WorkspaceLayout`
-    before initializing global paths or exposing CLI and MCP surfaces.
+Determines how a target directory maps to ``.vault/`` and ``.vaultspec/``
+roots across standalone, explicit, git, worktree, and ``.gt/`` container modes.
+Key exports: :func:`resolve_workspace`, :func:`discover_git`, :class:`WorkspaceLayout`,
+:class:`GitInfo`, :class:`LayoutMode`, :class:`WorkspaceError`. Re-exported via
+:mod:`vaultspec_core.config`; consumed by :mod:`vaultspec_core.cli.root` and
+:mod:`vaultspec_core.core.types`.
 """
 
 from __future__ import annotations
@@ -29,7 +28,14 @@ __all__ = [
 
 
 class LayoutMode(Enum):
-    """How VaultSpec was invoked and where paths point."""
+    """How the workspace layout was resolved.
+
+    Attributes:
+        STANDALONE: No explicit target override; root was inferred from git
+            detection or cwd.
+        EXPLICIT: Target directory was provided via ``--target`` or
+            ``VAULTSPEC_TARGET_DIR``.
+    """
 
     STANDALONE = "standalone"
     EXPLICIT = "explicit"
@@ -268,7 +274,11 @@ def discover_git(start: Path) -> GitInfo | None:
 
 
 class WorkspaceError(Exception):
-    """Raised when workspace layout validation fails."""
+    """Raised when workspace layout resolution or validation fails.
+
+    Typically indicates a missing ``.vaultspec/`` directory or an unreachable
+    target path.  Caught by the CLI root callback and converted to an error exit.
+    """
 
 
 def _validate(layout: WorkspaceLayout) -> None:
@@ -313,7 +323,7 @@ def resolve_workspace(
         framework_dir_name: Name of the framework directory (default ``".vaultspec"``).
         framework_root: Structurally-known location of the ``.vaultspec/``
             directory. Never derived from env vars.
-        cwd: Override for ``Path.cwd()`` — intended for testing.
+        cwd: Override for ``Path.cwd()``  - intended for testing.
 
     Returns:
         A fully resolved and validated ``WorkspaceLayout``.
@@ -345,8 +355,8 @@ def resolve_workspace(
     git = discover_git(effective_cwd)
 
     if git is not None:
-        # Container/worktree mode: use container_root if available
-        root = git.container_root if git.container_root is not None else git.repo_root
+        # Prefer container_root, then worktree_root, then repo_root
+        root = git.container_root or git.worktree_root or git.repo_root
         root = _strip_unc(root)
         fw_root = framework_root or (root / framework_dir_name)
 

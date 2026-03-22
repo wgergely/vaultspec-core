@@ -1,16 +1,17 @@
 ---
 tags:
-  - "#research"
-  - "#protocol"
-date: "2026-02-07"
+  - '#research'
+  - '#protocol'
+date: '2026-02-07'
 ---
+
 # ACP (Agent Client Protocol) -- Technical Reference
 
 **Date:** 2026-02-07
 **Source:** Research agent -- ACP SDK deep dive
 **Scope:** Full protocol surface area, SDK APIs, code examples
 
----
+______________________________________________________________________
 
 ## Protocol Overview
 
@@ -20,7 +21,7 @@ ACP is a JSON-RPC 2.0 based protocol enabling bidirectional communication betwee
 - **Transport**: stdio (primary, required). Messages are newline-delimited, UTF-8 encoded JSON-RPC. The client launches the agent as a subprocess. Messages MUST NOT contain embedded newlines. Agents MAY write to stderr for logging. Streamable HTTP is a draft proposal not yet finalized.
 - **Message types**: Methods (request/response with `id`) and Notifications (one-way, no `id`).
 
----
+______________________________________________________________________
 
 ## Initialization (`initialize`)
 
@@ -80,22 +81,22 @@ ACP is a JSON-RPC 2.0 based protocol enabling bidirectional communication betwee
 
 **ClientCapabilities**:
 
-| Field | Type | Description |
-|---|---|---|
-| `fs.readTextFile` | boolean | Supports `fs/read_text_file` |
-| `fs.writeTextFile` | boolean | Supports `fs/write_text_file` |
-| `terminal` | boolean | Supports all `terminal/*` methods |
+| Field              | Type    | Description                       |
+| ------------------ | ------- | --------------------------------- |
+| `fs.readTextFile`  | boolean | Supports `fs/read_text_file`      |
+| `fs.writeTextFile` | boolean | Supports `fs/write_text_file`     |
+| `terminal`         | boolean | Supports all `terminal/*` methods |
 
 **AgentCapabilities**:
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `loadSession` | boolean | false | Supports `session/load` |
-| `promptCapabilities.image` | boolean | false | Accept image content blocks |
-| `promptCapabilities.audio` | boolean | false | Accept audio content blocks |
-| `promptCapabilities.embeddedContext` | boolean | false | Accept embedded resource blocks |
-| `mcpCapabilities.http` | boolean | false | HTTP MCP transport |
-| `mcpCapabilities.sse` | boolean | false | SSE MCP transport |
+| Field                                | Type    | Default | Description                     |
+| ------------------------------------ | ------- | ------- | ------------------------------- |
+| `loadSession`                        | boolean | false   | Supports `session/load`         |
+| `promptCapabilities.image`           | boolean | false   | Accept image content blocks     |
+| `promptCapabilities.audio`           | boolean | false   | Accept audio content blocks     |
+| `promptCapabilities.embeddedContext` | boolean | false   | Accept embedded resource blocks |
+| `mcpCapabilities.http`               | boolean | false   | HTTP MCP transport              |
+| `mcpCapabilities.sse`                | boolean | false   | SSE MCP transport               |
 
 ### Baseline Requirements
 
@@ -103,7 +104,7 @@ ACP is a JSON-RPC 2.0 based protocol enabling bidirectional communication betwee
 - All agents MUST implement: `initialize`, `authenticate`, `session/new`, `session/prompt`, `session/cancel`
 - All clients MUST implement: `session/request_permission`
 
----
+______________________________________________________________________
 
 ## Authentication (`authenticate`)
 
@@ -120,7 +121,7 @@ ACP is a JSON-RPC 2.0 based protocol enabling bidirectional communication betwee
 
 Response: `AuthenticateResponse` (default empty). Called when agent requires auth before session creation.
 
----
+______________________________________________________________________
 
 ## Session Setup
 
@@ -146,11 +147,11 @@ Response: `{ "sessionId": "sess_abc123", "modes": { "currentModeId": "code", "av
 
 ### MCP Server Transport Types
 
-| Transport | Required Fields | Capability Gate |
-|---|---|---|
-| **Stdio** (required) | `name`, `command`, `args`, `env` | Always supported |
-| **HTTP** (optional) | `type: "http"`, `name`, `url`, `headers` | `mcpCapabilities.http` |
-| **SSE** (deprecated) | `type: "sse"`, `name`, `url`, `headers` | `mcpCapabilities.sse` |
+| Transport            | Required Fields                          | Capability Gate        |
+| -------------------- | ---------------------------------------- | ---------------------- |
+| **Stdio** (required) | `name`, `command`, `args`, `env`         | Always supported       |
+| **HTTP** (optional)  | `type: "http"`, `name`, `url`, `headers` | `mcpCapabilities.http` |
+| **SSE** (deprecated) | `type: "sse"`, `name`, `url`, `headers`  | `mcpCapabilities.sse`  |
 
 ### Load Session (`session/load`)
 
@@ -160,7 +161,7 @@ Only if agent advertises `loadSession: true`. Agent replays conversation history
 
 Agent can also change modes autonomously via `session/update` with `current_mode_update`.
 
----
+______________________________________________________________________
 
 ## Prompt Turn (`session/prompt`)
 
@@ -188,13 +189,13 @@ Agent can also change modes autonomously via `session/update` with `current_mode
 
 **StopReason values**:
 
-| Value | Meaning |
-|---|---|
-| `end_turn` | LLM completed naturally |
-| `max_tokens` | Token limit exceeded |
+| Value               | Meaning                              |
+| ------------------- | ------------------------------------ |
+| `end_turn`          | LLM completed naturally              |
+| `max_tokens`        | Token limit exceeded                 |
 | `max_turn_requests` | Max model requests per turn exceeded |
-| `refusal` | Agent declines continuation |
-| `cancelled` | Client initiated cancellation |
+| `refusal`           | Agent declines continuation          |
+| `cancelled`         | Client initiated cancellation        |
 
 ### Lifecycle
 
@@ -219,7 +220,7 @@ Client                          Agent
 
 Notification, no response. Agent returns `stopReason: "cancelled"`.
 
----
+______________________________________________________________________
 
 ## Session Updates (`session/update`)
 
@@ -227,18 +228,18 @@ Notification, no response. Agent returns `stopReason: "cancelled"`.
 
 ### Update Variants
 
-| `sessionUpdate` value | Description |
-|---|---|
-| `user_message_chunk` | Replayed user message during session load |
-| `agent_message_chunk` | Agent text/content output |
-| `agent_thought_chunk` | Agent internal reasoning |
-| `tool_call` | New tool call initiated |
-| `tool_call_update` | Tool call progress/completion |
-| `plan` | Agent plan with entries |
-| `available_commands_update` | Slash commands available |
-| `current_mode_update` | Mode change notification |
-| `config_option_update` | Config option change |
-| `session_info_update` | Session metadata update (unstable) |
+| `sessionUpdate` value       | Description                               |
+| --------------------------- | ----------------------------------------- |
+| `user_message_chunk`        | Replayed user message during session load |
+| `agent_message_chunk`       | Agent text/content output                 |
+| `agent_thought_chunk`       | Agent internal reasoning                  |
+| `tool_call`                 | New tool call initiated                   |
+| `tool_call_update`          | Tool call progress/completion             |
+| `plan`                      | Agent plan with entries                   |
+| `available_commands_update` | Slash commands available                  |
+| `current_mode_update`       | Mode change notification                  |
+| `config_option_update`      | Config option change                      |
+| `session_info_update`       | Session metadata update (unstable)        |
 
 ### Plan Update Example
 
@@ -269,7 +270,7 @@ Notification, no response. Agent returns `stopReason: "cancelled"`.
 }
 ```
 
----
+______________________________________________________________________
 
 ## Tool Calls
 
@@ -287,7 +288,7 @@ Notification, no response. Agent returns `stopReason: "cancelled"`.
 - **Diff**: `{"type": "diff", "path": "...", "oldText": "...", "newText": "..."}`
 - **Terminal reference**: `{"type": "terminal", "terminalId": "term_xyz789"}`
 
----
+______________________________________________________________________
 
 ## Permission System (`session/request_permission`)
 
@@ -314,7 +315,7 @@ Notification, no response. Agent returns `stopReason: "cancelled"`.
 
 **Outcome types**: `cancelled` (prompt turn was cancelled) | `selected` (user chose an option, includes `optionId`)
 
----
+______________________________________________________________________
 
 ## File System
 
@@ -328,19 +329,19 @@ Response: `{"content": "file contents..."}`
 Agent -> Client. Params: `path` (absolute), `sessionId`, `content`. Client MUST create file if not exists.
 Response: `null`.
 
----
+______________________________________________________________________
 
 ## Terminals
 
 All require `clientCapabilities.terminal: true`.
 
-| Method | Description |
-|---|---|
-| `terminal/create` | Spawn subprocess, returns `terminalId` immediately |
-| `terminal/output` | Get current output + optional exit status |
-| `terminal/wait_for_exit` | Block until completion |
-| `terminal/kill` | Terminate command, ID remains valid |
-| `terminal/release` | Kill + release all resources, ID becomes invalid |
+| Method                   | Description                                        |
+| ------------------------ | -------------------------------------------------- |
+| `terminal/create`        | Spawn subprocess, returns `terminalId` immediately |
+| `terminal/output`        | Get current output + optional exit status          |
+| `terminal/wait_for_exit` | Block until completion                             |
+| `terminal/kill`          | Terminate command, ID remains valid                |
+| `terminal/release`       | Kill + release all resources, ID becomes invalid   |
 
 ### Create Parameters
 
@@ -359,13 +360,14 @@ All require `clientCapabilities.terminal: true`.
 ### Recommended Pattern
 
 ```
+
 - terminal/create -> get terminalId
 - Race: terminal/wait_for_exit vs timeout
 - If timeout: terminal/kill, then terminal/output
 - Always: terminal/release
 ```
 
----
+______________________________________________________________________
 
 ## Content Blocks
 
@@ -405,7 +407,7 @@ All require `clientCapabilities.terminal: true`.
 }
 ```
 
----
+______________________________________________________________________
 
 ## Extensibility
 
@@ -419,17 +421,17 @@ Any method starting with `_` is a custom extension. Must return `-32601` for unr
 
 ### Error Codes
 
-| Code | Name |
-|---|---|
-| `-32700` | Parse error |
-| `-32600` | Invalid request |
-| `-32601` | Method not found |
-| `-32602` | Invalid params |
-| `-32603` | Internal error |
+| Code     | Name                    |
+| -------- | ----------------------- |
+| `-32700` | Parse error             |
+| `-32600` | Invalid request         |
+| `-32601` | Method not found        |
+| `-32602` | Invalid params          |
+| `-32603` | Internal error          |
 | `-32000` | Authentication required |
-| `-32002` | Resource not found |
+| `-32002` | Resource not found      |
 
----
+______________________________________________________________________
 
 ## Proxy Chains (RFD)
 
@@ -475,7 +477,7 @@ A **conductor** orchestrates all message routing. Single new method: **`proxy/su
 
 Multi-agent support via optional `peer` field in `proxy/successor` for M:N topologies.
 
----
+______________________________________________________________________
 
 ## MCP-over-ACP (RFD)
 
@@ -495,7 +497,7 @@ Enables MCP servers to communicate through ACP channels.
 
 Supports connection multiplexing and bidirectional messaging.
 
----
+______________________________________________________________________
 
 ## Rust SDK
 
@@ -625,8 +627,11 @@ pub enum SessionUpdate {
 ```toml
 [dependencies]
 agent-client-protocol = { version = "0.9", features = ["unstable"] }
+
 # Or individual: "unstable_session_model", "unstable_session_fork",
+
 #   "unstable_session_list", "unstable_session_resume"
+
 ```
 
 ### Rust Agent Example (Complete)
@@ -790,7 +795,7 @@ async fn main() -> anyhow::Result<()> {
 }
 ```
 
----
+______________________________________________________________________
 
 ## Python SDK
 
@@ -877,44 +882,44 @@ class ExampleAgent(Agent):
 asyncio.run(run_agent(ExampleAgent()))
 ```
 
----
+______________________________________________________________________
 
 ## JSON-RPC Method Reference
 
 ### Agent Interface (Client -> Agent)
 
-| Method | Type | Required |
-|---|---|---|
-| `initialize` | Request | Yes |
-| `authenticate` | Request | Yes |
-| `session/new` | Request | Yes |
-| `session/load` | Request | If `loadSession` |
-| `session/prompt` | Request | Yes |
-| `session/cancel` | Notification | Yes |
-| `session/set_mode` | Request | No |
-| `session/set_config_option` | Request | No |
-| `session/set_model` | Request | Unstable |
-| `session/list` | Request | Unstable |
-| `session/fork` | Request | Unstable |
-| `session/resume` | Request | Unstable |
-| `_*` | Request/Notification | Extension |
+| Method                      | Type                 | Required         |
+| --------------------------- | -------------------- | ---------------- |
+| `initialize`                | Request              | Yes              |
+| `authenticate`              | Request              | Yes              |
+| `session/new`               | Request              | Yes              |
+| `session/load`              | Request              | If `loadSession` |
+| `session/prompt`            | Request              | Yes              |
+| `session/cancel`            | Notification         | Yes              |
+| `session/set_mode`          | Request              | No               |
+| `session/set_config_option` | Request              | No               |
+| `session/set_model`         | Request              | Unstable         |
+| `session/list`              | Request              | Unstable         |
+| `session/fork`              | Request              | Unstable         |
+| `session/resume`            | Request              | Unstable         |
+| `_*`                        | Request/Notification | Extension        |
 
 ### Client Interface (Agent -> Client)
 
-| Method | Type | Required |
-|---|---|---|
-| `session/request_permission` | Request | Yes |
-| `session/update` | Notification | Yes |
-| `fs/read_text_file` | Request | If `fs.readTextFile` |
-| `fs/write_text_file` | Request | If `fs.writeTextFile` |
-| `terminal/create` | Request | If `terminal` |
-| `terminal/output` | Request | If `terminal` |
-| `terminal/wait_for_exit` | Request | If `terminal` |
-| `terminal/kill` | Request | If `terminal` |
-| `terminal/release` | Request | If `terminal` |
-| `_*` | Request/Notification | Extension |
+| Method                       | Type                 | Required              |
+| ---------------------------- | -------------------- | --------------------- |
+| `session/request_permission` | Request              | Yes                   |
+| `session/update`             | Notification         | Yes                   |
+| `fs/read_text_file`          | Request              | If `fs.readTextFile`  |
+| `fs/write_text_file`         | Request              | If `fs.writeTextFile` |
+| `terminal/create`            | Request              | If `terminal`         |
+| `terminal/output`            | Request              | If `terminal`         |
+| `terminal/wait_for_exit`     | Request              | If `terminal`         |
+| `terminal/kill`              | Request              | If `terminal`         |
+| `terminal/release`           | Request              | If `terminal`         |
+| `_*`                         | Request/Notification | Extension             |
 
----
+______________________________________________________________________
 
 ## Key Design Principles
 
@@ -927,7 +932,7 @@ asyncio.run(run_agent(ExampleAgent()))
 - Non-Send futures -- Rust SDK uses `?Send` async traits, requiring `LocalSet` and `spawn_local`.
 - Extension safety -- custom fields go in `_meta`; custom methods use underscore prefix.
 
----
+______________________________________________________________________
 
 ## Sources
 

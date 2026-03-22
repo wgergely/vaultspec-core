@@ -1,16 +1,17 @@
 ---
 tags:
-  - "#audit"
-  - "#roadmap"
-date: "2026-02-17"
+  - '#audit'
+  - '#roadmap'
+date: '2026-02-17'
 related:
-  - "[[2026-02-17-ux-simulation-audit]]"
-  - "[[2026-02-17-tech-audit-audit]]"
-  - "[[2026-02-17-test-verification-audit]]"
-  - "[[2026-02-17-competitive-landscape-audit]]"
-  - "[[2026-02-17-protocol-ecosystem-audit]]"
-  - "[[2026-02-17-marketing-ux-audit]]"
+  - '[[2026-02-17-ux-simulation-audit]]'
+  - '[[2026-02-17-tech-audit-audit]]'
+  - '[[2026-02-17-test-verification-audit]]'
+  - '[[2026-02-17-competitive-landscape-audit]]'
+  - '[[2026-02-17-protocol-ecosystem-audit]]'
+  - '[[2026-02-17-marketing-ux-audit]]'
 ---
+
 # vaultspec Comprehensive Audit: Executive Summary
 
 **Date**: 2026-02-17
@@ -23,19 +24,19 @@ related:
 - [2026-02-17-protocol-ecosystem-audit.md](2026-02-17-protocol-ecosystem-audit.md) -- Protocol Ecosystem & Feature Gap Analysis (ProductResearch-B)
 - [2026-02-17-marketing-ux-audit.md](2026-02-17-marketing-ux-audit.md) -- Documentation UX Audit (MarketingLead)
 
----
+______________________________________________________________________
 
 ## Project Health Scorecard
 
-| Dimension | Score | Grade | Key Evidence |
-|-----------|-------|-------|-------------|
-| **Technical Implementation** | 9.0/10 | A | 46 features, 0 stubs, production-quality code (02-tech-audit.md, S2) |
-| **Test Coverage** | 8.5/10 | A- | 976 tests, ~99.5% pass rate excl. live-API tests (03-test-verification.md, Exec Summary) |
-| **User Experience** | 3.5/10 | D | No onboarding path, broken subagent CLI, missing CRUD ops (01-ux-simulation.md, S7) |
-| **Documentation** | 3.0/10 | D | No tutorials, no install guide, ~35% feature coverage (06-marketing-ux-review.md, S6) |
-| **Market Position** | 7.5/10 | B+ | Unique 3-protocol stack, SDD is validated, but no AGENTS.md (04-competitive-landscape.md, S6) |
-| **Protocol Alignment** | 8.0/10 | A- | MCP+ACP+A2A ahead of curve; gaps in security, registry (05-protocol-ecosystem.md, S1) |
-| **Overall** | **6.6/10** | **C+** | Strong engine, weak chassis |
+| Dimension                    | Score      | Grade  | Key Evidence                                                                                  |
+| ---------------------------- | ---------- | ------ | --------------------------------------------------------------------------------------------- |
+| **Technical Implementation** | 9.0/10     | A      | 46 features, 0 stubs, production-quality code (02-tech-audit.md, S2)                          |
+| **Test Coverage**            | 8.5/10     | A-     | 976 tests, ~99.5% pass rate excl. live-API tests (03-test-verification.md, Exec Summary)      |
+| **User Experience**          | 3.5/10     | D      | No onboarding path, broken subagent CLI, missing CRUD ops (01-ux-simulation.md, S7)           |
+| **Documentation**            | 3.0/10     | D      | No tutorials, no install guide, ~35% feature coverage (06-marketing-ux-review.md, S6)         |
+| **Market Position**          | 7.5/10     | B+     | Unique 3-protocol stack, SDD is validated, but no AGENTS.md (04-competitive-landscape.md, S6) |
+| **Protocol Alignment**       | 8.0/10     | A-     | MCP+ACP+A2A ahead of curve; gaps in security, registry (05-protocol-ecosystem.md, S1)         |
+| **Overall**                  | **6.6/10** | **C+** | Strong engine, weak chassis                                                                   |
 
 ### Interpretation
 
@@ -43,7 +44,7 @@ vaultspec is a technically excellent framework with a serious presentation probl
 
 The analogy: a Formula 1 engine sitting in a parking lot with no car around it and no instructions on how to start it.
 
----
+______________________________________________________________________
 
 ## Top 10 Findings Across All Reports
 
@@ -117,7 +118,7 @@ Running `vault.py audit --verify` against the framework's own `.vault/` director
 
 OWASP has published an MCP Top 10 security list. Real CVEs have been disclosed against MCP servers (including Anthropic's own). vaultspec's MCP server (`vs-subagent-mcp`) has no authentication, no input validation beyond basic type checking, and no audit logging. As MCP adoption grows, security gaps become exploitation vectors.
 
----
+______________________________________________________________________
 
 ## What's Working
 
@@ -158,7 +159,7 @@ All 8 templates are self-documenting with YAML frontmatter examples, inline comm
 Thoughtworks Technology Radar, Martin Fowler's team, Amazon (Kiro), GitHub (Spec-Kit), and multiple industry publications have validated spec-driven development as a practice. vaultspec's 5-phase workflow (with the unique Research phase and Verify phase) is the most comprehensive SDD implementation available.
 (04-competitive-landscape.md, S1; 05-protocol-ecosystem.md, S3)
 
----
+______________________________________________________________________
 
 ## What Needs Attention
 
@@ -189,7 +190,7 @@ No AGENTS.md support (60K+ projects use it), no ACP Registry listing (multi-edit
 Kiro (AWS), GitHub Spec Kit, Tessl, and Factory all address parts of vaultspec's value proposition with massive platform advantages. Claude Code itself could absorb SDD methodology natively. The window for establishing vaultspec as the category-defining tool is measured in months, not years.
 (04-competitive-landscape.md, Competitive Threats)
 
----
+______________________________________________________________________
 
 ## Cross-Cutting Themes
 
@@ -229,7 +230,7 @@ The three-protocol stack is a genuine differentiator, but the ecosystem is movin
 The GPU-only RAG design (no CPU fallback) ensures performance but limits adoption. The requirement is undocumented. Users without NVIDIA GPUs cannot use semantic search at all. This is a deliberate trade-off but should be explicitly communicated and eventually addressed with a graceful degradation path.
 (02-tech-audit.md, S6.1; 05-protocol-ecosystem.md, S4; 01-ux-simulation.md, S3.2)
 
----
+______________________________________________________________________
 
 ## Top 5 Strategic Priorities
 
@@ -303,20 +304,20 @@ Actions:
 - Consider event-driven hooks (from Kiro) and constitution layer (from Spec Kit) [04-competitive-landscape.md, Lessons Learned #3, #4]
 - Build a simple documentation site for public discoverability [06-marketing-ux-review.md, S10 Tier 3 #10]
 
----
+______________________________________________________________________
 
 ## Report Index
 
-| # | Report | Author | Focus | Key Score |
-|---|--------|--------|-------|-----------|
-| 01 | [ux-simulation](2026-02-17-ux-simulation-audit.md) | JohnDoe | First-time user journey | 5.9/10 weighted |
-| 02 | [tech-audit](2026-02-17-tech-audit-audit.md) | TechAuditor | Implementation completeness | 46/46 features, 0 stubs |
-| 03 | [test-verification](2026-02-17-test-verification-audit.md) | TechTester | Test execution & coverage | 976 tests, ~99.5% pass |
-| 04 | [competitive-landscape](2026-02-17-competitive-landscape-audit.md) | ProductResearch-A | Market positioning | 20+ competitors profiled |
-| 05 | [protocol-ecosystem](2026-02-17-protocol-ecosystem-audit.md) | ProductResearch-B | Protocol & technology gaps | 3-protocol stack validated |
-| 06 | [marketing-ux-review](2026-02-17-marketing-ux-audit.md) | MarketingLead | Documentation UX standards | 3.05/10 weighted |
+| #   | Report                                                             | Author            | Focus                       | Key Score                  |
+| --- | ------------------------------------------------------------------ | ----------------- | --------------------------- | -------------------------- |
+| 01  | [ux-simulation](2026-02-17-ux-simulation-audit.md)                 | JohnDoe           | First-time user journey     | 5.9/10 weighted            |
+| 02  | [tech-audit](2026-02-17-tech-audit-audit.md)                       | TechAuditor       | Implementation completeness | 46/46 features, 0 stubs    |
+| 03  | [test-verification](2026-02-17-test-verification-audit.md)         | TechTester        | Test execution & coverage   | 976 tests, ~99.5% pass     |
+| 04  | [competitive-landscape](2026-02-17-competitive-landscape-audit.md) | ProductResearch-A | Market positioning          | 20+ competitors profiled   |
+| 05  | [protocol-ecosystem](2026-02-17-protocol-ecosystem-audit.md)       | ProductResearch-B | Protocol & technology gaps  | 3-protocol stack validated |
+| 06  | [marketing-ux-review](2026-02-17-marketing-ux-audit.md)            | MarketingLead     | Documentation UX standards  | 3.05/10 weighted           |
 
----
+______________________________________________________________________
 
 ## Conclusion
 
@@ -324,6 +325,6 @@ vaultspec is a technically ambitious and well-implemented framework that has sol
 
 The path forward is clear: fix the two blocking bugs, write the missing documentation, close the AGENTS.md and embedding model gaps, complete the CLI surface, and articulate the unique market position. The technical foundation is strong enough to support all of this. The question is not "can vaultspec compete?" but "will anyone know it exists?"
 
----
+______________________________________________________________________
 
 *Synthesized from 6 independent audit reports. Every finding is attributed to its source report with section references. Generated 2026-02-17.*

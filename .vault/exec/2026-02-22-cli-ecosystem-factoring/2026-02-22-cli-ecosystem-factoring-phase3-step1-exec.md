@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#exec"
-  - "#cli-ecosystem-factoring"
-date: "2026-02-22"
+  - '#exec'
+  - '#cli-ecosystem-factoring'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-cli-ecosystem-factoring-plan]]"
-  - "[[2026-02-22-cli-ecosystem-factoring-adr]]"
+  - '[[2026-02-22-cli-ecosystem-factoring-plan]]'
+  - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
 ---
+
 # cli-ecosystem-factoring phase3 step1 — core submodule extraction
 
 ## objective
@@ -37,18 +38,22 @@ under `src/vaultspec/core/`, reducing `cli.py` to a thin argparse wrapper.
 ## key technical decisions
 
 ### mutable globals pattern
+
 All submodules use `from . import types as _t` and access globals as `_t.RULES_SRC_DIR`
 etc. to ensure they always see post-`init_paths()` values.
 
 ### backward compat
+
 - `import vaultspec.cli as cli; cli.ROOT_DIR` works via `__getattr__` proxy
 - `from vaultspec.cli import main` works directly
 - Private helpers accessible via `cli._generate_config` etc. via explicit re-export
 
 ### print_summary output
+
 Uses `print()` (not `logger.info`) to preserve test capsys compatibility with original behavior.
 
 ### to_prompt error handling
+
 `_collect_skill_listing()` wraps `to_prompt()` call in try/except to fall through
 to Markdown fallback when skills have missing `name` frontmatter fields.
 

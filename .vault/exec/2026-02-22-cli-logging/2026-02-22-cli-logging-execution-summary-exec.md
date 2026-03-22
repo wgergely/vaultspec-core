@@ -1,13 +1,14 @@
 ---
 tags:
-  - "#exec"
-  - "#cli-logging"
-date: "2026-02-22"
+  - '#exec'
+  - '#cli-logging'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-cli-logging-plan]]"
-  - "[[2026-02-22-cli-logging-adr]]"
-  - "[[2026-02-22-cli-logging-research]]"
+  - '[[2026-02-22-cli-logging-plan]]'
+  - '[[2026-02-22-cli-logging-adr]]'
+  - '[[2026-02-22-cli-logging-research]]'
 ---
+
 # `cli-logging` execution summary
 
 Implemented unified Rich-based CLI logging and agent feed formatting across
@@ -24,12 +25,15 @@ all vaultspec entry points.
 **Phase 1 — CLI logging infrastructure:**
 
 - Added `rich>=13.0.0` as a core dependency
+
 - Rewrote `logging_config.py` with TTY-aware handler selection: `RichHandler`
   for interactive terminals (colorized levels, rich tracebacks), plain
   `StreamHandler` for pipes/CI. Added `get_console()` singleton for phase 2.
+
 - Added `--quiet`/`-q` flag to `cli_common.py` in a mutually exclusive group
   with `--verbose` and `--debug`. Verbosity ladder: quiet→WARNING,
   default→INFO, verbose→INFO (explicit), debug→DEBUG.
+
 - Fixed `spec_cli.py` double-init bug (removed redundant `configure_logging()`
   call that locked in INFO before CLI flags were parsed).
 

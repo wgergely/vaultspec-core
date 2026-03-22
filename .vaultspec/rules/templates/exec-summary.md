@@ -1,17 +1,18 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
+# REQUIRED TAGS (minimum 2): one directory tag + one feature tag
+# DIRECTORY TAGS: #adr #audit #exec #plan #reference #research
 # Directory tag (hardcoded - DO NOT CHANGE - based on .vault/exec/ location)
 # Feature tag (replace {feature} with your feature name, e.g., #editor-demo)
+# Additional tags may be appended below the required pair
 tags:
-  - "#exec"
-  - "#{feature}"
+  - '#exec'
+  - '#{feature}'
 # ISO date format (e.g., 2026-02-06)
-date: "{yyyy-mm-dd}"
+date: '{yyyy-mm-dd}'
 # Related documents as quoted wiki-links - MUST link to parent PLAN
 # (e.g., "[[2026-02-04-feature-plan]]")
 related:
-  - "[[{yyyy-mm-dd-*-plan}]]"
+  - '[[{yyyy-mm-dd-*-plan}]]'
 ---
 
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields

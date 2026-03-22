@@ -1,13 +1,14 @@
 ---
 tags:
-  - "#exec"
-  - "#hooks-maturity"
-date: "2026-02-23"
+  - '#exec'
+  - '#hooks-maturity'
+date: '2026-02-23'
 related:
-  - "[[2026-02-23-hooks-maturity-plan]]"
-  - "[[2026-02-23-hooks-maturity-adr]]"
-  - "[[2026-02-23-hooks-maturity-research]]"
+  - '[[2026-02-23-hooks-maturity-plan]]'
+  - '[[2026-02-23-hooks-maturity-adr]]'
+  - '[[2026-02-23-hooks-maturity-research]]'
 ---
+
 # hooks-maturity code review
 
 **Status:** `PASS`
@@ -26,7 +27,7 @@ related:
   - `.vaultspec/docs/concepts.md` — hooks subsection
   - `.vaultspec/rules/hooks/example-audit-on-create.yaml` — improved example
 
----
+______________________________________________________________________
 
 ## Requirement Verification Checklist
 
@@ -52,7 +53,7 @@ related:
 
 - VERIFIED. In `vault_cli.py`, all three `from .hooks import fire_hooks` statements appear inside their respective handler function bodies (lines 181, 325, 372). In `spec_cli.py`, the import appears inside the `elif args.resource == "sync-all":` branch (line 373). No `fire_hooks` import appears at module scope in either file.
 
----
+______________________________________________________________________
 
 ### Phase 3a — Test Requirements
 
@@ -80,7 +81,7 @@ related:
 
 - VERIFIED. Grep for `unittest.mock`, `MagicMock`, `monkeypatch.setattr`, `@patch`, `from unittest`, `import mock` in `test_hooks.py` returns zero matches. All tests use real subprocesses, real filesystem I/O, and real YAML parsing.
 
----
+______________________________________________________________________
 
 ### Phase 3b — Documentation Requirements
 
@@ -136,7 +137,7 @@ related:
 
 - VERIFIED. `example-audit-on-create.yaml` line 25: `enabled: false  # set to true to activate`. Both the correct value and clear activation instructions are present.
 
----
+______________________________________________________________________
 
 ## Findings
 
@@ -152,7 +153,7 @@ None.
 
 - **[LOW]** `test_hooks.py` lines 315-326: `TestReentrantGuard.test_reentrant_trigger_returns_empty` directly mutates the live module-level `_triggering` set. This is the correct no-mock approach, but a brief inline comment explaining why direct mutation of `_triggering` is used (rather than any workaround) would improve reader comprehension.
 
----
+______________________________________________________________________
 
 ## Recommendations
 

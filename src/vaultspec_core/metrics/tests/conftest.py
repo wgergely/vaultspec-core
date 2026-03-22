@@ -4,11 +4,14 @@ Resets configuration state and binds metrics calculations to the bundled
 vaultcore fixture tree.
 """
 
+from pathlib import Path
+
 import pytest
 
-from tests.constants import TEST_PROJECT
-
 from ...config import reset_config
+
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+TEST_PROJECT = _REPO_ROOT / "test-project"
 
 
 @pytest.fixture(autouse=True)

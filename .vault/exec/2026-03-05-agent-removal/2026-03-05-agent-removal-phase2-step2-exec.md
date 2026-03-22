@@ -1,10 +1,10 @@
 ---
 tags:
-  - "#exec"
-  - "#agent-removal"
-date: "2026-03-05"
+  - '#exec'
+  - '#agent-removal'
+date: '2026-03-05'
 related:
-  - "[[2026-03-05-agent-removal-plan]]"
+  - '[[2026-03-05-agent-removal-plan]]'
 ---
 
 # `agent-removal` `phase2` `step2`

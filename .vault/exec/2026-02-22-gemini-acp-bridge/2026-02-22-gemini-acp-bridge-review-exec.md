@@ -1,13 +1,14 @@
 ---
 tags:
-  - "#exec"
-  - "#gemini-acp-bridge"
-date: "2026-02-22"
+  - '#exec'
+  - '#gemini-acp-bridge'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-gemini-acp-bridge-plan]]"
-  - "[[2026-02-22-gemini-acp-bridge-adr]]"
-  - "[[2026-02-22-gemini-acp-bridge-summary]]"
+  - '[[2026-02-22-gemini-acp-bridge-plan]]'
+  - '[[2026-02-22-gemini-acp-bridge-adr]]'
+  - '[[2026-02-22-gemini-acp-bridge-summary]]'
 ---
+
 # `gemini-acp-bridge` code review
 
 **Status:** `FAIL`
@@ -35,6 +36,7 @@ related:
 - **[CRITICAL] F-03** `test_gemini_bridge.py:69` + all test fixtures: **All 7 tests fail with `TypeError`**. The `bridge` fixture passes `spawn_fn=mock_spawn_fn` to `GeminiACPBridge.__init__()`, but the constructor (line 170) only accepts `model` and `debug`. There is no `spawn_fn` parameter and no `_spawn_fn` attribute. This means the test file was written for an API that was never implemented. Running `pytest` confirms: 6 tests ERROR at fixture setup, 1 FAILED. The exec summary's claim that "All 7 tests passed" is false. The `ty` checker flagged this as `unknown-argument`.
 
 - **[CRITICAL] F-04** `gemini_bridge.py`: **Missing 10 of 15 required `Agent` protocol methods**. The ACP `Agent` protocol (defined in `acp.interfaces.Agent`) requires 15 methods. `GeminiACPBridge` only implements 5: `on_connect`, `initialize`, `new_session`, `prompt`, `cancel`, `authenticate` (broken), and `close`. The following are completely absent:
+
   - `load_session` -- required by ADR decision #2 (session management)
   - `resume_session` -- required by ADR decision #2
   - `list_sessions` -- advertised in capabilities but not implemented
@@ -44,7 +46,7 @@ related:
   - `set_config_option` -- required by Agent protocol
   - `ext_method` -- required by Agent protocol
   - `ext_notification` -- required by Agent protocol
-  The ADR explicitly states "Implement `load_session()` and `resume_session()` logic" as requirements (Plan Phase 3). The Claude bridge implements all 15 methods.
+    The ADR explicitly states "Implement `load_session()` and `resume_session()` logic" as requirements (Plan Phase 3). The Claude bridge implements all 15 methods.
 
 - **[HIGH] F-05** `gemini_bridge.py:170`: **No DI mechanism for subprocess spawning**. The `__init__` has no `spawn_fn` parameter, unlike `ClaudeACPBridge` which accepts `client_factory` and `options_factory` for testability. The test file was clearly written expecting this parameter but the bridge never added it. Without DI, the bridge is untestable without real subprocess execution (which the project's no-mocking policy makes even more critical to get right).
 
@@ -84,21 +86,21 @@ This implementation requires significant rework before it can be merged. The fol
 
 1. **Fix the 3 `ty` errors (F-01, F-02, F-03):** Add `McpCapabilities` to the import block. Fix `authenticate` to match the protocol signature `(self, method_id: str, **kwargs)`. Add `spawn_fn` as a constructor parameter with a default of `spawn_agent_process`.
 
-2. **Implement all missing Agent protocol methods (F-04):** At minimum: `load_session`, `resume_session`, `list_sessions`, `fork_session`, `set_session_mode`, `set_session_model`, `set_config_option`, `ext_method`, `ext_notification`. These can follow `claude_bridge.py` as a template. Stub methods that return empty responses are acceptable for `ext_method`/`ext_notification`/`set_*` but `load_session` and `resume_session` must have real session state logic per the ADR.
+1. **Implement all missing Agent protocol methods (F-04):** At minimum: `load_session`, `resume_session`, `list_sessions`, `fork_session`, `set_session_mode`, `set_session_model`, `set_config_option`, `ext_method`, `ext_notification`. These can follow `claude_bridge.py` as a template. Stub methods that return empty responses are acceptable for `ext_method`/`ext_notification`/`set_*` but `load_session` and `resume_session` must have real session state logic per the ADR.
 
-3. **Update `GeminiProvider.prepare_process` (F-06):** Change it to spawn `python -m vaultspec.protocol.acp.gemini_bridge` instead of the raw `gemini` CLI. Set `VAULTSPEC_*` environment variables as the plan specifies.
+1. **Update `GeminiProvider.prepare_process` (F-06):** Change it to spawn `python -m vaultspec.protocol.acp.gemini_bridge` instead of the raw `gemini` CLI. Set `VAULTSPEC_*` environment variables as the plan specifies.
 
-4. **Export from `__init__.py` (F-07):** Add `GeminiACPBridge` to `acp/__init__.py`'s `__all__`.
+1. **Export from `__init__.py` (F-07):** Add `GeminiACPBridge` to `acp/__init__.py`'s `__all__`.
 
-5. **Add session persistence to executor (F-08):** Update `GeminiA2AExecutor.execute()` to store and reuse `session_id` keyed by `context_id`.
+1. **Add session persistence to executor (F-08):** Update `GeminiA2AExecutor.execute()` to store and reuse `session_id` keyed by `context_id`.
 
-6. **Fix `SessionCapabilities` (F-09):** Change `fork=None, list=None, resume=None` to instantiated capability objects.
+1. **Fix `SessionCapabilities` (F-09):** Change `fork=None, list=None, resume=None` to instantiated capability objects.
 
-7. **Convert `TodoWrite` to `AgentPlanUpdate` (F-14):** Do not silently drop; emit `AgentPlanUpdate` with `PlanEntry` objects.
+1. **Convert `TodoWrite` to `AgentPlanUpdate` (F-14):** Do not silently drop; emit `AgentPlanUpdate` with `PlanEntry` objects.
 
-8. **Fix resource leaks (F-12, F-13):** Track fire-and-forget tasks; cancel the proxy client worker on cleanup.
+1. **Fix resource leaks (F-12, F-13):** Track fire-and-forget tasks; cancel the proxy client worker on cleanup.
 
-9. **Make all tests pass:** After fixing F-03 and F-05, verify all 7 tests pass. Add tests for the missing methods (`load_session`, `resume_session`, etc.).
+1. **Make all tests pass:** After fixing F-03 and F-05, verify all 7 tests pass. Add tests for the missing methods (`load_session`, `resume_session`, etc.).
 
 ## Notes
 

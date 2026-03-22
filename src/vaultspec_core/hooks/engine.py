@@ -1,12 +1,11 @@
 """Load, validate, and execute declarative vaultspec hooks.
 
-This module is the runtime for hook definitions stored as YAML files under
-``.vaultspec/hooks/``. It parses hook documents into typed models, filters them
-by supported event, and executes their actions while guarding against
-re-entrant event loops.
-
-Usage centers on ``load_hooks()`` to read hook definitions and ``trigger()`` or
-``fire_hooks()`` to execute the hooks bound to a specific event.
+Runtime for YAML hook definitions under ``.vaultspec/hooks/``. Parses files
+into :class:`Hook` / :class:`HookAction` models, filters by :data:`SUPPORTED_EVENTS`,
+and executes shell actions with re-entrancy guard and 60-second timeout.
+Key exports: :func:`load_hooks`, :func:`trigger`, :func:`fire_hooks`.
+Re-exported via :mod:`vaultspec_core.hooks`; depends on
+:func:`vaultspec_core.core.helpers.kill_process_tree` for subprocess cleanup.
 """
 
 from __future__ import annotations
@@ -49,7 +48,7 @@ class HookAction:
     """A single action within a hook.
 
     Attributes:
-        action_type: Kind of action — currently only ``"shell"`` is supported.
+        action_type: Kind of action  - currently only ``"shell"`` is supported.
         command: Shell command string; used only when ``action_type`` is
             ``"shell"``.
     """
@@ -318,7 +317,7 @@ def _execute_shell(
     """Execute a shell command action.
 
     Interpolates ``{key}`` placeholders in the command string, then runs it
-    via :func:`subprocess.run` with a 60-second timeout.
+    via ``subprocess.Popen`` with a 60-second timeout.
 
     Args:
         hook_name: Name of the parent hook (for result attribution).
@@ -330,13 +329,14 @@ def _execute_shell(
         with code 0.  Captures stdout as ``output`` and stderr as ``error``.
     """
     cmd = _interpolate(action.command, ctx)
-    from ..core import types as _t
+    from ..core.types import get_context
 
     env = os.environ.copy()
-    if _t.TARGET_DIR:
-        env["VAULTSPEC_TARGET_DIR"] = str(_t.TARGET_DIR)
-        cwd = str(_t.TARGET_DIR)
-    else:
+    try:
+        target_dir = get_context().target_dir
+        env["VAULTSPEC_TARGET_DIR"] = str(target_dir)
+        cwd: str | None = str(target_dir)
+    except LookupError:
         cwd = None
 
     try:
@@ -387,9 +387,9 @@ def fire_hooks(event: str, context: dict[str, str] | None = None) -> None:
         context: Optional context dict passed through to hook actions.
     """
     try:
-        from ..core import types as _t
+        from ..core.types import get_context
 
-        hooks = load_hooks(_t.HOOKS_DIR)
+        hooks = load_hooks(get_context().hooks_dir)
         trigger(hooks, event, context)
     except Exception:
         logger.debug("Hook trigger failed for %s", event, exc_info=True)

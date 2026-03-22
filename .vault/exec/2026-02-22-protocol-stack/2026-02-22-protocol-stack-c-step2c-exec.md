@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#protocol-stack"
-date: "2026-02-22"
+  - '#exec'
+  - '#protocol-stack'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-protocol-stack-deep-audit-plan]]"
+  - '[[2026-02-22-protocol-stack-deep-audit-plan]]'
 ---
+
 # `protocol-stack` Track C `Step 2c`
 
 Registered `--debug` and `--verbose` flags on `serve` and `a2a-serve` subparsers.

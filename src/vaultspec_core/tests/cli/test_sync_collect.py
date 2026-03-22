@@ -36,7 +36,7 @@ pytestmark = [pytest.mark.unit]
 
 
 def _cfg(tool: Tool) -> ToolConfig:
-    return _types.TOOL_CONFIGS[tool]
+    return _types.get_context().tool_configs[tool]
 
 
 class TestCollectRules:
@@ -53,7 +53,10 @@ class TestCollectRules:
         assert "b.md" in sources
 
     def test_empty_dirs(self, test_project):
-        # dirs exist but are empty
+        # Clear any pre-existing rules so dirs exist but are empty
+        rules_dir = test_project / ".vaultspec" / "rules" / "rules"
+        for f in rules_dir.glob("*.md"):
+            f.unlink()
         sources = collect_rules()
         assert sources == {}
 
@@ -76,7 +79,8 @@ class TestCollectRules:
 
 
 class TestCollectSkills:
-    def test_filters_task_prefix(self, test_project):
+    def test_collects_all_skill_directories(self, test_project):
+        """Any directory with a SKILL.md is collected, regardless of naming."""
         deploy_dir = (
             test_project / ".vaultspec" / "rules" / "skills" / "vaultspec-deploy"
         )
@@ -91,9 +95,16 @@ class TestCollectSkills:
         )
         skills = collect_skills()
         assert "vaultspec-deploy" in skills
-        assert "utility-helper" not in skills
+        assert "utility-helper" in skills
 
     def test_empty_skills_dir(self, test_project):
+        # Clear any pre-existing skills so the dir is empty
+        import shutil as _shutil
+
+        skills_dir = test_project / ".vaultspec" / "rules" / "skills"
+        if skills_dir.exists():
+            _shutil.rmtree(skills_dir)
+            skills_dir.mkdir()
         assert collect_skills() == {}
 
 
@@ -159,40 +170,30 @@ class TestListings:
         assert "Deploy things" in listing
 
     def test_skill_listing_empty(self, test_project):
+        # Clear any pre-existing skills so listing is empty
+        import shutil as _shutil
+
+        skills_dir = test_project / ".vaultspec" / "rules" / "skills"
+        if skills_dir.exists():
+            _shutil.rmtree(skills_dir)
+            skills_dir.mkdir()
         listing = _collect_skill_listing()
         assert listing == ""
 
 
 class TestGenerateConfig:
-    def test_internal_and_custom(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "Internal body", encoding="utf-8"
-        )
-        (test_project / ".vaultspec" / "rules" / "system" / "project.md").write_text(
-            "Custom body", encoding="utf-8"
-        )
-        content = _generate_config_body(_cfg(Tool.CLAUDE))
-        assert content is not None
-        assert "Internal body" in content
-        assert "Custom body" in content
-
-    def test_internal_only(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "Internal body", encoding="utf-8"
-        )
-        content = _generate_config_body(_cfg(Tool.CLAUDE))
-        assert content is not None
-        assert "Internal body" in content
-
-    def test_returns_none_without_internal(self, test_project):
+    def test_returns_none_without_rules(self, test_project):
+        """Config body is None when no synced rules exist."""
+        # Clear any pre-existing synced rules from the real corpus
+        rules_dir = test_project / ".claude" / "rules"
+        if rules_dir.exists():
+            for f in rules_dir.glob("*.md"):
+                f.unlink()
         content = _generate_config_body(_cfg(Tool.CLAUDE))
         assert content is None
 
     def test_includes_rule_references(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "Internal", encoding="utf-8"
-        )
-        # Create a synced rule in the destination
+        """Config body includes @rule references when synced rules exist."""
         (test_project / ".claude" / "rules" / "my-rule.md").write_text(
             "rule content", encoding="utf-8"
         )
@@ -200,18 +201,7 @@ class TestGenerateConfig:
         assert content is not None
         assert "@.claude/rules/my-rule.md" in content
 
-    def test_codex_generates_agents_md_with_rule_refs(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "Internal", encoding="utf-8"
-        )
-        content = _generate_config_body(_cfg(Tool.CODEX))
-        assert content is not None
-        assert "Internal" in content
-
     def test_antigravity_uses_workspace_rules_for_root_gemini(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "Internal", encoding="utf-8"
-        )
         (test_project / ".agents" / "rules").mkdir(parents=True, exist_ok=True)
         (test_project / ".agents" / "rules" / "workspace-rule.md").write_text(
             "rule content", encoding="utf-8"
@@ -221,8 +211,9 @@ class TestGenerateConfig:
         assert "@.agents/rules/workspace-rule.md" in content
 
     def test_codex_native_config_uses_explicit_frontmatter(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
+        (test_project / ".vaultspec" / "rules" / "system" / "codex-cfg.md").write_text(
             "---\n"
+            "pipeline: config\n"
             "codex_model: gpt-5-codex\n"
             "codex_approval_policy: on-request\n"
             "codex_project_root_markers:\n"
@@ -237,13 +228,13 @@ class TestGenerateConfig:
         assert 'approval_policy = "on-request"' in content
         assert 'project_root_markers = [".git", "pyproject.toml"]' in content
 
-    def test_codex_native_config_project_overrides_framework(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "---\ncodex_sandbox_mode: read-only\n---\n\nInternal",
+    def test_codex_native_config_later_file_overrides(self, test_project):
+        (test_project / ".vaultspec" / "rules" / "system" / "01-codex.md").write_text(
+            "---\npipeline: config\ncodex_sandbox_mode: read-only\n---\n\nFirst",
             encoding="utf-8",
         )
-        (test_project / ".vaultspec" / "rules" / "system" / "project.md").write_text(
-            "---\ncodex_sandbox_mode: workspace-write\n---\n\nProject",
+        (test_project / ".vaultspec" / "rules" / "system" / "02-codex.md").write_text(
+            "---\npipeline: config\ncodex_sandbox_mode: workspace-write\n---\n\nSecond",
             encoding="utf-8",
         )
         content = _generate_codex_native_config_body()
@@ -253,8 +244,9 @@ class TestGenerateConfig:
     def test_codex_native_config_supports_reasoning_and_service_tier(
         self, test_project
     ):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
+        (test_project / ".vaultspec" / "rules" / "system" / "codex-cfg.md").write_text(
             "---\n"
+            "pipeline: config\n"
             "codex_model_reasoning_effort: high\n"
             "codex_model_reasoning_summary: auto\n"
             "codex_model_supports_reasoning_summaries: true\n"
@@ -301,38 +293,36 @@ class TestCodexNegativeCoverage:
 
     def test_codex_native_config_returns_none_without_codex_keys(self, test_project):
         """If no codex_* frontmatter keys exist, native config returns None."""
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "---\nname: framework\n---\n\nInternal", encoding="utf-8"
+        (test_project / ".vaultspec" / "rules" / "system" / "some-part.md").write_text(
+            "---\npipeline: config\nname: some-part\n---\n\nInternal", encoding="utf-8"
         )
         assert _generate_codex_native_config_body() is None
 
 
 class TestGenerateSystemPrompt:
     def test_assembly_order(self, test_project):
-        # base comes first
-        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
-            "---\n---\n\n# BASE CONTENT", encoding="utf-8"
-        )
-        # tool-specific next
+        # tool-specific parts come first
         (
             test_project / ".vaultspec" / "rules" / "system" / "gemini-tools.md"
         ).write_text("---\ntool: gemini\n---\n\n# GEMINI TOOLS", encoding="utf-8")
-        # shared last
-        (test_project / ".vaultspec" / "rules" / "system" / "zzz-shared.md").write_text(
-            "---\n---\n\n# SHARED CONTENT", encoding="utf-8"
+        # shared parts come after, sorted by order
+        (test_project / ".vaultspec" / "rules" / "system" / "01-core.md").write_text(
+            "---\norder: 1\n---\n\n# CORE CONTENT", encoding="utf-8"
+        )
+        (test_project / ".vaultspec" / "rules" / "system" / "90-custom.md").write_text(
+            "---\norder: 90\n---\n\n# CUSTOM CONTENT", encoding="utf-8"
         )
 
         content = _generate_system_prompt(_cfg(Tool.GEMINI))
         assert content is not None
 
-        # Verify ordering: base -> tool-specific -> shared
-        base_pos = content.index("# BASE CONTENT")
+        # Verify ordering: tool-specific -> shared (by order)
         tool_pos = content.index("# GEMINI TOOLS")
-        shared_pos = content.index("# SHARED CONTENT")
-        assert base_pos < tool_pos < shared_pos
+        core_pos = content.index("# CORE CONTENT")
+        custom_pos = content.index("# CUSTOM CONTENT")
+        assert tool_pos < core_pos < custom_pos
 
-    def test_missing_base(self, test_project):
-        # Only a shared part, no base.md
+    def test_shared_parts_only(self, test_project):
         (test_project / ".vaultspec" / "rules" / "system" / "extra.md").write_text(
             "---\n---\n\n# Extra", encoding="utf-8"
         )
@@ -341,8 +331,8 @@ class TestGenerateSystemPrompt:
         assert "# Extra" in content
 
     def test_multiple_tool_specific_parts(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
-            "---\n---\n\n# Base", encoding="utf-8"
+        (test_project / ".vaultspec" / "rules" / "system" / "01-core.md").write_text(
+            "---\norder: 1\n---\n\n# Core", encoding="utf-8"
         )
         (test_project / ".vaultspec" / "rules" / "system" / "gemini-a.md").write_text(
             "---\ntool: gemini\n---\n\n# Gemini A", encoding="utf-8"

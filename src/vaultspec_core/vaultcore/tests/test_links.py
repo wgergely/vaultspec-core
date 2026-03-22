@@ -1,5 +1,10 @@
-"""Tests wiki-link extraction from document bodies and related field parsing
-from frontmatter, including normalization and rejection rules."""
+"""Tests for wiki-link extraction from document bodies and frontmatter.
+
+Covers :func:`~vaultspec_core.vaultcore.links.extract_wiki_links` and
+:func:`~vaultspec_core.vaultcore.links.extract_related_links` including
+alias stripping, ``.md``-extension normalization, deduplication, and
+malformed-link rejection.
+"""
 
 import pytest
 

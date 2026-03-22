@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#research"
-  - "#mcp-testing"
-date: "2026-02-22"
+  - '#research'
+  - '#mcp-testing'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-mcp-consolidation-research]]"
-  - "[[2026-02-22-mcp-consolidation-adr]]"
+  - '[[2026-02-22-mcp-consolidation-research]]'
+  - '[[2026-02-22-mcp-consolidation-adr]]'
 ---
+
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 
@@ -20,9 +21,7 @@ function calls and `FastMCP.call_tool()` -- neither exercises the MCP
 protocol's client-server session handshake, JSON-RPC serialization, or
 transport layer.
 
-
 ## Findings
-
 
 ### 1. SDK in-memory transport API (`mcp.shared.memory`)
 
@@ -65,23 +64,22 @@ async def create_connected_server_and_client_session(
 
 Import path: `from mcp.shared.memory import create_connected_server_and_client_session`
 
-
 ### 2. ClientSession API surface
 
 The yielded `ClientSession` provides the following methods relevant to testing
 (all return typed Pydantic result models):
 
-| Method | Returns | Purpose |
-|--------|---------|---------|
-| `list_tools()` | `ListToolsResult` | Enumerate registered tools with schemas |
-| `call_tool(name, arguments)` | `CallToolResult` | Invoke a tool through the protocol |
-| `list_resources()` | `ListResourcesResult` | Enumerate registered resources |
-| `read_resource(uri)` | `ReadResourceResult` | Read a specific resource by URI |
-| `list_prompts()` | `ListPromptsResult` | Enumerate registered prompts |
-| `get_prompt(name, arguments)` | `GetPromptResult` | Retrieve a specific prompt |
-| `list_resource_templates()` | `ListResourceTemplatesResult` | List resource templates |
-| `send_ping()` | `EmptyResult` | Protocol-level ping |
-| `set_logging_level(level)` | `EmptyResult` | Set server logging level |
+| Method                        | Returns                       | Purpose                                 |
+| ----------------------------- | ----------------------------- | --------------------------------------- |
+| `list_tools()`                | `ListToolsResult`             | Enumerate registered tools with schemas |
+| `call_tool(name, arguments)`  | `CallToolResult`              | Invoke a tool through the protocol      |
+| `list_resources()`            | `ListResourcesResult`         | Enumerate registered resources          |
+| `read_resource(uri)`          | `ReadResourceResult`          | Read a specific resource by URI         |
+| `list_prompts()`              | `ListPromptsResult`           | Enumerate registered prompts            |
+| `get_prompt(name, arguments)` | `GetPromptResult`             | Retrieve a specific prompt              |
+| `list_resource_templates()`   | `ListResourceTemplatesResult` | List resource templates                 |
+| `send_ping()`                 | `EmptyResult`                 | Protocol-level ping                     |
+| `set_logging_level(level)`    | `EmptyResult`                 | Set server logging level                |
 
 Key detail: `call_tool()` automatically validates tool results against their
 `outputSchema` (via `_validate_tool_result`). If the server returns structured
@@ -94,7 +92,6 @@ provides free schema conformance testing.
 containing the error message -- they do NOT raise Python exceptions on the
 client side. This is a critical behavioral difference from `FastMCP.call_tool()`
 which raises `ToolError` directly.
-
 
 ### 3. Lifespan interaction
 
@@ -125,7 +122,9 @@ runs the server, the lifespan fires. This means:
 
 - `initialize_server()` MUST be called before creating the session, so that
   the globals (`ROOT_DIR`, `AGENTS_DIR`, etc.) are set.
+
 - The agent-file poller task will start and run during the test.
+
 - On context exit, the task group cancellation will cancel the poller cleanly.
 
 This is actually beneficial -- it exercises the real lifespan, which current
@@ -138,16 +137,17 @@ existing conftest.
 without lifespan for focused tool tests. The choice depends on whether a given
 test needs the lifespan or not.
 
-
 ### 4. anyio vs asyncio compatibility
 
 **Status**: Compatible with care.
 
 The project uses:
+
 - `pytest-asyncio` v1.3.0 with `asyncio_mode = "auto"` in `pyproject.toml`
 - Python's `asyncio` event loop for all async tests (no `anyio` backend fixture)
 
 The MCP SDK's in-memory transport uses:
+
 - `anyio.create_memory_object_stream` for the streams
 - `anyio.create_task_group` for managing the server task
 
@@ -156,8 +156,10 @@ as its backend automatically. The `anyio.create_task_group()` call wraps
 `asyncio.TaskGroup` under the hood. This means:
 
 - `pytest-asyncio`'s event loop is used as the `anyio` backend transparently
+
 - No `anyio_backend` fixture is needed (that fixture is for `pytest-anyio`, a
   different plugin)
+
 - `pytest.mark.asyncio` (or `asyncio_mode = "auto"`) is sufficient
 
 **Key compatibility concern**: The MCP SDK's official test suite uses
@@ -176,16 +178,17 @@ However, for the `create_connected_server_and_client_session` pattern, the
 `async with` block is used within a single test function body (not across
 fixture yield), so this should not be an issue.
 
-
 ### 5. Windows asyncio concerns
 
 **In-memory transport avoids the main Windows pain points.** The known
 `WindowsProactorEventLoopPolicy` issues stem from:
+
 - Subprocess pipes (IOCP handles) not cleaning up cleanly
 - `ProactorEventLoop` required for subprocess support
 
 The in-memory transport uses pure memory streams (`anyio.create_memory_object_stream`)
 with no subprocess spawning, no pipes, and no IOCP handles. This means:
+
 - No `ProactorEventLoop` is required
 - The default `SelectorEventLoop` used by `pytest-asyncio` on Windows works
 - The transport is fully cross-platform with no OS-specific codepaths
@@ -197,16 +200,15 @@ MCP server as a subprocess). In-memory tests bypass this entirely.
 **Conclusion**: In-memory client session tests should be immune to the
 Windows async hangs seen with subprocess-based tests.
 
-
 ### 6. Current test gap analysis
 
 Current tests exercise three layers:
 
-| Layer | Approach | Example |
-|-------|----------|---------|
-| Logic | Direct `await list_agents()` | `test_mcp_tools.py` |
+| Layer            | Approach                                 | Example                |
+| ---------------- | ---------------------------------------- | ---------------------- |
+| Logic            | Direct `await list_agents()`             | `test_mcp_tools.py`    |
 | FastMCP pipeline | `await mcp.call_tool("list_agents", {})` | `test_mcp_protocol.py` |
-| Registration | `await mcp.list_tools()` | `test_mcp_protocol.py` |
+| Registration     | `await mcp.list_tools()`                 | `test_mcp_protocol.py` |
 
 What is missing:
 
@@ -251,7 +253,6 @@ What is missing:
   `spawn_agent`, `dissolve_team`, `relay_output`, `get_team_task_status`) are
   tested via direct function calls but never through the MCP protocol.
 
-
 ### 7. Recommended test structure
 
 Based on the SDK source and our codebase patterns, the recommended approach for
@@ -281,6 +282,7 @@ async def client_session() -> AsyncGenerator[ClientSession, None]:
 
 **Lifespan consideration**: The `create_server()` function attaches
 `_lifespan` which includes `subagent_lifespan()`. This will:
+
 - Call `_register_agent_resources()` which needs `AGENTS_DIR` to exist
 - Start the poller task (harmless -- cancelled on exit)
 
@@ -310,20 +312,25 @@ async def client_session_no_lifespan() -> AsyncGenerator[ClientSession, None]:
 
 - `TestProtocolHandshake` -- verify `initialize()` returns expected
   capabilities (tools=True, resources=True, prompts=None)
+
 - `TestToolDiscovery` -- `list_tools()` returns all 15 tools with correct
   schemas and annotations
+
 - `TestResourceDiscovery` -- `list_resources()` returns `agents://` URIs,
   `read_resource()` returns valid JSON
+
 - `TestToolCallRoundTrip` -- call each tool through the protocol, verify
   JSON-RPC serialization
+
 - `TestErrorPropagation` -- unknown tool, invalid arguments, ToolError -- all
   via `CallToolResult.isError`
+
 - `TestConcurrentCalls` -- fire multiple tool calls concurrently on a single
   session
+
 - `TestLifecycle` -- dispatch, poll, complete cycle through the protocol
   (already partially covered in `test_mcp_protocol.py` but only at the
   `FastMCP.call_tool` level)
-
 
 ### 8. `inline-snapshot` assessment
 
@@ -343,7 +350,6 @@ assertions against `ListToolsResult` fields are sufficient and more explicit.
 Could be added later for schema regression if tool definitions change
 frequently. Not a blocker.
 
-
 ### 9. SDK evolution: `Client` and `InMemoryTransport` (main branch)
 
 The MCP SDK's `main` branch (unreleased at time of research) introduces:
@@ -355,17 +361,20 @@ These are NOT available in v1.26.0. The `create_connected_server_and_client_sess
 approach is the correct one for our pinned version. When the SDK releases these
 APIs, the migration would be straightforward but is not necessary now.
 
-
 ### 10. NO-MOCK policy alignment
 
 The in-memory client session approach aligns perfectly with the project's
 strict no-mocking policy:
 
 - No `unittest.mock`, `monkeypatch.setattr`, or test doubles needed
+
 - The `ClientSession` is a real MCP client talking to a real MCP server
+
 - JSON-RPC serialization/deserialization happens for real
+
 - The only "fake" element is the transport (memory streams instead of stdio/HTTP),
   which is an explicitly supported and documented SDK feature
+
 - `initialize_server()` with `refresh_callback=lambda: False` is an injection
   point already used in production code -- not a mock
 
@@ -375,16 +384,21 @@ replaces the actual subprocess-spawning `run_subagent` with a recording
 function that exercises the same interface. This pattern should continue
 unchanged in protocol-level tests.
 
-
 ## Summary of key decisions for implementation
 
 - Use `create_connected_server_and_client_session` from `mcp.shared.memory`
   (available in SDK v1.26.0)
+
 - Pass `raise_exceptions=True` for test debuggability
+
 - Use `pytest-asyncio` with `asyncio_mode = "auto"` (no `anyio` plugin needed)
+
 - Two fixture variants: with lifespan (for resource/lifecycle tests) and
   without (for focused tool tests)
+
 - Error assertions must check `CallToolResult.isError` rather than
   `pytest.raises(ToolError)` since errors are protocol-level, not exceptions
+
 - Windows compatibility is a non-issue for in-memory transport
+
 - `inline-snapshot` is optional and not needed initially

@@ -1,16 +1,24 @@
 ---
 tags:
-  - "#audit"
-  - "#concurrency"
-date: "2026-02-18"
+  - '#audit'
+  - '#concurrency'
+date: '2026-02-18'
+related:
+  - '[[2026-02-18-health-audit-deep-contracts-abstractions-audit]]'
+  - '[[2026-02-18-health-audit-deep-error-propagation-audit]]'
+  - '[[2026-02-18-health-audit-investigator1-core-vault-orch-audit]]'
+  - '[[2026-02-18-health-audit-investigator2-protocol-subagent-audit]]'
+  - '[[2026-02-18-health-audit-investigator3-data-functional-audit]]'
+  - '[[2026-02-18-health-audit-summary-audit]]'
 ---
+
 # Deep Audit: Concurrency, Resource Lifecycle, and State Management
 
 **Auditor:** investigator2
 **Date:** 2026-02-18
 **Mandate:** READ-ONLY. Full concurrency, lifecycle, and state analysis.
 
----
+______________________________________________________________________
 
 ## Executive Summary
 
@@ -22,28 +30,28 @@ user-controlled input. Additional findings include a `WORKING` task leak in
 `execute()` and `cancel()` on `_active_clients` in `ClaudeA2AExecutor`, and
 `VaultRAG` lazy property initialization not being thread-safe.
 
----
+______________________________________________________________________
 
 ## Finding Index
 
-| ID | Severity | Module | Description |
-|----|----------|--------|-------------|
-| CC-1 | HIGH (security) | hooks/engine.py | `shell=True` + unsanitized context → command injection |
-| CC-2 | MEDIUM (bug) | task_engine.py | WORKING tasks never expire — permanent memory leak |
-| CC-3 | MEDIUM (bug) | claude_executor.py | `_active_clients` dict race: execute/cancel on same task_id |
-| CC-4 | MEDIUM (bug) | rag/api.py | `VaultRAG` lazy properties not thread-safe — double init |
-| CC-5 | LOW (design) | task_engine.py | threading.Lock + asyncio.Event: safe, but usage pattern fragile |
-| CC-6 | LOW (design) | subagent.py | AsyncExitStack: cleanup exception could swallow SubagentResult |
-| CC-7 | LOW (design) | rag/search.py | Graph TTL check+rebuild not atomic — stale graph served during rebuild |
-| CC-8 | LOW (design) | rag/api.py | `get_document()` creates standalone VaultStore — violates singleton rule |
-| CC-9 | INFO | subagent_server/server.py | Module-level globals are asyncio-safe but lack documentation |
-| CC-10 | INFO | protocol/acp/client.py | Zombie terminal risk if agent crashes before `release_terminal` |
+| ID    | Severity        | Module                    | Description                                                              |
+| ----- | --------------- | ------------------------- | ------------------------------------------------------------------------ |
+| CC-1  | HIGH (security) | hooks/engine.py           | `shell=True` + unsanitized context → command injection                   |
+| CC-2  | MEDIUM (bug)    | task_engine.py            | WORKING tasks never expire — permanent memory leak                       |
+| CC-3  | MEDIUM (bug)    | claude_executor.py        | `_active_clients` dict race: execute/cancel on same task_id              |
+| CC-4  | MEDIUM (bug)    | rag/api.py                | `VaultRAG` lazy properties not thread-safe — double init                 |
+| CC-5  | LOW (design)    | task_engine.py            | threading.Lock + asyncio.Event: safe, but usage pattern fragile          |
+| CC-6  | LOW (design)    | subagent.py               | AsyncExitStack: cleanup exception could swallow SubagentResult           |
+| CC-7  | LOW (design)    | rag/search.py             | Graph TTL check+rebuild not atomic — stale graph served during rebuild   |
+| CC-8  | LOW (design)    | rag/api.py                | `get_document()` creates standalone VaultStore — violates singleton rule |
+| CC-9  | INFO            | subagent_server/server.py | Module-level globals are asyncio-safe but lack documentation             |
+| CC-10 | INFO            | protocol/acp/client.py    | Zombie terminal risk if agent crashes before `release_terminal`          |
 
----
+______________________________________________________________________
 
 ## Detailed Findings
 
----
+______________________________________________________________________
 
 ### CC-1 — HIGH (security): Command Injection via `shell=True`
 
@@ -75,7 +83,9 @@ The `ctx` dict values are literal replacements — no shell escaping is applied.
 Hook context values come from caller-controlled data. For example:
 
 ```python
+
 # In vault.py or cli.py:
+
 trigger(hooks, "vault.document.created", {"path": str(doc_path)})
 ```
 
@@ -118,7 +128,7 @@ metacharacters (`;`, `|`, `&`, `` ` ``, `$`, `(`, `)`, `<`, `>`, `!`).
 Note: `_execute_agent` correctly uses a list `[sys.executable, str(subagent_script), ...]`
 with `shell=False` — the fix should mirror that pattern.
 
----
+______________________________________________________________________
 
 ### CC-2 — MEDIUM (bug): WORKING Tasks Never Expire — Permanent Memory Leak
 
@@ -139,7 +149,9 @@ TTL expiry is set **only when a task reaches a terminal state** (completed,
 failed, cancelled):
 
 ```python
+
 # In update_status(), complete_task(), fail_task():
+
 if is_terminal(status):
     self._expiry[task_id] = task.updated_at + self._ttl_seconds
 ```
@@ -174,25 +186,31 @@ No test covers a permanently-working task (stuck in WORKING state).
 **Fix:** Add a creation-time TTL cap for WORKING tasks:
 
 ```python
+
 # In create_task():
+
 # Set a maximum working TTL (e.g., 2x the normal TTL or a config value)
+
 self._expiry[tid] = now + self._max_working_ttl
 ```
 
 Or track `created_at` separately and evict WORKING tasks older than a
 configurable `max_working_seconds`.
 
----
+______________________________________________________________________
 
 ### CC-3 — MEDIUM (bug): `_active_clients` Race in ClaudeA2AExecutor
 
 **File:** `protocol/a2a/executors/claude_executor.py`, lines 88–168
 
 ```python
+
 # execute() — stores client
+
 self._active_clients[task_id] = sdk_client
 
 # cancel() — reads and removes
+
 client = self._active_clients.pop(task_id, None)
 ```
 
@@ -219,7 +237,9 @@ safe. No documentation or code comment confirms this.
 **Problem 2: execute() checks `_active_clients` implicitly (via finally).**
 
 ```python
+
 # In execute() finally:
+
 self._active_clients.pop(task_id, None)
 ```
 
@@ -253,7 +273,7 @@ async def execute(self, ...):
         self._active_clients.pop(task_id, None)
 ```
 
----
+______________________________________________________________________
 
 ### CC-4 — MEDIUM (bug): `VaultRAG` Lazy Properties Not Thread-Safe
 
@@ -321,7 +341,7 @@ def get_engine(root_dir):
             ...
 ```
 
----
+______________________________________________________________________
 
 ### CC-5 — LOW (design): threading.Lock + asyncio.Event — Safe but Fragile
 
@@ -336,18 +356,19 @@ loop?
 
 **Analysis:** All `with self._lock:` blocks in `TaskEngine` are called from:
 
-   non-blocking if uncontested (GIL + CPython lock fast path).
-2. `wait_for_update()` — acquires `self._lock` briefly to register the
+non-blocking if uncontested (GIL + CPython lock fast path).
+
+1. `wait_for_update()` — acquires `self._lock` briefly to register the
    event, then awaits `event.wait()` *outside* the lock.
 
 **Potential deadlock scenario:**
 
 - `LockManager.release_lock()` also uses `threading.Lock` internally.
 - These are two different lock objects, so no deadlock is possible here.
-calls `event.set()` outside the lock. If `event.set()` is called from a
-non-asyncio thread, it may not wake up asyncio waiters until the event loop
-next polls. In the current architecture, `_notify()` is always called from
-the asyncio event loop thread, so this is safe.
+  calls `event.set()` outside the lock. If `event.set()` is called from a
+  non-asyncio thread, it may not wake up asyncio waiters until the event loop
+  next polls. In the current architecture, `_notify()` is always called from
+  the asyncio event loop thread, so this is safe.
 
 **Verdict:** No deadlock. The pattern is correct but relies on the
 invariant that `_notify()` is always called from the event loop thread.
@@ -357,7 +378,7 @@ future maintenance risk.
 **Test coverage:** No concurrent access tests exist. The `test_task_engine.py`
 file tests only sequential operations.
 
----
+______________________________________________________________________
 
 ### CC-6 — LOW (design): AsyncExitStack — Exception Swallowing Risk
 
@@ -369,7 +390,9 @@ The resource lifecycle in `run_subagent()`:
 try:
     async with contextlib.AsyncExitStack() as stack:
         async with spawn_agent_process(client, ...) as (conn, _proc):
+
             # ... work ...
+
             return SubagentResult(...)   # ← return inside nested context managers
 
 except Exception:
@@ -380,8 +403,11 @@ except Exception:
         written_files=client.written_files,
     )
 finally:
+
     # Cleanup spec.cleanup_paths
+
     # Clear callbacks
+
     gc.collect()
 ```
 
@@ -429,7 +455,7 @@ except Exception as e:
     task_engine.fail_task(task_id, f"Unexpected error: {e}")
 ```
 
----
+______________________________________________________________________
 
 ### CC-7 — LOW (design): Graph TTL Not Atomic — Stale Graph During Rebuild
 
@@ -477,7 +503,7 @@ except Exception as e:
     return None
 ```
 
----
+______________________________________________________________________
 
 ### CC-8 — LOW (design): `get_document()` Creates Standalone VaultStore
 
@@ -523,7 +549,7 @@ def get_document(root_dir, doc_id):
         result = engine.store.get_by_id(doc_id)
 ```
 
----
+______________________________________________________________________
 
 ### CC-9 — INFO: Module-Level Globals in `subagent_server/server.py`
 
@@ -560,7 +586,7 @@ from coroutines on the same event loop, there is no concurrent access risk.
 **Verdict:** Safe as currently implemented. No action required, but a
 comment noting the single-event-loop assumption would prevent future bugs.
 
----
+______________________________________________________________________
 
 ### CC-10 — INFO: Zombie Terminal Risk in `SubagentClient`
 
@@ -592,7 +618,7 @@ object is garbage collected after `run_subagent()` returns, which eventually
 cancels the reader tasks, but:
 
 1. The subprocess may remain as a zombie until Python's GC runs.
-2. Between GC and subprocess death, the subprocess holds a pipe open to
+1. Between GC and subprocess death, the subprocess holds a pipe open to
    the SubagentClient, keeping stdout alive.
 
 **Likelihood:** Low in normal usage (agent sends `release_terminal` before
@@ -609,47 +635,53 @@ async def close(self) -> None:
 
 Call it in `run_subagent()`'s `finally` block alongside the callback cleanup.
 
----
+______________________________________________________________________
 
 ## Test Coverage Summary for Concurrency
 
-| Scenario | Covered by Tests? |
-|----------|------------------|
-| Concurrent execute + cancel on same task | NO |
-| WORKING task that never terminates | NO |
-| Double-disconnect on SDK client | NO |
-| CancelledError through run_subagent | NO |
-| Shell metacharacter injection in hook context | NO |
-| Graph rebuild retry storm | NO |
-| Multiple VaultStore instances on same .lance dir | NO |
-| Terminal orphan on agent crash | NO |
-| Threading.Lock contention in TaskEngine | NO |
-| AsyncExitStack cleanup exception | NO |
+| Scenario                                         | Covered by Tests? |
+| ------------------------------------------------ | ----------------- |
+| Concurrent execute + cancel on same task         | NO                |
+| WORKING task that never terminates               | NO                |
+| Double-disconnect on SDK client                  | NO                |
+| CancelledError through run_subagent              | NO                |
+| Shell metacharacter injection in hook context    | NO                |
+| Graph rebuild retry storm                        | NO                |
+| Multiple VaultStore instances on same .lance dir | NO                |
+| Terminal orphan on agent crash                   | NO                |
+| Threading.Lock contention in TaskEngine          | NO                |
+| AsyncExitStack cleanup exception                 | NO                |
 
 **All 10 concurrency scenarios have zero test coverage.**
 
----
+______________________________________________________________________
 
 ## Priority Recommendations
 
 **Priority 1 — Fix immediately:**
 
-
-  `hooks/engine.py:_execute_shell()`. This is a security vulnerability.
+`hooks/engine.py:_execute_shell()`. This is a security vulnerability.
 
 - **CC-2:** Add creation-time TTL cap for WORKING tasks in `TaskEngine`.
+
 - **CC-6:** Catch `asyncio.CancelledError` in `_run_in_background` in
   `subagent_server/server.py` and call `task_engine.cancel_task()`.
+
 - **CC-3:** Add asyncio.Lock for `_active_clients` in `ClaudeA2AExecutor`.
+
 - **CC-4:** Add threading.Lock for `get_engine()` singleton initialization.
+
 - **CC-7:** Set `self._graph_built_at = now` in the exception handler to
 
   prevent retry storms.
+
 - **CC-10:** Add `close()` to `SubagentClient` and call it in `run_subagent()`
-**Priority 4 — Document:**
+  **Priority 4 — Document:**
 
 - **CC-5:** Add comment in `TaskEngine._notify()` noting the event loop
   thread invariant.
+
 - **CC-8:** Route `get_document()` and `get_status()` through `get_engine()`
   or add a `store.close()` call after use.
+
 - **CC-9:** Add comment in `server.py` noting the single-event-loop assumption.

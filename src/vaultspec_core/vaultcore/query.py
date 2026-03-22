@@ -1,0 +1,331 @@
+"""Unified query engine for .vault/ document operations.
+
+Composes :mod:`.scanner` and :mod:`.parser` into a single query surface
+used by CLI commands (``vault stats``, ``vault list``, ``vault feature list``).
+Exports :class:`VaultDocument`, :func:`list_documents`, :func:`get_stats`,
+:func:`list_feature_details`, and :func:`archive_feature`.
+"""
+
+from __future__ import annotations
+
+import logging
+import re
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from .models import DocType
+from .parser import parse_frontmatter
+from .scanner import get_doc_type, scan_vault
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class VaultDocument:
+    """A resolved vault document with parsed metadata.
+
+    Attributes:
+        path: Absolute filesystem path to the document.
+        name: Filename stem (no extension).
+        doc_type: Document type value string (e.g. ``"adr"``, ``"plan"``).
+        feature: Feature name extracted from the non-type tag, or ``None``.
+        date: ISO 8601 date string from frontmatter or filename, or ``None``.
+        tags: Raw tag list from frontmatter.
+    """
+
+    path: Path
+    name: str
+    doc_type: str
+    feature: str | None
+    date: str | None
+    tags: list[str]
+
+
+def _parse_date_from_filename(name: str) -> str | None:
+    """Extract the ``YYYY-MM-DD`` prefix from a vault filename.
+
+    Args:
+        name: Filename stem (no directory component).
+
+    Returns:
+        Date string such as ``"2026-02-07"``, or ``None`` if absent.
+    """
+    m = re.match(r"(\d{4}-\d{2}-\d{2})", name)
+    return m.group(1) if m else None
+
+
+def _parse_feature_from_tags(tags: list[str], doc_type_tag: str | None) -> str | None:
+    """Return the first non-:class:`~vaultspec_core.vaultcore.models.DocType` tag.
+
+    Args:
+        tags: Raw tag list from frontmatter (e.g. ``["#adr", "#editor-demo"]``).
+        doc_type_tag: Bare doc-type value to skip (e.g. ``"adr"``), or ``None``.
+
+    Returns:
+        Feature name string without the leading ``#``, or ``None`` if not found.
+    """
+    for tag in tags:
+        cleaned = tag.lstrip("#")
+        if doc_type_tag and cleaned == doc_type_tag:
+            continue
+        if cleaned in {dt.value for dt in DocType}:
+            continue
+        return cleaned
+    return None
+
+
+def _scan_all(root_dir: Path) -> list[VaultDocument]:
+    """Scan the vault and parse every document into a :class:`VaultDocument`.
+
+    Used internally by :func:`list_documents`, :func:`get_stats`,
+    :func:`list_feature_details`, and :mod:`vaultspec_core.vaultcore.checks.features`.
+
+    Args:
+        root_dir: Project root directory.
+
+    Returns:
+        List of :class:`VaultDocument` instances for all readable vault files.
+    """
+    docs = []
+    for doc_path in scan_vault(root_dir):
+        try:
+            content = doc_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        meta, _ = parse_frontmatter(content)
+        dt = get_doc_type(doc_path, root_dir)
+        dt_str = dt.value if dt else "unknown"
+        tags = meta.get("tags", [])
+        if isinstance(tags, str):
+            tags = [tags]
+        feature = _parse_feature_from_tags(tags, dt_str)
+        # Fallback: if no feature from tags, check bare 'feature:' field
+        if not feature and "feature" in meta:
+            feature = str(meta["feature"]).lstrip("#").strip().lower() or None
+        date = meta.get("date") or _parse_date_from_filename(doc_path.name)
+
+        docs.append(
+            VaultDocument(
+                path=doc_path,
+                name=doc_path.stem,
+                doc_type=dt_str,
+                feature=feature,
+                date=str(date) if date else None,
+                tags=tags,
+            )
+        )
+    return docs
+
+
+def list_documents(
+    root_dir: Path,
+    *,
+    doc_type: str | None = None,
+    feature: str | None = None,
+    date: str | None = None,
+) -> list[VaultDocument]:
+    """List vault documents with optional filters.
+
+    Args:
+        root_dir: Project root directory.
+        doc_type: Filter by type. Standard types: ``adr``, ``audit``,
+            ``exec``, ``plan``, ``reference``, ``research``. Special
+            values: ``"orphaned"`` (no incoming links), ``"invalid"``
+            (contains broken outgoing links).
+        feature: Filter by feature tag (without ``#`` prefix).
+        date: Filter by exact date string (``YYYY-MM-DD``).
+
+    Returns:
+        Ordered list of :class:`VaultDocument` instances matching all
+        supplied filters.
+    """
+    docs = _scan_all(root_dir)
+
+    if doc_type == "orphaned":
+        from ..graph import VaultGraph
+
+        graph = VaultGraph(root_dir)
+        orphan_names = set(graph.get_orphaned())
+        docs = [d for d in docs if d.name in orphan_names]
+    elif doc_type == "invalid":
+        from ..graph import VaultGraph
+
+        graph = VaultGraph(root_dir)
+        invalid_sources = {src for src, _ in graph.get_invalid_links()}
+        docs = [d for d in docs if d.name in invalid_sources]
+    elif doc_type:
+        docs = [d for d in docs if d.doc_type == doc_type]
+
+    if feature:
+        feature = feature.lstrip("#")
+        docs = [d for d in docs if d.feature == feature]
+
+    if date:
+        docs = [d for d in docs if d.date == date]
+
+    return docs
+
+
+def get_stats(
+    root_dir: Path,
+    *,
+    feature: str | None = None,
+    doc_type: str | None = None,
+    date: str | None = None,
+) -> dict:
+    """Compute vault statistics with optional filters.
+
+    Args:
+        root_dir: Project root directory.
+        feature: Restrict counts to a single feature (without ``#``).
+        doc_type: Restrict counts to a single document type.
+        date: Restrict to documents matching this date (``YYYY-MM-DD``).
+
+    Returns:
+        Dict with keys: ``total_docs``, ``total_features``,
+        ``counts_by_type`` (``dict[str, int]``), ``orphaned_count``,
+        ``invalid_link_count``. Orphan and invalid counts are always
+        computed against the full unfiltered vault via
+        :class:`~vaultspec_core.graph.VaultGraph`.
+    """
+    docs = list_documents(root_dir, feature=feature, doc_type=doc_type, date=date)
+
+    counts_by_type: dict[str, int] = {}
+    features: set[str] = set()
+    for d in docs:
+        counts_by_type[d.doc_type] = counts_by_type.get(d.doc_type, 0) + 1
+        if d.feature:
+            features.add(d.feature)
+
+    # Orphan/invalid counts from graph (unfiltered)
+    from ..graph import VaultGraph
+
+    try:
+        graph = VaultGraph(root_dir)
+        orphaned_count = len(graph.get_orphaned())
+        invalid_link_count = len(graph.get_invalid_links())
+    except (OSError, ValueError) as exc:
+        logger.warning("Failed to build vault graph for stats: %s", exc)
+        orphaned_count = 0
+        invalid_link_count = 0
+
+    return {
+        "total_docs": len(docs),
+        "total_features": len(features),
+        "counts_by_type": counts_by_type,
+        "orphaned_count": orphaned_count,
+        "invalid_link_count": invalid_link_count,
+    }
+
+
+def list_feature_details(
+    root_dir: Path,
+    *,
+    date: str | None = None,
+    doc_type: str | None = None,
+    orphaned_only: bool = False,
+) -> list[dict]:
+    """List features with enriched per-feature metadata.
+
+    Args:
+        root_dir: Project root directory.
+        date: Exclude features whose earliest document date is after this
+            value (``YYYY-MM-DD``).
+        doc_type: Restrict to features that contain at least one document
+            of this type.
+        orphaned_only: When ``True``, return only features where every
+            document is orphaned (no incoming wiki-links).
+
+    Returns:
+        List of dicts sorted by feature name, each with keys: ``name``,
+        ``doc_count``, ``types`` (sorted list), ``earliest_date``,
+        ``has_plan``.
+    """
+    docs = _scan_all(root_dir)
+
+    # Group by feature
+    by_feature: dict[str, list[VaultDocument]] = {}
+    for d in docs:
+        if d.feature:
+            by_feature.setdefault(d.feature, []).append(d)
+
+    # Orphan detection
+    orphan_features: set[str] = set()
+    if orphaned_only:
+        from ..graph import VaultGraph
+
+        graph = VaultGraph(root_dir)
+        orphan_names = set(graph.get_orphaned())
+        for feat, feat_docs in by_feature.items():
+            if all(d.name in orphan_names for d in feat_docs):
+                orphan_features.add(feat)
+
+    results = []
+    for feat, feat_docs in sorted(by_feature.items()):
+        if orphaned_only and feat not in orphan_features:
+            continue
+
+        types = {d.doc_type for d in feat_docs}
+
+        if doc_type and doc_type not in types:
+            continue
+
+        dates = [d.date for d in feat_docs if d.date]
+        earliest = min(dates) if dates else None
+
+        if date and earliest and earliest > date:
+            continue
+
+        results.append(
+            {
+                "name": feat,
+                "doc_count": len(feat_docs),
+                "types": sorted(types),
+                "earliest_date": earliest,
+                "has_plan": "plan" in types,
+            }
+        )
+
+    return results
+
+
+def archive_feature(root_dir: Path, feature: str) -> dict:
+    """Move all documents for a feature into ``.vault/_archive/``.
+
+    Preserves the per-type subdirectory structure under the archive folder.
+
+    Args:
+        root_dir: Project root directory.
+        feature: Feature name to archive (leading ``#`` is stripped).
+
+    Returns:
+        Dict with keys: ``archived_count`` (int), ``paths`` (list of
+        strings -- new paths relative to ``root_dir``).
+    """
+    import shutil
+
+    from ..config import get_config
+
+    cfg = get_config()
+    vault_dir = root_dir / cfg.docs_dir
+    archive_dir = vault_dir / "_archive"
+
+    feature = feature.lstrip("#")
+    docs = list_documents(root_dir, feature=feature)
+
+    if not docs:
+        return {"archived_count": 0, "paths": []}
+
+    archived: list[str] = []
+    for doc in docs:
+        # Preserve subdirectory (e.g., adr/, plan/)
+        rel = doc.path.relative_to(vault_dir)
+        dest = archive_dir / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(doc.path), str(dest))
+        archived.append(str(dest.relative_to(root_dir)))
+
+    return {"archived_count": len(archived), "paths": archived}

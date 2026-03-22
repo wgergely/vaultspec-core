@@ -1,14 +1,15 @@
 ---
 tags:
-  - "#adr"
-  - "#a2a"
-date: "2026-02-24"
+  - '#adr'
+  - '#a2a'
+date: '2026-02-24'
 related:
-  - "[[2026-02-24-a2a-adr]]"
-  - "[[2026-02-24-subagent-protocol-research]]"
-  - "[[2026-02-24-cli-protocols-research]]"
-  - "[[2026-02-24-a2a-server-manager-adr]]"
+  - '[[2026-02-24-a2a-adr]]'
+  - '[[2026-02-24-subagent-protocol-research]]'
+  - '[[2026-02-24-cli-protocols-research]]'
+  - '[[2026-02-24-a2a-server-manager-adr]]'
 ---
+
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 
@@ -41,6 +42,7 @@ port. The orchestrator connects to each independently.
 - **Pro:** Process isolation (one crash doesn't affect others). Clean
   lifecycle (kill process = done). Matches A2A's agent-card-per-server
   model. Simple — each server wraps exactly one executor.
+
 - **Con:** Multiple processes. Port management. Slightly more resource
   usage.
 
@@ -58,7 +60,9 @@ already-running servers.
 
 - Must work for both single subagent invocations (1 server) and multi-agent
   teams (N servers).
+
 - Must work on Windows (process tree cleanup via `kill_process_tree()`).
+
 - Startup overhead must be negligible relative to LLM response times.
 
 ## Implementation
@@ -103,16 +107,21 @@ Orchestrator (vaultspec — A2A CLIENT)
 ## Rationale
 
 1. **Isolation** — one agent crash cannot take down others.
-2. **Simplicity** — each server wraps one executor, no routing logic.
-3. **A2A conformance** — one agent card per server, per the spec.
-4. **Lifecycle parity** — matches current ACP model where each
+
+1. **Simplicity** — each server wraps one executor, no routing logic.
+
+1. **A2A conformance** — one agent card per server, per the spec.
+
+1. **Lifecycle parity** — matches current ACP model where each
    `run_subagent()` spawns one process.
-5. **Clean teardown** — kill process = kill server = done.
+
+1. **Clean teardown** — kill process = kill server = done.
 
 ## Consequences
 
 - **Positive:** Fault isolation, simple lifecycle, A2A-conformant agent
   card behavior, works uniformly for subagents and teams.
+
 - **Negative:** Multiple processes per team. Port management complexity
   (mitigated by ephemeral OS-assigned ports). Slightly higher resource
   usage for large teams (acceptable given LLM-bound workloads).

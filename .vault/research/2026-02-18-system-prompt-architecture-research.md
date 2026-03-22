@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#research"
-  - "#system-prompt"
-date: "2026-02-18"
+  - '#research'
+  - '#system-prompt'
+date: '2026-02-18'
 related:
-  - "[[2026-02-17-tech-audit-audit]]"
+  - '[[2026-02-17-tech-audit-audit]]'
 ---
+
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields outside the YAML frontmatter above -->
 
 # system-prompt research: architecture and tool-specific behavioral disparity
@@ -22,12 +23,12 @@ Gemini CLI mechanisms, and an internal cohesion audit of all system/ files.
 
 Claude Code provides **four CLI flags** for system prompt control:
 
-| Flag | Behavior | Modes |
-|------|----------|-------|
-| `--system-prompt "text"` | Replaces entire default system prompt | Interactive + Print |
-| `--system-prompt-file path` | Replaces with file contents | Print only |
-| `--append-system-prompt "text"` | Appends to default prompt | Interactive + Print |
-| `--append-system-prompt-file path` | Appends file contents | Print only |
+| Flag                               | Behavior                              | Modes               |
+| ---------------------------------- | ------------------------------------- | ------------------- |
+| `--system-prompt "text"`           | Replaces entire default system prompt | Interactive + Print |
+| `--system-prompt-file path`        | Replaces with file contents           | Print only          |
+| `--append-system-prompt "text"`    | Appends to default prompt             | Interactive + Print |
+| `--append-system-prompt-file path` | Appends file contents                 | Print only          |
 
 `--system-prompt` and `--system-prompt-file` are mutually exclusive. The append
 flags can be combined with either replacement flag. There is **no equivalent
@@ -47,26 +48,26 @@ than any CLAUDE.md content.
 **Priority hierarchy** (highest to lowest):
 
 1. `--system-prompt` / `--append-system-prompt` (actual system prompt)
-2. Managed policy CLAUDE.md (`C:\Program Files\ClaudeCode\CLAUDE.md`)
-3. `.claude/CLAUDE.md` (project, VCS-tracked)
-4. `.claude/rules/*.md` (same priority as CLAUDE.md)
-5. `~/.claude/CLAUDE.md` (personal global)
-6. `CLAUDE.local.md` (personal project)
-7. Auto memory (`~/.claude/projects/*/memory/MEMORY.md`, 200 lines)
+1. Managed policy CLAUDE.md (`C:\Program Files\ClaudeCode\CLAUDE.md`)
+1. `.claude/CLAUDE.md` (project, VCS-tracked)
+1. `.claude/rules/*.md` (same priority as CLAUDE.md)
+1. `~/.claude/CLAUDE.md` (personal global)
+1. `CLAUDE.local.md` (personal project)
+1. Auto memory (`~/.claude/projects/*/memory/MEMORY.md`, 200 lines)
 
-**Sources:** [[claude-code-docs-memory]], [[claude-code-docs-cli-reference]],
-[[anthropics/claude-code#6973]], [[anthropics/claude-code#7571]]
+**Sources:** \[[claude-code-docs-memory]\], \[[claude-code-docs-cli-reference]\],
+\[[anthropics/claude-code#6973]\], \[[anthropics/claude-code#7571]\]
 
 ### 2. Gemini CLI system prompt mechanisms
 
 Gemini CLI supports **full system prompt replacement** via the `GEMINI_SYSTEM_MD`
 environment variable. There is **no `--system` or `--system-prompt` CLI flag**.
 
-| Mechanism | Effect |
-|-----------|--------|
-| `GEMINI_SYSTEM_MD=true` or `=1` | Reads `.gemini/system.md` as full replacement |
-| `GEMINI_SYSTEM_MD=/path/to/file` | Reads from specified path as full replacement |
-| `GEMINI_WRITE_SYSTEM_MD=1` | Exports built-in system prompt to `.gemini/system.md` |
+| Mechanism                        | Effect                                                |
+| -------------------------------- | ----------------------------------------------------- |
+| `GEMINI_SYSTEM_MD=true` or `=1`  | Reads `.gemini/system.md` as full replacement         |
+| `GEMINI_SYSTEM_MD=/path/to/file` | Reads from specified path as full replacement         |
+| `GEMINI_WRITE_SYSTEM_MD=1`       | Exports built-in system prompt to `.gemini/system.md` |
 
 Custom system prompt files support **template variables**:
 
@@ -89,8 +90,8 @@ The `context.fileName` setting is configurable and supports arrays
 **Design philosophy**: SYSTEM.md = "firmware" (non-negotiable operational rules),
 GEMINI.md = "strategy" (persona, goals, project context).
 
-**Sources:** [[geminicli-system-prompt]], [[gemini-cli-configuration]],
-[[google-gemini/gemini-cli/discussions/1471]]
+**Sources:** \[[geminicli-system-prompt]\], \[[gemini-cli-configuration]\],
+\[[google-gemini/gemini-cli/discussions/1471]\]
 
 ### 3. Current vaultspec system/ architecture
 
@@ -112,16 +113,16 @@ Final Gemini SYSTEM.md order:
 
 ### 4. Cohesion audit grades
 
-| File | Grade | Key issues |
-|------|-------|------------|
-| `base.md` | B- | "Jean-Claude" persona in shared file; `activate_skill` / `<activated_skill>` are Gemini-specific refs with no `tool:` frontmatter |
-| `gemini.md` | B | Correct `tool: gemini` frontmatter; ~35 lines of shell examples consuming ~40% of assembled prompt; forward-reference to "Explain Critical Commands rule above" which actually appears AFTER in assembly |
-| `operations.md` | C+ | **8+ Gemini-specific tool names** (`run_shell_command`, `save_memory`, `read_file`, `/help`, `/bug`) but NO `tool:` frontmatter -- masquerades as shared; allcaps "IT IS CRITICAL" anti-pattern; `****` typo on line 33 |
-| `workflow.md` | A- | Clean, tool-agnostic; references `system/framework.md` which is excluded from system prompt assembly |
-| `framework.md` | B+ | Correct `pipeline: config`; well-structured XML tags; tool-agnostic |
-| `project.md` | N/A | Empty placeholder |
-| Assembled `.gemini/SYSTEM.md` | C+ | Frankenstein assembly; contradictory identity (Jean-Claude vs. vaultspec); wrong ordering (workflow routing placed last); shell examples disproportionate |
-| Assembled `.claude/CLAUDE.md` | B | Correct config format; **missing ALL behavioral instructions** (base.md, operations.md, workflow.md never reach Claude) |
+| File                          | Grade | Key issues                                                                                                                                                                                                              |
+| ----------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `base.md`                     | B-    | "Jean-Claude" persona in shared file; `activate_skill` / `<activated_skill>` are Gemini-specific refs with no `tool:` frontmatter                                                                                       |
+| `gemini.md`                   | B     | Correct `tool: gemini` frontmatter; ~35 lines of shell examples consuming ~40% of assembled prompt; forward-reference to "Explain Critical Commands rule above" which actually appears AFTER in assembly                |
+| `operations.md`               | C+    | **8+ Gemini-specific tool names** (`run_shell_command`, `save_memory`, `read_file`, `/help`, `/bug`) but NO `tool:` frontmatter -- masquerades as shared; allcaps "IT IS CRITICAL" anti-pattern; `****` typo on line 33 |
+| `workflow.md`                 | A-    | Clean, tool-agnostic; references `system/framework.md` which is excluded from system prompt assembly                                                                                                                    |
+| `framework.md`                | B+    | Correct `pipeline: config`; well-structured XML tags; tool-agnostic                                                                                                                                                     |
+| `project.md`                  | N/A   | Empty placeholder                                                                                                                                                                                                       |
+| Assembled `.gemini/SYSTEM.md` | C+    | Frankenstein assembly; contradictory identity (Jean-Claude vs. vaultspec); wrong ordering (workflow routing placed last); shell examples disproportionate                                                               |
+| Assembled `.claude/CLAUDE.md` | B     | Correct config format; **missing ALL behavioral instructions** (base.md, operations.md, workflow.md never reach Claude)                                                                                                 |
 
 ### 5. P0 issues (critical)
 
@@ -130,11 +131,11 @@ Final Gemini SYSTEM.md order:
    `/bug` -- all Gemini CLI tool names. Any new tool added to the system sync
    pipeline would inherit these Gemini-specific instructions.
 
-2. **base.md leaks Gemini-specific content.** Line 14 references
+1. **base.md leaks Gemini-specific content.** Line 14 references
    `activate_skill` and `<activated_skill>` tags, which are Gemini CLI
    constructs. This is in a shared file with no `tool:` filter.
 
-3. **Claude receives zero behavioral instructions.** Claude's ToolConfig has no
+1. **Claude receives zero behavioral instructions.** Claude's ToolConfig has no
    `system_file`, so base.md, operations.md, and workflow.md are never assembled
    for Claude. The entire behavioral framework (core mandates, security rules,
    git workflow, tone guidelines) is invisible to Claude Code. Claude only
@@ -143,27 +144,32 @@ Final Gemini SYSTEM.md order:
 
 ### 6. P1 issues (important)
 
-4. `****` typo on operations.md line 33 (renders as visible garbage).
-5. ALLCAPS "IT IS CRITICAL" on operations.md line 5 (prompt engineering anti-pattern).
-6. "Jean-Claude" persona in base.md line 1 (tool-specific name in shared file;
+1. `****` typo on operations.md line 33 (renders as visible garbage).
+
+1. ALLCAPS "IT IS CRITICAL" on operations.md line 5 (prompt engineering anti-pattern).
+
+1. "Jean-Claude" persona in base.md line 1 (tool-specific name in shared file;
    doesn't reach Claude anyway since base.md is excluded from CLAUDE.md).
-7. Forward-reference in gemini.md line 64 ("rule above" but rule appears AFTER
+
+1. Forward-reference in gemini.md line 64 ("rule above" but rule appears AFTER
    in assembly).
-8. Shell tool examples consume ~40% of assembled system prompt. The `sg` examples
+
+1. Shell tool examples consume ~40% of assembled system prompt. The `sg` examples
    alone are 32 lines of code. These are processed on every conversation turn
    regardless of task type.
-9. Workflow routing (workflow.md) placed last in assembly due to alphabetical
+
+1. Workflow routing (workflow.md) placed last in assembly due to alphabetical
    sort. Should appear earlier given its importance as a routing directive.
 
 ### 7. Architectural design options for Claude behavioral coverage
 
-| Option | Mechanism | Pros | Cons |
-|--------|-----------|------|------|
-| A: `--append-system-prompt-file` | CLI flag on launch | Highest priority; actual system prompt; persistent across session | Not persistent across sessions without wrapper script; CLI-only |
-| B: Add `system_file` to Claude ToolConfig | Assemble `.claude/SYSTEM.md` like Gemini | Symmetric architecture; reuses existing pipeline | Claude Code ignores files outside CLAUDE.md/rules; unclear if Claude Code would load a SYSTEM.md |
-| C: Expand `.claude/rules/` | Generate behavioral rules from system/ parts | Leverages existing rules mechanism; always loaded | Rules have the `<system-reminder>` disclaimer; lower priority than system prompt |
-| D: Embed in CLAUDE.md body | Put behavioral content below rule references | Simple; uses existing config sync | CLAUDE.md already has disclaimer issue; body content is user context |
-| E: Use `project.md` body | Write behavioral content to project.md, which flows into CLAUDE.md body | Uses existing pipeline; no new mechanism | Same disclaimer issue as option D |
+| Option                                    | Mechanism                                                               | Pros                                                              | Cons                                                                                             |
+| ----------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| A: `--append-system-prompt-file`          | CLI flag on launch                                                      | Highest priority; actual system prompt; persistent across session | Not persistent across sessions without wrapper script; CLI-only                                  |
+| B: Add `system_file` to Claude ToolConfig | Assemble `.claude/SYSTEM.md` like Gemini                                | Symmetric architecture; reuses existing pipeline                  | Claude Code ignores files outside CLAUDE.md/rules; unclear if Claude Code would load a SYSTEM.md |
+| C: Expand `.claude/rules/`                | Generate behavioral rules from system/ parts                            | Leverages existing rules mechanism; always loaded                 | Rules have the `<system-reminder>` disclaimer; lower priority than system prompt                 |
+| D: Embed in CLAUDE.md body                | Put behavioral content below rule references                            | Simple; uses existing config sync                                 | CLAUDE.md already has disclaimer issue; body content is user context                             |
+| E: Use `project.md` body                  | Write behavioral content to project.md, which flows into CLAUDE.md body | Uses existing pipeline; no new mechanism                          | Same disclaimer issue as option D                                                                |
 
 **Recommended approach**: Option C (expand `.claude/rules/`) as the primary
 mechanism, with the behavioral instructions extracted into tool-agnostic shared

@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#packaging-restructure"
-date: "2026-02-21"
+  - '#exec'
+  - '#packaging-restructure'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-packaging-restructure-p1p2-plan]]"
+  - '[[2026-02-21-packaging-restructure-p1p2-plan]]'
 ---
+
 # Step 5: Rewrite imports in leaf packages `core/` and `vaultcore/`
 
 ## Status: COMPLETE

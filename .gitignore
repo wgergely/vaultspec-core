@@ -34,6 +34,7 @@ MANIFEST
 
 # Auto-generated temp files
 .vaultspec/.tmp/
+tmp/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -173,11 +174,8 @@ CLAUDE.md
 GEMINI.md
 
 # Antigravity
+.agent/
 .agents/
-
-# codex
-.codex/
-AGENTS.md
 
 # LanceDB vector store
 .lance/
@@ -194,5 +192,17 @@ test-project/*
 
 # Temporary reference files
 tmp-ref/
+
+# Framework
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.codex/
+.claude/
+.gemini/
+
+# Builtins content — copied from .vaultspec/rules/ at build time
+src/vaultspec_core/builtins/*
+!src/vaultspec_core/builtins/__init__.py
 
 

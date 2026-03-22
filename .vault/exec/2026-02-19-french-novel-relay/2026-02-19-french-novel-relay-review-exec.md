@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#french-novel-relay"
-date: "2026-02-20"
+  - '#exec'
+  - '#french-novel-relay'
+date: '2026-02-20'
 related:
-  - "[[2026-02-19-french-novel-relay-adr]]"
+  - '[[2026-02-19-french-novel-relay-adr]]'
 ---
+
 # `french-novel-relay` code review
 
 **Status:** `REVISION REQUIRED`
@@ -15,7 +16,7 @@ related:
 - **ADR:** `[[2026-02-19-french-novel-relay-adr]]`
 - **Scope:** `.vaultspec/lib/src/protocol/a2a/tests/test_french_novel_relay.py` (single new test file; no production code changes)
 
----
+______________________________________________________________________
 
 ## Findings
 
@@ -27,7 +28,7 @@ related:
 
 - **[HIGH]** `StoryRelayExecutor.execute()` line 183 / `cancel()` line 196 — The `event_queue` parameter is untyped. Every executor in the codebase (`EchoExecutor`, `PrefixExecutor` in `conftest.py` lines 31/43 and 56/68) annotates `event_queue: EventQueue` via a `TYPE_CHECKING` import guard. This is the established convention and is missing here, degrading type-checker coverage on the public `AgentExecutor` interface.
 
----
+______________________________________________________________________
 
 ### Medium / Low (Recommended)
 
@@ -45,7 +46,7 @@ related:
 
 - **[LOW]** `import time` is present and used only for `time.monotonic()` timing measurements in both test methods. In the live test, timing variables are printed but not asserted, which is correct given the absence of a live-test timing SLA. No issue.
 
----
+______________________________________________________________________
 
 ## Recommendations
 
@@ -92,7 +93,7 @@ Annotate both `StoryRelayExecutor` methods: `async def execute(self, context: Re
 - Add accumulation comment to `StoryRelayExecutor.execute()`.
 - Raise the 5s mock timing ceiling to 10s.
 
----
+______________________________________________________________________
 
 ## Notes
 

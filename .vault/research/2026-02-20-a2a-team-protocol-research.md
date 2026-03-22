@@ -1,13 +1,14 @@
 ---
 tags:
-  - "#research"
-  - "#protocol"
-date: "2026-02-20"
+  - '#research'
+  - '#protocol'
+date: '2026-02-20'
 related:
-  - "[[2026-02-07-a2a-research]]"
-  - "[[2026-02-15-a2a-adr]]"
-  - "[[2026-02-15-cross-agent-bidirectional-communication]]"
+  - '[[2026-02-07-a2a-research]]'
+  - '[[2026-02-15-a2a-adr]]'
+  - '[[2026-02-15-cross-agent-bidirectional-communication]]'
 ---
+
 # A2A Team Protocol Research: Multi-Agent Team Coordination Patterns
 
 Research into how the A2A protocol (v0.3.x, a2a-sdk v0.3.22) supports multi-agent
@@ -35,14 +36,18 @@ signal continuation within the same conversation or session.
   with this shared session.
 
 - **Limits:**
+
   - contextId is **per-server scoped** -- each A2A server manages its own task store.
     Two different agent servers receiving the same contextId will independently create
     their own tasks. The coordinator must stitch results together.
+
   - No built-in **expiration or TTL** is mandated by the spec. Servers MAY implement
     expiration policies, but this is implementation-defined.
+
   - No **cross-server context synchronization** -- the protocol does not define how
     two servers should share or reconcile context state. The contextId is purely a
     hint for the server's internal state management.
+
   - contextId carries no **team membership** semantics. It doesn't encode which agents
     belong to a team or what roles they play.
 
@@ -93,16 +98,20 @@ protocol between one client and one server.
 What exists:
 
 - **contextId:** Groups tasks into sessions (see above).
+
 - **referenceTaskIds:** Creates task dependency graphs (see above).
+
 - **tenant field:** An optional namespace isolation parameter present in most request
   types (SendMessage, GetTask, ListTasks, CancelTask, push notifications,
   GetExtendedAgentCard). It isolates operations within shared infrastructure but
   carries no team semantics. Use case: a SaaS A2A platform serving multiple
   organizations. For vaultspec's team use, `tenant` could encode a team ID, but this
   is a creative repurposing, not the intended use.
+
 - **ListTasks with contextId filter:** `ListTasksRequest` supports filtering by
   `contextId`, which allows a coordinator to enumerate all tasks in a team session.
   This is useful for monitoring and result aggregation.
+
 - **Multiple concurrent streams:** "An agent MAY serve multiple concurrent streams to
   one or more clients for the same task." This supports multiple observers of the same
   task, relevant for team dashboards or leader monitoring.
@@ -119,16 +128,16 @@ What does NOT exist:
 
 ### 4. Team Lifecycle Mapping to A2A States
 
-| Team Event | A2A Mapping | Notes |
-|---|---|---|
-| Team forms | Coordinator generates contextId | No protocol event; purely coordinator logic |
-| Agent assigned | Coordinator discovers agent via Agent Card | GET `/.well-known/agent-card.json` |
-| Agent working | Task transitions to `working` | Per-agent task state; coordinator polls or streams |
-| Agent idle | No A2A state for "idle" | Coordinator must track agent availability separately |
-| Agent reports result | Task transitions to `completed` | Artifacts contain the result |
-| Agent needs input | Task transitions to `input_required` | Coordinator must provide follow-up |
-| Agent fails | Task transitions to `failed` | Error message in status |
-| Team dissolves | No protocol event | Coordinator stops dispatching; tasks reach terminal states |
+| Team Event           | A2A Mapping                                | Notes                                                      |
+| -------------------- | ------------------------------------------ | ---------------------------------------------------------- |
+| Team forms           | Coordinator generates contextId            | No protocol event; purely coordinator logic                |
+| Agent assigned       | Coordinator discovers agent via Agent Card | GET `/.well-known/agent-card.json`                         |
+| Agent working        | Task transitions to `working`              | Per-agent task state; coordinator polls or streams         |
+| Agent idle           | No A2A state for "idle"                    | Coordinator must track agent availability separately       |
+| Agent reports result | Task transitions to `completed`            | Artifacts contain the result                               |
+| Agent needs input    | Task transitions to `input_required`       | Coordinator must provide follow-up                         |
+| Agent fails          | Task transitions to `failed`               | Error message in status                                    |
+| Team dissolves       | No protocol event                          | Coordinator stops dispatching; tasks reach terminal states |
 
 **Key gap:** A2A has no "idle" or "available" state. The protocol is task-centric, not
 agent-centric. Between tasks, the agent simply has no active task -- there is no
@@ -162,9 +171,11 @@ heartbeat or presence mechanism.
   After authenticating, it can request `GET /extendedAgentCard` to receive a more
   detailed card with additional skills and capabilities. This provides tiered access:
   trusted agents see more capabilities.
+
 - **Per-request authentication:** Every SendMessage, GetTask, etc. requires valid
   credentials matching the card's security requirements. The server verifies before
   processing.
+
 - **No per-message authorization:** A2A does not define fine-grained permissions like
   "Agent X can send task type Y but not Z." Authorization is binary: authenticated or
   not. Role-based restrictions must be implemented in the executor logic.
@@ -180,29 +191,29 @@ production, OAuth2 client credentials or mTLS between agents is appropriate.
 
 **Existing code in `.vaultspec/lib/src/protocol/a2a/`:**
 
-| File | Status | Purpose |
-|---|---|---|
-| `__init__.py` | Implemented | Package init with docstring |
-| `state_map.py` | Implemented | Bidirectional TaskEngine<->A2A state mapping (6+9 states) |
-| `agent_card.py` | Implemented | Agent Card generation from agent definitions |
-| `discovery.py` | Implemented | Gemini CLI agent discovery file generation |
-| `server.py` | Implemented | `create_app()` -- wraps executor+card into Starlette ASGI app |
-| `executors/base.py` | Implemented | Re-exports sandbox logic from `protocol.sandbox` |
+| File                           | Status      | Purpose                                                         |
+| ------------------------------ | ----------- | --------------------------------------------------------------- |
+| `__init__.py`                  | Implemented | Package init with docstring                                     |
+| `state_map.py`                 | Implemented | Bidirectional TaskEngine\<->A2A state mapping (6+9 states)      |
+| `agent_card.py`                | Implemented | Agent Card generation from agent definitions                    |
+| `discovery.py`                 | Implemented | Gemini CLI agent discovery file generation                      |
+| `server.py`                    | Implemented | `create_app()` -- wraps executor+card into Starlette ASGI app   |
+| `executors/base.py`            | Implemented | Re-exports sandbox logic from `protocol.sandbox`                |
 | `executors/claude_executor.py` | Implemented | ClaudeA2AExecutor -- claude-agent-sdk wrapper with timeouts, DI |
-| `executors/gemini_executor.py` | Implemented | GeminiA2AExecutor -- delegates to `run_subagent()` via ACP |
+| `executors/gemini_executor.py` | Implemented | GeminiA2AExecutor -- delegates to `run_subagent()` via ACP      |
 
 **Test coverage:**
 
-| Test File | Tests | Scope |
-|---|---|---|
-| `test_unit_a2a.py` | 10 | State mapping, agent card, executor logic (no network) |
-| `test_integration_a2a.py` | 10 | In-process HTTP via ASGI transport (no LLM) |
-| `test_e2e_a2a.py` | 6 | Real LLM bidirectional (requires Claude+Gemini CLIs) |
-| `test_french_novel_relay.py` | 2 | 3-turn collaborative relay (mock + live) |
-| `test_claude_executor.py` | exists | Claude executor unit tests |
-| `test_gemini_executor.py` | exists | Gemini executor unit tests |
-| `test_discovery.py` | exists | Discovery file generation tests |
-| `test_agent_card.py` | exists | Agent card generation tests |
+| Test File                    | Tests  | Scope                                                  |
+| ---------------------------- | ------ | ------------------------------------------------------ |
+| `test_unit_a2a.py`           | 10     | State mapping, agent card, executor logic (no network) |
+| `test_integration_a2a.py`    | 10     | In-process HTTP via ASGI transport (no LLM)            |
+| `test_e2e_a2a.py`            | 6      | Real LLM bidirectional (requires Claude+Gemini CLIs)   |
+| `test_french_novel_relay.py` | 2      | 3-turn collaborative relay (mock + live)               |
+| `test_claude_executor.py`    | exists | Claude executor unit tests                             |
+| `test_gemini_executor.py`    | exists | Gemini executor unit tests                             |
+| `test_discovery.py`          | exists | Discovery file generation tests                        |
+| `test_agent_card.py`         | exists | Agent card generation tests                            |
 
 **ADR:** `.vault/adr/2026-02-15-a2a-adr.md` -- Proposed status, covers full 6-phase
 implementation plan. Phases 1-4 (foundation, server, Claude executor, Gemini executor)
@@ -214,6 +225,7 @@ CLI discovery) has implementation but needs further testing.
 The `test_french_novel_relay.py` is the closest existing example to team coordination.
 It chains 3 agents sequentially (Claude begins -> Gemini continues -> Claude finishes),
 passing output from one turn as input to the next. This validates:
+
 - Multi-agent message chaining via A2A
 - Task ID independence across agents
 - Content continuity through the chain
@@ -260,7 +272,9 @@ class TeamCoordinator:
 
     async def dispatch_parallel(self, assignments: dict[str, str]):
         """Fan-out: dispatch tasks to multiple agents concurrently."""
+
         # All messages share contextId + reference the seed task
+
         coros = []
         for agent_name, task_text in assignments.items():
             msg = SendMessageRequest(
@@ -290,32 +304,36 @@ class TeamCoordinator:
 **Key design decisions:**
 
 - **contextId is coordinator-generated** and shared across all agent servers.
+
 - **referenceTaskIds** link dependent tasks: if Agent B's work depends on Agent A's
   result, the dispatch to Agent B includes Agent A's task ID in `referenceTaskIds`
   AND includes Agent A's output in the message body (since Agent B's server cannot
   query Agent A's server directly).
+
 - **Fan-out uses `asyncio.gather()`** for concurrent dispatch.
+
 - **Fan-in uses polling or streaming.** For blocking tasks, the coordinator awaits
   each `send_message()` call. For non-blocking (long-running) tasks, the coordinator
   polls `get_task()` or subscribes to SSE streams.
+
 - **Error handling:** If any agent fails, the coordinator decides whether to retry,
   reassign, or abort the team. A2A's terminal state immutability means failed tasks
   stay failed -- a new task must be created for retry.
 
 ### 8. Gap Analysis: What's Missing for Team Coordination
 
-| Gap | Severity | Workaround |
-|---|---|---|
-| No team formation protocol | High | Build `TeamCoordinator` abstraction on top of A2A |
-| No agent presence/heartbeat | Medium | Coordinator pings agent cards periodically; track liveness |
-| No broadcast messaging | Medium | Coordinator loops over agents, sending individually |
-| No cross-server task visibility | High | Coordinator aggregates via `ListTasks` per server; include referenced output in message body |
-| No role-based authorization | Low | Implement in executor logic; different executors for different roles |
-| No shared artifact store | Medium | Coordinator extracts artifacts from completed tasks and re-injects into subsequent dispatches |
-| No agent "idle" state | Low | Track at coordinator level: agent is idle when it has no active tasks |
-| No consensus/voting | Low | Not needed for current use case; coordinator makes decisions |
-| referenceTaskIds are cross-server opaque | Medium | Coordinator must relay referenced task content in message body |
-| InMemoryTaskStore is per-process | Medium | Fine for local dev; production needs persistent store (SQL backends available in a2a-sdk extras) |
+| Gap                                      | Severity | Workaround                                                                                       |
+| ---------------------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| No team formation protocol               | High     | Build `TeamCoordinator` abstraction on top of A2A                                                |
+| No agent presence/heartbeat              | Medium   | Coordinator pings agent cards periodically; track liveness                                       |
+| No broadcast messaging                   | Medium   | Coordinator loops over agents, sending individually                                              |
+| No cross-server task visibility          | High     | Coordinator aggregates via `ListTasks` per server; include referenced output in message body     |
+| No role-based authorization              | Low      | Implement in executor logic; different executors for different roles                             |
+| No shared artifact store                 | Medium   | Coordinator extracts artifacts from completed tasks and re-injects into subsequent dispatches    |
+| No agent "idle" state                    | Low      | Track at coordinator level: agent is idle when it has no active tasks                            |
+| No consensus/voting                      | Low      | Not needed for current use case; coordinator makes decisions                                     |
+| referenceTaskIds are cross-server opaque | Medium   | Coordinator must relay referenced task content in message body                                   |
+| InMemoryTaskStore is per-process         | Medium   | Fine for local dev; production needs persistent store (SQL backends available in a2a-sdk extras) |
 
 **What a2a-sdk v0.3.22 already provides:**
 

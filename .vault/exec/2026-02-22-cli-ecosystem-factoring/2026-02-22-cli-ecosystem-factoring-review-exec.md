@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#exec"
-  - "#cli-ecosystem-factoring"
-date: "2026-02-22"
+  - '#exec'
+  - '#cli-ecosystem-factoring'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-cli-ecosystem-factoring-plan]]"
-  - "[[2026-02-22-cli-ecosystem-factoring-adr]]"
+  - '[[2026-02-22-cli-ecosystem-factoring-plan]]'
+  - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
 ---
+
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 
@@ -16,8 +17,8 @@ related:
 
 ## Audit Context
 
-- **Plan:** [[2026-02-22-cli-ecosystem-factoring-plan]]
-- **ADR:** [[2026-02-22-cli-ecosystem-factoring-adr]]
+- **Plan:** \[[2026-02-22-cli-ecosystem-factoring-plan]\]
+- **ADR:** \[[2026-02-22-cli-ecosystem-factoring-adr]\]
 - **Scope:** All files created/modified across Phases 1-4:
   - `src/vaultspec/core/` (9 submodules + `__init__.py`)
   - `src/vaultspec/cli_common.py`
@@ -43,13 +44,15 @@ The refactoring achieves its primary objectives: `cli.py` is reduced from 2459 t
   **Root cause:** `src/vaultspec/orchestration/__init__.py` was rewritten during this refactoring (explicit imports replaced with wildcard `from .X import *` for 6 submodules). The `.subagent` module was NOT included in the wildcard list. The old code used `from vaultspec.orchestration.subagent import run_subagent` (direct module path), which bypassed `__init__.py`. The refactored code changed the import to go through `__init__.py`, which now fails.
 
   **Evidence:** `python -m pytest src/vaultspec/tests/cli/test_integration.py::test_cli_help` fails with:
+
   ```
   ImportError: cannot import name 'run_subagent' from 'vaultspec.orchestration'
   ```
 
   **Fix options (pick one):**
+
   1. Add `from .subagent import *` to `orchestration/__init__.py`
-  2. Revert the import in `subagent_cli.py` to use the direct module path: `from .orchestration.subagent import run_subagent` (and similarly for `load_agent`, `AgentNotFoundError`)
+  1. Revert the import in `subagent_cli.py` to use the direct module path: `from .orchestration.subagent import run_subagent` (and similarly for `load_agent`, `AgentNotFoundError`)
 
   Option 2 is preferable because it matches the original behavior without expanding the `orchestration` package's public surface unnecessarily.
 
@@ -101,16 +104,19 @@ The refactoring achieves its primary objectives: `cli.py` is reduced from 2459 t
 ## Verification Results
 
 ### Tests
+
 - `python -m pytest src/vaultspec/tests/cli/ -x -q` -- **1 FAILED** (`test_cli_help` -- the `run_subagent` ImportError)
 - `python -m pytest src/vaultspec/tests/cli/ -q --ignore=test_integration.py` -- **168 PASSED**
 - `python -m pytest src/vaultspec/config/tests/ -x -q` -- **87 PASSED**
 
 ### Structural Checks
+
 - `wc -l src/vaultspec/cli.py` = **982** (target ~700, overshoot ~40%)
 - `ls src/vaultspec/core/` = 9 submodules + `__init__.py` + `tests/` + `__pycache__/` -- **PASS**
 - `ls src/vaultspec/cli_common.py` = exists, 227 lines -- **PASS**
 
 ### Import Integrity
+
 - `from vaultspec.cli import main` -- **PASS**
 - `import vaultspec.cli as cli; cli.ROOT_DIR` -- **PASS** (returns workspace root)
 - `from vaultspec.core.rules import collect_rules` -- **PASS**
@@ -121,12 +127,14 @@ The refactoring achieves its primary objectives: `cli.py` is reduced from 2459 t
 - `cli_common.py` importable without side effects -- **PASS**
 
 ### Antipattern Verification
+
 - `rg "except ImportError" src/vaultspec/core/` -- **1 result** (`core/system.py` -- the legitimate `skills_ref.prompt` guard)
 - `rg "PROVIDERS = {}" src/vaultspec/` -- **ZERO results** -- **PASS**
 - `sys.exit(1)` import guards in `subagent_cli.py` / `team_cli.py` -- **REMOVED** -- **PASS**
 - `_get_version` in `src/vaultspec/*.py` (non-test) -- **ZERO results** -- **PASS**
 
 ### Dependency Graph
+
 - `types.py`: imports from `..protocol.providers` (external to core) -- leaf module -- **PASS**
 - `helpers.py`: imports only stdlib + `yaml` -- **PASS**
 - `sync.py`: imports from `.helpers`, `.types` -- **PASS**
@@ -136,9 +144,10 @@ The refactoring achieves its primary objectives: `cli.py` is reduced from 2459 t
 - `config_gen.py`: imports from `.helpers`, `.rules`, `.sync`, `.types` -- **PASS**
 - `system.py`: imports from `.agents`, `.config_gen`, `.helpers`, `.skills`, `.sync`, `.types` -- **PASS**
 - `resources.py`: imports from `.helpers`, `.skills`, `.types` -- **PASS**
-- DAG: types <- helpers <- sync <- rules/agents/skills <- config_gen/system/resources -- **NO CYCLES**
+- DAG: types \<- helpers \<- sync \<- rules/agents/skills \<- config_gen/system/resources -- **NO CYCLES**
 
 ### Code Quality
+
 - No mock usage in any new code -- **PASS**
 - No dead code or leftover comments referencing old locations -- **PASS** (except test docstrings)
 - Proper relative imports within core/ package -- **PASS**
@@ -148,11 +157,11 @@ The refactoring achieves its primary objectives: `cli.py` is reduced from 2459 t
 
 1. **[MUST FIX]** Fix the `subagent_cli.py` import regression. Change line 28 to `from .orchestration.subagent import run_subagent` and line 170 to `from .orchestration.subagent import load_agent, AgentNotFoundError`. This restores the original direct-module import path.
 
-2. **[MUST FIX]** Revert `orchestration/__init__.py` to its last committed state. The wildcard-import rewrite is out-of-scope for this refactoring.
+1. **[MUST FIX]** Revert `orchestration/__init__.py` to its last committed state. The wildcard-import rewrite is out-of-scope for this refactoring.
 
-3. **[RECOMMENDED]** Update `test_vault_cli.py` docstrings/comments to reference `get_version()` instead of `_get_version()`.
+1. **[RECOMMENDED]** Update `test_vault_cli.py` docstrings/comments to reference `get_version()` instead of `_get_version()`.
 
-4. **[FUTURE]** Add unit tests under `src/vaultspec/core/tests/` for the domain library.
+1. **[FUTURE]** Add unit tests under `src/vaultspec/core/tests/` for the domain library.
 
 ## Notes
 

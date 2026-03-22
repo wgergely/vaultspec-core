@@ -1,10 +1,13 @@
-"""Expose the core resource-management and sync surface for vaultspec.
+"""Public surface for vaultspec resource management and sync orchestration.
 
-The `core` package contains the synchronized framework resources and the
-helpers used to materialize them into a workspace. Its submodules cover
-`agents`, `rules`, `skills`, and `system` resources, plus `config_gen`,
-`resources`, `sync`, `types`, and helper utilities that support bootstrap and
-distribution.
+Aggregates per-resource CRUD (:func:`agents_add`, :func:`rules_sync`,
+:func:`skills_list`, :func:`system_sync`), the sync engine
+(:func:`sync_files`, :func:`format_summary`), config generation
+(:func:`config_show`, :func:`config_sync`), I/O helpers
+(:func:`atomic_write`, :func:`build_file`), domain exceptions
+(:class:`VaultSpecError` and subclasses), and path/type contracts
+(:class:`SyncResult`, :class:`ToolConfig`, :class:`WorkspaceContext`).
+Consumed by :mod:`vaultspec_core.cli` and :mod:`vaultspec_core.mcp_server`.
 """
 
 from .agents import agents_add as agents_add
@@ -14,6 +17,12 @@ from .agents import collect_agents as collect_agents
 from .agents import transform_agent as transform_agent
 from .config_gen import config_show as config_show
 from .config_gen import config_sync as config_sync
+from .exceptions import ProviderError as ProviderError
+from .exceptions import ProviderNotInstalledError as ProviderNotInstalledError
+from .exceptions import ResourceExistsError as ResourceExistsError
+from .exceptions import ResourceNotFoundError as ResourceNotFoundError
+from .exceptions import VaultSpecError as VaultSpecError
+from .exceptions import WorkspaceNotInitializedError as WorkspaceNotInitializedError
 from .helpers import atomic_write as atomic_write
 from .helpers import build_file as build_file
 from .helpers import ensure_dir as ensure_dir
@@ -31,22 +40,14 @@ from .skills import skills_add as skills_add
 from .skills import skills_list as skills_list
 from .skills import skills_sync as skills_sync
 from .skills import transform_skill as transform_skill
-from .sync import print_summary as print_summary
+from .sync import format_summary as format_summary
 from .sync import sync_files as sync_files
 from .system import system_show as system_show
 from .system import system_sync as system_sync
-from .types import AGENTS_SRC_DIR as AGENTS_SRC_DIR
 from .types import CONFIG_HEADER as CONFIG_HEADER
-from .types import FRAMEWORK_CONFIG_SRC as FRAMEWORK_CONFIG_SRC
-from .types import HOOKS_DIR as HOOKS_DIR
-from .types import PROJECT_CONFIG_SRC as PROJECT_CONFIG_SRC
-from .types import ROOT_DIR as ROOT_DIR
-from .types import RULES_SRC_DIR as RULES_SRC_DIR
-from .types import SKILLS_SRC_DIR as SKILLS_SRC_DIR
-from .types import SYSTEM_SRC_DIR as SYSTEM_SRC_DIR
-from .types import TARGET_DIR as TARGET_DIR
-from .types import TEMPLATES_DIR as TEMPLATES_DIR
-from .types import TOOL_CONFIGS as TOOL_CONFIGS
 from .types import SyncResult as SyncResult
 from .types import ToolConfig as ToolConfig
+from .types import WorkspaceContext as WorkspaceContext
+from .types import get_context as get_context
 from .types import init_paths as init_paths
+from .types import set_context as set_context

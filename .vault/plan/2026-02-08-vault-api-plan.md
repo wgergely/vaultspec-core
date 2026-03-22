@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#plan"
-  - "#vault-api"
-date: "2026-02-08"
+  - '#plan'
+  - '#vault-api'
+date: '2026-02-08'
 related:
-  - "[[2026-02-08-vault-api-adr]]"
+  - '[[2026-02-08-vault-api-adr]]'
 ---
+
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields outside the YAML frontmatter above -->
 
 # vault-api plan: Implementation of Docs Verification and Scaffolding

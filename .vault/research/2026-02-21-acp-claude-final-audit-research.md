@@ -1,20 +1,22 @@
 ---
 tags:
-  - "#research"
-  - "#acp-claude-audit"
-date: "2026-02-21"
+  - '#research'
+  - '#acp-claude-audit'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-acp-claude-audit-research]]"
+  - '[[2026-02-21-acp-claude-audit-research]]'
 ---
+
 # ACP Claude Final Audit Findings
 
 ## 1. Permission Mode Magic Strings
 
 **Finding:**
 The reference implementation `agent.ts` supports changing the permission mode dynamically by checking the prompt text for specific magic strings:
-*   `[ACP:PERMISSION:ACCEPT_EDITS]` -> `acceptEdits`
-*   `[ACP:PERMISSION:BYPASS]` -> `bypassPermissions`
-*   `[ACP:PERMISSION:DEFAULT]` -> `default`
+
+- `[ACP:PERMISSION:ACCEPT_EDITS]` -> `acceptEdits`
+- `[ACP:PERMISSION:BYPASS]` -> `bypassPermissions`
+- `[ACP:PERMISSION:DEFAULT]` -> `default`
 
 Our `claude_bridge.py` hardcodes `bypassPermissions` in `_build_options`.
 
@@ -30,18 +32,22 @@ Neither implementation emits `UsageUpdate` events. This is likely due to the SDK
 
 **Finding:**
 Reference `loadSession` logic:
+
 ```typescript
     const existingSession = this.sessions.get(params.sessionId);
     if (existingSession) { return; }
     // If not found, create a new entry to allow Zed to resume conversation with a potentially restarted agent
     this.sessions.set(params.sessionId, { ... });
 ```
+
 Our `load_session` logic:
+
 ```python
         state = self._sessions.get(session_id)
         if state is None:
             return None  # We return None (failure?)
 ```
+
 If the bridge restarts but the Client (Zed) still has the session ID, our bridge rejects the load request. The reference *recreates* the session structure (empty state) to allow the conversation to proceed (potentially without history, or relying on `resume` later if the ID is known).
 
 Wait, our `load_session` returns `None` which usually means "error/not found" in ACP? The spec says `loadSession` returns `LoadSessionResponse` or `null` (if void).
@@ -64,10 +70,12 @@ The Python SDK types (`claude_agent_sdk.types`) should be checked. If there is a
 However, `UserMessage` is the standard way tool results (including errors) are fed back.
 If `tool_use_error` is a distinct event in the *stream* (before UserMessage), we might miss it.
 Reference `agent.ts`:
+
 ```typescript
       case "tool_use_error":
         await this.client.sessionUpdate({ ..., status: "failed", ... });
 ```
+
 This suggests it's an event.
 Our `_emit_stream_event` handles `content_block_delta`. It does not check for a top-level event type of `tool_use_error`.
 Wait, `StreamEvent` wraps the raw event.
@@ -75,6 +83,6 @@ We should check if `event.type == "tool_use_error"` or similar exists in the Pyt
 
 ## 5. Action Plan
 
-1.  **Implement Permission Magic Strings:** Parse prompt for strings and update `options.permission_mode`.
-2.  **Robust Session Loading:** Allow `load_session` to create a new session if missing (recover from bridge restart).
-3.  **Audit Tool Errors:** Check if `tool_use_error` is a possible event type in `StreamEvent` and handle it.
+1. **Implement Permission Magic Strings:** Parse prompt for strings and update `options.permission_mode`.
+1. **Robust Session Loading:** Allow `load_session` to create a new session if missing (recover from bridge restart).
+1. **Audit Tool Errors:** Check if `tool_use_error` is a possible event type in `StreamEvent` and handle it.

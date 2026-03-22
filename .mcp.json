@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "vaultspec-core": {
+      "command": "uv",
+      "args": [
+        "run",
+        "vaultspec-mcp"
+      ]
+    }
+  }
+}

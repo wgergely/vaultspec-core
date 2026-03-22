@@ -1,10 +1,15 @@
-"""Expose the vault document kernel used throughout vaultspec.
+"""Vault document kernel: models, parsing, scanning, and hydration.
 
-The `vaultcore` package provides the reusable primitives for working with
-`.vault/` documents: `models` defines the domain objects, `parser` extracts
-frontmatter and metadata, `links` reads wiki-link relationships, `scanner`
-discovers and classifies files, and `hydration` scaffolds new records from
-templates.
+Re-exports from six internal modules: :mod:`.models`
+(:class:`~vaultspec_core.vaultcore.models.DocType`,
+:class:`~vaultspec_core.vaultcore.models.DocumentMetadata`,
+:class:`~vaultspec_core.vaultcore.models.VaultConstants`),
+:mod:`.parser`
+(:func:`~vaultspec_core.vaultcore.parser.parse_frontmatter`,
+:func:`~vaultspec_core.vaultcore.parser.parse_vault_metadata`),
+:mod:`.links`, :mod:`.scanner`, :mod:`.query`, and
+:mod:`.hydration`.  Consumed by :mod:`vaultspec_core.metrics`,
+:mod:`vaultspec_core.graph`, and :mod:`vaultspec_core.mcp_server`.
 """
 
 from .hydration import create_vault_doc as create_vault_doc
@@ -17,5 +22,11 @@ from .models import DocumentMetadata as DocumentMetadata
 from .models import VaultConstants as VaultConstants
 from .parser import parse_frontmatter as parse_frontmatter
 from .parser import parse_vault_metadata as parse_vault_metadata
+from .query import VaultDocument as VaultDocument
+from .query import archive_feature as archive_feature
+from .query import get_stats as get_stats
+from .query import list_documents as list_documents
+from .query import list_feature_details as list_feature_details
 from .scanner import get_doc_type as get_doc_type
+from .scanner import list_features as list_features
 from .scanner import scan_vault as scan_vault

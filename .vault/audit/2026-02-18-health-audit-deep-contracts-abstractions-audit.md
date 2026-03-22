@@ -1,22 +1,23 @@
 ---
 tags:
-  - "#audit"
-  - "#health-audit"
-date: "2026-02-18"
+  - '#audit'
+  - '#health-audit'
+date: '2026-02-18'
 ---
+
 # Deep Audit: API Contracts, Dead Code, and Abstraction Quality
 
 **Auditor:** Investigator3
 **Date:** 2026-02-18
 **Scope:** Production code in `lib/src/` — API surface, type hints, abstractions, dead code, import graph, YAML parser architecture, provider ABC hierarchy, and deferred CLI test issues.
 
----
+______________________________________________________________________
 
 ## Executive Summary
 
 The codebase has a well-organized layer structure with clear module boundaries. The most significant findings are: `VaultConstants.DOCS_DIR` is dead code replaced by `_get_docs_dir()` but never removed; `handle_create` in `vault.py` hardcodes `".vault"` rather than using `get_config().docs_dir`; `_delete_by_ids` uses a different and weaker escaping strategy than `_sanitize_filter_value`; `get_document` and `get_status` create bare `VaultStore` instances that violate the singleton principle; `supported_models` and `get_model_capability` are defined on the `AgentProvider` base but never called from production code; and `construct_system_prompt` is abstract in the base but has identical implementations in both concrete providers — a copy-paste abstraction. The CLI test issues are non-trivial: `TestArgumentParsing` is genuinely divergent from production (missing `--fix` on audit), and `test_create_generates_correct_filename` exercises zero production code paths.
 
----
+______________________________________________________________________
 
 ## 1. Dead Code Detection
 
@@ -85,7 +86,7 @@ def close(self) -> None:
 
 **File:** `rag/api.py` — there is no `reset_engine()` function. Tests reset the singleton by directly setting `api_mod._engine = None`. This works but is an undocumented internal pattern. There is no public `reset_engine()` function despite tests needing one. Compare to `core/config.py` which has the clean pair `get_config()` / `reset_config()`.
 
----
+______________________________________________________________________
 
 ## 2. API Contract Consistency
 
@@ -96,10 +97,13 @@ def close(self) -> None:
 Two different escaping strategies exist in the same file:
 
 ```python
+
 # _sanitize_filter_value (line 42): proper SQL double-quoting escape
+
 sanitized = value.replace("'", "''")
 
 # _delete_by_ids (line 332): strips single quotes entirely
+
 escaped = ", ".join(f"'{i.replace(chr(39), '')}'" for i in ids)
 ```
 
@@ -140,7 +144,7 @@ The pattern is inconsistent with the singleton design in `VaultRAG`. Both functi
 
 `parse_frontmatter` (line 55) calls `content.lstrip()` before matching `---`. `parse_vault_metadata` does NOT — it matches the raw content with `re.match(r"^---\s*\n...")`. This means content with a leading blank line or BOM will fail to parse frontmatter in `parse_vault_metadata` but would succeed in `parse_frontmatter`. The BOM case is handled by callers of `parse_vault_metadata` (e.g., `fix_violations` strips the BOM before calling it), but a leading newline would silently produce an empty `DocumentMetadata` with no error.
 
----
+______________________________________________________________________
 
 ## 3. Abstraction Quality
 
@@ -179,7 +183,7 @@ The ABC does NOT enforce `check_version`, which is a `@staticmethod` on `GeminiP
 
 Claude warns on `approval_mode` (a Gemini-only feature). Gemini warns on `max_turns`, `budget`, `disallowed_tools`, `effort`, `fallback_model` (Claude-only features). But `allowed_tools` is handled by **both** providers and is NOT in either warning list — it's in `_CLAUDE_ONLY_FEATURES` exclusion only. This is correct (both handle it), but `output_format` appears in both: Claude handles it but doesn't put it in `_GEMINI_ONLY_FEATURES`, and Gemini handles it via `--output-format`. This is correct but the feature-to-provider mapping is only documented in two private tuples with no cross-referencing tests.
 
----
+______________________________________________________________________
 
 ## 4. Import Graph Analysis
 
@@ -229,7 +233,7 @@ from rag.embeddings import EmbeddingModel
 
 `rag/embeddings.py` imports `torch` at the top level (inside a `try/except ImportError`). This means importing `rag.store` will attempt to import `torch` immediately. For the "no RAG deps" case, the `_check_rag_deps()` guard in `VaultStore.__init__` catches the `ImportError` at construction time, but the module-level `EmbeddingModel` import runs before any guard. If `rag.embeddings` fails to import (no torch), `rag.store` itself will fail to import. This is only a problem if code tries to `import rag.store` without RAG deps — which is currently guarded by the `try: from rag.store import VaultStore ... except ImportError` pattern in callers. The chain is safe but fragile.
 
----
+______________________________________________________________________
 
 ## 5. Deferred CLI Test Issues — Full Analysis
 
@@ -239,36 +243,46 @@ from rag.embeddings import EmbeddingModel
 
 **Production `audit` parser includes:**
 
-
 **Impact:** Any future `--fix`-related argument changes in `vault.py` would not be caught by `TestArgumentParsing`. More fundamentally, testing argparse configuration by re-implementing it is the wrong approach. The correct fix is to extract `_make_parser()` from `main()` in `vault.py` and import it directly in the test:
-# vault.py — extract parser construction
-def _make_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(...)
-    # ... all parser setup ...
-    return parser
 
-def main():
-    args = _make_parser().parse_args()
-    ...
+## vault.py — extract parser construction
+
+def \_make_parser() -> argparse.ArgumentParser:
+parser = argparse.ArgumentParser(...)
+
+```
+# ... all parser setup ...
+
+return parser
 ```
 
+def main():
+args = \_make_parser().parse_args()
+...
+
+````
+
 ```python
+
 # test_docs_cli.py — import the real parser
+
 @pytest.fixture()
 def parser(self):
     import docs
     return docs._make_parser()
-```
+````
 
 This would make `TestArgumentParsing` tests genuinely verify the production parser rather than a manually-maintained copy. The existing tests would continue to pass unchanged (same API), and any future parser changes would be automatically covered.
 
-### 5.2 `test_create_generates_correct_filename` — exercises zero production code
+## 5.2 `test_create_generates_correct_filename` — exercises zero production code
 
 **Current implementation (lines 424-447):**
 
 ```python
 def test_create_generates_correct_filename(self, tmp_path):
+
     # Set up vault structure and template ...
+
     date_str = datetime.now().strftime("%Y-%m-%d")
     feature = "my-feature"
     doc_type_value = "adr"
@@ -283,44 +297,55 @@ This test constructs a `Path` object in pure Python and asserts on the string it
 
 **What `handle_create` actually does** (lines 162-188 in `vault.py`):
 
-2. Calls `get_template_path(root_dir, doc_type)` — can return `None` if template missing
-3. Reads template content and calls `hydrate_template(content, feature, date_str, args.title)`
-5. Writes hydrated content to `target_path`
-6. Prints `Created {target_path}`
-**What a proper integration test would look like:**
+1. Calls `get_template_path(root_dir, doc_type)` — can return `None` if template missing
+1. Reads template content and calls `hydrate_template(content, feature, date_str, args.title)`
+1. Writes hydrated content to `target_path`
+1. Prints `Created {target_path}`
+   **What a proper integration test would look like:**
 
 def test_create_generates_correct_filename(self, tmp_path):
-    # Create required template
-    template_dir = tmp_path / ".vaultspec" / "templates"
-    template_dir.mkdir(parents=True)
-    (template_dir / "adr.md").write_text(
-        "---\ntags: [\"#adr\", \"#<feature>\"]\ndate: <yyyy-mm-dd>\n---\n# <title>\n",
-        encoding="utf-8",
-    )
 
-    # Run the actual CLI command
-    result = run_docs(
-        "create",
-        "--type", "adr",
-        "--feature", "my-feature",
-        "--title", "My ADR Title",
-        "--root", str(tmp_path),
-    )
-
-    assert result.returncode == 0
-
-    # Verify the file was created with the expected name pattern
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    expected_filename = f"{date_str}-my-feature-adr.md"
-    expected_path = tmp_path / ".vault" / "adr" / expected_filename
-    assert expected_path.exists(), f"Expected file not created: {expected_path}"
-
-    # Verify content was hydrated
-    content = expected_path.read_text(encoding="utf-8")
-    assert "my-feature" in content
-    assert date_str in content
-    assert "My ADR Title" in content
 ```
+# Create required template
+
+template_dir = tmp_path / ".vaultspec" / "templates"
+template_dir.mkdir(parents=True)
+(template_dir / "adr.md").write_text(
+    "---\ntags: [\"#adr\", \"#<feature>\"]\ndate: <yyyy-mm-dd>\n---\n# <title>\n",
+    encoding="utf-8",
+)
+```
+
+```
+
+# Run the actual CLI command
+
+result = run_docs(
+    "create",
+    "--type", "adr",
+    "--feature", "my-feature",
+    "--title", "My ADR Title",
+    "--root", str(tmp_path),
+)
+
+assert result.returncode == 0
+
+# Verify the file was created with the expected name pattern
+
+date_str = datetime.now().strftime("%Y-%m-%d")
+expected_filename = f"{date_str}-my-feature-adr.md"
+expected_path = tmp_path / ".vault" / "adr" / expected_filename
+assert expected_path.exists(), f"Expected file not created: {expected_path}"
+
+# Verify content was hydrated
+
+content = expected_path.read_text(encoding="utf-8")
+assert "my-feature" in content
+assert date_str in content
+assert "My ADR Title" in content
+```
+
+````
 
 This test would cover: `handle_create`, `get_template_path`, `hydrate_template`, the filename construction, directory creation (`target_dir.mkdir(parents=True, exist_ok=True)`), and the file write. It would also catch the hardcoded `".vault"` bug (§2.2) if `VAULTSPEC_DOCS_DIR` is set differently.
 
@@ -336,7 +361,7 @@ This test would cover: `handle_create`, `get_template_path`, `hydrate_template`,
 def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
     self.close()
     return False
-```
+````
 
 The return type is annotated as `bool` but should be `Literal[False]` or simply `None` (returning `False` from `__exit__` is the canonical "do not suppress exceptions" signal, equivalent to `None`). This is cosmetic but technically inaccurate: returning `None` and returning `False` both mean "don't suppress", but the type annotation `bool` implies it could return `True`. The canonical signature is `def __exit__(self, ...) -> bool | None`.
 
@@ -373,24 +398,24 @@ if template_path is None:
 content = template_path.read_text(encoding="utf-8")  # type checker knows not None
 ```
 
----
+______________________________________________________________________
 
 ## Critical Findings Summary
 
-| # | Severity | Location | Finding |
-|---|----------|----------|---------|
-| 1 | High | `rag/store.py:332` | `_delete_by_ids` strips quotes rather than escaping them — inconsistent with `_sanitize_filter_value`, silently corrupts IDs containing apostrophes |
-| 2 | High | `vault.py:179` | `handle_create` hardcodes `".vault"` instead of using `get_config().docs_dir` — configuration bypass |
-| 3 | Medium | `rag/api.py:170,290` | `get_document` and `get_status` create raw `VaultStore` instances, bypassing the singleton and risking concurrent LanceDB connections |
-| 4 | Medium | `vault/models.py:109` | `VaultConstants.DOCS_DIR` is dead code with zero production callers — misleading to future developers |
-| 5 | Medium | `protocol/providers/base.py:171` | `construct_system_prompt` is abstract but both implementations are identical — should be concrete on base |
-| 6 | Medium | `lib/tests/cli/test_docs_cli.py:148` | `TestArgumentParsing` fixture is missing `--fix` from audit parser — diverged from production |
-| 7 | Medium | `lib/tests/cli/test_docs_cli.py:424` | `test_create_generates_correct_filename` exercises no production code — only tests Python string interpolation |
-| 8 | Low | `protocol/providers/base.py:148,151` | `supported_models` and `get_model_capability` are never called from production code — test-only utilities on the ABC surface |
-| 9 | Low | `vault/parser.py:77` | `parse_vault_metadata` does not strip leading whitespace before frontmatter match; `parse_frontmatter` does — behavioral gap |
-| 10 | Low | `rag/api.py` | No `reset_engine()` public function; tests reset via `_engine = None` directly |
+| #   | Severity | Location                             | Finding                                                                                                                                             |
+| --- | -------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | High     | `rag/store.py:332`                   | `_delete_by_ids` strips quotes rather than escaping them — inconsistent with `_sanitize_filter_value`, silently corrupts IDs containing apostrophes |
+| 2   | High     | `vault.py:179`                       | `handle_create` hardcodes `".vault"` instead of using `get_config().docs_dir` — configuration bypass                                                |
+| 3   | Medium   | `rag/api.py:170,290`                 | `get_document` and `get_status` create raw `VaultStore` instances, bypassing the singleton and risking concurrent LanceDB connections               |
+| 4   | Medium   | `vault/models.py:109`                | `VaultConstants.DOCS_DIR` is dead code with zero production callers — misleading to future developers                                               |
+| 5   | Medium   | `protocol/providers/base.py:171`     | `construct_system_prompt` is abstract but both implementations are identical — should be concrete on base                                           |
+| 6   | Medium   | `lib/tests/cli/test_docs_cli.py:148` | `TestArgumentParsing` fixture is missing `--fix` from audit parser — diverged from production                                                       |
+| 7   | Medium   | `lib/tests/cli/test_docs_cli.py:424` | `test_create_generates_correct_filename` exercises no production code — only tests Python string interpolation                                      |
+| 8   | Low      | `protocol/providers/base.py:148,151` | `supported_models` and `get_model_capability` are never called from production code — test-only utilities on the ABC surface                        |
+| 9   | Low      | `vault/parser.py:77`                 | `parse_vault_metadata` does not strip leading whitespace before frontmatter match; `parse_frontmatter` does — behavioral gap                        |
+| 10  | Low      | `rag/api.py`                         | No `reset_engine()` public function; tests reset via `_engine = None` directly                                                                      |
 
----
+______________________________________________________________________
 
 ## Recommendations
 
@@ -399,9 +424,11 @@ content = template_path.read_text(encoding="utf-8")  # type checker knows not No
 - Fix `handle_create`: replace `root_dir / ".vault" / doc_type.value` with `root_dir / get_config().docs_dir / doc_type.value`.
 
 - Wrap `VaultStore` creation in `get_document` and `get_status` with proper lifecycle management (either use `get_engine().store` or use the context manager pattern).
+
 - Remove `VaultConstants.DOCS_DIR` class attribute.
 
 - Make `construct_system_prompt` a concrete method on `AgentProvider` base class.
 
 **Cleanup (Low severity):**
+
 - Remove `supported_models` and `get_model_capability` from `AgentProvider` ABC surface if they have no production callers.

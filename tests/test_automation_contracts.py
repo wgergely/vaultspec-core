@@ -24,15 +24,17 @@ def _recipe_exists(justfile_text: str, name: str) -> bool:
 def test_justfile_contains_required_recipes() -> None:
     justfile = _read("justfile")
     required = {
-        "sync",
-        "lock",
-        "fix",
-        "check",
-        "test",
-        "build",
-        "publish",
-        "install",
-        "uninstall",
+        "prod",
+        "dev",
+        "ci",
+        "_dev-deps",
+        "_dev-lint",
+        "_dev-fix",
+        "_dev-audit",
+        "_dev-test",
+        "_dev-build",
+        "_dev-publish",
+        "_dev-precommit",
     }
     missing = [name for name in sorted(required) if not _recipe_exists(justfile, name)]
     assert not missing, f"Missing required just recipes: {missing}"
@@ -40,27 +42,35 @@ def test_justfile_contains_required_recipes() -> None:
 
 def test_justfile_exposes_approved_targets() -> None:
     justfile = _read("justfile")
-    assert "sync target='dependencies':" in justfile
-    assert "lock target='dependencies':" in justfile
-    assert "fix target='lint':" in justfile
-    assert "check target='all':" in justfile
-    assert "test target='all':" in justfile
-    assert "build target:" in justfile
-    assert "publish target tag:" in justfile
-    for target in ("dependencies", "dependency-upgrades"):
-        assert target in justfile
-    for target in (
+    # Top-level namespace recipes
+    assert "prod *args='':" in justfile
+    assert "dev target *args='':" in justfile
+    assert "ci:" in justfile
+    # Internal dev recipes with default targets
+    assert "_dev-deps target='sync':" in justfile
+    assert "_dev-lint target='all':" in justfile
+    assert "_dev-fix target='all':" in justfile
+    assert "_dev-audit target:" in justfile
+    assert "_dev-test target='all':" in justfile
+    assert "_dev-build target:" in justfile
+    assert "_dev-publish target tag:" in justfile
+    assert "_dev-precommit target='run':" in justfile
+    # Dev dispatch covers all verbs
+    for verb in (
+        "deps",
         "lint",
-        "type",
-        "dependencies",
-        "links",
-        "toml",
-        "markdown",
-        "workflow",
-        "vault",
-        "all",
+        "fix",
+        "audit",
+        "test",
+        "build",
+        "publish",
+        "precommit",
     ):
+        assert verb in justfile
+    # Lint sub-targets
+    for target in ("python", "type", "links", "toml", "markdown", "workflow"):
         assert target in justfile
+    # Build/test sub-targets
     for target in ("python", "docker", "all"):
         assert target in justfile
     assert "docker-ghcr" in justfile
@@ -68,54 +78,46 @@ def test_justfile_exposes_approved_targets() -> None:
 
 def test_dependency_audit_uses_lockfile_export_without_root_project() -> None:
     justfile = _read("justfile")
-    export_cmd = 'uv export --frozen --group dev --no-emit-project --output-file "$tmp"'
-    audit_cmd = 'uv run pip-audit --strict -r "$tmp"'
-    assert export_cmd in justfile
-    assert audit_cmd in justfile
+    # Export and audit commands are split across continuation lines
+    assert "uv export --frozen --group dev" in justfile
+    assert "--no-emit-project --output-file" in justfile
+    assert 'uv run pip-audit --strict -r "$tmp"' in justfile
 
 
-def test_check_all_runs_every_validation_surface() -> None:
+def test_lint_all_runs_every_validation_surface() -> None:
     justfile = _read("justfile")
-    assert "just check lint" in justfile
-    assert "just check type" in justfile
-    assert "just check dependencies" in justfile
-    assert "just check links" in justfile
-    assert "just check toml" in justfile
-    assert "just check markdown" in justfile
-    assert "just check workflow" in justfile
-    assert "just check vault" in justfile
-    assert "just test all" in justfile
+    assert "just _dev-lint python" in justfile
+    assert "just _dev-lint type" in justfile
+    assert "just _dev-lint links" in justfile
+    assert "just _dev-lint toml" in justfile
+    assert "just _dev-lint markdown" in justfile
+    assert "just _dev-lint workflow" in justfile
 
 
 def test_test_all_runs_python_and_docker() -> None:
     justfile = _read("justfile")
-    assert "just test python" in justfile
-    assert "just test docker" in justfile
-    assert "just build docker" in justfile
-    assert "just build python" in justfile
+    assert "just _dev-test python" in justfile
+    assert "just _dev-test docker" in justfile
+    assert "just _dev-build docker" in justfile
+    assert "just _dev-build python" in justfile
 
 
-def test_fix_surface_includes_lint_markdown_and_vault() -> None:
+def test_fix_surface_covers_all_autofixable_targets() -> None:
     justfile = _read("justfile")
-    assert "fix target='lint':" in justfile
+    assert "_dev-fix target='all':" in justfile
     assert "uv run ruff format src tests" in justfile
     assert "uv run ruff check --fix src tests" in justfile
-    assert "npx --yes @taplo/cli fmt *.toml" in justfile
-    mdlint_fix = (
-        "npx --yes markdownlint-cli"
-        " --config .markdownlint.json --fix .vaultspec/ .vault/ README.md"
-    )
-    assert mdlint_fix in justfile
-    assert "uv run python -m vaultspec_core vault audit --verify --fix" in justfile
+    assert "taplo fmt" in justfile
+    assert "pymarkdown" in justfile
+    assert ".pymarkdown.json" in justfile
+    assert "vault check all --fix" in justfile
 
 
-def test_markdown_check_and_fix_use_markdownlint() -> None:
+def test_markdown_lint_uses_pymarkdown() -> None:
     justfile = _read("justfile")
-    mdlint_check = (
-        "npx --yes markdownlint-cli"
-        " --config .markdownlint.json .vaultspec/ .vault/ README.md"
-    )
-    assert mdlint_check in justfile
+    assert "pymarkdown" in justfile
+    assert "--config .pymarkdown.json" in justfile
+    assert "README.md" in justfile
 
 
 def test_ci_workflow_calls_just_for_quality_gates() -> None:
@@ -132,16 +134,16 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
 
     expected_runs = {
         "lint-and-type": {
-            "just sync dependencies",
-            "just check lint",
-            "just check type",
-            "just check toml",
-            "just check links",
-            "just check markdown",
+            "just dev deps sync",
+            "just dev lint python",
+            "just dev lint type",
+            "just dev lint toml",
+            "just dev lint links",
+            "just dev lint markdown",
         },
-        "tests": {"just sync dependencies", "just test python"},
-        "vault-audit": {"just sync dependencies", "just check vault"},
-        "dependency-audit": {"just sync dependencies", "just check dependencies"},
+        "tests": {"just dev deps sync", "just dev test python"},
+        "vault-audit": {"just dev deps sync", "just prod vault check all"},
+        "dependency-audit": {"just dev deps sync", "just dev audit deps"},
     }
 
     for job_name, expected in expected_runs.items():
@@ -159,13 +161,14 @@ def test_ci_workflow_uses_actionlint() -> None:
     assert "docker://rhysd/actionlint:latest" in used_actions
 
 
-def test_ci_workflow_installs_node_and_lychee_for_config_and_link_checks() -> None:
+def test_ci_workflow_installs_native_lint_tools() -> None:
     ci = _load_yaml(".github/workflows/ci.yml")
     jobs = ci["jobs"]
     steps = jobs["lint-and-type"]["steps"]
     used_actions = {step.get("uses") for step in steps if "uses" in step}
-    assert "actions/setup-node@v4" in used_actions
     assert "taiki-e/install-action@v2" in used_actions
+    # Node.js is no longer required - taplo and pymarkdown are native
+    assert "actions/setup-node@v4" not in used_actions
 
 
 def test_docker_workflow_builds_and_smokes_on_pr() -> None:
@@ -174,7 +177,7 @@ def test_docker_workflow_builds_and_smokes_on_pr() -> None:
     assert "docker-build" in jobs, "Docker workflow missing PR build job"
     steps = jobs["docker-build"]["steps"]
     run_commands = [step.get("run") for step in steps if "run" in step]
-    assert "just test docker" in run_commands
+    assert "just dev test docker" in run_commands
 
 
 def test_docker_publish_workflow_uses_standard_registry_actions() -> None:
@@ -194,14 +197,14 @@ def test_docker_publish_workflow_uses_standard_registry_actions() -> None:
     assert not missing, f"Docker publish workflow missing required actions: {missing}"
 
 
-def test_justfile_install_uninstall_delegate_to_cli() -> None:
+def test_prod_delegates_to_cli() -> None:
     justfile = _read("justfile")
-    assert "uv run vaultspec-core install" in justfile
-    assert "uv run vaultspec-core uninstall" in justfile
-    assert "install path='.' " in justfile
-    assert "uninstall path='.' " in justfile
-    # Provider parameter in recipes
-    assert "provider='all'" in justfile
+    # prod recipe passes all args through to uv run vaultspec-core
+    assert "prod *args='':" in justfile
+    assert "uv run vaultspec-core {{args}}" in justfile
+    # install/uninstall available via prod namespace (documented in comments)
+    assert "just prod install" in justfile
+    assert "uv run vaultspec-core" in justfile
 
 
 def test_provider_capability_enum_covers_all_tools() -> None:
@@ -209,11 +212,10 @@ def test_provider_capability_enum_covers_all_tools() -> None:
     from vaultspec_core.core.enums import Tool
     from vaultspec_core.core.types import init_paths
 
-    init_paths(ROOT)
-    from vaultspec_core.core import types as _t
+    ctx = init_paths(ROOT)
 
     for tool in Tool:
-        cfg = _t.TOOL_CONFIGS.get(tool)
+        cfg = ctx.tool_configs.get(tool)
         assert cfg is not None, f"Tool {tool.value} has no ToolConfig"
         assert cfg.capabilities, f"Tool {tool.value} has empty capabilities"
 
@@ -223,11 +225,10 @@ def test_provider_capability_consistency() -> None:
     from vaultspec_core.core.enums import ProviderCapability, Tool
     from vaultspec_core.core.types import init_paths
 
-    init_paths(ROOT)
-    from vaultspec_core.core import types as _t
+    ctx = init_paths(ROOT)
 
     for tool in Tool:
-        cfg = _t.TOOL_CONFIGS.get(tool)
+        cfg = ctx.tool_configs.get(tool)
         if cfg is None:
             continue
         caps = cfg.capabilities
@@ -251,15 +252,14 @@ def test_every_capability_has_at_least_one_provider() -> None:
     from vaultspec_core.core.enums import ProviderCapability, Tool
     from vaultspec_core.core.types import init_paths
 
-    init_paths(ROOT)
-    from vaultspec_core.core import types as _t
+    ctx = init_paths(ROOT)
 
     for cap in ProviderCapability:
         providers = [
             tool.value
             for tool in Tool
             if cap
-            in _t.TOOL_CONFIGS.get(
+            in ctx.tool_configs.get(
                 tool, type("", (), {"capabilities": frozenset()})()
             ).capabilities
         ]

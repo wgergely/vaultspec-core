@@ -1,16 +1,17 @@
 ---
 tags:
-  - "#research"
-  - "#marketing-audit"
-date: "2026-02-18"
+  - '#research'
+  - '#marketing-audit'
+date: '2026-02-18'
 ---
+
 ## Marketing Audit: Competitor Landscape
 
 ## Executive Summary
 
 The AI coding tool market has matured into a two-tier landscape: (1) **autonomous agents** that work independently on GitHub issues and codebases, and (2) **AI-assisted editors/CLIs** that augment developer workflow in real-time. vaultspec occupies a unique niche — a governed, spec-driven development framework that mandates documentation, decision traceability, and audit trails. No direct competitor provides equivalent governance infrastructure. This is both a market gap and a positioning challenge.
 
----
+______________________________________________________________________
 
 ## Direct Competitors: Autonomous AI Software Engineers
 
@@ -26,7 +27,7 @@ The AI coding tool market has matured into a two-tier landscape: (1) **autonomou
 
 **Sources**: [VentureBeat – Devin 2.0](https://venturebeat.com/programming-development/devin-2-0-is-here-cognition-slashes-price-of-ai-software-engineer-to-20-per-month-from-500), [TechCrunch – Pay-as-you-go](https://techcrunch.com/2025/04/03/devin-the-viral-coding-ai-agent-gets-a-new-pay-as-you-go-plan/), [Cognition Blog – 2025 Review](https://cognition.ai/blog/devin-annual-performance-review-2025)
 
----
+______________________________________________________________________
 
 ### SWE-Agent (Princeton/Stanford)
 
@@ -40,7 +41,7 @@ The AI coding tool market has matured into a two-tier landscape: (1) **autonomou
 
 **Sources**: [GitHub – SWE-agent](https://github.com/SWE-agent/SWE-agent), [mini-swe-agent](https://github.com/SWE-agent/mini-swe-agent)
 
----
+______________________________________________________________________
 
 ### OpenHands (formerly OpenDevin)
 
@@ -54,7 +55,7 @@ The AI coding tool market has matured into a two-tier landscape: (1) **autonomou
 
 **Sources**: [OpenHands GitHub](https://github.com/OpenHands/OpenHands), [OpenHands.dev](https://openhands.dev/), [arXiv paper](https://arxiv.org/abs/2407.16741)
 
----
+______________________________________________________________________
 
 ### AutoCodeRover
 
@@ -68,7 +69,7 @@ The AI coding tool market has matured into a two-tier landscape: (1) **autonomou
 
 **Sources**: [GitHub – AutoCodeRover](https://github.com/AutoCodeRoverSG/auto-code-rover), [arXiv paper](https://arxiv.org/abs/2404.05427)
 
----
+______________________________________________________________________
 
 ### Sweep AI
 
@@ -82,7 +83,7 @@ The AI coding tool market has matured into a two-tier landscape: (1) **autonomou
 
 **Sources**: [Sweep GitHub](https://github.com/sweepai/sweep), [sweep.dev](https://sweep.dev/), [GitHub Marketplace](https://github.com/marketplace/sweep-ai)
 
----
+______________________________________________________________________
 
 ## Indirect Competitors: AI Coding Assistants and Editors
 
@@ -98,7 +99,7 @@ The AI coding tool market has matured into a two-tier landscape: (1) **autonomou
 
 **Sources**: [Cursor Pro Review 2026](https://www.openaitoolshub.org/en/blog/cursor-pro-review-2026), [Cursor Pricing – SaaSworthy](https://www.saasworthy.com/product/cursor-sh-tool/pricing), [Medium – $9.9B valuation](https://medium.com/@fahey_james/cursors-next-leap-inside-the-9-9-b-ai-code-editor-redefining-how-software-gets-built-290fec7ac726)
 
----
+______________________________________________________________________
 
 ### Aider
 
@@ -112,7 +113,7 @@ The AI coding tool market has matured into a two-tier landscape: (1) **autonomou
 
 **Sources**: [Aider GitHub](https://github.com/Aider-AI/aider), [aider.chat](https://aider.chat/)
 
----
+______________________________________________________________________
 
 ### GitHub Copilot / Copilot Workspace
 
@@ -126,7 +127,7 @@ The AI coding tool market has matured into a two-tier landscape: (1) **autonomou
 
 **Sources**: [GitHub Copilot Plans](https://github.com/features/copilot/plans), [DevOps.com – Agent Mode](https://devops.com/github-copilot-evolves-agent-mode-and-multi-model-support-transform-devops-workflows-2/), [SmartScope – Multi-Agent Feb 2026](https://smartscope.blog/en/generative-ai/github-copilot/github-copilot-claude-code-multi-agent-2025/)
 
----
+______________________________________________________________________
 
 ### Claude Code (Anthropic)
 
@@ -140,7 +141,7 @@ The AI coding tool market has matured into a two-tier landscape: (1) **autonomou
 
 **Sources**: [Claude Code Docs](https://code.claude.com/docs/en/overview), [Anthropic Pricing](https://platform.claude.com/docs/en/about-claude/pricing), [Claude Code Changelog](https://claudefa.st/blog/guide/changelog)
 
----
+______________________________________________________________________
 
 ### Gemini CLI (Google)
 
@@ -154,7 +155,7 @@ The AI coding tool market has matured into a two-tier landscape: (1) **autonomou
 
 **Sources**: [Google Blog – Gemini CLI](https://blog.google/technology/developers/introducing-gemini-cli-open-source-ai-agent/), [GitHub – gemini-cli](https://github.com/google-gemini/gemini-cli)
 
----
+______________________________________________________________________
 
 ### Cody (Sourcegraph)
 
@@ -168,7 +169,7 @@ The AI coding tool market has matured into a two-tier landscape: (1) **autonomou
 
 **Sources**: [Sourcegraph Pricing](https://sourcegraph.com/pricing), [Cody Review 2025](https://sider.ai/blog/ai-tools/ai-cody-review-is-sourcegraph-s-ai-pair-programmer-worth-it-in-2025), [Gartner Reviews 2026](https://www.gartner.com/reviews/market/ai-code-assistants/vendor/sourcegraph/product/sourcegraph-cody)
 
----
+______________________________________________________________________
 
 ### Continue
 
@@ -182,7 +183,7 @@ The AI coding tool market has matured into a two-tier landscape: (1) **autonomou
 
 **Sources**: [Shakudo – Best AI Coding Assistants Feb 2026](https://www.shakudo.io/blog/best-ai-coding-assistants), [Second Talent – Open Source AI Coding Assistants](https://www.secondtalent.com/resources/open-source-ai-coding-assistants/)
 
----
+______________________________________________________________________
 
 ### Codex CLI (OpenAI)
 
@@ -196,7 +197,7 @@ The AI coding tool market has matured into a two-tier landscape: (1) **autonomou
 
 **Sources**: [OpenAI Codex](https://openai.com/codex/), [Codex CLI Features](https://developers.openai.com/codex/cli/features/)
 
----
+______________________________________________________________________
 
 ### GPT-Engineer
 
@@ -210,7 +211,7 @@ The AI coding tool market has matured into a two-tier landscape: (1) **autonomou
 
 **Sources**: [GitHub – gpt-engineer](https://github.com/AntonOsika/gpt-engineer)
 
----
+______________________________________________________________________
 
 ### Windsurf (formerly Codeium)
 
@@ -224,7 +225,7 @@ The AI coding tool market has matured into a two-tier landscape: (1) **autonomou
 
 **Sources**: [Windsurf Pricing](https://windsurf.com/pricing), [eesel – Windsurf Overview](https://www.eesel.ai/blog/windsurf-overview)
 
----
+______________________________________________________________________
 
 ## Governance Landscape: Market Gap Analysis
 
@@ -232,24 +233,24 @@ The AI coding tool market has matured into a two-tier landscape: (1) **autonomou
 
 Across all surveyed tools, **governance and accountability features are nearly absent**:
 
-| Tool | Audit Trail | Decision Docs | Spec-Driven | Multi-Agent |
-|---|---|---|---|---|
-| Devin | No | No | No | Yes |
-| SWE-Agent | No | No | No | Via ecosystem |
-| OpenHands | No | No | No | Partial |
-| AutoCodeRover | No | No | No | No |
-| Sweep | No | No | No | No |
-| Cursor | No | No | No | Background agents |
-| Aider | Git history only | No | No | No |
-| GitHub Copilot | PR workflow only | No | No | Yes (Feb 2026) |
-| Claude Code | Agent Skills | No | No | Yes |
-| Gemini CLI | No | No | No | No |
-| Cody | Enterprise audit logs | No | No | No |
-| Continue | No | No | No | No |
-| Codex CLI | No | No | No | Codex Cloud |
-| GPT-Engineer | No | No | No | No |
-| Windsurf | No | No | No | Cascade only |
-| **vaultspec** | **Yes (.vault/)** | **Yes (ADRs, plans)** | **Yes (SDD pipeline)** | **Yes** |
+| Tool           | Audit Trail           | Decision Docs         | Spec-Driven            | Multi-Agent       |
+| -------------- | --------------------- | --------------------- | ---------------------- | ----------------- |
+| Devin          | No                    | No                    | No                     | Yes               |
+| SWE-Agent      | No                    | No                    | No                     | Via ecosystem     |
+| OpenHands      | No                    | No                    | No                     | Partial           |
+| AutoCodeRover  | No                    | No                    | No                     | No                |
+| Sweep          | No                    | No                    | No                     | No                |
+| Cursor         | No                    | No                    | No                     | Background agents |
+| Aider          | Git history only      | No                    | No                     | No                |
+| GitHub Copilot | PR workflow only      | No                    | No                     | Yes (Feb 2026)    |
+| Claude Code    | Agent Skills          | No                    | No                     | Yes               |
+| Gemini CLI     | No                    | No                    | No                     | No                |
+| Cody           | Enterprise audit logs | No                    | No                     | No                |
+| Continue       | No                    | No                    | No                     | No                |
+| Codex CLI      | No                    | No                    | No                     | Codex Cloud       |
+| GPT-Engineer   | No                    | No                    | No                     | No                |
+| Windsurf       | No                    | No                    | No                     | Cascade only      |
+| **vaultspec**  | **Yes (.vault/)**     | **Yes (ADRs, plans)** | **Yes (SDD pipeline)** | **Yes**           |
 
 ### Key Insight
 
@@ -257,19 +258,19 @@ The entire market is converging on **autonomous execution speed** with minimal a
 
 ### Pricing Positioning
 
-| Tier | Tools | Price Range |
-|---|---|---|
-| Free/OSS | Aider, SWE-Agent, OpenHands, Continue, Gemini CLI, GPT-Engineer, AutoCodeRover | $0 (API costs only) |
-| Low-cost individual | Cursor Pro, Windsurf Pro, Copilot Pro, Devin entry, Codex (ChatGPT Plus) | $10–$20/month |
-| Mid-tier professional | Cursor Pro+, Windsurf Pro Ultimate, Copilot Pro+, Devin Teams | $39–$60/month |
-| Enterprise | Cody Enterprise, Copilot Enterprise, Devin Teams+ | $39–$500+/user/month |
+| Tier                  | Tools                                                                          | Price Range          |
+| --------------------- | ------------------------------------------------------------------------------ | -------------------- |
+| Free/OSS              | Aider, SWE-Agent, OpenHands, Continue, Gemini CLI, GPT-Engineer, AutoCodeRover | $0 (API costs only)  |
+| Low-cost individual   | Cursor Pro, Windsurf Pro, Copilot Pro, Devin entry, Codex (ChatGPT Plus)       | $10–$20/month        |
+| Mid-tier professional | Cursor Pro+, Windsurf Pro Ultimate, Copilot Pro+, Devin Teams                  | $39–$60/month        |
+| Enterprise            | Cody Enterprise, Copilot Enterprise, Devin Teams+                              | $39–$500+/user/month |
 
----
+______________________________________________________________________
 
 ## Competitive Positioning Recommendations
 
 1. **Lead with governance**: No competitor offers audit trails + spec-driven pipelines. This is vaultspec's blue ocean.
-2. **Target regulated industries**: Financial services (Goldman Sachs uses Devin but with no governance), healthcare, and defense all face agentic AI governance requirements under emerging regulation.
-3. **Complement, don't replace**: Position vaultspec as a governance layer on top of tools like Claude Code, GitHub Copilot, and Cursor — not as a replacement for them.
-4. **Open-source the framework layer**: Given the high star counts for OSS tools (GPT-Engineer 55K, Aider 39K, Continue 20K), an open-source framework with optional enterprise features could drive adoption.
-5. **Benchmark against regulation**: Frame vaultspec's pipeline as the operational implementation of EU AI Act High-Risk system requirements and Singapore IMDA guidelines.
+1. **Target regulated industries**: Financial services (Goldman Sachs uses Devin but with no governance), healthcare, and defense all face agentic AI governance requirements under emerging regulation.
+1. **Complement, don't replace**: Position vaultspec as a governance layer on top of tools like Claude Code, GitHub Copilot, and Cursor — not as a replacement for them.
+1. **Open-source the framework layer**: Given the high star counts for OSS tools (GPT-Engineer 55K, Aider 39K, Continue 20K), an open-source framework with optional enterprise features could drive adoption.
+1. **Benchmark against regulation**: Frame vaultspec's pipeline as the operational implementation of EU AI Act High-Risk system requirements and Singapore IMDA guidelines.

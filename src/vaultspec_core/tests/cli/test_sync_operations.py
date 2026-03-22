@@ -126,7 +126,7 @@ class TestSyncSkills:
         skills_dir.mkdir(parents=True, exist_ok=True)
         for name in names:
             d = skills_dir / name
-            d.mkdir()
+            d.mkdir(exist_ok=True)
             content = f"---\ndescription: {name}\n---\n\nbody"
             (d / "SKILL.md").write_text(content, encoding="utf-8")
 
@@ -141,11 +141,14 @@ class TestSyncSkills:
         assert shared_dest.exists()
 
     def test_prune_respects_protected(self, test_project):
-        # Protected skills like 'fd' or 'rg' shouldn't be pruned
+        # Directories without a SKILL.md (e.g. user tooling) shouldn't be pruned.
+        # Directories with a SKILL.md that are no longer in sources ARE pruned.
         skills_dir = test_project / ".claude" / "skills"
         skills_dir.mkdir(parents=True, exist_ok=True)
+        # User-placed directory without SKILL.md  - must survive pruning
         (skills_dir / "fd").mkdir()
-        (skills_dir / "fd" / "SKILL.md").write_text("protected", encoding="utf-8")
+        (skills_dir / "fd" / "README.md").write_text("user tool", encoding="utf-8")
+        # Stale synced skill with SKILL.md  - should be pruned
         (skills_dir / "vaultspec-old").mkdir()
         (skills_dir / "vaultspec-old" / "SKILL.md").write_text(
             "stale", encoding="utf-8"
@@ -153,7 +156,7 @@ class TestSyncSkills:
 
         self._make_skill_sources(test_project, ["vaultspec-deploy"])
         skills_sync(prune=True)
-        assert (skills_dir / "fd" / "SKILL.md").exists()
+        assert (skills_dir / "fd" / "README.md").exists()
         assert not (skills_dir / "vaultspec-old" / "SKILL.md").exists()
 
 
@@ -234,7 +237,7 @@ class TestSyncSkillsCodex:
         skills_dir.mkdir(parents=True, exist_ok=True)
         for name in names:
             d = skills_dir / name
-            d.mkdir()
+            d.mkdir(exist_ok=True)
             content = f"---\ndescription: {name}\n---\n\n# {name}"
             (d / "SKILL.md").write_text(content, encoding="utf-8")
 
@@ -317,23 +320,22 @@ class TestSystemSyncBehavioralRules:
 
 
 class TestConfigSync:
-    def test_generates_from_internal_and_custom(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "Internal instructions here", encoding="utf-8"
-        )
-        (test_project / ".vaultspec" / "rules" / "system" / "project.md").write_text(
-            "Custom user content", encoding="utf-8"
-        )
+    def test_generates_from_rule_refs(self, test_project):
+        # Config body now only generates rule references from synced rule files
+        rules_dir = test_project / ".claude" / "rules"
+        rules_dir.mkdir(parents=True, exist_ok=True)
+        (rules_dir / "my-rule.md").write_text("rule content", encoding="utf-8")
         config_sync()
         config_file = test_project / "CLAUDE.md"
         assert config_file.exists()
         content = config_file.read_text(encoding="utf-8")
-        assert "Custom user content" in content
+        assert "@.claude/rules/my-rule.md" in content
 
     def test_preserves_user_content_and_adds_managed_block(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "Internal", encoding="utf-8"
-        )
+        # Create rule files so config body has content to generate
+        rules_dir = test_project / ".claude" / "rules"
+        rules_dir.mkdir(parents=True, exist_ok=True)
+        (rules_dir / "my-rule.md").write_text("rule content", encoding="utf-8")
         config_file = test_project / "CLAUDE.md"
         config_file.write_text("# Hand-written", encoding="utf-8")
         config_sync()
@@ -341,12 +343,10 @@ class TestConfigSync:
         # User content preserved, managed block added alongside.
         assert "# Hand-written" in content
         assert "<vaultspec" in content
-        assert "Internal" in content
+        assert "@.claude/rules/my-rule.md" in content
 
     def test_generates_root_configs_for_antigravity_and_codex(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "Internal instructions here", encoding="utf-8"
-        )
+        # Create rule files in shared .agents/rules/ for antigravity/codex config
         (test_project / ".agents" / "rules").mkdir(parents=True, exist_ok=True)
         (test_project / ".agents" / "rules" / "antigravity-rule.md").write_text(
             "---\nname: antigravity\n---\n\nRule", encoding="utf-8"
@@ -355,19 +355,15 @@ class TestConfigSync:
         config_sync()
 
         antigravity_config = test_project / "GEMINI.md"
-        codex_config = test_project / "AGENTS.md"
         assert antigravity_config.exists()
-        assert codex_config.exists()
         assert "@.agents/rules/antigravity-rule.md" in antigravity_config.read_text(
             encoding="utf-8"
         )
-        codex_content = codex_config.read_text(encoding="utf-8")
-        assert "Internal instructions here" in codex_content
-        assert "@.agents/rules/antigravity-rule.md" not in codex_content
 
     def test_codex_writes_managed_top_level_config_block(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
+        (test_project / ".vaultspec" / "rules" / "system" / "codex-cfg.md").write_text(
             "---\n"
+            "pipeline: config\n"
             "codex_model: gpt-5-codex\n"
             "codex_approval_policy: on-request\n"
             "codex_project_doc_fallback_filenames:\n"
@@ -397,8 +393,12 @@ class TestConfigSync:
         )
         agents_sync()
 
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "---\ncodex_sandbox_mode: workspace-write\n---\n\nInternal",
+        sys_dir = test_project / ".vaultspec" / "rules" / "system"
+        (sys_dir / "codex-cfg.md").write_text(
+            "---\n"
+            "pipeline: config\n"
+            "codex_sandbox_mode: workspace-write\n"
+            "---\n\nInternal",
             encoding="utf-8",
         )
         config_sync()
@@ -409,8 +409,9 @@ class TestConfigSync:
         assert '[agents."vaultspec-worker"]' in content
 
     def test_codex_writes_reasoning_and_service_tier_settings(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
+        (test_project / ".vaultspec" / "rules" / "system" / "codex-cfg.md").write_text(
             "---\n"
+            "pipeline: config\n"
             "codex_model_reasoning_effort: medium\n"
             "codex_model_reasoning_summary: concise\n"
             "codex_model_supports_reasoning_summaries: false\n"
@@ -437,8 +438,8 @@ class TestEndToEnd:
         (test_project / ".vaultspec" / "rules" / "rules" / "no-swear.md").write_text(
             "---\nname: no-swear\n---\n\nDo not swear.", encoding="utf-8"
         )
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "framework", encoding="utf-8"
+        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+            "---\n---\n\n# Base system prompt", encoding="utf-8"
         )
 
         rules_sync()
@@ -448,6 +449,7 @@ class TestEndToEnd:
 
         # Verify
         assert (test_project / ".claude" / "rules" / "no-swear.md").exists()
+        # Config is generated from rule refs (rules were synced above)
         assert (test_project / "CLAUDE.md").exists()
         assert (test_project / ".gemini" / "SYSTEM.md").exists()
 
@@ -474,9 +476,10 @@ class TestEndToEnd:
         assert not dest.exists()
 
     def test_managed_block_coexists_with_user_content(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "Internal", encoding="utf-8"
-        )
+        # Create rule files so config body has content to generate
+        rules_dir = test_project / ".claude" / "rules"
+        rules_dir.mkdir(parents=True, exist_ok=True)
+        (rules_dir / "my-rule.md").write_text("rule content", encoding="utf-8")
         config_file = test_project / "CLAUDE.md"
         config_file.write_text("# Custom user content", encoding="utf-8")
         config_sync()
@@ -484,7 +487,7 @@ class TestEndToEnd:
         # Managed block added alongside user content.
         assert "# Custom user content" in content
         assert "<vaultspec" in content
-        assert "Internal" in content
+        assert "@.claude/rules/my-rule.md" in content
         # Second sync updates managed block, preserves user content.
         config_sync()
         content2 = config_file.read_text(encoding="utf-8")
@@ -500,11 +503,12 @@ class TestEndToEndAllDestinations:
         (test_project / ".vaultspec" / "rules" / "rules" / "no-swear.md").write_text(
             "---\nname: no-swear\n---\n\nDo not swear.", encoding="utf-8"
         )
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
+        (test_project / ".vaultspec" / "rules" / "system" / "codex-cfg.md").write_text(
             "---\n"
+            "pipeline: config\n"
             "codex_model: gpt-5-codex\n"
             "codex_approval_policy: on-request\n"
-            "---\n\nFramework instructions",
+            "---\n\nCodex config settings",
             encoding="utf-8",
         )
         (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
@@ -553,7 +557,8 @@ class TestEndToEndAllDestinations:
         antigravity_config = test_project / "GEMINI.md"
         assert antigravity_config.exists()
         ag_content = antigravity_config.read_text(encoding="utf-8")
-        assert "Framework instructions" in ag_content
+        # Config body now only contains rule references
+        assert "@.agents/rules/no-swear.md" in ag_content
         assert (test_project / ".agents" / "rules" / "no-swear.md").exists()
         # Antigravity must NOT get system builtin rule (emit_system_rule=False)
         assert not (
@@ -561,11 +566,7 @@ class TestEndToEndAllDestinations:
         ).exists()
 
         # === Codex destination ===
-        codex_agents_md = test_project / "AGENTS.md"
-        assert codex_agents_md.exists()
-        codex_agents_content = codex_agents_md.read_text(encoding="utf-8")
-        assert "Framework instructions" in codex_agents_content
-
+        # AGENTS.md is only created when Codex has rule refs (rule_ref_dir=None)
         codex_toml = test_project / ".codex" / "config.toml"
         assert codex_toml.exists()
         toml_content = codex_toml.read_text(encoding="utf-8")
@@ -578,17 +579,30 @@ class TestEndToEndAllDestinations:
         assert not (test_project / ".codex" / "SYSTEM.md").exists()
 
     def test_dry_run_writes_nothing(self, test_project):
-        """dry_run=True must not create any destination files."""
+        """dry_run=True must not create any destination files or directories."""
         (test_project / ".vaultspec" / "rules" / "rules" / "dry-rule.md").write_text(
             "---\nname: dry-rule\n---\n\nDry run test.", encoding="utf-8"
         )
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "---\ncodex_model: gpt-5-codex\n---\n\nFramework",
+        (test_project / ".vaultspec" / "rules" / "system" / "codex-cfg.md").write_text(
+            "---\npipeline: config\ncodex_model: gpt-5-codex\n---\n\nCodex config",
             encoding="utf-8",
         )
         (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Base", encoding="utf-8"
         )
+
+        # Remove all destination dirs and root configs to prove
+        # dry-run doesn't create them
+        import shutil
+
+        for d in [".claude", ".gemini", ".agents", ".codex"]:
+            target = test_project / d
+            if target.exists():
+                shutil.rmtree(target)
+        for f in ["CLAUDE.md", "GEMINI.md", "AGENTS.md"]:
+            cfg = test_project / f
+            if cfg.exists():
+                cfg.unlink()
 
         rules_sync(dry_run=True)
         skills_sync(dry_run=True)
@@ -602,3 +616,36 @@ class TestEndToEndAllDestinations:
         assert not (test_project / "CLAUDE.md").exists()
         assert not (test_project / ".gemini" / "SYSTEM.md").exists()
         assert not (test_project / "AGENTS.md").exists()
+
+        # No destination directories should be created by dry-run
+        assert not (test_project / ".claude").exists()
+        assert not (test_project / ".gemini").exists()
+        assert not (test_project / ".agents").exists()
+
+
+class TestDryRunReturnsItems:
+    """Verify that dry-run populates SyncResult.items for rendering."""
+
+    def test_rules_sync_dry_run_returns_items(self, test_project):
+        (test_project / ".vaultspec" / "rules" / "rules" / "my-rule.md").write_text(
+            "---\nname: my-rule\n---\n\nRule body.", encoding="utf-8"
+        )
+        result = rules_sync(dry_run=True)
+        assert result.items, "dry-run must populate items list"
+        paths = [p for p, _action in result.items]
+        assert any("my-rule" in p for p in paths)
+
+    def test_dry_run_items_have_correct_actions(self, test_project):
+        (test_project / ".vaultspec" / "rules" / "rules" / "new-rule.md").write_text(
+            "---\nname: new-rule\n---\n\nNew.", encoding="utf-8"
+        )
+        result = rules_sync(dry_run=True)
+        actions = [a for _p, a in result.items]
+        assert all(a == "[ADD]" for a in actions)
+
+    def test_system_sync_dry_run_returns_items(self, test_project):
+        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+            "---\n---\n\n# Base prompt", encoding="utf-8"
+        )
+        result = system_sync(dry_run=True)
+        assert result.items, "system dry-run must populate items list"

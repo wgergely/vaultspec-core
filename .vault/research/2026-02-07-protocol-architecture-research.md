@@ -1,36 +1,37 @@
 ---
 tags:
-  - "#research"
-  - "#protocol"
-date: "2026-02-07"
+  - '#research'
+  - '#protocol'
+date: '2026-02-07'
 related:
-  - "[[2026-02-07-acp-research]]"
-  - "[[2026-02-07-a2a-research]]"
-  - "[[2026-02-07-multi-agent-orchestration-research]]"
-  - "[[2026-02-07-frontier-landscape-research]]"
-  - "[[2026-02-07-protocol-review-research]]"
+  - '[[2026-02-07-acp-research]]'
+  - '[[2026-02-07-a2a-research]]'
+  - '[[2026-02-07-multi-agent-orchestration-research]]'
+  - '[[2026-02-07-frontier-landscape-research]]'
+  - '[[2026-02-07-protocol-review-research]]'
 ---
+
 # Protocol Architecture for Sub-Agent Driven Development
 
 **Date:** 2026-02-07
 **Status:** Research / Architecture
 **Scope:** How to correctly implement agent dispatch, delegation, and bidirectional communication using the right protocols for each boundary.
 
----
+______________________________________________________________________
 
 ## The Three-Layer Protocol Stack
 
 The AI agent ecosystem is crystallizing around three complementary protocol layers. Each serves a distinct communication boundary.
 
-| Layer | Protocol | Boundary | Transport | Status |
-|---|---|---|---|---|
-| **Client-to-Agent** | ACP (Zed) | Human ↔ Agent | JSON-RPC 2.0 / stdio | Production. 25 agents, 16 clients |
-| **Agent-to-Tool** | MCP (Anthropic) | Agent ↔ Tool/Resource | JSON-RPC 2.0 / stdio/HTTP | De facto standard |
-| **Agent-to-Agent** | A2A (Google/LF) | Agent ↔ Agent | JSON-RPC 2.0 / HTTPS/SSE/gRPC | Growing adoption. 150+ orgs |
+| Layer               | Protocol        | Boundary              | Transport                     | Status                            |
+| ------------------- | --------------- | --------------------- | ----------------------------- | --------------------------------- |
+| **Client-to-Agent** | ACP (Zed)       | Human ↔ Agent         | JSON-RPC 2.0 / stdio          | Production. 25 agents, 16 clients |
+| **Agent-to-Tool**   | MCP (Anthropic) | Agent ↔ Tool/Resource | JSON-RPC 2.0 / stdio/HTTP     | De facto standard                 |
+| **Agent-to-Agent**  | A2A (Google/LF) | Agent ↔ Agent         | JSON-RPC 2.0 / HTTPS/SSE/gRPC | Growing adoption. 150+ orgs       |
 
 **Key insight**: These are not competing protocols — they are complementary layers. An agent can simultaneously speak ACP to its editor, MCP to its tools, and A2A to peer agents.
 
----
+______________________________________________________________________
 
 ## Protocol Deep Dive
 
@@ -116,7 +117,7 @@ class AgentExecutor(ABC):
 
 **Bridge potential**: The `mcp-over-acp` RFD enables MCP servers to communicate through ACP channels. Methods: `mcp/connect`, `mcp/message`, `mcp/disconnect`. Agents advertise support via `mcpCapabilities.acp: true`.
 
----
+______________________________________________________________________
 
 ## Real-World Orchestration Patterns
 
@@ -181,21 +182,21 @@ Dual-loop planning: outer loop (Task Ledger with facts/plan) and inner loop (Pro
 
 > Full survey: [2026-02-07-multi-agent-orchestration-research.md](./2026-02-07-multi-agent-orchestration-research.md)
 
----
+______________________________________________________________________
 
 ## Comparative Matrix
 
-| Dimension | Claude Teams | OpenAI SDK | LangGraph | Magentic-One | CrewAI | ADK+A2A |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| Topology | Star + P2P | Chain | Star | Star | Star | Tree + Remote |
-| Peer DMs | Yes | No | No | No | Yes | No |
-| Shared Tasks | Yes | No | Graph state | Ledgers | Task context | A2A tasks |
-| Parallel | Yes | No | Via nodes | One-at-a-time | Sequential | Via sub-agents |
-| Cross-process | Yes | No | No | No | No | Yes (HTTP) |
-| Cross-network | No | No | No | No | No | Yes (A2A) |
-| Protocol | Proprietary | Proprietary | Proprietary | Proprietary | Proprietary | A2A (open) |
+| Dimension     | Claude Teams | OpenAI SDK  |  LangGraph  | Magentic-One  |    CrewAI    |    ADK+A2A     |
+| ------------- | :----------: | :---------: | :---------: | :-----------: | :----------: | :------------: |
+| Topology      |  Star + P2P  |    Chain    |    Star     |     Star      |     Star     | Tree + Remote  |
+| Peer DMs      |     Yes      |     No      |     No      |      No       |     Yes      |       No       |
+| Shared Tasks  |     Yes      |     No      | Graph state |    Ledgers    | Task context |   A2A tasks    |
+| Parallel      |     Yes      |     No      |  Via nodes  | One-at-a-time |  Sequential  | Via sub-agents |
+| Cross-process |     Yes      |     No      |     No      |      No       |      No      |   Yes (HTTP)   |
+| Cross-network |      No      |     No      |     No      |      No       |      No      |   Yes (A2A)    |
+| Protocol      | Proprietary  | Proprietary | Proprietary |  Proprietary  | Proprietary  |   A2A (open)   |
 
----
+______________________________________________________________________
 
 ## Our Current Architecture and Its Misalignment
 
@@ -210,30 +211,30 @@ Human → Claude Code (team lead) → acp_dispatch.py (headless ACP client) → 
 
 The dispatcher (`GeminiDispatchClient`) uses ACP — a Human↔Agent protocol — to implement Agent↔Agent delegation. It works mechanically, but creates five specific tensions:
 
-| Tension | Problem |
-|---|---|
-| **Vestigial permissions** | `request_permission` exists for human approval. Dispatcher rubber-stamps everything. |
-| **Shared mutable workspace** | Two agents write to the same filesystem with no locking or conflict resolution. |
-| **One-shot delegation** | ACP's multi-turn conversation model is used for task delegation, not conversation. |
-| **No task semantics** | No structured handoff — results are files written by convention, not protocol artifacts. |
-| **No discovery** | Agent selection and model fallback are hard-coded, not negotiated. |
+| Tension                      | Problem                                                                                  |
+| ---------------------------- | ---------------------------------------------------------------------------------------- |
+| **Vestigial permissions**    | `request_permission` exists for human approval. Dispatcher rubber-stamps everything.     |
+| **Shared mutable workspace** | Two agents write to the same filesystem with no locking or conflict resolution.          |
+| **One-shot delegation**      | ACP's multi-turn conversation model is used for task delegation, not conversation.       |
+| **No task semantics**        | No structured handoff — results are files written by convention, not protocol artifacts. |
+| **No discovery**             | Agent selection and model fallback are hard-coded, not negotiated.                       |
 
 ### What We Need
 
 The dispatcher needs the **process control** of ACP (spawn subprocess, stdio, filesystem, terminals) combined with the **interaction semantics** of A2A (task delegation, structured results, status tracking, discovery).
 
-| Need | ACP Provides | A2A Provides |
-|---|---|---|
-| Spawn local subprocess | Yes | No |
-| Filesystem pass-through | Yes | No |
-| Terminal execution | Yes | No |
-| Task lifecycle states | No | Yes |
-| Structured artifacts | No | Yes |
-| Agent discovery | No | Yes |
-| Auth between agents | No | Yes |
-| Human approval | Yes | No |
+| Need                    | ACP Provides | A2A Provides |
+| ----------------------- | ------------ | ------------ |
+| Spawn local subprocess  | Yes          | No           |
+| Filesystem pass-through | Yes          | No           |
+| Terminal execution      | Yes          | No           |
+| Task lifecycle states   | No           | Yes          |
+| Structured artifacts    | No           | Yes          |
+| Agent discovery         | No           | Yes          |
+| Auth between agents     | No           | Yes          |
+| Human approval          | Yes          | No           |
 
----
+______________________________________________________________________
 
 ## Gaps and Open Problems in the Ecosystem
 
@@ -265,19 +266,19 @@ Credential delegation, permission scoping across proxy chains, sandboxing — al
 
 Claude Teams prohibit nested teams. ACP proxy chains allow nesting in theory but no implementations demonstrate deep nesting. No standard for hierarchical agent orchestration.
 
----
+______________________________________________________________________
 
 ## Emerging Standards and Future Direction
 
 ### IETF Work
 
-| Draft | Topic |
-|---|---|
-| `draft-narvaneni-agent-uri-02` | `agent://` URI scheme |
-| `draft-zyyhl-agent-networks-framework` | AI Agent Networks framework |
-| `draft-cui-ai-agent-discovery-invocation` | HTTP-based discovery |
-| `draft-liu-agent-context-protocol` | Agent Context Protocol |
-| `draft-yl-agent-id-requirements` | Digital Identity for agents |
+| Draft                                     | Topic                       |
+| ----------------------------------------- | --------------------------- |
+| `draft-narvaneni-agent-uri-02`            | `agent://` URI scheme       |
+| `draft-zyyhl-agent-networks-framework`    | AI Agent Networks framework |
+| `draft-cui-ai-agent-discovery-invocation` | HTTP-based discovery        |
+| `draft-liu-agent-context-protocol`        | Agent Context Protocol      |
+| `draft-yl-agent-id-requirements`          | Digital Identity for agents |
 
 ### ACP Proxy Chains
 
@@ -291,7 +292,7 @@ Niko Matsakis proposed symmetric ACP capabilities (October 2025): either side ca
 
 Launched January 2026. Live in JetBrains IDE 2025.3+. Four discovery methods: Basic, Open, Registry-Based, Embedded. 19 RFD documents as of February 2026.
 
----
+______________________________________________________________________
 
 ## The Central Tension
 
@@ -313,7 +314,7 @@ For our architecture — sub-agent driven development where agents report to a t
 
 - **Hybrid**: ACP for transport (subprocess, stdio, filesystem) + A2A semantics for task lifecycle (states, artifacts, discovery) encoded as conventions on top of ACP messages. A pragmatic bridge until the ecosystem converges.
 
----
+______________________________________________________________________
 
 ## Recommendations for Our System
 
@@ -339,19 +340,19 @@ For our architecture — sub-agent driven development where agents report to a t
 
 - **Support multi-vendor agent teams**: Move away from Claude-only or Gemini-only delegation toward protocol-mediated federation where any agent speaking the right protocol can participate.
 
----
+______________________________________________________________________
 
 ## Reference Documents
 
-| Document | Scope |
-|---|---|
-| [Protocol Review](./2026-02-07-protocol-review-research.md) | Initial ACP vs A2A analysis and architectural diagnosis |
-| [ACP Protocol Reference](./2026-02-07-acp-research.md) | Full ACP spec: init, sessions, prompts, tools, permissions, proxy chains, SDKs |
-| [A2A Protocol Reference](./2026-02-07-a2a-research.md) | Full A2A spec: RPCs, task states, data types, Agent Cards, SDKs |
+| Document                                                                               | Scope                                                                                  |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [Protocol Review](./2026-02-07-protocol-review-research.md)                            | Initial ACP vs A2A analysis and architectural diagnosis                                |
+| [ACP Protocol Reference](./2026-02-07-acp-research.md)                                 | Full ACP spec: init, sessions, prompts, tools, permissions, proxy chains, SDKs         |
+| [A2A Protocol Reference](./2026-02-07-a2a-research.md)                                 | Full A2A spec: RPCs, task states, data types, Agent Cards, SDKs                        |
 | [Multi-Agent Orchestration Survey](./2026-02-07-multi-agent-orchestration-research.md) | Cross-framework comparison: Claude Teams, OpenAI, LangGraph, Magentic-One, CrewAI, ADK |
-| [Frontier Landscape](./2026-02-07-frontier-landscape-research.md) | Three ACPs, proxy chains, SymmACP, IETF drafts, gaps, three-layer stack |
+| [Frontier Landscape](./2026-02-07-frontier-landscape-research.md)                      | Three ACPs, proxy chains, SymmACP, IETF drafts, gaps, three-layer stack                |
 
----
+______________________________________________________________________
 
 ## Sources
 

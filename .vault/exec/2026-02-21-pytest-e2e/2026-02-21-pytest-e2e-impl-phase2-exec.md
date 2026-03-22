@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#pytest-e2e"
-date: "2026-02-21"
+  - '#exec'
+  - '#pytest-e2e'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-pytest-e2e-observability-impl-plan]]"
+  - '[[2026-02-21-pytest-e2e-observability-impl-plan]]'
 ---
+
 # `pytest-e2e` `impl` `phase2`
 
 Instrumented E2E test classes with retry markers and structured logging.
@@ -28,8 +29,7 @@ not real LLM calls.
 Step 2.2: Initially added `results_bag` fixture from `pytest-harvest` to all
 E2E test methods. During live validation against real Claude, discovered
 `results_bag` throws `KeyError` on rerun attempts by `pytest-rerunfailures`
-(`"Internal Error - This fixture 'results_bag' was already stored for test
-id..."`). The two plugins are fundamentally incompatible. Replaced all
+(`"Internal Error - This fixture 'results_bag' was already stored for test id..."`). The two plugins are fundamentally incompatible. Replaced all
 `results_bag` attribute assignments with structured `logger.info(...)` calls
 capturing the same data (latency, model, state). Removed `pytest-harvest`
 from `pyproject.toml` dependencies entirely.

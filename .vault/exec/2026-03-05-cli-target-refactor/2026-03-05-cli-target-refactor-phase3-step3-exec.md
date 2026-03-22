@@ -1,10 +1,10 @@
 ---
 tags:
-  - "#exec"
-  - "#cli-target-refactor"
-date: "2026-03-05"
+  - '#exec'
+  - '#cli-target-refactor'
+date: '2026-03-05'
 related:
-  - "[[2026-03-05-cli-target-refactor-plan]]"
+  - '[[2026-03-05-cli-target-refactor-plan]]'
 ---
 
 # `cli-target-refactor` `phase3` `step3`

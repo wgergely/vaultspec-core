@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#adr"
-  - "#workspace-paths"
-date: "2026-02-19"
+  - '#adr'
+  - '#workspace-paths'
+date: '2026-02-19'
 related:
-  - "[[2026-02-19-workspace-path-decoupling-research]]"
+  - '[[2026-02-19-workspace-path-decoupling-research]]'
 ---
+
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 
@@ -28,7 +29,7 @@ breaks in two scenarios:
    knowledge base (`.vault/`) all live at the container root — but the
    framework Python code lives elsewhere.
 
-2. **Git worktree layouts.** In container mode (bare repo at `.gt/` with
+1. **Git worktree layouts.** In container mode (bare repo at `.gt/` with
    sibling worktrees), `.vaultspec/`, `.vault/`, `.claude/`, `.gemini/` are
    all peers at the container root, shared across worktrees. Worktrees
    contain source code only. VaultSpec has zero git awareness and cannot
@@ -40,6 +41,7 @@ three independently configurable path roots via environment variables.
 ## Considerations
 
 **Companion project requirements (ADR-006):**
+
 - `VAULTSPEC_ROOT_DIR` — output root (where `.claude/`, `.gemini/` are written)
 - `VAULTSPEC_CONTENT_DIR` — content source (where rules, agents, skills are read)
 - `VAULTSPEC_FRAMEWORK_DIR` — framework directory name (already exists)
@@ -47,29 +49,42 @@ three independently configurable path roots via environment variables.
 - The repo manager passes explicit paths via env vars when invoking CLI/MCP
 
 **Companion project's git handling (repo-fs crate):**
+
 - Three layout modes: Container (`.gt`), InRepoWorktrees (`.worktrees`),
   Classic (`.git`)
+
 - `.git` detected with `.exists()` not `.is_dir()` — linked worktrees use
   `.git` files containing `gitdir: <path>` pointers
+
 - `dunce::canonicalize()` for Windows UNC prefix stripping
+
 - `NormalizedPath` type: forward-slash internal, native at I/O boundary
+
 - `SyncContext` separates `config_root()` (shared) from `working_dir()`
   (per-worktree)
 
 **Existing VaultSpec infrastructure:**
+
 - `VaultSpecConfig` already supports `VAULTSPEC_*` env vars with type parsing
   and validation
+
 - `_paths.py` provides `ROOT_DIR` and `LIB_SRC_DIR` as module-level globals
+
 - `cli.py` `init_paths(root)` sets all global path variables from one root
+
 - All three CLIs (cli.py, subagent.py, vault.py) accept `--root` with
   `ROOT_DIR` fallback
+
 - `atomic_write()` already uses write-to-temp-then-rename
 
 **Alternative approaches considered:**
+
 - **Do nothing, rely on `--root` only.** Rejected: a single root cannot
   address content/output divergence in worktree mode.
+
 - **Symlink content into output root.** Rejected: fragile, OS-dependent,
   breaks on Windows in restricted environments.
+
 - **Config file at output root pointing to content.** Rejected: adds a
   configuration layer the companion project already handles via env vars.
 
@@ -138,6 +153,7 @@ def discover_git(start: Path) -> GitInfo | None:
 ```
 
 Key implementation details:
+
 - `.git` checked with `.exists()`, NOT `.is_dir()` — worktrees use files
 - `.git` file content parsed for `gitdir: <path>` (absolute or relative)
 - `.gt/` checked with `.is_dir()` for container mode
@@ -167,22 +183,22 @@ def resolve_workspace(
 
 Resolution priority per path:
 
-| Priority | Source | Applies to |
-|---|---|---|
-| 1 | Explicit env var / CLI flag | content_root, output_root |
-| 2 | Git-aware auto-detection | content_root, output_root |
-| 3 | Structural fallback (_paths.py behavior) | all paths |
+| Priority | Source                                    | Applies to                |
+| -------- | ----------------------------------------- | ------------------------- |
+| 1        | Explicit env var / CLI flag               | content_root, output_root |
+| 2        | Git-aware auto-detection                  | content_root, output_root |
+| 3        | Structural fallback (\_paths.py behavior) | all paths                 |
 
 Resolution matrix:
 
-| Condition | Mode | content_root | output_root | vault_root |
-|---|---|---|---|---|
-| Both `CONTENT_DIR` + `ROOT_DIR` set | EXPLICIT | env `CONTENT_DIR` | env `ROOT_DIR` | `output_root / .vault` |
-| Only `ROOT_DIR` set | STANDALONE | `root / fw_dir` | `root` | `root / .vault` |
-| No env vars, classic git | STANDALONE | `repo_root / fw_dir` | `repo_root` | `repo_root / .vault` |
-| No env vars, container git (`.gt/`), CWD anywhere | STANDALONE | `container_root / fw_dir` | `container_root` | `container_root / .vault` |
-| No env vars, linked worktree (`.git` file) | STANDALONE | `repo_root / fw_dir` | `repo_root` | `repo_root / .vault` |
-| No env vars, no git | STANDALONE | structural fallback | structural fallback | structural / .vault |
+| Condition                                         | Mode       | content_root              | output_root         | vault_root                |
+| ------------------------------------------------- | ---------- | ------------------------- | ------------------- | ------------------------- |
+| Both `CONTENT_DIR` + `ROOT_DIR` set               | EXPLICIT   | env `CONTENT_DIR`         | env `ROOT_DIR`      | `output_root / .vault`    |
+| Only `ROOT_DIR` set                               | STANDALONE | `root / fw_dir`           | `root`              | `root / .vault`           |
+| No env vars, classic git                          | STANDALONE | `repo_root / fw_dir`      | `repo_root`         | `repo_root / .vault`      |
+| No env vars, container git (`.gt/`), CWD anywhere | STANDALONE | `container_root / fw_dir` | `container_root`    | `container_root / .vault` |
+| No env vars, linked worktree (`.git` file)        | STANDALONE | `repo_root / fw_dir`      | `repo_root`         | `repo_root / .vault`      |
+| No env vars, no git                               | STANDALONE | structural fallback       | structural fallback | structural / .vault       |
 
 **Key simplification (per ADR-006 Appendix A):** In container/worktree mode,
 `.vaultspec/`, `.vault/`, `.claude/`, `.gemini/`, `.agent/`, and `AGENTS.md`
@@ -212,6 +228,7 @@ root — where `.vaultspec/` and `.vault/` live.
 #### Validation
 
 Every resolved `WorkspaceLayout` is validated:
+
 - `content_root` must be a directory (or error with fix suggestion)
 - `output_root` parent must exist
 - `framework_root / lib` must exist
@@ -222,10 +239,13 @@ Every resolved `WorkspaceLayout` is validated:
 **`core/config.py`** — One new field + registry entry:
 
 ```python
+
 # In VaultSpecConfig:
+
 content_dir: Path | None = None
 
 # In CONFIG_REGISTRY:
+
 ConfigVariable(
     env_name="VAULTSPEC_CONTENT_DIR",
     attr_name="content_dir",
@@ -249,7 +269,9 @@ import sys
 from pathlib import Path
 
 # Step 1: Structural bootstrap (always correct for framework location)
+
 # This is WHERE THE PYTHON CODE LIVES — not where content lives.
+
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 _LIB_DIR = _SCRIPTS_DIR.parent              # .vaultspec/lib/
 _FRAMEWORK_ROOT = _LIB_DIR.parent           # .vaultspec/
@@ -259,6 +281,7 @@ if str(LIB_SRC_DIR) not in sys.path:
     sys.path.insert(0, str(LIB_SRC_DIR))
 
 # Step 2: Now safe to import from the library
+
 from core.workspace import resolve_workspace
 
 def _env_path(name: str) -> Path | None:
@@ -291,6 +314,7 @@ def init_paths(layout: WorkspaceLayout) -> None:
     global ROOT_DIR, RULES_SRC_DIR, AGENTS_SRC_DIR, ...
 
     # Source dirs from CONTENT root
+
     ROOT_DIR = layout.output_root
     RULES_SRC_DIR = layout.content_root / "rules"
     AGENTS_SRC_DIR = layout.content_root / "agents"
@@ -299,6 +323,7 @@ def init_paths(layout: WorkspaceLayout) -> None:
     CONSTITUTION_SRC = layout.content_root / "constitution.md"
 
     # Output dirs from OUTPUT root
+
     TOOL_CONFIGS = {
         "claude": ToolConfig(
             rules_dir=layout.output_root / cfg.claude_dir / "rules",
@@ -334,6 +359,7 @@ init_paths(layout)
 ### Test Coverage: `core/tests/test_workspace.py`
 
 Unit tests for all detection modes using `tmp_path` fixtures:
+
 - Standard git repo (`.git/` directory) — all paths at repo root
 - Linked worktree (`.git` file with gitdir pointer) — resolves to repo root
 - Container mode (`.gt/`), CWD inside a worktree — resolves to container root
@@ -374,26 +400,36 @@ certain output files that are shared).
 ## Consequences
 
 **Positive:**
+
 - VaultSpec can run embedded inside repository-manager without structural
   assumptions about its own location
+
 - Git worktree/container layouts work correctly: `.vaultspec/`, `.vault/`,
   and all output directories are peers at the container root, shared across
   worktrees
+
 - Standalone use is completely unaffected — all new paths have
   backwards-compatible defaults
+
 - Validation catches misconfigured paths early with actionable error messages
+
 - The `WorkspaceLayout` type provides a single source of truth, replacing
   scattered global variables
 
 **Negative:**
+
 - Adds ~250 lines of new code in `core/workspace.py`
+
 - `init_paths()` signature change requires updating all call sites (3 CLIs +
   tests)
+
 - Git detection adds ~50ms on first invocation (directory walk, file reads);
   negligible for CLI usage but measurable
+
 - Test fixtures need to create mock `.git` files/directories
 
 **Migration path:**
+
 - No user-facing migration needed for standalone users
 - The companion project sets env vars; no VaultSpec config file changes
 - Existing `--root` flag semantics preserved (becomes output root override)
@@ -401,13 +437,13 @@ certain output files that are shared).
 
 **Deliverables summary:**
 
-| # | Change | Scope |
-|---|---|---|
-| 1 | `core/workspace.py` — WorkspaceLayout, GitInfo, LayoutMode, resolve_workspace(), discover_git() | New file (~250 lines) |
-| 2 | `core/config.py` — Add `content_dir` field + VAULTSPEC_CONTENT_DIR registry entry | Small edit |
-| 3 | `_paths.py` — Delegate to resolve_workspace(), structural fallback inside resolver | Small edit |
-| 4 | `cli.py` — init_paths() takes WorkspaceLayout; add --content-dir flag | Medium edit |
-| 5 | `subagent.py`, `vault.py` — Add --content-dir flag, use resolve_workspace() | Small edits |
-| 6 | `core/tests/test_workspace.py` — Unit tests for all layout modes | New file (~200 lines) |
-| 7 | `requirements.txt` — Fix stale dependency list (ADR-006 item 4) | Small edit |
-| 8 | `extension.toml` — New file for companion project discovery (ADR-006 item 5) | New file (~20 lines) |
+| #   | Change                                                                                          | Scope                 |
+| --- | ----------------------------------------------------------------------------------------------- | --------------------- |
+| 1   | `core/workspace.py` — WorkspaceLayout, GitInfo, LayoutMode, resolve_workspace(), discover_git() | New file (~250 lines) |
+| 2   | `core/config.py` — Add `content_dir` field + VAULTSPEC_CONTENT_DIR registry entry               | Small edit            |
+| 3   | `_paths.py` — Delegate to resolve_workspace(), structural fallback inside resolver              | Small edit            |
+| 4   | `cli.py` — init_paths() takes WorkspaceLayout; add --content-dir flag                           | Medium edit           |
+| 5   | `subagent.py`, `vault.py` — Add --content-dir flag, use resolve_workspace()                     | Small edits           |
+| 6   | `core/tests/test_workspace.py` — Unit tests for all layout modes                                | New file (~200 lines) |
+| 7   | `requirements.txt` — Fix stale dependency list (ADR-006 item 4)                                 | Small edit            |
+| 8   | `extension.toml` — New file for companion project discovery (ADR-006 item 5)                    | New file (~20 lines)  |

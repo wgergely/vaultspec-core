@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#cuda-dependencies"
-date: "2026-02-20"
+  - '#exec'
+  - '#cuda-dependencies'
+date: '2026-02-20'
 related:
-  - "[[2026-02-20-cuda-dependencies-p1-plan]]"
+  - '[[2026-02-20-cuda-dependencies-p1-plan]]'
 ---
+
 # `cuda-dependencies` `p3` `step3`
 
 Standardized `--extra-index-url` across all install references in documentation and added a prominent warning callout in `docs/getting-started.md`.

@@ -1,13 +1,14 @@
 ---
 tags:
-  - "#adr"
-  - "#cli-output"
-date: "2026-02-23"
+  - '#adr'
+  - '#cli-output'
+date: '2026-02-23'
 related:
-  - "[[2026-02-23-cli-output-architecture-research]]"
-  - "[[2026-02-22-cli-logging-research]]"
-  - "[[2026-02-22-cli-logging-adr]]"
+  - '[[2026-02-23-cli-output-architecture-research]]'
+  - '[[2026-02-22-cli-logging-research]]'
+  - '[[2026-02-22-cli-logging-adr]]'
 ---
+
 # `cli-output` adr: dual-console Printer abstraction | (**status:** `accepted`)
 
 ## Problem Statement
@@ -29,22 +30,28 @@ simultaneously. These bugs are not cosmetic — they silently break pipelines.
 - Rich is already a project dependency (introduced in Phase 1 which added
   `RichHandler` for structured log output to stderr). No new dependencies are
   required.
+
 - 30+ modules use the canonical `logging.getLogger(__name__)` pattern throughout
   the codebase. Library internals in `core/`, `orchestration/`, and `protocol/`
   must not be changed — they are not CLI-layer concerns.
+
 - The MCP server (`mcp_server/app.py`) uses stdio transport. Any write to stdout
   outside the JSON-RPC framing corrupts the transport. The `Printer` abstraction
   must never be instantiated in the MCP server execution path.
+
 - `src/vaultspec/protocol/acp/client.py` maintains a module-level
   `_console = Console(stderr=True)` for streaming agent feed content. This is
   an independent concern and must remain independent — it is not CLI program
   output.
+
 - The existing `--json` flags in `vault_cli.py` already route machine output
   via `print(json.dumps(...))` to stdout. This is the correct pattern; the
   `Printer` formalises it.
+
 - `doctor_run()` and `readiness_run()` in `commands.py` already follow the
   gold-standard pattern: `print()` for structured data, `logger.warning()` for
   issue flagging. The `Printer` aligns the rest of the codebase with this pattern.
+
 - The modern CLI convention (ruff, uv, cargo, OpenTofu) is unambiguous:
   stdout carries the answer (pipeable, machine-readable), stderr carries the
   conversation (progress, status, warnings). Verbosity flags control stderr;
@@ -53,16 +60,21 @@ simultaneously. These bugs are not cosmetic — they silently break pipelines.
 ## Constraints
 
 - Python 3.13+.
+
 - No new dependencies — Rich is already available.
+
 - No mocking in tests (project rule). The `Printer` class accepts optional
   `Console` constructor parameters to support test injection via `StringIO`-backed
   consoles. This satisfies the no-mock constraint: real `Printer` objects with
   real `Console` instances backed by real `StringIO` streams — no stubbing.
+
 - Must not break existing `pytest` log capture. The `Printer` writes to `Console`
   instances directly; it does not touch the `logging` subsystem, so `caplog` and
   `capsys` behaviour is unchanged.
+
 - The MCP server path must never instantiate `Printer`. MCP tool handlers use
   `logger.*()` only, routed through the logging subsystem to stderr.
+
 - Sub-phase A introduces infrastructure with zero behavioral change. No call sites
   are altered until sub-phase B.
 
@@ -84,13 +96,16 @@ class Printer:
     ) -> None: ...
 
     # stdout — program output, never suppressed by --quiet
+
     def out(self, *args, **kwargs) -> None: ...
     def out_json(self, data: Any, *, indent: int = 2) -> None: ...
 
     # stderr — human messaging, suppressed by --quiet
+
     def status(self, msg: str, *args, **kwargs) -> None: ...
 
     # stderr — diagnostic, never suppressed
+
     def warn(self, msg: str, *args, **kwargs) -> None: ...
     def error(self, msg: str, *args, **kwargs) -> None: ...
 ```
@@ -115,11 +130,11 @@ No call sites change in sub-phase A. Zero behavioral difference.
 The targeted fixes are:
 
 1. `vault_cli.py handle_search()` — empty-state `logger.info("No results found...")` → `printer.out(...)`. Both the results path and the empty-state path now emit to stdout. Pipelines receive consistent output regardless of result count.
-2. `vault_cli.py handle_index()` — index-complete summary table `logger.info(...)` calls → `printer.out(...)`. The summary is program output, not a status message.
-3. `commands.py hooks_list()` — empty-state `logger.info("No hooks defined.")` → `printer.out(...)`. Populated and empty states now both go to stdout; `--quiet` no longer inverts between the two cases.
-4. `commands.py init_run()` — remove the duplicate `logger.info()` calls that mirror the existing `print()` calls. Eliminates phantom duplication on both channels simultaneously.
-5. `orchestration/subagent.py` — convert three f-string `logger.debug()` calls (lines 261, 269, 492) to lazy `%s` format. Eliminates unconditional f-string evaluation in hot paths run per-turn in every subagent session.
-6. `mcp_server/app.py` — add a `configure_logging()` call in `main()` so the startup `logger.info()` message is visible when the process is run in a terminal with `--debug`. Does not affect stdio transport safety; `configure_logging()` routes to stderr only.
+1. `vault_cli.py handle_index()` — index-complete summary table `logger.info(...)` calls → `printer.out(...)`. The summary is program output, not a status message.
+1. `commands.py hooks_list()` — empty-state `logger.info("No hooks defined.")` → `printer.out(...)`. Populated and empty states now both go to stdout; `--quiet` no longer inverts between the two cases.
+1. `commands.py init_run()` — remove the duplicate `logger.info()` calls that mirror the existing `print()` calls. Eliminates phantom duplication on both channels simultaneously.
+1. `orchestration/subagent.py` — convert three f-string `logger.debug()` calls (lines 261, 269, 492) to lazy `%s` format. Eliminates unconditional f-string evaluation in hot paths run per-turn in every subagent session.
+1. `mcp_server/app.py` — add a `configure_logging()` call in `main()` so the startup `logger.info()` message is visible when the process is run in a terminal with `--debug`. Does not affect stdio transport safety; `configure_logging()` routes to stderr only.
 
 **Sub-phase C — optional systematic migration:**
 
@@ -173,16 +188,22 @@ formatting requirements.
 ## Consequences
 
 - A new module `src/vaultspec/printer.py` is added to the public package surface.
+
 - `args.printer` is available to all command handlers after `setup_logging()` returns.
+
 - Sub-phase B touches approximately 10 call sites across 4 files. Blast radius is low.
+
 - `print()` calls not yet migrated in sub-phase C continue to work correctly;
   they emit to stdout as before. No regression.
+
 - Tests that use `capsys` for existing `print()` call sites are unaffected in
   sub-phase A. Sub-phase B test updates are localized to the fixed call sites.
   New tests for `Printer` use `StringIO`-backed `Console` injection without mocks.
+
 - Future capabilities (progress spinners, styled tables, `--format csv`, TTY
   color control) can be added to `Printer` without touching the `logging`
   subsystem or altering call site semantics.
+
 - The `--json` implied-quiet pattern aligns vaultspec with the conventions of
   ruff, cargo, and uv — machine consumers get clean stdout without needing to
   manually suppress status output.

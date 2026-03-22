@@ -1,56 +1,63 @@
 repos:
+  # ── Read-only checks only ───────────────────────────────────────────
+  # Every hook here is a pure gate: it exits non-zero when the code is
+  # not acceptable but NEVER modifies files.  Auto-fixing lives in
+  # `just dev fix` which is safe to run outside the stash cycle.
+  #
+  # Why: pre-commit stashes unstaged changes before running hooks, then
+  # restores them afterward.  If any hook modifies files AND the restore
+  # conflicts, pre-commit rolls back ALL fixes  - even from unrelated
+  # hooks that succeeded.  Keeping hooks read-only avoids this entirely.
   - repo: local
     hooks:
       - id: ruff-check
-        name: Lint and fix Python code (Ruff)
-        entry: uv run ruff check --fix
+        name: Lint Python code (Ruff)
+        entry: uv run --no-sync ruff check
         language: system
         types: [python]
         pass_filenames: true
 
-      - id: ruff-format
-        name: Format Python code (Ruff)
-        entry: uv run ruff format
+      - id: ruff-format-check
+        name: Check Python formatting (Ruff)
+        entry: uv run --no-sync ruff format --check
         language: system
         types: [python]
-        pass_filenames: true
-
-      - id: taplo-format
-        name: Format TOML files (Taplo)
-        entry: taplo fmt
-        language: node
-        additional_dependencies: ["@taplo/cli@0.7.0"]
-        types: [toml]
         pass_filenames: true
 
       - id: taplo-lint
         name: Lint TOML files (Taplo)
         entry: taplo lint
-        language: node
-        additional_dependencies: ["@taplo/cli@0.7.0"]
+        language: system
         types: [toml]
         pass_filenames: true
 
       - id: ty
         name: Type-check Python codebase (Ty)
-        entry: uv run python -m ty check src/vaultspec_core
+        entry: uv run --no-sync python -m ty check src/vaultspec_core
         language: system
         types: [python]
         pass_filenames: false
 
       - id: check-naming
         name: Verify vault document naming and integrity
-        entry: uv run python -m vaultspec_core vault audit --verify
+        entry: uv run --no-sync python -c "from vaultspec_core.cli import app; app()" vault check structure
         language: system
         types: [markdown]
         pass_filenames: false
 
-      - id: markdownlint
-        name: Lint Markdown style (markdownlint)
-        entry: markdownlint
-        language: node
-        additional_dependencies: ["markdownlint-cli@0.44.0"]
-        args: ["--config", ".markdownlint.json"]
+      - id: mdformat-check
+        name: Check Markdown formatting (mdformat)
+        entry: uv run --no-sync mdformat --check
+        language: system
         pass_filenames: true
         types: [markdown]
+        exclude: ^test-project/
+
+      - id: pymarkdown
+        name: Lint Markdown style (pymarkdown)
+        entry: uv run --no-sync pymarkdown --config .pymarkdown.json scan
+        language: system
+        pass_filenames: true
+        types: [markdown]
+        exclude: ^test-project/
 

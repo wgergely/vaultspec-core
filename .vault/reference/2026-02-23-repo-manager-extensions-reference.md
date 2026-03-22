@@ -1,9 +1,10 @@
 ---
 tags:
-  - "#reference"
-  - "#repo-manager-extensions"
-date: "2026-02-23"
+  - '#reference'
+  - '#repo-manager-extensions'
+date: '2026-02-23'
 ---
+
 # repo-manager extensions system reference
 
 ```
@@ -30,13 +31,13 @@ File(s):
 Related: []
 ```
 
----
+______________________________________________________________________
 
 ## overview
 
 The repository-manager extension system is **partially designed and partially implemented**. The data-model layer (manifest parsing, registry, MCP config resolution) is fully implemented and tested. The lifecycle layer (install, add, remove, activate) is explicitly stubbed out — every CLI handler returns `"not yet implemented"`. Understanding both what exists and what is missing is the purpose of this audit.
 
----
+______________________________________________________________________
 
 ## 1. extension lifecycle
 
@@ -123,23 +124,23 @@ So the system is designed to tolerate uninstalled extensions gracefully, but doe
 
 `handle_extension_list` (`extension.rs:45-85`) is the sole functional CLI handler. It queries `ExtensionRegistry::with_known()` and prints the static catalog. The `--json` flag outputs structured JSON. All entries are reported as `"installed": false` since no install tracking exists.
 
----
+______________________________________________________________________
 
 ## 2. extension CLI commands
 
 All commands are defined in `crates/repo-cli/src/commands/extension.rs`. The surface is:
 
-| Command | Handler | Status |
-|---|---|---|
-| `repo extension list [--json]` | `handle_extension_list` | Functional (read-only, static catalog) |
-| `repo extension install <source> [--no-activate]` | `handle_extension_install` | Stub — returns error |
-| `repo extension add <name>` | `handle_extension_add` | Stub — returns error |
-| `repo extension init <name>` | `handle_extension_init` | Stub — returns error |
-| `repo extension remove <name>` | `handle_extension_remove` | Stub — returns error |
+| Command                                           | Handler                    | Status                                 |
+| ------------------------------------------------- | -------------------------- | -------------------------------------- |
+| `repo extension list [--json]`                    | `handle_extension_list`    | Functional (read-only, static catalog) |
+| `repo extension install <source> [--no-activate]` | `handle_extension_install` | Stub — returns error                   |
+| `repo extension add <name>`                       | `handle_extension_add`     | Stub — returns error                   |
+| `repo extension init <name>`                      | `handle_extension_init`    | Stub — returns error                   |
+| `repo extension remove <name>`                    | `handle_extension_remove`  | Stub — returns error                   |
 
 The distinction between `install` (by URL/path) and `add` (by known name) is present in the interface design but not yet implemented in either handler.
 
----
+______________________________________________________________________
 
 ## 3. extension manifest format (`repo_extension.toml`)
 
@@ -196,7 +197,7 @@ ExtensionManifest           manifest.rs:47
 - Unknown top-level sections are accepted (the outer struct does not have `deny_unknown_fields`).
 - Entry point paths that are absolute are force-resolved relative to the source directory with a warning (`manifest.rs:167-174`).
 
----
+______________________________________________________________________
 
 ## 4. dependency installation
 
@@ -206,7 +207,7 @@ The `repo-meta` registry (`registry.rs:47-53`) associates preset IDs to provider
 
 The hooks system (`crates/repo-core/src/hooks.rs`) does support arbitrary subprocess execution via `Command::new` (`hooks.rs:210`), but hooks are general-purpose lifecycle callbacks (pre/post branch-create, pre/post branch-delete, pre/post sync) configured by the user — they are not extension-installation hooks.
 
----
+______________________________________________________________________
 
 ## 5. virtual environment management
 
@@ -240,7 +241,7 @@ There is no `uv venv`, `python -m venv`, `pip install`, or any subprocess call t
 
 The system assumes the convention `.venv/bin/python` (Linux/macOS) or `.venv/Scripts/python.exe` (Windows) relative to the extension's source directory at `.repository/extensions/<name>/`.
 
----
+______________________________________________________________________
 
 ## 6. config.toml format
 
@@ -249,7 +250,9 @@ The system assumes the convention `.venv/bin/python` (Linux/macOS) or `.venv/Scr
 The test fixture at `test-fixtures/repos/config-test/.repository/config.toml`:
 
 ```toml
+
 # Repository Manager Configuration
+
 # This fixture tests config generation across tools
 
 tools = ["cursor", "claude"]
@@ -261,7 +264,9 @@ mode = "standard"
 ### full schema
 
 ```toml
+
 # Top-level arrays (must appear before any [section] headers)
+
 tools = ["cursor", "vscode", "claude", "windsurf", "antigravity", "gemini"]
 rules = ["no-unsafe", "no-unwrap"]
 
@@ -282,6 +287,7 @@ enabled = true
 [extensions."vaultspec"]
 source = "https://github.com/vaultspec/vaultspec.git"
 ref_pin = "v0.1.0"
+
 # Any additional keys pass through (flatten)
 
 [extensions."other-ext"]
@@ -302,11 +308,12 @@ working_dir = ".scripts"   # optional; must be inside repo root
 ### config hierarchy (4 layers, later overrides earlier)
 
 1. `~/.config/repo-manager/config.toml` — global defaults
-2. `~/.config/repo-manager/org/config.toml` — organization defaults
-3. `.repository/config.toml` — repository config
-4. `.repository/config.local.toml` — local overrides (git-ignored)
+1. `~/.config/repo-manager/org/config.toml` — organization defaults
+1. `.repository/config.toml` — repository config
+1. `.repository/config.local.toml` — local overrides (git-ignored)
 
 Merge semantics (`manifest.rs:156-197`):
+
 - `core.mode`: last value wins.
 - `presets`: deep merge per-key (object fields merged recursively, scalars replaced).
 - `tools`: union (unique values from all layers).
@@ -317,6 +324,7 @@ Merge semantics (`manifest.rs:156-197`):
 ### preset key taxonomy
 
 Preset keys follow the pattern `"type:name"` (e.g., `"env:python"`, `"tool:linter"`, `"config:editor"`). The `RuntimeContext` (`config/runtime.rs:54-108`) separates them:
+
 - `env:*` presets go into `RuntimeContext.runtime` keyed by the name after the colon.
 - `tool:*` and `config:*` presets go into `RuntimeContext.capabilities` (sorted list of keys).
 
@@ -324,7 +332,7 @@ Preset keys follow the pattern `"type:name"` (e.g., `"env:python"`, `"tool:linte
 
 Built-in tool integrations (`tool_syncer.rs` test coverage confirms): `cursor`, `vscode`, `claude`, `windsurf`, `antigravity`, `gemini`. `cursor` -> `.cursorrules`, `vscode` -> `.vscode/settings.json`, `claude` -> `CLAUDE.md`.
 
----
+______________________________________________________________________
 
 ## 7. MCP config resolution (the only active extension integration)
 
@@ -336,6 +344,7 @@ This is the only part of the extension system that is wired into the main sync p
 SyncEngine::sync()
   -> resolve_extension_mcp_configs(&manifest)
      for each extension in manifest.extensions:
+
        1. Read .repository/extensions/<name>/repo_extension.toml
        2. Check provides.mcp_config field
        3. Read extension's mcp.json (relative to extension source dir)
@@ -349,11 +358,11 @@ SyncEngine::sync()
 
 ### template variables in mcp.json
 
-| Variable | Resolves to |
-|---|---|
-| `{{root}}` | Absolute path to repository root |
-| `{{extension.source}}` | Absolute path to `.repository/extensions/<name>/` |
-| `{{runtime.python}}` | Absolute path to `.venv/bin/python` (or `None` if not found) |
+| Variable               | Resolves to                                                  |
+| ---------------------- | ------------------------------------------------------------ |
+| `{{root}}`             | Absolute path to repository root                             |
+| `{{extension.source}}` | Absolute path to `.repository/extensions/<name>/`            |
+| `{{runtime.python}}`   | Absolute path to `.venv/bin/python` (or `None` if not found) |
 
 Example `mcp.json` (shipped by an extension):
 
@@ -385,25 +394,25 @@ ResolvedCommand {
 
 The entry point string is split on whitespace: the first token is the script path (joined to `source_dir`), remaining tokens become additional args. The python interpreter is always `program`.
 
----
+______________________________________________________________________
 
 ## 8. gaps and unimplemented surface
 
-| Capability | Status | Where |
-|---|---|---|
-| `extension install` | Not implemented | `extension.rs:14-18` |
-| `extension add` | Not implemented | `extension.rs:21-25` |
-| `extension init` | Not implemented | `extension.rs:28-32` |
-| `extension remove` | Not implemented | `extension.rs:35-39` |
-| Git clone of extension source | Not implemented | No code path exists |
-| Python venv creation | Not implemented | Only probing exists (`engine.rs:612-626`) |
-| Running `runtime.install` command | Not implemented | Field is parsed, never executed |
-| `requires.python.version` checking | Not implemented | Field is parsed, never checked |
-| Extension activation state tracking | Not implemented | No install state persisted |
+| Capability                          | Status          | Where                                         |
+| ----------------------------------- | --------------- | --------------------------------------------- |
+| `extension install`                 | Not implemented | `extension.rs:14-18`                          |
+| `extension add`                     | Not implemented | `extension.rs:21-25`                          |
+| `extension init`                    | Not implemented | `extension.rs:28-32`                          |
+| `extension remove`                  | Not implemented | `extension.rs:35-39`                          |
+| Git clone of extension source       | Not implemented | No code path exists                           |
+| Python venv creation                | Not implemented | Only probing exists (`engine.rs:612-626`)     |
+| Running `runtime.install` command   | Not implemented | Field is parsed, never executed               |
+| `requires.python.version` checking  | Not implemented | Field is parsed, never checked                |
+| Extension activation state tracking | Not implemented | No install state persisted                    |
 | Content type syncing (rules/agents) | Not implemented | `provides.content_types` parsed, not acted on |
-| `outputs` directory mapping | Not implemented | Fields parsed, not used |
+| `outputs` directory mapping         | Not implemented | Fields parsed, not used                       |
 
----
+______________________________________________________________________
 
 ## 9. key type relationships
 
@@ -438,7 +447,7 @@ repo-meta::Registry                      ← preset-id -> provider mapping
   "env:rust" -> "rust"
 ```
 
----
+______________________________________________________________________
 
 ## 10. crate dependency graph (extension-relevant)
 

@@ -1,10 +1,10 @@
 ---
 tags:
-  - "#exec"
-  - "#agent-removal"
-date: "2026-03-05"
+  - '#exec'
+  - '#agent-removal'
+date: '2026-03-05'
 related:
-  - "[[2026-03-05-agent-removal-plan]]"
+  - '[[2026-03-05-agent-removal-plan]]'
 ---
 
 # `agent-removal` `phase1` `step1`
@@ -20,6 +20,7 @@ Phase 1: Remove CLI Commands and MCP Tools. Deleted CLI entry points and MCP too
 ## Description
 
 The following files were removed as part of the initial phase of the agent removal plan:
+
 - CLI entry points for `team`, `subagent`, and `server` commands.
 - MCP tools for subagent and team coordination.
 

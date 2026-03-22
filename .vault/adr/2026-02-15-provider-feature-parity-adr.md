@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#adr"
-  - "#protocol"
-date: "2026-02-15"
+  - '#adr'
+  - '#protocol'
+date: '2026-02-15'
 related:
-  - "[[2026-02-07-a2a-research]]"
-  - "[[2026-02-08-vault-api-adr]]"
+  - '[[2026-02-08-vault-api-adr]]'
+  - '[[2026-02-07-protocol-architecture-research]]'
 ---
+
 # provider-parity adr: Align Provider Feature Surface and Terminology | (**status:** accepted)
 
 ## Problem Statement
@@ -33,11 +34,11 @@ Feature asymmetry between the Claude and Gemini providers means agent behavior d
 ## Implementation
 
 1. **Standardize abstract interface**: Add `load_system_prompt()`, `load_rules()`, and `construct_system_prompt()` as abstract methods on `AgentProvider` base class.
-2. **Align Claude provider**: Rename `_build_system_context()` to `construct_system_prompt()`, add `load_system_prompt()` for `.claude/CLAUDE.md`, and add `system_instructions` parameter.
-3. **Fix mode parameter**: Claude provider now sets `VS_AGENT_MODE` in env instead of discarding the mode parameter. Remove redundant set in `run_subagent()`.
-4. **Fix VS_OUTPUT_FORMAT bridge gap**: Pass `output_format` through to `ClaudeAgentOptions` in `_build_options()`.
-5. **Add provider warnings**: Log warnings when agent YAML configures features unsupported by the resolved provider.
-6. **Extract include_dirs validation**: Move duplicated path traversal validation to `_validate_include_dirs()` on base class.
+1. **Align Claude provider**: Rename `_build_system_context()` to `construct_system_prompt()`, add `load_system_prompt()` for `.claude/CLAUDE.md`, and add `system_instructions` parameter.
+1. **Fix mode parameter**: Claude provider now sets `VS_AGENT_MODE` in env instead of discarding the mode parameter. Remove redundant set in `run_subagent()`.
+1. **Fix VS_OUTPUT_FORMAT bridge gap**: Pass `output_format` through to `ClaudeAgentOptions` in `_build_options()`.
+1. **Add provider warnings**: Log warnings when agent YAML configures features unsupported by the resolved provider.
+1. **Extract include_dirs validation**: Move duplicated path traversal validation to `_validate_include_dirs()` on base class.
 
 ## Rationale
 

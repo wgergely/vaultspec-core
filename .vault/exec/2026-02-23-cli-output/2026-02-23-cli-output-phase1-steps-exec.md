@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#cli-output"
-date: "2026-02-23"
+  - '#exec'
+  - '#cli-output'
+date: '2026-02-23'
 related:
-  - "[[2026-02-23-cli-output-plan]]"
+  - '[[2026-02-23-cli-output-plan]]'
 ---
+
 # cli-output phase-1 steps
 
 Execution record for phase-1 (sub-phase a — infrastructure). All four tasks
@@ -22,15 +23,18 @@ Introduced the `Printer` class with:
   defaults construct `Console(stderr=False, highlight=False)` (stdout) and
   `Console(stderr=True, highlight=False)` (stderr). Injection points support
   `StringIO`-backed testing without mocks.
+
 - `out(*args, **kwargs)` — routes to stdout Console; never suppressed.
+
 - `out_json(data, *, indent=2)` — serializes via `json.dumps`, calls `out()`;
   never suppressed.
+
 - `status(msg, *args, **kwargs)` — routes to stderr Console; gated by
   `self.quiet`.
-- `warn(msg, *args, **kwargs)` — routes to stderr Console with `style="yellow
-  bold"` default; never suppressed.
-- `error(msg, *args, **kwargs)` — routes to stderr Console with `style="red
-  bold"` default; never suppressed.
+
+- `warn(msg, *args, **kwargs)` — routes to stderr Console with `style="yellow bold"` default; never suppressed.
+
+- `error(msg, *args, **kwargs)` — routes to stderr Console with `style="red bold"` default; never suppressed.
 
 `__all__ = ["Printer"]` declared at module level.
 
@@ -72,12 +76,17 @@ submodule directly. The existing docstring was preserved verbatim.
 `StringIO`-backed `Console` injection — no mocks, no patching:
 
 - `TestOut` — `out()` writes to stdout buffer; not suppressed when `quiet=True`.
+
 - `TestOutJson` — `out_json()` emits valid JSON; not suppressed when
   `quiet=True`; handles list payloads.
+
 - `TestStatus` — `status()` writes to stderr when `quiet=False`; silent when
   `quiet=True`.
+
 - `TestWarn` — `warn()` writes to stderr; not suppressed when `quiet=True`.
+
 - `TestError` — `error()` writes to stderr; not suppressed when `quiet=True`.
+
 - `TestConstructorDefaults` — default and quiet construction succeed without
   injection.
 
@@ -109,9 +118,9 @@ Exit code: 0. No output. No regressions detected.
 
 ## files produced or modified
 
-| File | Action |
-| :--- | :--- |
-| `src/vaultspec/printer.py` | created |
-| `src/vaultspec/cli_common.py` | modified (3 lines added to `setup_logging()`) |
-| `src/vaultspec/__init__.py` | modified (2 lines added after docstring) |
-| `src/vaultspec/tests/cli/test_printer.py` | created |
+| File                                      | Action                                        |
+| :---------------------------------------- | :-------------------------------------------- |
+| `src/vaultspec/printer.py`                | created                                       |
+| `src/vaultspec/cli_common.py`             | modified (3 lines added to `setup_logging()`) |
+| `src/vaultspec/__init__.py`               | modified (2 lines added after docstring)      |
+| `src/vaultspec/tests/cli/test_printer.py` | created                                       |

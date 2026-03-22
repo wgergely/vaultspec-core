@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#research"
-  - "#acp-bridge-auth"
-date: "2026-02-21"
+  - '#research'
+  - '#acp-bridge-auth'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-acp-bridge-auth-research]]"
-  - "[[2026-02-20-a2a-team-gemini-research]]"
+  - '[[2026-02-21-acp-bridge-auth-research]]'
+  - '[[2026-02-20-a2a-team-gemini-research]]'
 ---
+
 # `acp-bridge-auth` research: Gemini CLI child-process authentication
 
 Parallel investigation to `"[[2026-02-21-acp-bridge-auth-research]]"` (Claude). Maps Gemini
@@ -21,7 +22,9 @@ correct fix strategy.
 Python bridge layer. The binary speaks the ACP stdio protocol natively via `--experimental-acp`:
 
 ```python
+
 # gemini.py
+
 executable, prefix_args = resolve_executable("gemini", _which_fn)
 args = ["--experimental-acp", "--model", model]
 return ProcessSpec(executable=executable, args=prefix_args + args, env=env, ...)
@@ -35,12 +38,12 @@ only `claude-agent-sdk` is a direct dependency.
 
 `getAuthTypeFromEnv()` in the Gemini CLI resolves auth type in strict order:
 
-| Priority | Env var | Auth type | Non-interactive? |
-|---|---|---|---|
-| 1 | `GOOGLE_GENAI_USE_GCA=true` | OAuth (browser, cached) | Only if `~/.gemini/oauth_creds.json` fresh |
-| 2 | `GOOGLE_GENAI_USE_VERTEXAI=true` | Vertex AI | Yes (with ADC) |
-| 3 | `GEMINI_API_KEY` set | Direct API key | **Yes — fully** |
-| 4 | None | OAuth browser flow | **No — hangs without TTY** |
+| Priority | Env var                          | Auth type               | Non-interactive?                           |
+| -------- | -------------------------------- | ----------------------- | ------------------------------------------ |
+| 1        | `GOOGLE_GENAI_USE_GCA=true`      | OAuth (browser, cached) | Only if `~/.gemini/oauth_creds.json` fresh |
+| 2        | `GOOGLE_GENAI_USE_VERTEXAI=true` | Vertex AI               | Yes (with ADC)                             |
+| 3        | `GEMINI_API_KEY` set             | Direct API key          | **Yes — fully**                            |
+| 4        | None                             | OAuth browser flow      | **No — hangs without TTY**                 |
 
 There is **no analog to `CLAUDE_CODE_ENTRYPOINT=sdk-py`** — Gemini has no subprocess-mode
 signal that changes auth behavior. Resolution is purely env-var and file-based.
@@ -78,16 +81,23 @@ Controls tool/file modification approval policy. `yolo` = equivalent of Claude's
 ### Current `GeminiProvider` auth gap
 
 ```python
+
 # gemini.py — current auth block
+
 env = os.environ.copy()
+
 # ... sets only GEMINI_SYSTEM_MD
+
 # NO auth injection
+
 ```
 
 Compare to `ClaudeProvider`:
 
 ```python
+
 # claude.py — after fix
+
 if "CLAUDE_CODE_OAUTH_TOKEN" not in env and "ANTHROPIC_API_KEY" not in env:
     token = _load_claude_oauth_token()   # reads ~/.claude/.credentials.json
     if token:
@@ -128,7 +138,8 @@ What IS missing (parity with `ClaudeProvider` post-fix):
 
 1. **Defensive warning** — if neither `GEMINI_API_KEY` is in env nor `~/.gemini/oauth_creds.json`
    exists, log a warning so auth failures are diagnosable.
-2. **No token injection possible** — unlike Claude (where `CLAUDE_CODE_OAUTH_TOKEN` accepts
+
+1. **No token injection possible** — unlike Claude (where `CLAUDE_CODE_OAUTH_TOKEN` accepts
    the raw access token), there is no Gemini env var to inject a raw OAuth token. The
    binary reads the JSON file directly. Token refresh, if needed, must go through
    `~/.gemini/oauth_creds.json` on disk.

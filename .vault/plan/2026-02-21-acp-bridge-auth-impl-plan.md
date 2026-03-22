@@ -1,15 +1,16 @@
 ---
 tags:
-  - "#plan"
-  - "#acp-bridge-auth"
-date: "2026-02-21"
+  - '#plan'
+  - '#acp-bridge-auth'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-claude-provider-auth-strategy-adr]]"
-  - "[[2026-02-21-gemini-provider-auth-strategy-adr]]"
-  - "[[2026-02-21-acp-bridge-auth-research]]"
-  - "[[2026-02-21-gemini-bridge-auth-research]]"
-  - "[[2026-02-21-provider-auth-billing-research]]"
+  - '[[2026-02-21-claude-provider-auth-strategy-adr]]'
+  - '[[2026-02-21-gemini-provider-auth-strategy-adr]]'
+  - '[[2026-02-21-acp-bridge-auth-research]]'
+  - '[[2026-02-21-gemini-bridge-auth-research]]'
+  - '[[2026-02-21-provider-auth-billing-research]]'
 ---
+
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 
@@ -31,14 +32,14 @@ which reads `accessToken` from `~/.claude/.credentials.json` and injects it as
 `CLAUDE_CODE_OAUTH_TOKEN` if neither that env var nor `ANTHROPIC_API_KEY` is present. The
 function has no expiry awareness and performs no refresh. The v2 increment adds expiry
 checking and a stdlib-only `urllib.request` refresh call, conforming to the implementation
-path described in [[2026-02-21-claude-provider-auth-strategy-adr]].
+path described in \[[2026-02-21-claude-provider-auth-strategy-adr]\].
 
 **`src/vaultspec/protocol/providers/gemini.py`** — currently performs no auth wrangling.
 `prepare_process()` calls `os.environ.copy()` and then directly builds the process spec.
 Two new module-level helper functions (`_load_gemini_oauth_creds`,
 `_refresh_gemini_oauth_token`) and a three-branch auth check block are added after the
 `env = os.environ.copy()` line, conforming to
-[[2026-02-21-gemini-provider-auth-strategy-adr]].
+\[[2026-02-21-gemini-provider-auth-strategy-adr]\].
 
 **`src/vaultspec/protocol/tests/test_providers.py`** (existing) or a new sibling file
 `test_provider_auth.py` — new test classes are added for the auth paths introduced in
@@ -48,66 +49,69 @@ Steps 1 and 2. The existing test patterns use `pytest`, `caplog`, `tmp_path`, an
 ## Tasks
 
 - Phase 1 — Claude token refresh (v2 increment)
-    1. Extend `_load_claude_oauth_token()` with expiry awareness and refresh
-    2. Add `logger.debug` for the `ANTHROPIC_API_KEY` override path in `prepare_process()`
+
+  1. Extend `_load_claude_oauth_token()` with expiry awareness and refresh
+  1. Add `logger.debug` for the `ANTHROPIC_API_KEY` override path in `prepare_process()`
 
 - Phase 2 — Gemini OAuth wrangling (new)
-    1. Add `_load_gemini_oauth_creds()` helper
-    2. Add `_refresh_gemini_oauth_token()` helper
-    3. Add three-branch auth check block in `GeminiProvider.prepare_process()`
+
+  1. Add `_load_gemini_oauth_creds()` helper
+  1. Add `_refresh_gemini_oauth_token()` helper
+  1. Add three-branch auth check block in `GeminiProvider.prepare_process()`
 
 - Phase 3 — Unit tests
-    1. Claude auth test cases (five scenarios)
-    2. Gemini auth test cases (five scenarios)
+
+  1. Claude auth test cases (five scenarios)
+  1. Gemini auth test cases (five scenarios)
 
 ## Steps
 
 - Name: Claude token expiry check and refresh
 - Step summary: Step Record (`.vault/exec/2026-02-21-acp-bridge-auth/2026-02-21-acp-bridge-auth-p1-s1.md`)
 - Executing sub-agent: vaultspec-standard-executor
-- References: [[2026-02-21-claude-provider-auth-strategy-adr]], [[2026-02-21-acp-bridge-auth-research]]
+- References: \[[2026-02-21-claude-provider-auth-strategy-adr]\], \[[2026-02-21-acp-bridge-auth-research]\]
 
----
+______________________________________________________________________
 
 - Name: Claude API-key-override debug log
 - Step summary: Step Record (`.vault/exec/2026-02-21-acp-bridge-auth/2026-02-21-acp-bridge-auth-p1-s2.md`)
 - Executing sub-agent: vaultspec-standard-executor
-- References: [[2026-02-21-claude-provider-auth-strategy-adr]]
+- References: \[[2026-02-21-claude-provider-auth-strategy-adr]\]
 
----
+______________________________________________________________________
 
 - Name: Gemini `_load_gemini_oauth_creds()` helper
 - Step summary: Step Record (`.vault/exec/2026-02-21-acp-bridge-auth/2026-02-21-acp-bridge-auth-p2-s1.md`)
 - Executing sub-agent: vaultspec-standard-executor
-- References: [[2026-02-21-gemini-provider-auth-strategy-adr]], [[2026-02-21-gemini-bridge-auth-research]]
+- References: \[[2026-02-21-gemini-provider-auth-strategy-adr]\], \[[2026-02-21-gemini-bridge-auth-research]\]
 
----
+______________________________________________________________________
 
 - Name: Gemini `_refresh_gemini_oauth_token()` helper
 - Step summary: Step Record (`.vault/exec/2026-02-21-acp-bridge-auth/2026-02-21-acp-bridge-auth-p2-s2.md`)
 - Executing sub-agent: vaultspec-complex-executor
-- References: [[2026-02-21-gemini-provider-auth-strategy-adr]], [[2026-02-21-provider-auth-billing-research]]
+- References: \[[2026-02-21-gemini-provider-auth-strategy-adr]\], \[[2026-02-21-provider-auth-billing-research]\]
 
----
+______________________________________________________________________
 
 - Name: Gemini three-branch auth check in `prepare_process()`
 - Step summary: Step Record (`.vault/exec/2026-02-21-acp-bridge-auth/2026-02-21-acp-bridge-auth-p2-s3.md`)
 - Executing sub-agent: vaultspec-standard-executor
-- References: [[2026-02-21-gemini-provider-auth-strategy-adr]]
+- References: \[[2026-02-21-gemini-provider-auth-strategy-adr]\]
 
----
+______________________________________________________________________
 
 - Name: Claude provider auth unit tests
 - Step summary: Step Record (`.vault/exec/2026-02-21-acp-bridge-auth/2026-02-21-acp-bridge-auth-p3-s1.md`)
 - Executing sub-agent: vaultspec-standard-executor
-- References: [[2026-02-21-claude-provider-auth-strategy-adr]]
+- References: \[[2026-02-21-claude-provider-auth-strategy-adr]\]
 
----
+______________________________________________________________________
 
 - Name: Gemini provider auth unit tests
 - Step summary: Step Record (`.vault/exec/2026-02-21-acp-bridge-auth/2026-02-21-acp-bridge-auth-p3-s2.md`)
 - Executing sub-agent: vaultspec-standard-executor
-- References: [[2026-02-21-gemini-provider-auth-strategy-adr]]
+- References: \[[2026-02-21-gemini-provider-auth-strategy-adr]\]
 
 ## Phase 1 — Claude token refresh (v2 increment in `claude.py`)
 
@@ -153,14 +157,19 @@ billing or auth routing issues.
 
 - When `expiresAt / 1000 > time.time() + 300`, no refresh POST is issued and the
   existing `accessToken` is returned.
+
 - When `expiresAt / 1000 <= time.time() + 300`, a POST is issued to the OAuth endpoint.
   On a 200 response the new `accessToken` is returned and `.credentials.json` is
   overwritten atomically.
+
 - When the POST fails (any exception or non-200), `logger.warning` is emitted and
   `None` is returned.
+
 - When `ANTHROPIC_API_KEY` is present in env, `logger.debug` confirms the key-override
   path and no file I/O is performed on `.credentials.json`.
+
 - No new third-party dependencies are introduced.
+
 - `expiresAt` comparison uses integer millisecond division, not multiplication.
 
 ## Phase 2 — Gemini OAuth wrangling (new, in `gemini.py`)
@@ -197,14 +206,16 @@ applied to match the Claude provider's proactive refresh policy.
 
 The three-branch auth check block is inserted in `prepare_process()` immediately after
 `env = os.environ.copy()` (currently line 159) and before the system-prompt temp file
-block. The structure mirrors the pseudocode in [[2026-02-21-gemini-provider-auth-strategy-adr]]:
+block. The structure mirrors the pseudocode in \[[2026-02-21-gemini-provider-auth-strategy-adr]\]:
 
 - If `GEMINI_API_KEY` is in `env`: emit `logger.debug` confirming the key-override path
   and take no further action. The key propagates naturally via `os.environ.copy()`.
+
 - Elif `~/.gemini/oauth_creds.json` exists: load the creds, check the `expiry` field
   with a 5-minute buffer. If expired, call `_refresh_gemini_oauth_token()` and log a
   warning if it returns `None`. If not expired, no action is taken. In all sub-cases the
   binary reads the file directly on startup — no env injection is needed or possible.
+
 - Else: emit `logger.warning` directing the user to either set `GEMINI_API_KEY` or run
   `gemini auth login`. The subprocess is still spawned; it will produce a diagnosable
   error.
@@ -216,14 +227,19 @@ are added to the top-level imports.
 ### Acceptance criteria
 
 - When `GEMINI_API_KEY` is in env, `logger.debug` fires and no file I/O is performed.
+
 - When `oauth_creds.json` exists and `expiry` is in the future (plus 5-min buffer), no
   refresh POST is issued.
+
 - When `oauth_creds.json` exists and `expiry` is in the past (within buffer), a POST is
   issued to `token_uri`. On success the file is rewritten atomically. On failure a
   warning is logged and the subprocess is spawned anyway.
+
 - When neither `GEMINI_API_KEY` is set nor `oauth_creds.json` exists, `logger.warning`
   names both setup paths.
+
 - `pathlib` is a runtime import (not TYPE_CHECKING-only) after this change.
+
 - No new third-party dependencies are introduced.
 
 ## Phase 3 — Tests
@@ -249,6 +265,7 @@ parameters with production-safe defaults:
 
 - **Credentials file path** (`creds_path: pathlib.Path | None = None`) — defaults to
   the real home-relative path. Tests supply a `tmp_path`-based real file.
+
 - **OAuth endpoint URL** (`token_url: str | None = None`) — defaults to the real
   Anthropic / Google endpoint. Tests supply the URL of a real local HTTP server spun
   up in the test process.
@@ -290,19 +307,23 @@ These test `_load_claude_oauth_token()` and the injection guard in
   with `expiresAt` set to `(time.time() + 3600) * 1000`. Call `_load_claude_oauth_token(creds_path=tmp_creds)`.
   Assert the returned token equals `accessToken` from the file. Assert the file is
   unmodified (compare mtime or content).
+
 - **Expired token, refresh succeeds**: write a real credentials JSON with `expiresAt`
   set to `(time.time() - 1) * 1000`. Start a real local HTTP server that returns
   `{"access_token": "new-token", "expires_in": 3600}`. Call
   `_load_claude_oauth_token(creds_path=tmp_creds, token_url=server_url)`. Assert the
   returned token is `"new-token"`. Assert the credentials file on disk now contains
   the updated `accessToken`.
+
 - **Expired token, refresh fails (server returns 400)**: write expired credentials.
   Start a real local HTTP server that returns HTTP 400. Call
   `_load_claude_oauth_token(creds_path=tmp_creds, token_url=server_url)`. Assert
   `logger.warning` is emitted via `caplog`. Assert `None` is returned. Assert the
   credentials file on disk is unchanged.
+
 - **Credentials file missing**: call `_load_claude_oauth_token(creds_path=tmp_path / "nonexistent.json")`.
   Assert `None` is returned with no exception raised.
+
 - **`ANTHROPIC_API_KEY` in env**: set `os.environ["ANTHROPIC_API_KEY"] = "test-key"`,
   call `prepare_process()`, assert `CLAUDE_CODE_OAUTH_TOKEN` is absent from the
   returned `ProcessSpec.env`, assert `logger.debug` is emitted. Restore env in
@@ -317,18 +338,22 @@ block in `GeminiProvider.prepare_process()`.
   with `expiry` 5+ minutes in the future. Call
   `_load_gemini_oauth_creds(creds_path=tmp_creds)`. Assert the returned dict matches
   the file contents. Assert no warning is logged and the file is unmodified.
+
 - **Expired token, refresh succeeds**: write expired creds with real `token_uri` field
   set to the local test server URL. Start a real local HTTP server returning
   `{"access_token": "refreshed", "expires_in": 3600}`. Call
   `_refresh_gemini_oauth_token(creds, token_url=server_url)`. Assert the returned dict
   has the updated `access_token`. Assert the credentials file on disk is updated
   atomically (original content gone, new content present).
+
 - **Expired token, refresh fails (server returns 500)**: start a real local HTTP
   server returning HTTP 500. Assert `logger.warning` fires. Assert `None` is returned.
   Assert the credentials file is unchanged.
+
 - **Credentials file missing, no `GEMINI_API_KEY`**: call `prepare_process()` with
   `creds_path` pointing to a nonexistent file and `GEMINI_API_KEY` absent from env.
   Assert `logger.warning` names both setup paths.
+
 - **`GEMINI_API_KEY` present**: set `os.environ["GEMINI_API_KEY"] = "test-key"`, call
   `prepare_process()`, assert `logger.debug` fires, assert no file I/O occurs on the
   (nonexistent) creds path (verified by observing the creds file path was never
@@ -339,11 +364,15 @@ block in `GeminiProvider.prepare_process()`.
 
 - All ten test cases pass under `pytest -m unit` with zero mocks, patches, stubs, or
   skips of any kind.
+
 - Every test that exercises a network path uses a real local HTTP server; no
   `urlopen`, `requests`, or HTTP client is intercepted.
+
 - Every test that exercises file I/O reads and writes real files in `tmp_path`.
+
 - `caplog` assertions verify exact log level (`DEBUG` vs `WARNING`) and message
   substring for each path.
+
 - Atomic write is verified by reading the credentials file after the call and asserting
   the full updated content is present — no partial writes, no temp files left behind.
 
@@ -362,15 +391,17 @@ merge conflicts.
 
 - `pytest -m unit src/vaultspec/protocol/tests/` — all pre-existing tests continue to
   pass; all new auth tests pass.
+
 - `ruff check src/vaultspec/protocol/providers/claude.py src/vaultspec/protocol/providers/gemini.py`
   — no lint errors introduced.
+
 - `mypy src/vaultspec/protocol/providers/claude.py src/vaultspec/protocol/providers/gemini.py`
   — no new type errors; `pathlib` is a runtime import in `gemini.py`.
 
 **Correctness checks requiring reviewer attention:**
 
 The `expiresAt` millisecond division is a known footgun (documented in
-[[2026-02-21-claude-provider-auth-strategy-adr]]). Code review must explicitly verify
+\[[2026-02-21-claude-provider-auth-strategy-adr]\]). Code review must explicitly verify
 that `expiresAt / 1000` (not `expiresAt * 1000`) is used. The real-file tests make
 this easier to catch because test values are actual timestamps, not magic mock numbers.
 

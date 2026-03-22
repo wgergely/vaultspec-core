@@ -1,10 +1,10 @@
 ---
 tags:
-  - "#plan"
-  - "#a2a-server-management"
+  - '#plan'
+  - '#a2a-server-management'
 date: 2026-02-24
 related:
-  - "[[2026-02-24-a2a-adr]]"
+  - '[[2026-02-24-a2a-adr]]'
 ---
 
 # A2A Server Management CLI & Daemonization Plan
@@ -29,10 +29,13 @@ We will introduce a top-level `server` subcommand group with the following tools
 
 - `vaultspec server start --executor <name> --model <model> [--port <port>]`:
   Spawns an agent server in the background (detached), writes its configuration to the state registry in `.vault/logs/teams/`, and outputs the Session ID and Port.
+
 - `vaultspec server list`:
   Reads the state registry, pings the ports to verify liveness, and prints a formatted table of active servers, cleaning up entries for processes that have died.
+
 - `vaultspec server stop <session_id>`:
   Looks up the PID in the registry, sends a graceful shutdown signal, and forcefully kills the process tree if it fails to exit. Removes the registry entry.
+
 - `vaultspec server logs <session_id>`:
   Streams `stdout` and `stderr` from the server's log file in `.vault/logs/teams/`.
 
@@ -43,9 +46,9 @@ Once the daemonization foundation is laid, `ServerProcessManager` (used by `run_
 ## Implementation Steps
 
 1. **State Registry Module**: Create `protocol/a2a/server_registry.py` to handle reading/writing the JSON definitions and managing log files in `.vault/logs/teams/`.
-2. **Refactor ServerProcessManager**: Update `server_manager.py` to decouple the concept of an *in-memory process handle* from the *persistent server state*. It should use the registry to track what it spawns.
-3. **CLI Group**: Create `server_cli.py` and register it in `vault_cli.py`. Implement `start`, `stop`, `list`, and `logs`.
-4. **Daemonization/Detachment**: Ensure the `start` command correctly detaches the `a2a-serve` subprocess from the invoking terminal so it continues running in the background.
+1. **Refactor ServerProcessManager**: Update `server_manager.py` to decouple the concept of an *in-memory process handle* from the *persistent server state*. It should use the registry to track what it spawns.
+1. **CLI Group**: Create `server_cli.py` and register it in `vault_cli.py`. Implement `start`, `stop`, `list`, and `logs`.
+1. **Daemonization/Detachment**: Ensure the `start` command correctly detaches the `a2a-serve` subprocess from the invoking terminal so it continues running in the background.
 
 ## Testing Constraints
 

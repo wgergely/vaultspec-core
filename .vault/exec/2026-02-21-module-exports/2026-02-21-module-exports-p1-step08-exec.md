@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#module-exports"
-date: "2026-02-21"
+  - '#exec'
+  - '#module-exports'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-module-exports-p1-plan]]"
+  - '[[2026-02-21-module-exports-p1-plan]]'
 ---
+
 # Step 8: Retarget entry point imports and add `__all__` to top-level modules
 
 ## Status: COMPLETE
@@ -26,6 +27,7 @@ Added `__all__` exports to top-level modules and the `mcp_tools` package, conver
 ### 8b. `mcp_tools/__init__.py` re-exports
 
 Replaced the docstring-only `__init__.py` with disambiguated re-exports:
+
 - `register_framework_tools`
 - `register_team_tools`
 - `register_vault_tools`
@@ -37,6 +39,7 @@ Converted `from vaultspec.cli import main` to `from .cli import main`.
 ### 8d. CLI entry point import audit
 
 Verified all five CLI files (`cli.py`, `vault_cli.py`, `team_cli.py`, `subagent_cli.py`, `server.py`). All imports already target package-level exports where available. Remaining deep imports are intentional by design:
+
 - `orchestration.team` (team_cli.py) -- no package-level re-export by design
 - `orchestration.subagent` (subagent_cli.py) -- no package-level re-export by design
 - `subagent_server.server` (subagent_cli.py) -- `main as server_main` aliased import
@@ -45,6 +48,7 @@ Verified all five CLI files (`cli.py`, `vault_cli.py`, `team_cli.py`, `subagent_
 ## Verification
 
 All modified modules import cleanly:
+
 - `python -c "from vaultspec.mcp_tools import register_framework_tools, ..."` -- OK
 - `python -c "from vaultspec.logging_config import configure_logging, reset_logging"` -- OK
 - `python -m vaultspec --help` -- OK

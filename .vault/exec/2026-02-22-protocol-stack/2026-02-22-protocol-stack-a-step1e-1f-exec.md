@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#protocol-stack"
-date: "2026-02-22"
+  - '#exec'
+  - '#protocol-stack'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-protocol-stack-deep-audit-plan]]"
+  - '[[2026-02-22-protocol-stack-deep-audit-plan]]'
 ---
+
 # `protocol-stack` Track A `Steps 1e-1f`
 
 Fixed Gemini executor session reuse and updated multi-turn test assertions.

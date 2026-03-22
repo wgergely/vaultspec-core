@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#cuda-dependencies"
-date: "2026-02-20"
+  - '#exec'
+  - '#cuda-dependencies'
+date: '2026-02-20'
 related:
-  - "[[2026-02-20-cuda-dependencies-p1-plan]]"
+  - '[[2026-02-20-cuda-dependencies-p1-plan]]'
 ---
+
 # `cuda-dependencies` `p3` `step2`
 
 Added clarifying note about `nvidia-smi` vs `nvcc --version` to `docs/getting-started.md`.

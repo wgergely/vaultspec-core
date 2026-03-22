@@ -2,15 +2,15 @@
 # ALLOWED TAGS - DO NOT REMOVE
 # REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
 tags:
-  - "#audit"
-  - "#mcp-cli-interface"
-date: "2026-03-11"
+  - '#audit'
+  - '#mcp-cli-interface'
+date: '2026-03-11'
 related:
-  - "[[2026-02-22-cli-ecosystem-factoring-adr]]"
-  - "[[2026-02-22-mcp-consolidation-adr]]"
-  - "[[2026-02-22-mcp-testing-adr]]"
-  - "[[2026-02-24-cli-protocols-research]]"
-  - "[[2026-03-05-cli-architecture-audit]]"
+  - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
+  - '[[2026-02-22-mcp-consolidation-adr]]'
+  - '[[2026-02-22-mcp-testing-adr]]'
+  - '[[2026-02-24-cli-protocols-research]]'
+  - '[[2026-03-05-cli-architecture-audit]]'
 ---
 
 # `mcp-cli-interface` audit: `surface-alignment`
@@ -59,8 +59,7 @@ This audit synthesizes parallel subagent reviews of:
 
 - `init` scaffolds `.mcp.json` against a route that the root CLI does not
   register.
-  `src/vaultspec_core/core/commands.py` writes `["-m", "vaultspec_core",
-  "mcp"]`, while `src/vaultspec_core/cli.py` does not register `mcp`.
+  `src/vaultspec_core/core/commands.py` writes `["-m", "vaultspec_core", "mcp"]`, while `src/vaultspec_core/cli.py` does not register `mcp`.
   The router still contains a dead special-case branch for `mcp`, which
   strongly suggests incomplete refactor residue.
 
@@ -167,20 +166,20 @@ This audit synthesizes parallel subagent reviews of:
 
 ## Compatibility map
 
-| CLI surface | MCP surface | Status |
-| --- | --- | --- |
-| `vault add` | `create_vault_document` | Partial: same domain, different argument contract |
-| `vault audit` | `audit_vault` | Partial: MCP exposes reduced capability |
-| `readiness` + `doctor` | `workspace_status` | Partial: related but not structurally equivalent |
-| `rules list/show` | `list_spec_resources` / `get_spec_resource` | Partial: naming hierarchy differs |
-| `skills list/show` | `list_spec_resources` / `get_spec_resource` | Partial: naming hierarchy differs |
-| `agents list/show` | `list_spec_resources` / `get_spec_resource` | Partial: naming hierarchy differs |
-| `config/*`, `system/*`, `hooks/*`, `sync-all`, `test`, `init` | none | No MCP bridge |
-| none | `query_vault` | MCP-only |
-| none | `feature_status` | MCP-only |
-| documented `vaultspec mcp` | actual `vaultspec-mcp` script / current router | Drifted |
-| documented `subagent` and `team` CLI | none in live root CLI | Drifted |
-| documented MCP agent/team tools | none in live MCP source | Drifted |
+| CLI surface                                                   | MCP surface                                    | Status                                            |
+| ------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------- |
+| `vault add`                                                   | `create_vault_document`                        | Partial: same domain, different argument contract |
+| `vault audit`                                                 | `audit_vault`                                  | Partial: MCP exposes reduced capability           |
+| `readiness` + `doctor`                                        | `workspace_status`                             | Partial: related but not structurally equivalent  |
+| `rules list/show`                                             | `list_spec_resources` / `get_spec_resource`    | Partial: naming hierarchy differs                 |
+| `skills list/show`                                            | `list_spec_resources` / `get_spec_resource`    | Partial: naming hierarchy differs                 |
+| `agents list/show`                                            | `list_spec_resources` / `get_spec_resource`    | Partial: naming hierarchy differs                 |
+| `config/*`, `system/*`, `hooks/*`, `sync-all`, `test`, `init` | none                                           | No MCP bridge                                     |
+| none                                                          | `query_vault`                                  | MCP-only                                          |
+| none                                                          | `feature_status`                               | MCP-only                                          |
+| documented `vaultspec mcp`                                    | actual `vaultspec-mcp` script / current router | Drifted                                           |
+| documented `subagent` and `team` CLI                          | none in live root CLI                          | Drifted                                           |
+| documented MCP agent/team tools                               | none in live MCP source                        | Drifted                                           |
 
 ## Priority docs to revise
 
@@ -197,9 +196,11 @@ reconfirmed in live runtime code rather than only in stale documentation.
 
 - `src/vaultspec_core/core/commands.py` still scaffolds `.mcp.json` with
   `["-m", "vaultspec_core", "mcp"]` in `init_run`.
+
 - `src/vaultspec_core/cli.py` still does not register an `mcp` command on the
   root Typer application, even though `main()` retains a special-case branch
   for `ctx.invoked_subcommand == "mcp"`.
+
 - `src/vaultspec_core/mcp_server/app.py` remains the actual MCP process
   entrypoint, which reinforces that the scaffolded root-CLI route and the live
   MCP runtime entry boundary are still out of alignment.
@@ -213,9 +214,11 @@ surface was also checked for unreconciled non-documentation issues.
   API-parity checks that validate structure more than behavior, including
   `hasattr` checks, abstract-method presence checks, and signature-equality
   checks.
+
 - These tests do not appear to rely on mocks or skips, but they still weaken
   confidence because they can pass while exercising little real provider
   behavior.
+
 - This is a test-quality issue, not only a documentation issue, and should be
   addressed in a later repair pass if the project intends to enforce the
   non-tautological testing standard consistently.
@@ -228,6 +231,7 @@ non-documentation issues that remain unresolved in code.
 - `VerificationError` is named and exported like an exception, but the live
   API uses it as a record-like validation result rather than an `Exception`
   subtype. That creates semantic ambiguity in the verification surface.
+
 - `src/vaultspec_core/verification/tests/test_verification.py` includes a test
   against a known-nonconformant fixture vault that only proves the call
   returns a list, not that a valid known directory actually passes
@@ -244,9 +248,11 @@ contract mismatch.
 - `src/vaultspec_core/vaultcore/tests/test_hydration.py` no longer matches the
   live `hydrate_template` signature in
   `src/vaultspec_core/vaultcore/hydration.py`.
+
 - The tests expect placeholder and defaulting behavior that the current
   implementation does not provide, including `type` placeholder handling and
   feature/title defaults.
+
 - The Researcher reported that a targeted run of the hydration test module
   fails all three tests, which indicates real drift rather than a purely
   documentary mismatch.

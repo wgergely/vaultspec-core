@@ -1,17 +1,19 @@
 """Materialize runtime path state and typed core configuration containers.
 
-This module bridges resolved configuration and workspace layout into the global
-path constants and `ToolConfig` mappings consumed by sync, CLI, and MCP
-surfaces.
+This module bridges resolved configuration and workspace layout into a frozen
+:class:`WorkspaceContext` stored in a :class:`~contextvars.ContextVar`,
+consumed by sync, CLI, and MCP surfaces.
 
 Usage:
-    Call `init_paths(...)` after configuration and workspace resolution to
-    initialize the process-wide path layout used by downstream modules.
+    Call :func:`init_paths` after configuration and workspace resolution to
+    build and activate the :class:`WorkspaceContext` for the current execution
+    context. Access the active context via :func:`get_context`.
 """
 
 from __future__ import annotations
 
 import logging
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -44,9 +46,9 @@ class ToolConfig:
         rule_ref_dir: Directory whose markdown files should be referenced from
             ``config_file``. Defaults to ``rules_dir`` when omitted.
         rule_ref_config_file: Optional secondary config file that carries
-            ``@rules/...`` references, separate from ``config_file``.  Used
-            by Gemini where ``.gemini/GEMINI.md`` holds rule references while
-            the root ``GEMINI.md`` holds shared framework content.
+            ``@rules/...`` references, separate from ``config_file``.
+            Currently unused; retained for future providers that need a
+            secondary config file distinct from their root config.
         system_file: Path to the tool's system prompt file, or ``None`` if the
             tool does not have a dedicated system file.
         emit_system_rule: Whether shared system content should be materialized
@@ -79,6 +81,10 @@ class SyncResult:
             (e.g. transform returned ``None``, or safety guard triggered).
         pruned: Number of stale destination files that were deleted.
         errors: List of error message strings for files that failed to sync.
+        items: Per-file action log  - list of ``(path, action)`` tuples for
+            dry-run rendering.
+        warnings: Advisories about what ``--force`` would change beyond the
+            default sync.
     """
 
     added: int = 0
@@ -86,20 +92,53 @@ class SyncResult:
     skipped: int = 0
     pruned: int = 0
     errors: list[str] = field(default_factory=list)
+    items: list[tuple[str, str]] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
 
-# Module-level globals initialised by init_paths()
-ROOT_DIR: Path = Path()
-TARGET_DIR: Path = Path()  # Alias for ROOT_DIR
-RULES_SRC_DIR: Path = Path()
-SKILLS_SRC_DIR: Path = Path()
-AGENTS_SRC_DIR: Path = Path()
-SYSTEM_SRC_DIR: Path = Path()
-TEMPLATES_DIR: Path = Path()
-FRAMEWORK_CONFIG_SRC: Path = Path()
-PROJECT_CONFIG_SRC: Path = Path()
-HOOKS_DIR: Path = Path()
-TOOL_CONFIGS: dict[Tool, ToolConfig] = {}
+@dataclass(frozen=True)
+class WorkspaceContext:
+    """Immutable snapshot of resolved workspace paths and tool configuration.
+
+    Attributes:
+        root_dir: Workspace root path.
+        target_dir: Target directory (alias for root in standard layouts).
+        rules_src_dir: Source directory for rule files.
+        skills_src_dir: Source directory for skill files.
+        agents_src_dir: Source directory for agent files.
+        system_src_dir: Source directory for system prompt files.
+        templates_dir: Source directory for template files.
+        hooks_dir: Source directory for hook files.
+        tool_configs: Per-tool configuration mapping.
+    """
+
+    root_dir: Path
+    target_dir: Path
+    rules_src_dir: Path
+    skills_src_dir: Path
+    agents_src_dir: Path
+    system_src_dir: Path
+    templates_dir: Path
+    hooks_dir: Path
+    tool_configs: dict[Tool, ToolConfig] = field(default_factory=dict)
+
+
+_workspace_ctx: ContextVar[WorkspaceContext] = ContextVar("_workspace_ctx")
+
+
+def get_context() -> WorkspaceContext:
+    """Return the active :class:`WorkspaceContext`.
+
+    Raises:
+        LookupError: If :func:`init_paths` has not been called in this
+            execution context.
+    """
+    return _workspace_ctx.get()
+
+
+def set_context(ctx: WorkspaceContext) -> None:
+    """Explicitly set the active :class:`WorkspaceContext`."""
+    _workspace_ctx.set(ctx)
 
 
 def _create_tool_cfg(
@@ -130,19 +169,17 @@ def _create_tool_cfg(
     )
 
 
-def init_paths(layout: Any) -> None:
-    """(Re-)initialise all path globals from a workspace layout or root Path.
+def init_paths(layout: Any) -> WorkspaceContext:
+    """Build a :class:`WorkspaceContext` from a workspace layout or root Path.
+
+    The context is stored in the module-level :class:`~contextvars.ContextVar`
+    and also returned for convenience.
 
     Args:
         layout: A ``WorkspaceLayout`` instance providing the resolved target,
             vault, and framework directories, OR a ``pathlib.Path`` to the
             project root (which will be resolved into a layout).
     """
-    global ROOT_DIR, TARGET_DIR, RULES_SRC_DIR
-    global SKILLS_SRC_DIR, AGENTS_SRC_DIR, SYSTEM_SRC_DIR, TEMPLATES_DIR
-    global FRAMEWORK_CONFIG_SRC, PROJECT_CONFIG_SRC
-    global HOOKS_DIR, TOOL_CONFIGS
-
     from ..config import get_config, resolve_workspace
 
     if isinstance(layout, Path):
@@ -154,23 +191,19 @@ def init_paths(layout: Any) -> None:
     target = layout.target_dir
     vaultspec = layout.vaultspec_dir
 
-    ROOT_DIR = target
-    TARGET_DIR = target
-    RULES_SRC_DIR = vaultspec / Resource.RULES.value / Resource.RULES.value
-    SKILLS_SRC_DIR = vaultspec / Resource.RULES.value / Resource.SKILLS.value
-    AGENTS_SRC_DIR = vaultspec / Resource.RULES.value / Resource.AGENTS.value
-    SYSTEM_SRC_DIR = vaultspec / Resource.RULES.value / Resource.SYSTEM.value
-    TEMPLATES_DIR = vaultspec / Resource.RULES.value / Resource.TEMPLATES.value
-    FRAMEWORK_CONFIG_SRC = SYSTEM_SRC_DIR / FileName.FRAMEWORK.value
-    PROJECT_CONFIG_SRC = SYSTEM_SRC_DIR / FileName.PROJECT.value
-    HOOKS_DIR = vaultspec / Resource.RULES.value / Resource.HOOKS.value
+    rules_src_dir = vaultspec / Resource.RULES.value / Resource.RULES.value
+    skills_src_dir = vaultspec / Resource.RULES.value / Resource.SKILLS.value
+    agents_src_dir = vaultspec / Resource.RULES.value / Resource.AGENTS.value
+    system_src_dir = vaultspec / Resource.RULES.value / Resource.SYSTEM.value
+    templates_dir = vaultspec / Resource.RULES.value / Resource.TEMPLATES.value
+    hooks_dir = vaultspec / Resource.RULES.value / Resource.HOOKS.value
     shared_agents_root = target / DirName.ANTIGRAVITY.value
 
     gemini_dir = target / cfg.gemini_dir
 
     # Build Tool Configurations
     _pc = ProviderCapability
-    TOOL_CONFIGS = {
+    tool_configs: dict[Tool, ToolConfig] = {
         Tool.CLAUDE: ToolConfig(
             name=Tool.CLAUDE.value,
             rules_dir=target / cfg.claude_dir / Resource.RULES.value,
@@ -197,7 +230,6 @@ def init_paths(layout: Any) -> None:
             agents_dir=gemini_dir / Resource.AGENTS.value,
             config_file=target / FileName.GEMINI.value,
             rule_ref_dir=gemini_dir / Resource.RULES.value,
-            rule_ref_config_file=gemini_dir / FileName.GEMINI.value,
             system_file=gemini_dir / FileName.SYSTEM.value,
             capabilities=frozenset(
                 {
@@ -250,3 +282,17 @@ def init_paths(layout: Any) -> None:
             ),
         ),
     }
+
+    ctx = WorkspaceContext(
+        root_dir=target,
+        target_dir=target,
+        rules_src_dir=rules_src_dir,
+        skills_src_dir=skills_src_dir,
+        agents_src_dir=agents_src_dir,
+        system_src_dir=system_src_dir,
+        templates_dir=templates_dir,
+        hooks_dir=hooks_dir,
+        tool_configs=tool_configs,
+    )
+    _workspace_ctx.set(ctx)
+    return ctx

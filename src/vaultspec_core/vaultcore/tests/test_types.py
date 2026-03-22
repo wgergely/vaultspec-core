@@ -1,5 +1,11 @@
-"""Tests the vaultcore semantic model for document type tags, metadata
-validation, filename rules, and typed metadata parsing."""
+"""Tests for the vaultcore semantic model.
+
+Covers :class:`~vaultspec_core.vaultcore.models.DocType` tag mapping,
+:class:`~vaultspec_core.vaultcore.models.DocumentMetadata` validation rules,
+:meth:`~vaultspec_core.vaultcore.models.VaultConstants.validate_filename`,
+and :func:`~vaultspec_core.vaultcore.parser.parse_vault_metadata` including
+inline-list and block-list YAML forms.
+"""
 
 import pytest
 
@@ -34,7 +40,7 @@ def test_document_metadata_validation_fail_tags():
     # Only one tag
     meta = DocumentMetadata(tags=["#adr"], date="2026-02-08")
     errors = meta.validate()
-    assert any("Exactly 2 tags required" in e for e in errors)
+    assert any("At least 2 tags required" in e for e in errors)
 
     # Two directory tags
     meta = DocumentMetadata(tags=["#adr", "#plan"], date="2026-02-08")

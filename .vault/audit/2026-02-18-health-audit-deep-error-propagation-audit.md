@@ -1,9 +1,10 @@
 ---
 tags:
-  - "#audit"
-  - "#code-health"
-date: "2026-02-18"
+  - '#audit'
+  - '#code-health'
+date: '2026-02-18'
 ---
+
 # Deep Audit: Error Propagation and Silent Failure Paths
 
 ## Executive Summary
@@ -18,14 +19,16 @@ server's background task handling and the RAG API's broken-singleton problem. Al
 findings are ranked by severity and each includes whether existing tests would catch
 the failure.
 
----
+______________________________________________________________________
 
 ## 1. `orchestration/subagent.py` — The Swallowed-Exception Pattern
 
 ### Defect: Crash masquerades as empty success
 
 ```python
+
 # subagent.py lines 322-328
+
 except Exception:
     logger.exception("Subagent execution failed")
     return SubagentResult(
@@ -53,13 +56,13 @@ perspective the agent ran, produced nothing, and succeeded. **There is no way to
 distinguish a crashed agent from an agent that completed but produced no output.**
 
 **Additional amplifier:** The `finally` block contains:
+
 ```python
 
 if "spec" in locals():
 ```
 
-This guard is unreachable in the crash path if the exception happened before `spec =
-provider.prepare_process(...)` (line 211) — e.g., during `load_agent()` at line 195
+This guard is unreachable in the crash path if the exception happened before `spec = provider.prepare_process(...)` (line 211) — e.g., during `load_agent()` at line 195
 (the non-fallback call, when both provider-specific and canonical paths fail). In that
 case `spec` is not in locals but the `finally` still runs safely. However the guard
 itself is misleading: `spec` IS always in locals after the assignment, so the check
@@ -71,11 +74,10 @@ communicated upward.
 **What callers do with empty result:**
 
 - `server.py` `_run_in_background()`: catches `SubagentError` explicitly (line 514) but
-  the crash returns a `SubagentResult`, not a `SubagentError`. So the `except
-  SubagentError` never fires for crashes. The final `except Exception as e:` (line
-  516) would catch truly unexpected errors from the await itself, but since `await
-  _run_subagent_fn(...)` already returns a result (not raises), neither except block
+  the crash returns a `SubagentResult`, not a `SubagentError`. So the `except SubagentError` never fires for crashes. The final `except Exception as e:` (line
+  516\) would catch truly unexpected errors from the await itself, but since `await _run_subagent_fn(...)` already returns a result (not raises), neither except block
   fires. The task is marked `completed` with empty data.
+
 - `lib/scripts/subagent.py` CLI entry point: calls `asyncio.run(run_subagent(...))`,
   gets the empty result, exits 0.
 
@@ -85,13 +87,12 @@ communicated upward.
 
 **Severity: CRITICAL**
 
-
 1. Re-raise after logging (callers decide whether to swallow), OR
-2. Return a `SubagentResult` with a typed `error` field, and callers must check it, OR
-3. Raise a `SubagentError` from the `except` block so `server.py`'s existing
+1. Return a `SubagentResult` with a typed `error` field, and callers must check it, OR
+1. Raise a `SubagentError` from the `except` block so `server.py`'s existing
    `except SubagentError` handler fires correctly.
 
----
+______________________________________________________________________
 
 ## 2. `orchestration/task_engine.py` — WORKING Tasks Never Expire
 
@@ -103,7 +104,9 @@ A task stuck in `WORKING` or `INPUT_REQUIRED` is never added to `self._expiry` a
 therefore never evicted.
 
 ```python
+
 # task_engine.py lines 343-347 (update_status)
+
 if is_terminal(status):
     task.completed_at = task.updated_at
     self._expiry[task_id] = task.updated_at + self._ttl_seconds
@@ -128,7 +131,9 @@ propagating from `_server_lifespan`) does NOT trigger the server-side cleanup be
 `_active_clients` but does NOT call `fail_task()` or `cancel_task()`.
 
 ```python
+
 # server.py lines 514-521
+
 except SubagentError as e:
     task_engine.fail_task(task_id, str(e))
 except Exception as e:
@@ -137,7 +142,9 @@ except Exception as e:
 finally:
     _background_tasks.pop(task_id, None)
     _active_clients.pop(task_id, None)
+
     # NOTE: No fail_task/cancel_task here!
+
 ```
 
 **Impact:** On server restart or event-loop cancellation, all in-flight tasks remain
@@ -158,14 +165,16 @@ completed task. No test checks behavior on CancelledError or server shutdown.
 that calls `task_engine.cancel_task(task_id)` before re-raising, OR add a
 `WORKING_TTL` that evicts tasks that have been working beyond a reasonable timeout.
 
----
+______________________________________________________________________
 
 ## 3. `protocol/acp/client.py` — Silent Failures in Critical Operations
 
 ### 3a. `graceful_cancel()` swallows all exceptions
 
 ```python
+
 # client.py lines 443-447
+
 async def graceful_cancel(self) -> None:
     """Send ACP session/cancel notification before termination."""
     if self._conn and self._session_id:
@@ -186,7 +195,9 @@ does not exercise the actual ACP cancel path.
 ### 3b. `terminal_output()` returns empty string for unknown terminal
 
 ```python
+
 # client.py lines 353-357
+
 terminal = self._terminals.get(terminal_id)
 if terminal is None:
     return TerminalOutputResponse(output="", truncated=False)
@@ -205,7 +216,9 @@ unit tests).
 ### 3c. `_reader()` task in `create_terminal()` swallows `asyncio.CancelledError`
 
 ```python
+
 # client.py lines 327-337
+
 async def _reader() -> None:
     assert proc.stdout is not None
     try:
@@ -230,14 +243,16 @@ semantics. Swallowing it breaks cooperative cancellation.
 
 **Severity: LOW** (cosmetic in most cases, but can cause resource leaks in edge cases)
 
----
+______________________________________________________________________
 
 ## 4. `protocol/acp/claude_bridge.py` — Stream Error Handling
 
 ### 4a. Streaming exception converts to `stop_reason="refusal"` — misleading
 
 ```python
+
 # claude_bridge.py lines 429-445
+
 try:
     async for message in self._sdk_client.receive_messages():
         if self._cancelled:
@@ -274,8 +289,7 @@ path cannot be verified from unit tests alone since it requires a real SDK conne
 
 ### 4b. `_emit_updates()` exceptions would propagate to the streaming loop
 
-In `_emit_stream_event()`, `_emit_assistant()`, etc., all `await
-self._conn.session_update(...)` calls are bare awaits with no error handling. If
+In `_emit_stream_event()`, `_emit_assistant()`, etc., all `await self._conn.session_update(...)` calls are bare awaits with no error handling. If
 `session_update()` raises (e.g., broken pipe to ACP client), the exception propagates
 to `prompt()` where it is caught by the broad `except Exception:` at line 441 and
 treated as `stop_reason="refusal"`. This means a broken ACP connection (client
@@ -286,20 +300,22 @@ disconnected mid-stream) looks like a model refusal.
 ### 4c. `new_session()` connect failure leaves `_sessions` partially populated
 
 ```python
+
 # claude_bridge.py lines 372-398
+
 options = self._build_options(cwd, sdk_mcp, sandbox_cb)
 self._sdk_client = self._client_factory(options)
 await self._sdk_client.connect()  # Can raise!
 
 # Only reached if connect() succeeds:
+
 self._sessions[session_id] = _SessionState(...)
 return NewSessionResponse(session_id=session_id)
 ```
 
 If `self._sdk_client.connect()` raises, `self._sdk_client` is set to a disconnected
 client object, `self._session_id` is set, but `self._sessions` is NOT populated. A
-subsequent call to `prompt()` would hit `if self._sdk_client is None: raise
-RuntimeError(...)` — but `_sdk_client` is not None, it's a disconnected client. The
+subsequent call to `prompt()` would hit `if self._sdk_client is None: raise RuntimeError(...)` — but `_sdk_client` is not None, it's a disconnected client. The
 prompt would then call `self._sdk_client.query()` on a disconnected client, which
 would raise from within the SDK.
 
@@ -307,7 +323,7 @@ would raise from within the SDK.
 
 **Severity: MEDIUM** (broken session state, hard to recover from without reinitializing)
 
----
+______________________________________________________________________
 
 ## 5. `hooks/engine.py` — Caller Cannot Act on Hook Failures
 
@@ -321,9 +337,13 @@ failures are entirely silent.
 Checking the hooks invocation sites:
 
 ```python
+
 # Typical invocation pattern (from vault.py / cli.py — callers of trigger()):
+
 trigger(hooks, "vault.document.created", {"path": str(path)})
+
 # Return value discarded
+
 ```
 
 Even if callers DO check results, there is no mechanism to propagate a hook failure
@@ -335,7 +355,9 @@ back to the user or halt the operation that triggered the hook. A failed hook af
 ### 5b. `load_hooks()` bare `except Exception` loses parse error details
 
 ```python
+
 # engine.py lines 107-108
+
 except Exception:
     logger.warning("Failed to parse hook: %s", path.name)
 ```
@@ -351,14 +373,16 @@ exception). The `except Exception` path (actual parse error) is not tested.
 
 **Severity: LOW**
 
----
+______________________________________________________________________
 
 ## 6. `rag/api.py` — Broken Singleton After Partial Initialization
 
 ### 6a. `get_engine()` singleton left in broken state on lazy-property failure
 
 ```python
+
 # api.py lines 81-102
+
 def get_engine(root_dir: pathlib.Path) -> VaultRAG:
     global _engine
     if _engine is None or _engine.root_dir != root_dir:
@@ -375,11 +399,9 @@ def get_engine(root_dir: pathlib.Path) -> VaultRAG:
 
 `_engine` is set to a fresh `VaultRAG` instance before `_require_cuda()` is called.
 If `_require_cuda()` raises a `GPUNotAvailableError` (not `ImportError`), it propagates
-out of `get_engine()` — but `_engine` is already set to the new instance with `_model
-= None`.
+out of `get_engine()` — but `_engine` is already set to the new instance with `_model = None`.
 
-On the next call to `get_engine()` with the same `root_dir`, the condition `_engine is
-None or _engine.root_dir != root_dir` is False, so it returns the broken singleton
+On the next call to `get_engine()` with the same `root_dir`, the condition `_engine is None or _engine.root_dir != root_dir` is False, so it returns the broken singleton
 without re-initializing. Subsequent calls to `engine.indexer` or `engine.searcher`
 will call `EmbeddingModel()` again via the lazy properties — which will call
 `_require_cuda()` again and raise again.
@@ -404,7 +426,9 @@ requires CUDA), but the broken-singleton-on-second-call scenario is not tested.
 ### 6b. `get_document()` silently swallows lancedb OSError
 
 ```python
+
 # api.py lines 167-177
+
 try:
     store = VaultStore(root_dir)
     result = store.get_by_id(doc_id)
@@ -426,14 +450,16 @@ fail the vector lookup and do a full filesystem scan — a silent performance re
 
 **Severity: LOW** (graceful degradation is correct, but should be `warning` not `debug`)
 
----
+______________________________________________________________________
 
 ## 7. `rag/indexer.py` — ThreadPoolExecutor Worker Exceptions
 
 ### 7a. `pool.map()` propagates first worker exception but silently skips others
 
 ```python
+
 # indexer.py lines 138-142 (full_index)
+
 with ThreadPoolExecutor() as pool:
     results = pool.map(lambda p: prepare_document(p, self.root_dir), paths)
     for doc in results:
@@ -445,7 +471,9 @@ with ThreadPoolExecutor() as pool:
 `prepare_document()` has its own `try/except`:
 
 ```python
+
 # indexer.py lines 68-72
+
 try:
     content = path.read_text(encoding="utf-8")
 except Exception as e:
@@ -476,7 +504,9 @@ catches per-worker exceptions.
 ### 7b. Full re-index OSError is caught but partially completes
 
 ```python
+
 # indexer.py lines 165-170
+
 try:
     existing_ids = self.store.get_all_ids()
     if existing_ids:
@@ -495,14 +525,16 @@ entries).
 
 **Severity: MEDIUM** — silent index corruption on OSError during delete.
 
----
+______________________________________________________________________
 
 ## 8. `subagent_server/server.py` — Background Task Error Handling
 
 ### 8a. `_poll_agent_files()` exceptions kill the poller silently
 
 ```python
+
 # server.py lines 343-347
+
 async def _poll_agent_files() -> None:
     while True:
         await asyncio.sleep(_poll_interval())
@@ -524,12 +556,14 @@ is garbage collected — a deferred warning, not an immediate error. The agent f
 
 ```python
 async with _server_lifespan(_app):  # via FastMCP
+
     # ...
+
 # On exit, poller.cancel() is called
+
 ```
 
-The lifespan manager calls `poller.cancel()` on shutdown but does NOT `await
-poller` in a way that would surface the exception. `contextlib.suppress(CancelledError)`
+The lifespan manager calls `poller.cancel()` on shutdown but does NOT `await poller` in a way that would surface the exception. `contextlib.suppress(CancelledError)`
 is used, which masks the original exception.
 
 **Consequence:** Agent file changes after a poller crash stop being reflected in the
@@ -546,7 +580,9 @@ level, continuing the loop rather than letting the exception kill the task.
 ### 8b. `asyncio.create_task()` for `_run_in_background` — uncaught exceptions
 
 ```python
+
 # server.py lines 523-524
+
 bg_task = asyncio.create_task(_run_in_background())
 _background_tasks[task_id] = bg_task
 ```
@@ -563,27 +599,27 @@ orphaned `WORKING` task.
 
 **Severity: HIGH** (same root cause as finding #2, different manifestation)
 
----
+______________________________________________________________________
 
 ## Summary Table
 
-| # | Location | Issue | Severity | Test Catches? |
-|---|----------|-------|----------|---------------|
-| 1 | `orchestration/subagent.py:322` | Crash returns empty success — indistinguishable from valid empty result | **CRITICAL** | No |
-| 2 | `orchestration/task_engine.py` + `server.py` | WORKING tasks never expire; CancelledError bypasses fail_task | **HIGH** | No |
-| 3a | `server.py:343` | Poll loop exception kills poller silently | **HIGH** | No |
-| 3b | `server.py` + `task_engine.py` | CancelledError bypasses fail_task in background tasks | **HIGH** | No |
-| 4a | `rag/indexer.py:165` | OSError during delete leads to duplicate documents silently | **MEDIUM** | No |
-| 4b | `claude_bridge.py:441` | Stream crash reported as "refusal" — misleading to caller | **MEDIUM** | No |
-| 4c | `claude_bridge.py:377` | connect() failure leaves broken session state | **MEDIUM** | No |
-| 4d | `hooks/engine.py` | Callers discard HookResult — hook failures invisible | **MEDIUM** | No |
-| 4e | `client.py:446` | graceful_cancel() swallows all exceptions | **MEDIUM** | No |
-| 5a | `rag/api.py:89` | Broken singleton not re-initialized after GPU check fails | **LOW** | No |
-| 5b | `rag/api.py:177` | lancedb OSError downgraded to debug log | **LOW** | No |
-| 5c | `rag/indexer.py:138` | ThreadPoolExecutor worker exception kills entire index run | **LOW** | No |
-| 5d | `hooks/engine.py:107` | Parse error detail lost (no exc_info in warning) | **LOW** | No |
-| 5e | `client.py:337` | CancelledError swallowed in _reader() coroutine | **LOW** | No |
-| 5f | `client.py:355` | Unknown terminal_id returns empty output (no error signal) | **LOW** | No |
+| #   | Location                                     | Issue                                                                   | Severity     | Test Catches? |
+| --- | -------------------------------------------- | ----------------------------------------------------------------------- | ------------ | ------------- |
+| 1   | `orchestration/subagent.py:322`              | Crash returns empty success — indistinguishable from valid empty result | **CRITICAL** | No            |
+| 2   | `orchestration/task_engine.py` + `server.py` | WORKING tasks never expire; CancelledError bypasses fail_task           | **HIGH**     | No            |
+| 3a  | `server.py:343`                              | Poll loop exception kills poller silently                               | **HIGH**     | No            |
+| 3b  | `server.py` + `task_engine.py`               | CancelledError bypasses fail_task in background tasks                   | **HIGH**     | No            |
+| 4a  | `rag/indexer.py:165`                         | OSError during delete leads to duplicate documents silently             | **MEDIUM**   | No            |
+| 4b  | `claude_bridge.py:441`                       | Stream crash reported as "refusal" — misleading to caller               | **MEDIUM**   | No            |
+| 4c  | `claude_bridge.py:377`                       | connect() failure leaves broken session state                           | **MEDIUM**   | No            |
+| 4d  | `hooks/engine.py`                            | Callers discard HookResult — hook failures invisible                    | **MEDIUM**   | No            |
+| 4e  | `client.py:446`                              | graceful_cancel() swallows all exceptions                               | **MEDIUM**   | No            |
+| 5a  | `rag/api.py:89`                              | Broken singleton not re-initialized after GPU check fails               | **LOW**      | No            |
+| 5b  | `rag/api.py:177`                             | lancedb OSError downgraded to debug log                                 | **LOW**      | No            |
+| 5c  | `rag/indexer.py:138`                         | ThreadPoolExecutor worker exception kills entire index run              | **LOW**      | No            |
+| 5d  | `hooks/engine.py:107`                        | Parse error detail lost (no exc_info in warning)                        | **LOW**      | No            |
+| 5e  | `client.py:337`                              | CancelledError swallowed in \_reader() coroutine                        | **LOW**      | No            |
+| 5f  | `client.py:355`                              | Unknown terminal_id returns empty output (no error signal)              | **LOW**      | No            |
 
 ## Cross-Cutting Pattern
 
@@ -592,8 +628,8 @@ caught at a boundary, logged, and converted to either an empty successful result
 or a degraded-success indicator. This means:
 
 1. Callers cannot distinguish crash from success with empty output.
-2. Monitoring/alerting systems see no error signals.
-3. The error is visible ONLY if log lines are actively watched.
+1. Monitoring/alerting systems see no error signals.
+1. The error is visible ONLY if log lines are actively watched.
 
 The secondary pattern is **asyncio.CancelledError bypass**: because `CancelledError`
 is `BaseException` (not `Exception`), all `except Exception:` handlers miss it. This

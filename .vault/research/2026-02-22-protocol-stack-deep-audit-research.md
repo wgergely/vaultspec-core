@@ -1,15 +1,16 @@
 ---
 tags:
-  - "#research"
-  - "#protocol-stack"
-date: "2026-02-22"
+  - '#research'
+  - '#protocol-stack'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-protocol-test-architecture-research]]"
-  - "[[2026-02-22-protocol-test-architecture-adr]]"
-  - "[[2026-02-22-protocol-test-architecture-plan]]"
-  - "[[2026-02-22-gemini-acp-audit-research]]"
-  - "[[2026-02-22-gemini-overhaul-reference]]"
+  - '[[2026-02-22-protocol-test-architecture-research]]'
+  - '[[2026-02-22-protocol-test-architecture-adr]]'
+  - '[[2026-02-22-protocol-test-architecture-plan]]'
+  - '[[2026-02-22-gemini-acp-audit-research]]'
+  - '[[2026-02-22-gemini-overhaul-reference]]'
 ---
+
 # Protocol Stack Deep Audit: MCP, CLI, and Test Suite
 
 Cross-domain audit of the vaultspec protocol stack (ACP/A2A/MCP/CLI) conducted
@@ -30,12 +31,17 @@ never `conn.resume_session()` or `conn.load_session()`. The Gemini bridge
 (`gemini_bridge.py:720-842`), but no caller in the codebase invokes them.
 
 This means:
+
 - Multi-turn "state retention" tests create independent sessions per turn
+
 - The State Agent cannot remember values set in a previous invocation
+
 - `interactive=True` (real multi-turn via stdin loop) is only available via
   CLI `--interactive` flag, never programmatically
+
 - MCP `dispatch_agent` hardcodes `interactive=False` and has no
   `resume_session_id` parameter
+
 - No agent definition or skill file specifies session behavior
 
 ### Domain 1: MCP Server
@@ -89,23 +95,23 @@ warned-and-ignored. MCP callers don't know their parameters were dropped.
 
 **Parameter mapping for `subagent_cli.py` `command_run` → `run_subagent()`:**
 
-| CLI Flag | Backend Param | Status |
-|---|---|---|
-| `--agent` | `agent_name` | Present |
-| `--goal` | `initial_task` | Present |
-| `--model` | `model_override` | Present |
-| `--provider` | `provider_override` | Present |
-| `--mode` | `mode` | Present |
-| `--interactive` | `interactive` | Present |
-| `--context` | `context_files` | Present |
-| `--plan` | `plan_file` | Present |
-| (none) | `resume_session_id` | **MISSING** |
-| (none) | `max_turns` | **MISSING** |
-| (none) | `budget` | **MISSING** |
-| (none) | `effort` | **MISSING** |
-| (none) | `output_format` | **MISSING** |
-| (none) | `mcp_servers` | **MISSING** |
-| `--content-dir` | `content_root` | Partial (resolved but not passed to `run_subagent`) |
+| CLI Flag        | Backend Param       | Status                                              |
+| --------------- | ------------------- | --------------------------------------------------- |
+| `--agent`       | `agent_name`        | Present                                             |
+| `--goal`        | `initial_task`      | Present                                             |
+| `--model`       | `model_override`    | Present                                             |
+| `--provider`    | `provider_override` | Present                                             |
+| `--mode`        | `mode`              | Present                                             |
+| `--interactive` | `interactive`       | Present                                             |
+| `--context`     | `context_files`     | Present                                             |
+| `--plan`        | `plan_file`         | Present                                             |
+| (none)          | `resume_session_id` | **MISSING**                                         |
+| (none)          | `max_turns`         | **MISSING**                                         |
+| (none)          | `budget`            | **MISSING**                                         |
+| (none)          | `effort`            | **MISSING**                                         |
+| (none)          | `output_format`     | **MISSING**                                         |
+| (none)          | `mcp_servers`       | **MISSING**                                         |
+| `--content-dir` | `content_root`      | Partial (resolved but not passed to `run_subagent`) |
 
 **P1 — CLI missing 6 backend parameters** (`subagent_cli.py:125-142`).
 MCP `dispatch_agent` exposes `max_turns`, `budget`, `effort`,
@@ -134,6 +140,7 @@ Claude executor stores `session_id` per `context_id` and passes
 ### Domain 3: Test Suite
 
 **Positive confirmations:**
+
 - Protocol matrix is 100% complete — all 8 ADR Decision 3 scenarios covered
 - Every production module has corresponding test coverage
 - Zero mocking in the entire test suite — DI pattern used consistently
@@ -216,11 +223,11 @@ in spirit. Rule should be clarified to explicitly allow
 
 ## Consolidated Priority Summary
 
-| Severity | Count |
-|----------|-------|
-| P0 (Broken) | 7 |
-| P1 (Missing critical) | 7 |
-| P2 (Gap) | 7 |
-| P3 (Quality) | 7 |
-| P4 (Polish) | 7 |
-| **Total** | **35** |
+| Severity              | Count  |
+| --------------------- | ------ |
+| P0 (Broken)           | 7      |
+| P1 (Missing critical) | 7      |
+| P2 (Gap)              | 7      |
+| P3 (Quality)          | 7      |
+| P4 (Polish)           | 7      |
+| **Total**             | **35** |

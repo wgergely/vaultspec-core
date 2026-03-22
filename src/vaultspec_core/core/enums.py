@@ -27,6 +27,15 @@ class ClaudeModels(StrEnum):
 
     @classmethod
     def from_level(cls, level: CapabilityLevel) -> ClaudeModels:
+        """Return the Claude model for a given :class:`CapabilityLevel`.
+
+        Args:
+            level: Desired capability tier.
+
+        Returns:
+            Corresponding :class:`ClaudeModels` member; defaults to ``MEDIUM``
+            for any unmapped level.
+        """
         mapping = {
             CapabilityLevel.HIGH: cls.HIGH,
             CapabilityLevel.MEDIUM: cls.MEDIUM,
@@ -44,6 +53,15 @@ class GeminiModels(StrEnum):
 
     @classmethod
     def from_level(cls, level: CapabilityLevel) -> GeminiModels:
+        """Return the Gemini model for a given :class:`CapabilityLevel`.
+
+        Args:
+            level: Desired capability tier.
+
+        Returns:
+            Corresponding :class:`GeminiModels` member; defaults to ``MEDIUM``
+            for any unmapped level.
+        """
         mapping = {
             CapabilityLevel.HIGH: cls.HIGH,
             CapabilityLevel.MEDIUM: cls.MEDIUM,
@@ -93,8 +111,6 @@ class Resource(StrEnum):
 class FileName(StrEnum):
     """Canonical filenames for framework documentation and configuration."""
 
-    FRAMEWORK = "framework.md"
-    PROJECT = "project.md"
     CONFIG_TOML = "config.toml"
     CLAUDE = "CLAUDE.md"
     GEMINI = "GEMINI.md"

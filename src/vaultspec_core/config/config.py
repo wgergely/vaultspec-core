@@ -1,9 +1,10 @@
-"""Define the runtime configuration model and singleton access for vaultspec.
+"""Runtime configuration model and singleton access for vaultspec.
 
-This module centralizes typed defaults, environment-variable parsing, and the
-global `get_config()` access pattern used throughout the package. It is the
-authoritative source for configuration semantics such as model selection,
-filesystem naming, and integration flags.
+Centralizes typed defaults, ``VAULTSPEC_*`` env-var parsing, and the
+:func:`get_config` singleton pattern. Key exports: :class:`VaultSpecConfig`,
+:class:`ConfigVariable`, :data:`CONFIG_REGISTRY`, :func:`get_config`,
+:func:`reset_config`, and three parse helpers. Consumed by every module
+that reads workspace settings; re-exported via :mod:`vaultspec_core.config`.
 """
 
 from __future__ import annotations
@@ -155,7 +156,7 @@ class VaultSpecConfig:
                         f"(attr: {var.attr_name}) is not set and no "
                         f"override was provided."
                     )
-                # Skip — dataclass default will apply
+                # Skip  - dataclass default will apply
                 continue
 
             # Parse the raw string value into the target type
@@ -220,7 +221,7 @@ def _parse_raw(var: ConfigVariable, raw: str, source: str | None) -> Any:
                 return _SENTINEL
             value = value_or_none
         else:
-            # str or Optional[str] — no conversion needed
+            # str or Optional[str]  - no conversion needed
             value = raw
 
         # Validate options
@@ -276,7 +277,7 @@ def _parse_raw(var: ConfigVariable, raw: str, source: str | None) -> Any:
         return _SENTINEL
 
 
-# Type sentinels for Optional[int] / Optional[float] — we cannot use
+# Type sentinels for Optional[int] / Optional[float]  - we cannot use
 # ``int | None`` as a registry *value* because the registry needs a single
 # type token to drive parsing.
 

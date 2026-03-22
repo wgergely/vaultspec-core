@@ -1,16 +1,17 @@
 ---
 tags:
-  - "#research"
-  - "#sdk"
-date: "2026-02-21"
+  - '#research'
+  - '#sdk'
+date: '2026-02-21'
 ---
+
 # claude-agent-sdk `rate_limit_event` Handling Gap
 
 ## Summary
 
 The `claude-agent-sdk` v0.1.39 `parse_message()` function raises `MessageParseError` when the Claude Code CLI emits a `rate_limit_event` message type during streaming. This is a **CLI-internal message type** not documented in the public Anthropic streaming API, but emitted by the Claude Code CLI process via its `--output-format stream-json` interface. The SDK's parser uses an exhaustive match with no fallback for unknown types, causing a hard crash.
 
----
+______________________________________________________________________
 
 ## 1. SDK Internals
 
@@ -24,13 +25,13 @@ File: `.venv/Lib/site-packages/claude_agent_sdk/_internal/message_parser.py`
 
 The `match message_type` block at line 47 handles exactly **five** types:
 
-| `type` value    | SDK dataclass     | Description                              |
-|-----------------|-------------------|------------------------------------------|
-| `"user"`        | `UserMessage`     | User input with content blocks           |
-| `"assistant"`   | `AssistantMessage` | Model response with text/tool/thinking  |
-| `"system"`      | `SystemMessage`   | System metadata (subtype-keyed)          |
-| `"result"`      | `ResultMessage`   | Terminal message with cost/usage/session |
-| `"stream_event"`| `StreamEvent`     | Partial SSE event for streaming          |
+| `type` value     | SDK dataclass      | Description                              |
+| ---------------- | ------------------ | ---------------------------------------- |
+| `"user"`         | `UserMessage`      | User input with content blocks           |
+| `"assistant"`    | `AssistantMessage` | Model response with text/tool/thinking   |
+| `"system"`       | `SystemMessage`    | System metadata (subtype-keyed)          |
+| `"result"`       | `ResultMessage`    | Terminal message with cost/usage/session |
+| `"stream_event"` | `StreamEvent`      | Partial SSE event for streaming          |
 
 The wildcard `case _:` at line 179-180 raises `MessageParseError(f"Unknown message type: {message_type}", data)`. There is **no skip, filter, warn-and-continue, or callback mechanism** for unknown types.
 
@@ -61,6 +62,7 @@ Consumer (e.g., ClaudeA2AExecutor)
 ```
 
 Key observation: `Query._read_messages()` passes **all** non-control messages through to the channel without filtering by type. The only types it intercepts are:
+
 - `control_response` (routed to pending response handlers)
 - `control_request` (dispatched to `_handle_control_request`)
 - `control_cancel_request` (TODO: not implemented)
@@ -71,6 +73,7 @@ Everything else -- including `rate_limit_event` -- lands in `parse_message()`.
 ### 1.4 No Extension Mechanism
 
 There is no:
+
 - `on_unknown_message` callback
 - Configuration to skip unknown types
 - `try/except` wrapper around `parse_message` in `receive_messages()`
@@ -79,11 +82,12 @@ There is no:
 ### 1.5 TODO/FIXME in SDK Source
 
 No TODO or FIXME comments exist related to message types or unknown events in the SDK source. There are TODOs for:
+
 - Cancellation support (`control_cancel_request`)
 - Abort signal support
 - PermissionUpdate/PermissionMode types
 
----
+______________________________________________________________________
 
 ## 2. Claude API Streaming Protocol vs. CLI Protocol
 
@@ -105,6 +109,7 @@ Source: [Streaming Messages - Claude API Docs](https://platform.claude.com/docs/
 ### 2.2 Other Potentially Unhandled CLI Event Types
 
 The Claude API docs explicitly state: "new event types may be added, and your code should handle unknown event types gracefully." The CLI wraps the API and may emit additional internal message types at any time. Besides `rate_limit_event`, potential future types could include:
+
 - Billing/quota events
 - Connection status events
 - Retry notifications
@@ -114,7 +119,7 @@ The Claude API docs explicitly state: "new event types may be added, and your co
 
 The CLI uses newline-delimited JSON over stdout (not SSE). Each line is a JSON object with a `type` field. The SDK sets `--output-format stream-json` and `--input-format stream-json` for bidirectional communication.
 
----
+______________________________________________________________________
 
 ## 3. ClaudeA2AExecutor Integration
 
@@ -144,15 +149,17 @@ while True:
 ### 3.2 Where It Breaks
 
 The crash path is:
+
 1. `sdk_client.receive_messages()` calls `parse_message(data)` at `client.py:187`
-2. `parse_message()` hits the wildcard case and raises `MessageParseError("Unknown message type: rate_limit_event", data)`
-3. The executor catches `MessageParseError` and checks if `"rate_limit_event"` is in the string
-4. If yes, it raises `RuntimeError` -- which propagates to the outer `except Exception` at line 182
-5. The outer handler calls `updater.failed()` with the error message
+1. `parse_message()` hits the wildcard case and raises `MessageParseError("Unknown message type: rate_limit_event", data)`
+1. The executor catches `MessageParseError` and checks if `"rate_limit_event"` is in the string
+1. If yes, it raises `RuntimeError` -- which propagates to the outer `except Exception` at line 182
+1. The outer handler calls `updater.failed()` with the error message
 
 ### 3.3 Current Error Handling Strategy
 
 The executor distinguishes:
+
 - **`MessageParseError` with "rate_limit_event"**: Treated as fatal, raises `RuntimeError` which becomes a task failure
 - **Other `MessageParseError`**: Logged at debug level, skipped (continues iteration)
 - **`StopAsyncIteration`**: Normal stream end
@@ -161,11 +168,11 @@ The executor distinguishes:
 ### 3.4 Problems with Current Approach
 
 1. **String matching on error messages** is fragile -- SDK could change the error format
-2. **Rate limit treated as fatal** -- the task fails immediately instead of retrying
-3. **The `rate_limit_event` message likely contains retry-after metadata** (delay, window) that is completely lost because `parse_message` discards the raw data in the exception
-4. **No retry mechanism** -- the A2A task goes straight to `failed` terminal state
+1. **Rate limit treated as fatal** -- the task fails immediately instead of retrying
+1. **The `rate_limit_event` message likely contains retry-after metadata** (delay, window) that is completely lost because `parse_message` discards the raw data in the exception
+1. **No retry mechanism** -- the A2A task goes straight to `failed` terminal state
 
----
+______________________________________________________________________
 
 ## 4. A2A Protocol Task Lifecycle Implications
 
@@ -179,6 +186,7 @@ Per the [A2A Protocol specification](https://a2a-protocol.org/latest/specificati
 - Servers MAY include retry guidance (e.g., `Retry-After` header)
 
 Rate limiting is a **transient condition**, not a permanent failure. Current behavior marks the task as `failed` (terminal), which means:
+
 - The client cannot retry via the same task
 - The client must create a brand new task
 - No retry-after guidance is communicated
@@ -188,10 +196,10 @@ Rate limiting is a **transient condition**, not a permanent failure. Current beh
 For rate limits, the executor should either:
 
 1. **Retry internally** with exponential backoff before surfacing failure, keeping the task in `in-progress` state
-2. **Report a specific error code** (e.g., HTTP 429 equivalent) with retry-after metadata, so the A2A client can decide to retry
-3. **At minimum**, not mark the task as permanently failed on the first rate limit encounter
+1. **Report a specific error code** (e.g., HTTP 429 equivalent) with retry-after metadata, so the A2A client can decide to retry
+1. **At minimum**, not mark the task as permanently failed on the first rate limit encounter
 
----
+______________________________________________________________________
 
 ## 5. Upstream SDK State
 
@@ -205,17 +213,18 @@ The fundamental issue is a **design gap** in the SDK's `parse_message()` functio
 
 The `MessageParseError` does preserve the raw `data` dict in its `.data` attribute, which means callers can inspect the original message. However, the SDK's `receive_messages()` generator propagates the exception rather than offering a filter-or-skip option.
 
----
+______________________________________________________________________
 
 ## 6. Fix Options
 
 ### Option A: Patch the Executor (Local Workaround)
 
 Improve `ClaudeA2AExecutor` to:
+
 1. Catch `MessageParseError` and extract `.data` for the raw event payload
-2. For `rate_limit_event`, parse retry-after metadata from `.data`
-3. Implement retry with backoff instead of immediate failure
-4. For other unknown types, continue skipping (current behavior)
+1. For `rate_limit_event`, parse retry-after metadata from `.data`
+1. Implement retry with backoff instead of immediate failure
+1. For other unknown types, continue skipping (current behavior)
 
 **Pros**: No upstream dependency; immediately actionable.
 **Cons**: Still relies on catching exceptions from the SDK for normal control flow.
@@ -231,8 +240,9 @@ Subclass or wrap `Query.receive_messages()` to filter unknown types before they 
 ### Option D: Upstream SDK Fix
 
 File an issue / PR against `claude-agent-sdk` to:
+
 1. Add a catch-all case in `parse_message()` that returns a new `UnknownMessage` type (or logs and skips)
-2. Add a callback/filter mechanism for unknown message types
+1. Add a callback/filter mechanism for unknown message types
 
 **Pros**: Correct long-term fix.
 **Cons**: Dependent on upstream release timeline.
@@ -240,27 +250,28 @@ File an issue / PR against `claude-agent-sdk` to:
 ### Recommended Approach
 
 **Option A (immediate)** combined with **Option D (long-term)**. The executor should:
-1. Extract the raw data from `MessageParseError.data` instead of string-matching
-2. Check `exc.data.get("type") == "rate_limit_event"` for reliable identification
-3. Parse any retry-after / delay metadata from the event
-4. Implement a bounded retry loop (e.g., 3 attempts with exponential backoff)
-5. Only fail the task after retries are exhausted
 
----
+1. Extract the raw data from `MessageParseError.data` instead of string-matching
+1. Check `exc.data.get("type") == "rate_limit_event"` for reliable identification
+1. Parse any retry-after / delay metadata from the event
+1. Implement a bounded retry loop (e.g., 3 attempts with exponential backoff)
+1. Only fail the task after retries are exhausted
+
+______________________________________________________________________
 
 ## 7. Key Files
 
-| File | Role |
-|------|------|
-| `.venv/Lib/site-packages/claude_agent_sdk/_internal/message_parser.py` | Parser with exhaustive match (line 179) |
-| `.venv/Lib/site-packages/claude_agent_sdk/client.py` | `receive_messages()` calls `parse_message()` (line 187) |
-| `.venv/Lib/site-packages/claude_agent_sdk/_internal/query.py` | Message routing, no type filtering before channel |
-| `.venv/Lib/site-packages/claude_agent_sdk/_internal/transport/subprocess_cli.py` | Raw JSON reading from CLI stdout |
-| `.venv/Lib/site-packages/claude_agent_sdk/_errors.py` | `MessageParseError` definition with `.data` attribute |
-| `.venv/Lib/site-packages/claude_agent_sdk/types.py` | `Message` union type (5 variants), `AssistantMessageError` includes `"rate_limit"` |
-| `src/vaultspec/protocol/a2a/executors/claude_executor.py` | A2A executor with current workaround |
+| File                                                                             | Role                                                                               |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `.venv/Lib/site-packages/claude_agent_sdk/_internal/message_parser.py`           | Parser with exhaustive match (line 179)                                            |
+| `.venv/Lib/site-packages/claude_agent_sdk/client.py`                             | `receive_messages()` calls `parse_message()` (line 187)                            |
+| `.venv/Lib/site-packages/claude_agent_sdk/_internal/query.py`                    | Message routing, no type filtering before channel                                  |
+| `.venv/Lib/site-packages/claude_agent_sdk/_internal/transport/subprocess_cli.py` | Raw JSON reading from CLI stdout                                                   |
+| `.venv/Lib/site-packages/claude_agent_sdk/_errors.py`                            | `MessageParseError` definition with `.data` attribute                              |
+| `.venv/Lib/site-packages/claude_agent_sdk/types.py`                              | `Message` union type (5 variants), `AssistantMessageError` includes `"rate_limit"` |
+| `src/vaultspec/protocol/a2a/executors/claude_executor.py`                        | A2A executor with current workaround                                               |
 
----
+______________________________________________________________________
 
 ## 8. Additional Finding: `AssistantMessageError` Already Models Rate Limits
 

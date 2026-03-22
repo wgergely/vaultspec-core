@@ -1,19 +1,21 @@
 ---
 tags:
-  - "#research"
-  - "#a2a"
-date: "2026-02-21"
+  - '#research'
+  - '#a2a'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-acp-ref-impl-research]]"
-  - "[[2026-02-21-a2a-ref-impl-research]]"
-  - "[[2026-02-21-a2a-layer-audit-research]]"
-  - "[[2026-02-21-acp-layer-audit-research]]"
+  - '[[2026-02-21-acp-ref-impl-research]]'
+  - '[[2026-02-21-a2a-ref-impl-research]]'
+  - '[[2026-02-21-a2a-layer-audit-research]]'
+  - '[[2026-02-21-acp-layer-audit-research]]'
 ---
+
 # Protocol Layer Gap Analysis
 
 ## Executive Summary
 
 Comprehensive comparison of our A2A and ACP implementations against two reference repos:
+
 - **python-a2a** (980 stars) — Python A2A library with Anthropic support
 - **acp-claude-code** (235 stars) — TypeScript ACP bridge for Claude Code
 
@@ -22,18 +24,22 @@ where references use the raw `anthropic` SDK or `@anthropic-ai/claude-code` Type
 directly. This introduces `rate_limit_event` parse bugs, env var juggling, PATH dependency,
 and prevents session resume.
 
----
+______________________________________________________________________
 
 ## P0 — Fix Immediately
 
 ### 1. No Session Resume in ACP Bridge (CRITICAL)
 
 - **File**: `src/vaultspec/protocol/acp/claude_bridge.py`
+
 - **Impact**: Every `prompt()` starts a fresh conversation. Multi-turn is broken.
+
 - **Root cause**: We never extract Claude's `session_id` from messages and pass it as
   `resume` on subsequent queries.
+
 - **Reference pattern**: acp-claude-code's `tryToStoreClaudeSessionId()` extracts
   `session_id` from any SDK message and passes it as `resume` option to `query()`.
+
 - **Fix**: Add session ID extraction to the streaming loop. Store in `_SessionState`.
   Pass as `resume` parameter on subsequent `query()` calls.
 
@@ -57,7 +63,7 @@ and prevents session resume.
 - **Fix**: Use subprocess env isolation (copy env dict) instead of mutating `os.environ`.
   The ACP provider already does this correctly.
 
----
+______________________________________________________________________
 
 ## P1 — Fix Soon
 
@@ -88,8 +94,10 @@ and prevents session resume.
 ### 9. ACP `stop_reason: "refusal"` Is Non-Standard
 
 - **File**: `src/vaultspec/protocol/acp/claude_bridge.py:448-474`
+
 - **Impact**: ACP spec defines `end_turn`, `cancelled`, `max_tokens`, `tool_use`.
   "refusal" is not standard.
+
 - **Fix**: Map to appropriate standard stop reasons.
 
 ### 10. No Multi-Turn E2E Tests
@@ -109,7 +117,7 @@ and prevents session resume.
 - **Impact**: All exceptions become "refusal". Network errors indistinguishable from model refusal.
 - **Fix**: Differentiate exception types. Map to appropriate stop reasons.
 
----
+______________________________________________________________________
 
 ## P2 — Fix When Convenient
 
@@ -149,7 +157,7 @@ and prevents session resume.
 - **File**: `src/vaultspec/protocol/acp/claude_bridge.py:725-753`
 - **Impact**: Reaches into `_options` via getattr. Fragile if SDK changes.
 
----
+______________________________________________________________________
 
 ## P3 — Nice to Have
 
@@ -159,15 +167,17 @@ and prevents session resume.
 - API key auth support in A2A executor (alternative to CLI auth)
 - Agent card validation in A2A layer
 
----
+______________________________________________________________________
 
 ## Root Cause Pattern
 
 Both layers use `claude-agent-sdk` (CLI wrapper) where references use either:
+
 - Raw `anthropic` SDK (python-a2a) — simple REST, no subprocess
 - `@anthropic-ai/claude-code` TypeScript SDK (acp-claude-code) — stateless `query()` calls
 
 The CLI wrapper introduces:
+
 - `rate_limit_event` parse bug (upstream `claude-agent-sdk`)
 - Env var juggling (`CLAUDECODE` stripping)
 - PATH dependency on `claude` binary
@@ -176,11 +186,11 @@ The CLI wrapper introduces:
 The reference ACP bridge solves multi-turn by capturing the CLI's own session ID from
 the stream — we never do this.
 
----
+______________________________________________________________________
 
 ## Cross-References
 
-- [[2026-02-21-acp-ref-impl-research]] — Full acp-claude-code analysis
-- [[2026-02-21-a2a-ref-impl-research]] — Full python-a2a analysis
-- [[2026-02-21-a2a-layer-audit-research]] — Our A2A layer audit
-- [[2026-02-21-acp-layer-audit-research]] — Our ACP layer audit
+- \[[2026-02-21-acp-ref-impl-research]\] — Full acp-claude-code analysis
+- \[[2026-02-21-a2a-ref-impl-research]\] — Full python-a2a analysis
+- \[[2026-02-21-a2a-layer-audit-research]\] — Our A2A layer audit
+- \[[2026-02-21-acp-layer-audit-research]\] — Our ACP layer audit

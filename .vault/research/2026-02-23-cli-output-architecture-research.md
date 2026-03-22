@@ -1,12 +1,13 @@
 ---
 tags:
-  - "#research"
-  - "#cli-output"
-date: "2026-02-23"
+  - '#research'
+  - '#cli-output'
+date: '2026-02-23'
 related:
-  - "[[2026-02-22-cli-logging-research]]"
-  - "[[2026-02-22-cli-logging-adr]]"
+  - '[[2026-02-22-cli-logging-research]]'
+  - '[[2026-02-22-cli-logging-adr]]'
 ---
+
 # `cli-output` research: dual-console Printer abstraction for stdout/stderr separation
 
 Follow-up to the Phase 1 RichHandler work. Phase 1 introduced Rich-based
@@ -15,7 +16,7 @@ logging to stderr via `RichHandler`. Phase 2 replaces the inconsistent
 abstraction that owns both stdout (program output) and stderr (human status messages)
 as distinct `Console` instances.
 
----
+______________________________________________________________________
 
 ## Findings
 
@@ -24,11 +25,11 @@ as distinct `Console` instances.
 A cross-layer audit of the 5 CLI entry points and their supporting modules
 found three distinct output mechanisms in use:
 
-| Mechanism | Destination | Count (approx) | Used for |
-|---|---|---|---|
-| `print()` | stdout | ~50 call sites | program output, tables, results |
-| `logger.info()` | stderr via RichHandler | ~100 call sites | progress, status, confirmations |
-| `Console.print()` | stderr | ~10 call sites | agent feed (client.py) |
+| Mechanism         | Destination            | Count (approx)  | Used for                        |
+| ----------------- | ---------------------- | --------------- | ------------------------------- |
+| `print()`         | stdout                 | ~50 call sites  | program output, tables, results |
+| `logger.info()`   | stderr via RichHandler | ~100 call sites | progress, status, confirmations |
+| `Console.print()` | stderr                 | ~10 call sites  | agent feed (client.py)          |
 
 The audit identified specific inconsistency patterns by file:
 
@@ -39,9 +40,11 @@ The audit identified specific inconsistency patterns by file:
   populated-state diverge on channel. A user piping output
   (`vaultspec vault search ... | jq`) receives nothing in the empty case
   because the message went to stderr.
+
 - `handle_index()`: progress messages via `logger.info()` (correct) but the
   index-complete summary table (`Total documents: %d`, etc.) also via `logger.info()` --
   that summary is program output and should be stdout.
+
 - `handle_audit()`: all structured output via `print()` to stdout. Correct.
   Already has `--json` flag routing to `print(json.dumps(...))`. Consistent.
 
@@ -93,7 +96,7 @@ and 492. The f-string evaluates unconditionally even when DEBUG is not enabled.
 The `%s` lazy-formatting idiom avoids this. Minor perf concern in hot paths
 (run per-turn in every subagent session).
 
----
+______________________________________________________________________
 
 ### the gold-standard pattern: stdout vs stderr
 
@@ -101,8 +104,10 @@ The convergent practice in modern CLI tools (ruff, uv, cargo, OpenTofu, just, mi
 
 - **stdout** = the answer -- data the user asked for, pipeable, potentially
   machine-readable with `--json`. Empty when the command has nothing to say.
+
 - **stderr** = the conversation -- progress, status, warnings, errors.
   Always goes to the terminal even when stdout is piped. Controlled by verbosity flags.
+
 - **logging** = the diagnostic -- reserved for `--debug` level only. Not
   the primary UI channel. Library code uses `logging.getLogger(__name__)` and
   never touches the output channel directly.
@@ -116,7 +121,7 @@ that were routed through `logger.info()`.
 The practical rule: if suppressing a message with `--quiet` would make the
 command appear to do nothing, that message is program output and belongs on stdout.
 
----
+______________________________________________________________________
 
 ### what a Printer abstraction looks like
 
@@ -136,10 +141,12 @@ class Printer:
     ): ...
 
     # stdout - program output (never suppressed by --quiet)
+
     def out(self, *args, **kwargs) -> None: ...
     def out_json(self, data: Any, *, indent: int = 2) -> None: ...
 
     # stderr - human messaging (suppressed by --quiet)
+
     def status(self, msg: str, *args, **kwargs) -> None: ...
     def warn(self, msg: str, *args, **kwargs) -> None: ...
     def error(self, msg: str, *args, **kwargs) -> None: ...
@@ -171,7 +178,7 @@ maps to `logging.WARNING` via `configure_logging()`. With a `Printer`,
 respect the flag. This requires `setup_logging()` in `cli_common.py` to also
 instantiate and configure the `Printer`.
 
----
+______________________________________________________________________
 
 ### class vs module-level functions
 
@@ -179,11 +186,15 @@ instantiate and configure the `Printer`.
 
 - Instantiated once in the CLI entry point after argument parsing:
   `printer = Printer(quiet=args.quiet)`
+
 - Passed to command handlers, or attached to `args` namespace
   (`args.printer = printer`)
+
 - Testable: inject `Printer(stdout_console=Console(file=StringIO()))` in tests
+
 - Thread-safe: each `Printer` owns its own `Console` instances, which are
   themselves thread-safe for print calls (Rich uses a lock internally)
+
 - Supports subclassing (e.g., a `CapturingPrinter` for tests backed by `StringIO`)
 
 **Module-level singleton approach:**
@@ -197,7 +208,7 @@ instantiate and configure the `Printer`.
 through all command handlers; attaching `args.printer` after `setup_logging()`
 in `cli_common.py` follows the existing initialization pattern exactly.
 
----
+______________________________________________________________________
 
 ### `--json` and `--format` flag handling
 
@@ -208,7 +219,7 @@ and `spec_cli.py` (readiness). Current pattern:
 With a `Printer`, the `--json` flag changes behavior at two levels:
 
 1. `printer.out_json(data)` -- formats and emits JSON to stdout via the stdout Console
-2. `printer.quiet = True` (implied) -- suppresses `status()` stderr messages
+1. `printer.quiet = True` (implied) -- suppresses `status()` stderr messages
    so JSON consumers get clean stdout
 
 This is the pattern used by ruff (`--output-format=json`) and cargo
@@ -218,7 +229,7 @@ the purposes of the Printer, even if the `--quiet` flag was not passed.
 A richer `--format` flag (supporting `text`, `json`, `csv`) can be layered
 onto `Printer.out_json()` later without changing the call sites.
 
----
+______________________________________________________________________
 
 ### incremental migration strategy
 
@@ -243,12 +254,16 @@ Fix the specific anti-patterns identified in the audit:
 
 1. `hooks_list()` empty-state: change `logger.info(...)` to `printer.out(...)`
    -- both states now go to stdout
-2. `handle_search()` empty-state: change `logger.info(...)` to `printer.out(...)`
+
+1. `handle_search()` empty-state: change `logger.info(...)` to `printer.out(...)`
    -- results and no-results both go to stdout
-3. `handle_index()` summary table: change `logger.info(...)` to `printer.out(...)`
+
+1. `handle_index()` summary table: change `logger.info(...)` to `printer.out(...)`
    -- the index results are program output
-4. `init_run()` duplicate: remove the `logger.info()` mirror of `print()` calls
-5. `orchestration/subagent.py` f-strings: convert to `%s` lazy format
+
+1. `init_run()` duplicate: remove the `logger.info()` mirror of `print()` calls
+
+1. `orchestration/subagent.py` f-strings: convert to `%s` lazy format
    at lines 261, 269, 492
 
 This sub-phase touches approximately 10 call sites. Each is a targeted, justified fix.
@@ -260,7 +275,7 @@ mechanical and can be done command-by-command. Not urgent -- `print()` to
 stdout is already correct behavior; `printer.out()` just adds TTY awareness
 and style options for future enhancements (color, markup).
 
----
+______________________________________________________________________
 
 ### when logger.info() stays in CLI code
 
@@ -270,9 +285,12 @@ The research question: should CLI-layer `logger.info()` calls be replaced by
 **Arguments for keeping `logger.info()` in CLI code:**
 
 - The RichHandler already routes `logger.info()` to stderr correctly (Phase 1)
+
 - Verbosity ladder (`--quiet` to WARNING) already suppresses `logger.info()`
   as intended for status messages
+
 - Status messages (Syncing rules..., Done.) are correctly suppressible
+
 - 30+ module-level loggers use the canonical pattern -- consistency argument
 
 **Arguments for replacing with `printer.status()`:**
@@ -288,7 +306,7 @@ output (search empty-state, index summary, hooks empty-state) need to change.
 Library-internal `logger.*()` calls in `core/sync.py`, `orchestration/`,
 `protocol/` must not be changed.
 
----
+______________________________________________________________________
 
 ### MCP server interaction
 
@@ -297,6 +315,7 @@ output to stdout corrupts the JSON-RPC framing. Current state:
 
 - No `configure_logging()` call -- the root logger default handler at WARNING
   level means `logger.info()` calls are silently dropped. Accidental safety.
+
 - `logger.info("Starting vaultspec-mcp server root=%s", root_dir)` is the
   only logging call -- at INFO level, never visible under default config.
 
@@ -306,7 +325,7 @@ which routes to stderr via the logging subsystem. The `SubagentClient` (used
 by MCP server to dispatch agents) already uses `_console = Console(stderr=True)` --
 it never touches stdout. This is already correct and must be preserved.
 
----
+______________________________________________________________________
 
 ### agent feed Console interaction
 
@@ -333,7 +352,7 @@ if a `Printer.status()` message and an agent chunk both emit to stderr
 simultaneously in an async context, they may interleave. This is an acceptable
 trade-off for now; a future phase could use Rich live displays to handle this cleanly.
 
----
+______________________________________________________________________
 
 ### testability
 
@@ -358,7 +377,7 @@ about which stream content appeared on. The no-mock constraint is satisfied:
 `Printer` is a real object injected with real `Console` instances backed by
 real `StringIO` streams. No stubbing needed.
 
----
+______________________________________________________________________
 
 ### summary of findings mapped to research questions
 

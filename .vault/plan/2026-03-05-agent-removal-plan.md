@@ -1,12 +1,12 @@
 ---
 tags:
-  - "#plan"
-  - "#agent-removal"
-date: "2026-03-05"
+  - '#plan'
+  - '#agent-removal'
+date: '2026-03-05'
 related:
-  - "[[2026-03-05-agent-removal-adr]]"
-  - "[[2026-03-05-agent-removal-research]]"
-  - "[[2026-03-05-agent-removal-reference]]"
+  - '[[2026-03-05-agent-removal-adr]]'
+  - '[[2026-03-05-agent-removal-research]]'
+  - '[[2026-03-05-agent-removal-reference]]'
 ---
 
 # `agent-removal` plan
@@ -20,33 +20,33 @@ Remove all obsolete agent management, A2A protocol, subagent, and team coordinat
 ## Tasks
 
 - Phase 1: Remove CLI Commands and MCP Tools
-    - Name: Delete CLI entry points and MCP tools
-    - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase1-step1.md`
-    - Executing sub-agent: `vaultspec-standard-executor`
-    - References: `[[2026-03-05-agent-removal-adr]]`, `[[2026-03-05-agent-removal-research]]`
+  - Name: Delete CLI entry points and MCP tools
+  - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase1-step1.md`
+  - Executing sub-agent: `vaultspec-standard-executor`
+  - References: `[[2026-03-05-agent-removal-adr]]`, `[[2026-03-05-agent-removal-research]]`
 - Phase 2: Remove Library Code and Protocol Layer
-    - Name: Delete orchestration logic and A2A directory
-    - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase2-step1.md`
-    - Executing sub-agent: `vaultspec-standard-executor`
-    - References: `[[2026-03-05-agent-removal-adr]]`, `[[2026-03-05-agent-removal-reference]]`
-    - Name: Remove A2A methods from providers
-    - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase2-step2.md`
-    - Executing sub-agent: `vaultspec-standard-executor`
-    - References: `[[2026-03-05-agent-removal-reference]]`
+  - Name: Delete orchestration logic and A2A directory
+  - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase2-step1.md`
+  - Executing sub-agent: `vaultspec-standard-executor`
+  - References: `[[2026-03-05-agent-removal-adr]]`, `[[2026-03-05-agent-removal-reference]]`
+  - Name: Remove A2A methods from providers
+  - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase2-step2.md`
+  - Executing sub-agent: `vaultspec-standard-executor`
+  - References: `[[2026-03-05-agent-removal-reference]]`
 - Phase 3: Update Core Entry Points and Configuration
-    - Name: Clean up __main__, spec_cli, and __init__
-    - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase3-step1.md`
-    - Executing sub-agent: `vaultspec-complex-executor`
-    - References: `[[2026-03-05-agent-removal-adr]]`, `[[2026-03-05-agent-removal-research]]`
-    - Name: Remove A2A configurations, enums, and types
-    - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase3-step2.md`
-    - Executing sub-agent: `vaultspec-complex-executor`
-    - References: `[[2026-03-05-agent-removal-research]]`
+  - Name: Clean up __main__, spec_cli, and __init__
+  - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase3-step1.md`
+  - Executing sub-agent: `vaultspec-complex-executor`
+  - References: `[[2026-03-05-agent-removal-adr]]`, `[[2026-03-05-agent-removal-research]]`
+  - Name: Remove A2A configurations, enums, and types
+  - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase3-step2.md`
+  - Executing sub-agent: `vaultspec-complex-executor`
+  - References: `[[2026-03-05-agent-removal-research]]`
 - Phase 4: Clean up Test Suite
-    - Name: Delete A2A and agent tests
-    - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase4-step1.md`
-    - Executing sub-agent: `vaultspec-standard-executor`
-    - References: `[[2026-03-05-agent-removal-reference]]`
+  - Name: Delete A2A and agent tests
+  - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase4-step1.md`
+  - Executing sub-agent: `vaultspec-standard-executor`
+  - References: `[[2026-03-05-agent-removal-reference]]`
 
 ## Parallelization
 

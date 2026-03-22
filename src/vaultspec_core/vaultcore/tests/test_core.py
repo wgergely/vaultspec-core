@@ -1,5 +1,11 @@
-"""Tests low-level frontmatter parsing, including fallback semantics, value
-normalization, and body preservation."""
+"""Tests for low-level frontmatter parsing.
+
+Targets :func:`~vaultspec_core.vaultcore.parser.parse_frontmatter`.
+
+Covers fallback semantics (PyYAML → simple parser), value normalization,
+colon-in-value handling, quoted strings, whitespace trimming, and body
+preservation.
+"""
 
 from __future__ import annotations
 

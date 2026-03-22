@@ -18,6 +18,8 @@ dependencies = [
   "PyYAML>=6.0.3",
   "httpx>=0.28.1",
   "mcp>=1.26.0",
+  "networkx>=3.4",
+  "phart>=0.5.0",
   "pydantic>=2.12.5",
   "rich>=14.3.2",
   "sse-starlette>=3.2.0",
@@ -42,7 +44,7 @@ version = "0.1.0"
 
   [project.urls]
   "Bug Tracker" = "https://github.com/wgergely/vaultspec-core/issues"
-  Documentation = "https://github.com/wgergely/vaultspec-core/tree/main/.vaultspec/docs"
+  Documentation = "https://github.com/wgergely/vaultspec-core/tree/main/.vaultspec/README.md"
   Homepage = "https://github.com/wgergely/vaultspec-core"
   Repository = "https://github.com/wgergely/vaultspec-core"
 
@@ -52,25 +54,30 @@ version = "0.1.0"
 
   [project.optional-dependencies]
   dev = [
+    "identify>=2.0.0",
+    "mdformat>=1.0.0",
+    "mdformat-frontmatter>=2.0.10",
+    "mdformat-gfm>=1.0.0",
+    "pip-audit>=2.9.0",
+    "prek>=0.3.2",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
-    "pytest-timeout>=2.4.0",
-    "pytest-reportlog>=0.4.0",
     "pytest-durations>=1.0.0",
-    "pip-audit>=2.9.0",
+    "pytest-reportlog>=0.4.0",
+    "pytest-timeout>=2.4.0",
     "ruff>=0.15.2",
     "ty>=0.0.15",
-    "prek>=0.3.2",
-    "identify>=2.0.0",
-    "nodeenv>=1.0.0",
   ]
 
 [dependency-groups]
 dev = [
   "identify>=2.0.0",
-  "nodeenv>=1.0.0",
+  "mdformat>=1.0.0",
+  "mdformat-frontmatter>=2.0.10",
+  "mdformat-gfm>=1.0.0",
   "pip-audit>=2.9.0",
   "prek>=0.3.2",
+  "pymarkdownlnt>=0.9.0",
   "pytest>=9.0.2",
   "pytest-asyncio>=1.3.0",
   "pytest-durations>=1.0.0",
@@ -85,6 +92,9 @@ allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/vaultspec_core"]
+
+[tool.hatch.build.targets.wheel.force-include]
+".vaultspec/rules" = "vaultspec_core/builtins"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -135,6 +145,9 @@ target-version = "py313"
     "src/vaultspec_core/core/*.py" = ["TC003"]
     # FastMCP inspects tool annotations at runtime, so Context must be importable.
     "src/vaultspec_core/mcp_server/vault_tools.py" = ["TC002"]
+    # CLI stub commands accept Typer params that are not yet wired to backends.
+    "src/vaultspec_core/cli/root.py" = ["ARG001"]
+    "src/vaultspec_core/cli/vault_cmd.py" = ["ARG001"]
 
     [tool.ruff.lint.isort]
     known-first-party = ["vaultspec_core"]

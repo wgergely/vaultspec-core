@@ -1,16 +1,17 @@
 ---
 tags:
-  - "#research"
-  - "#protocol"
-date: "2026-02-07"
+  - '#research'
+  - '#protocol'
+date: '2026-02-07'
 ---
+
 # A2A (Agent-to-Agent) Protocol -- Technical Reference
 
 **Date:** 2026-02-07
 **Source:** Research agent -- A2A protocol deep dive
 **Scope:** Full protobuf spec, SDK APIs, code examples, task lifecycle
 
----
+______________________________________________________________________
 
 ## Protocol Overview
 
@@ -27,13 +28,13 @@ A2A is an open standard created by Google (April 2025), donated to Linux Foundat
 
 ### Protocol Stack
 
-| Protocol | Focus |
-|---|---|
-| **A2A** | Agent-to-agent collaboration (horizontal) |
-| **MCP** | Agent-to-tool/resource connection (vertical) |
-| **ACP** | Editor-to-agent communication (client-agent) |
+| Protocol | Focus                                        |
+| -------- | -------------------------------------------- |
+| **A2A**  | Agent-to-agent collaboration (horizontal)    |
+| **MCP**  | Agent-to-tool/resource connection (vertical) |
+| **ACP**  | Editor-to-agent communication (client-agent) |
 
----
+______________________________________________________________________
 
 ## Core Actors
 
@@ -45,7 +46,7 @@ User  --->  A2A Client (Client Agent)  --->  A2A Server (Remote Agent)
 - **A2A Client**: Application/agent acting on behalf of the user
 - **A2A Server**: AI agent exposing HTTP endpoints; operates as opaque black-box
 
----
+______________________________________________________________________
 
 ## Service Definition (11 RPCs)
 
@@ -65,7 +66,7 @@ service A2AService {
 }
 ```
 
----
+______________________________________________________________________
 
 ## Task State Machine (9 States)
 
@@ -75,20 +76,20 @@ submitted --> working --> input_required --> completed
                      --> failed / canceled / rejected / auth_required
 ```
 
-| State | Category | Description |
-|---|---|---|
-| `submitted` | Active | Task created, acknowledged |
-| `working` | Active | Being processed |
+| State            | Category    | Description                 |
+| ---------------- | ----------- | --------------------------- |
+| `submitted`      | Active      | Task created, acknowledged  |
+| `working`        | Active      | Being processed             |
 | `input_required` | Interrupted | Needs more info from client |
-| `auth_required` | Interrupted | Authentication needed |
-| `completed` | Terminal | Finished successfully |
-| `failed` | Terminal | Done but failed |
-| `canceled` | Terminal | Canceled before finishing |
-| `rejected` | Terminal | Agent declined the task |
+| `auth_required`  | Interrupted | Authentication needed       |
+| `completed`      | Terminal    | Finished successfully       |
+| `failed`         | Terminal    | Done but failed             |
+| `canceled`       | Terminal    | Canceled before finishing   |
+| `rejected`       | Terminal    | Agent declined the task     |
 
 **Immutability rule**: Once terminal, a task cannot restart. New work creates a new task in the same `contextId`.
 
----
+______________________________________________________________________
 
 ## Core Data Types
 
@@ -191,7 +192,7 @@ message SendMessageResponse {
 }
 ```
 
----
+______________________________________________________________________
 
 ## Agent Card (Discovery)
 
@@ -278,7 +279,7 @@ message AgentSkill {
 
 Supports: API keys, HTTP auth (Bearer/Basic), OAuth 2.0 (authorization code, client credentials, device code), OpenID Connect, mTLS.
 
----
+______________________________________________________________________
 
 ## Interaction Mechanisms
 
@@ -294,7 +295,7 @@ Supports: API keys, HTTP auth (Bearer/Basic), OAuth 2.0 (authorization code, cli
 
 Webhook-based. Server POSTs `StreamResponse` to client URL. Security: JWT + JWKS, HMAC, mTLS.
 
----
+______________________________________________________________________
 
 ## Agent Response Patterns
 
@@ -302,7 +303,7 @@ Webhook-based. Server POSTs `StreamResponse` to client URL. Security: JWT + JWKS
 - **Task-generating**: Always returns `Task` objects
 - **Hybrid**: `Message` for negotiation, then `Task` for tracked work
 
----
+______________________________________________________________________
 
 ## Request/Response Types
 
@@ -346,7 +347,7 @@ message PushNotificationConfig {
 }
 ```
 
----
+______________________________________________________________________
 
 ## Python SDK (`a2a-sdk`)
 
@@ -410,7 +411,7 @@ a2a_client = A2AClient(httpx_client=client, agent_card=card)
 response = await a2a_client.send_message(request)
 ```
 
----
+______________________________________________________________________
 
 ## Complete Working Examples
 
@@ -557,7 +558,7 @@ server = A2AStarletteApplication(agent_card=agent_card, http_handler=handler)
 uvicorn.run(server.build(), host='localhost', port=10000)
 ```
 
----
+______________________________________________________________________
 
 ## Multi-turn Flow
 
@@ -580,7 +581,7 @@ Multiple concurrent tasks within the same context:
 - Task 3: Based on Task 1 -> Book a snowmobile activity
 - Task 4: Based on Task 2 -> Add spa reservation
 
----
+______________________________________________________________________
 
 ## Streaming Sequence
 
@@ -594,7 +595,7 @@ Client                              Server
   |<-- Stream closed ---------------|
 ```
 
----
+______________________________________________________________________
 
 ## Request Lifecycle (with Auth)
 
@@ -613,7 +614,7 @@ Client                        A2A Server               Auth Server
   |<-- Returns Task Response -----|                        |
 ```
 
----
+______________________________________________________________________
 
 ## Sources
 

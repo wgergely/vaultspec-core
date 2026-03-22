@@ -1,49 +1,25 @@
 ---
-# ALLOWED TAGS - DO NOT REMOVE
-# REFERENCE: #adr #audit #exec #plan #reference #research #{feature}
-# Directory tag (hardcoded - DO NOT CHANGE - based on .vault/exec/ location)
+# REQUIRED TAGS (minimum 2): one directory tag + one feature tag
+# DIRECTORY TAGS: #adr #audit #exec #plan #reference #research
+# Directory tag (hardcoded - DO NOT CHANGE - based on .vault/audit/ location)
 # Feature tag (replace {feature} with your feature name, e.g., #editor-demo)
+# Additional tags may be appended below the required pair
 tags:
-  - "#exec"
-  - "#{feature}"
+  - '#audit'
+  - '#{feature}'
 # ISO date format (e.g., 2026-02-06)
-date: "{yyyy-mm-dd}"
+date: '{yyyy-mm-dd}'
 # Related documents as quoted wiki-links
 # (e.g., "[[2026-02-04-feature-plan]]")
 related:
-  - "[[{yyyy-mm-dd-*}]]"
+  - '[[{yyyy-mm-dd-*}]]'
 ---
 
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 
-# `{feature}` code review
+# `{feature}` Code Review
 
-<!-- STATUS MUST BE ONE OF: PASS | FAIL | REVISION REQUIRED -->
+<!-- Persistent log of audit findings appended below. -->
 
-**Status:** `{PASS|FAIL|REVISION REQUIRED}`
-
-## Audit Context
-
-- **Plan:** `[[{yyyy-mm-dd-feature-plan}]]`
-- **Scope:** List of files or modules reviewed
-
-## Findings
-
-Classify findings by Severity: CRITICAL, HIGH, MEDIUM, LOW
-
-### Critical / High (Must Fix)
-
-- **[CRITICAL]** `{Location}`: `{Description}`
-- **[HIGH]** `{Location}`: `{Description}`
-
-### Medium / Low (Recommended)
-
-- **[MEDIUM]** `{Location}`: `{Description}`
-- **[LOW]** `{Location}`: `{Description}`
-
-## Recommendations
-
-Actionable next steps. If FAIL, list specific requirements for re-submission.
-
-## Notes
+<!-- Use: {TOPIC}-### | {LEVEL} | {Summary} \n {DESCRIPTION} format-->

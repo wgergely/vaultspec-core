@@ -1,13 +1,14 @@
 ---
 tags:
-  - "#adr"
-  - "#french-novel-relay"
-date: "2026-02-19"
+  - '#adr'
+  - '#french-novel-relay'
+date: '2026-02-19'
 related:
-  - "[[2026-02-19-french-novel-relay-test-research]]"
-  - "[[2026-02-15-cross-agent-adr]]"
-  - "[[2026-02-15-a2a-adr]]"
+  - '[[2026-02-19-french-novel-relay-test-research]]'
+  - '[[2026-02-15-cross-agent-adr]]'
+  - '[[2026-02-15-a2a-adr]]'
 ---
+
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 
@@ -27,7 +28,7 @@ collaborative content generation between agents.
 ## Considerations
 
 Three design options were evaluated in
-[[2026-02-19-french-novel-relay-test-research]]:
+\[[2026-02-19-french-novel-relay-test-research]\]:
 
 - **Option A (Mock Only):** `StoryRelayExecutor` test doubles produce
   deterministic French chapter templates. Fast and cheap but tests plumbing,
@@ -45,11 +46,16 @@ Three design options were evaluated in
 ## Constraints
 
 - No production code changes — test-only addition
+
 - Must use existing A2A infrastructure (`create_app`, `_build_client`,
   `_send_message_payload`, executor classes) without modification
+
 - Port range 10100-10109 (currently unused; existing tests use 10050-10099)
+
 - Live tests gated on `shutil.which("claude")` and `shutil.which("gemini")`
+
 - 300s timeout for live tests (matching `TestGoldStandardBidirectional`)
+
 - French prose validation without external language detection libraries
 
 ## Implementation
@@ -65,11 +71,13 @@ chapter template to the accumulated story text. Each executor is named after
 a Jean-Claude variant (`"Jean-Claude le Boulanger"`, `"Jean-Claude le Critique"`).
 
 3-turn relay:
+
 1. Claude mock begins: produces chapter 1 template with "Croustillant"
-2. Gemini mock continues: receives chapter 1, appends chapter 2
-3. Claude mock finishes: receives chapters 1+2, appends epilogue
+1. Gemini mock continues: receives chapter 1, appends chapter 2
+1. Claude mock finishes: receives chapters 1+2, appends epilogue
 
 Assertions:
+
 - All 3 task IDs are independent
 - Each chapter's text is present in the accumulated output
 - Final output contains all 3 chapter markers
@@ -82,16 +90,21 @@ Real executors with French prompts and Jean-Claude persona:
 - **Turn 1 (Claude begins):** French prompt asking to start a story about
   Croustillant in a Parisian boulangerie. Constrained to one paragraph (3-5
   sentences), ending in suspense.
+
 - **Turn 2 (Gemini continues):** Receives chapter 1, prompted to continue with
   a new character encounter. Same length constraint.
+
 - **Turn 3 (Claude finishes):** Receives chapters 1+2, prompted to write an
   epilogue with resolution.
 
 French prose validation (no external libraries):
+
 - Response non-empty, 100-2000 chars
-- Contains at least 3 words from a French indicator set (`le, la, les, un, une,
-  de, du, des, et, est, dans, sur, qui, que, pas, avec, pour, mais`)
+
+- Contains at least 3 words from a French indicator set (`le, la, les, un, une, de, du, des, et, est, dans, sur, qui, que, pas, avec, pour, mais`)
+
 - Contains "Croustillant" (character continuity)
+
 - Each chapter is distinct from prior chapters (no echo)
 
 ### Shared infrastructure
@@ -104,7 +117,7 @@ French prose validation (no external libraries):
 
 Option C was chosen because it provides defense-in-depth testing:
 
-- The mock layer is deterministic, fast (<1s), and can run in CI on every push.
+- The mock layer is deterministic, fast (\<1s), and can run in CI on every push.
   It validates the 3-turn relay orchestration pattern — that messages chain
   correctly through 3 independent A2A task lifecycles.
 
@@ -125,10 +138,15 @@ already supports the 3-turn relay pattern — it was simply never tested.
 ## Consequences
 
 - Adds one new test file (~250-350 lines) with no production code changes
-- Mock tests add <1s to the integration test suite
+
+- Mock tests add \<1s to the integration test suite
+
 - Live tests add ~3-5 minutes when both CLIs are available (gated by skipif)
+
 - Establishes the pattern for future multi-turn A2A test scenarios
+
 - French prose assertions are intentionally minimal (word-presence, not
   linguistic analysis) to avoid false negatives from LLM output variance
+
 - The `StoryRelayExecutor` test double may be reusable for future A2A relay
   tests with different themes or languages

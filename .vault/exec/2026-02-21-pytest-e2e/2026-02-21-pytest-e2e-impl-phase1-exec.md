@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#pytest-e2e"
-date: "2026-02-21"
+  - '#exec'
+  - '#pytest-e2e'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-pytest-e2e-observability-impl-plan]]"
+  - '[[2026-02-21-pytest-e2e-observability-impl-plan]]'
 ---
+
 # `pytest-e2e` `impl` `phase1`
 
 Added pytest observability config and four new test dependencies.

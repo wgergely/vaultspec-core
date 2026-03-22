@@ -1,9 +1,10 @@
 ---
 tags:
-  - "#reference"
-  - "#repo-manager-extension"
-date: "2026-02-23"
+  - '#reference'
+  - '#repo-manager-extension'
+date: '2026-02-23'
 ---
+
 # repo-manager manifest and configuration format reference
 
 ## crate(s)
@@ -32,7 +33,7 @@ date: "2026-02-23"
 - `/y/code/repository-manager-worktrees/main/crates/repo-meta/src/schema/tool.rs`
 - `/y/code/repository-manager-worktrees/main/test-fixtures/repos/config-test/.repository/config.toml`
 
----
+______________________________________________________________________
 
 ## 1. repository config format (`config.toml`)
 
@@ -41,9 +42,9 @@ date: "2026-02-23"
 The repo-manager loads and merges four config layers in order (later wins):
 
 1. `~/.config/repo-manager/config.toml` — global defaults
-2. `~/.config/repo-manager/org/config.toml` — org-shared defaults
-3. `.repository/config.toml` — per-repository config
-4. `.repository/config.local.toml` — local overrides (git-ignored)
+1. `~/.config/repo-manager/org/config.toml` — org-shared defaults
+1. `.repository/config.toml` — per-repository config
+1. `.repository/config.local.toml` — local overrides (git-ignored)
 
 The struct for a single layer is `Manifest` (`repo-core/src/config/manifest.rs`).
 After merging all layers the result is a `ResolvedConfig` (`resolver.rs`).
@@ -85,6 +86,7 @@ provider = "uv"       # "uv" (default) or "venv"
 ```
 
 The `RuntimeContext` transformer (`runtime.rs`) routes preset keys:
+
 - `env:*` → `RuntimeContext.runtime` (keyed by name after the colon)
 - `tool:*` / `config:*` → `RuntimeContext.capabilities`
 
@@ -153,12 +155,13 @@ working_dir = "/optional/override"
 `post-branch-delete`, `pre-sync`, `post-sync`.
 
 Hook args support `${VAR_NAME}` substitution. Available vars differ by event:
+
 - branch events: `BRANCH_NAME`, `WORKTREE_PATH`
 - sync events: `HOOK_EVENT_TYPE`
 
 Hooks are fail-fast: a non-zero exit stops the chain.
 
----
+______________________________________________________________________
 
 ## 2. extension manifest format (`repo_extension.toml`)
 
@@ -254,7 +257,7 @@ The `[extension]` table will reject unknown keys (e.g., adding `author` will
 cause a parse error). All other top-level sections (`[runtime]`, `[provides]`,
 etc.) are open: unknown TOML sections are silently ignored at deserialization.
 
----
+______________________________________________________________________
 
 ## 3. presets system (`repo-presets`)
 
@@ -295,10 +298,10 @@ pub trait PresetProvider: Send + Sync {
 
 Two concrete providers ship for Python:
 
-| Provider | `id()` | mechanism |
-|---|---|---|
-| `UvProvider` | `"env:python"` | `uv venv --python <version>` |
-| `VenvProvider` | `"env:python-venv"` | `python -m venv` |
+| Provider       | `id()`              | mechanism                    |
+| -------------- | ------------------- | ---------------------------- |
+| `UvProvider`   | `"env:python"`      | `uv venv --python <version>` |
+| `VenvProvider` | `"env:python-venv"` | `python -m venv`             |
 
 `UvProvider.apply()` runs: `uv venv --python <python_version> <venv_path>`
 from the repository root.
@@ -319,11 +322,12 @@ pub struct Context {
 ```
 
 Key derived values from `config`:
+
 - `context.python_version()` → `config["version"]` or `"3.12"` (default)
 - `context.provider()` → `config["provider"]` or `"uv"` (default)
 - `context.venv_path()` → `.venv` (no tag) or `.venv-{tag}` (with tag)
 
----
+______________________________________________________________________
 
 ## 4. tool definitions (`repo-meta/src/schema/tool.rs`)
 
@@ -355,7 +359,7 @@ python_path_key  = "python.defaultInterpreterPath"  # used by VSCode tool syncer
 Python awareness in the tool integration layer. It carries a JSON keypath for
 writing the Python interpreter path into the tool's settings file.
 
----
+______________________________________________________________________
 
 ## 5. MCP template variables in `mcp.json`
 
@@ -365,11 +369,11 @@ template substitution before injecting MCP server entries into tools.
 
 Supported placeholders:
 
-| Placeholder | Resolved value |
-|---|---|
-| `{{root}}` | Absolute path to repository root |
-| `{{extension.source}}` | Absolute path to extension source directory |
-| `{{runtime.python}}` | Absolute path to extension's Python venv interpreter |
+| Placeholder            | Resolved value                                       |
+| ---------------------- | ---------------------------------------------------- |
+| `{{root}}`             | Absolute path to repository root                     |
+| `{{extension.source}}` | Absolute path to extension source directory          |
+| `{{runtime.python}}`   | Absolute path to extension's Python venv interpreter |
 
 `ResolveContext`:
 
@@ -384,7 +388,7 @@ pub struct ResolveContext {
 Security: `mcp_config` path must be relative to `source_dir`; canonicalize
 containment check is enforced. Absolute paths and `../` traversal are rejected.
 
----
+______________________________________________________________________
 
 ## 6. extension lifecycle status
 
@@ -392,12 +396,13 @@ As of `crates/repo-cli/src/commands/extension.rs`, all mutating extension
 operations (`install`, `add`, `init`, `remove`) return `CliError::user("... not yet implemented")`. Only `extension list` works (reads the built-in `ExtensionRegistry`).
 
 The `ExtensionRegistry` hardcodes two known extensions:
+
 - `vaultspec` → `https://github.com/vaultspec/vaultspec.git`
 - `registry-manager` → `https://github.com/registry-manager/registry-manager.git`
 
 The actual install/fetch/activate pipeline does not exist yet.
 
----
+______________________________________________________________________
 
 ## 7. gap analysis — python package dependency support
 
@@ -413,6 +418,7 @@ no reference to `pyproject.toml`, `requirements.txt`, or git-based deps.
 **Missing fields needed on `Requirements` or a new `[packages]` section:**
 
 ```toml
+
 # proposed additions to repo_extension.toml
 
 [requires.python]
@@ -537,22 +543,22 @@ version      = ">=3.13"
 version_file = ".python-version"   # if set, override version from this file
 ```
 
----
+______________________________________________________________________
 
 ## 8. summary of existing python-aware fields
 
-| Location | Field | Purpose |
-|---|---|---|
-| `repo_extension.toml [requires.python]` | `version` | Python version constraint (string) |
-| `repo_extension.toml [runtime]` | `type = "python"` | Declares runtime type |
-| `repo_extension.toml [runtime]` | `install` | Shell command (not yet executed) |
-| `repo_extension.toml [entry_points]` | `cli`, `mcp` | Scripts invoked via python interpreter |
-| `mcp.json` template | `{{runtime.python}}` | Resolved venv interpreter path |
-| `config.toml [presets."env:python"]` | `version` | Python version for venv creation |
-| `config.toml [presets."env:python"]` | `provider` | `"uv"` or `"venv"` |
-| `tool definition [schema]` | `python_path_key` | JSON key for writing interpreter path to tool config |
+| Location                                | Field                | Purpose                                              |
+| --------------------------------------- | -------------------- | ---------------------------------------------------- |
+| `repo_extension.toml [requires.python]` | `version`            | Python version constraint (string)                   |
+| `repo_extension.toml [runtime]`         | `type = "python"`    | Declares runtime type                                |
+| `repo_extension.toml [runtime]`         | `install`            | Shell command (not yet executed)                     |
+| `repo_extension.toml [entry_points]`    | `cli`, `mcp`         | Scripts invoked via python interpreter               |
+| `mcp.json` template                     | `{{runtime.python}}` | Resolved venv interpreter path                       |
+| `config.toml [presets."env:python"]`    | `version`            | Python version for venv creation                     |
+| `config.toml [presets."env:python"]`    | `provider`           | `"uv"` or `"venv"`                                   |
+| `tool definition [schema]`              | `python_path_key`    | JSON key for writing interpreter path to tool config |
 
----
+______________________________________________________________________
 
 ## 9. architectural notes
 

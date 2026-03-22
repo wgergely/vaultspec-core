@@ -1,14 +1,16 @@
 ---
 tags:
-  - "#plan"
-  - "#team-hardening"
-date: "2026-02-23"
+  - '#plan'
+  - '#team-hardening'
+date: '2026-02-23'
 related:
-  - "[[2026-02-23-task-tool-dispatch-research]]"
-  - "[[2026-02-22-protocol-stack-deep-audit-research]]"
-  - "[[2026-02-21-a2a-layer-audit-research]]"
-  - "[[2026-02-20-a2a-team-p1-plan]]"
+  - '[[2026-02-23-task-tool-dispatch-research]]'
+  - '[[2026-02-22-protocol-stack-deep-audit-research]]'
+  - '[[2026-02-21-a2a-layer-audit-research]]'
+  - '[[2026-02-20-a2a-team-p1-plan]]'
+  - '[[2026-02-20-a2a-team-adr]]'
 ---
+
 # team-hardening phase-1 plan
 
 Fix the three remaining bugs that block real team functionality in the A2A multi-agent system. Each bug is independently scoped and can be fixed in parallel. All three must pass before the team feature is considered production-ready.
@@ -24,20 +26,23 @@ Three bugs were identified during live A2A team testing and cross-referenced aga
 **Root cause**: In `src/vaultspec/protocol/a2a/executors/claude_executor.py:176-204`, the clean `sdk_env` is computed and assigned to `options.env` *after* `_options_factory` has already been called. The `ClaudeAgentOptions` constructor likely reads env vars at construction, not at connect time.
 
 **Fix**: Move the env stripping into `kwargs` *before* `_options_factory()` is called, so the options object is constructed with the clean env from the start:
+
 - Compute `sdk_env` at line ~176, before `kwargs` is assembled.
 - Pass `env=sdk_env` in `kwargs` so `_options_factory(**kwargs)` receives it.
 - Remove the post-construction `options.env = sdk_env` assignment.
 - Add a fallback in `GeminiACPBridge` / `ClaudeACPBridge` that also strips `CLAUDECODE` from child process env (belt-and-suspenders for the bridge subprocess path).
 
 **Files**:
+
 - `src/vaultspec/protocol/a2a/executors/claude_executor.py` (lines 176–204)
 - `src/vaultspec/protocol/acp/claude_bridge.py` (env forwarding in `_spawn_child_session`)
 
 **Tests**:
+
 - `src/vaultspec/protocol/a2a/tests/test_claude_executor.py` — add test asserting `CLAUDECODE` absent from options env even when set in `os.environ`
 - Test that `connect()` succeeds when `CLAUDECODE=1` is in `os.environ`
 
----
+______________________________________________________________________
 
 ### Bug C2 — Gemini session resume → "Method not found"
 
@@ -48,6 +53,7 @@ Three bugs were identified during live A2A team testing and cross-referenced aga
 **Fix**: Remove the `_session_ids` cache and `resume_session_id` forwarding from `GeminiA2AExecutor`. Each A2A turn spawns a fresh Gemini ACP session (`new_session`). Multi-turn continuity is the responsibility of the server-side `GeminiACPBridge`, which already implements `load_session` / `resume_session` for the ACP-level persistence — that is a separate concern from A2A task dispatch.
 
 **Files**:
+
 - `src/vaultspec/protocol/a2a/executors/gemini_executor.py`
   - Remove `self._session_ids: dict[str, str] = {}` (line 128)
   - Remove `self._session_ids_lock = asyncio.Lock()` (line 129)
@@ -56,12 +62,13 @@ Three bugs were identified during live A2A team testing and cross-referenced aga
   - Remove the `if result.session_id:` block that caches the session (lines 259–261)
 
 **Tests**:
+
 - `src/vaultspec/protocol/a2a/tests/test_gemini_executor.py`
   - Add test: second call to same `context_id` does NOT pass `resume_session_id`
   - Verify `run_subagent` is called with `resume_session_id=None` (or absent) on second turn
   - Add test that `_session_ids` attribute does not exist on executor (regression guard)
 
----
+______________________________________________________________________
 
 ### Bug M1 — Agent name collision silently collapses mixed teams
 
@@ -72,6 +79,7 @@ Three bugs were identified during live A2A team testing and cross-referenced aga
 **Fix**: Key members by `card.url` (normalized, stripped of trailing slash). Keep `card.name` only for display/logging. The `TeamMember.name` field should remain the human-readable name but the dict key should be URL-based.
 
 **Files**:
+
 - `src/vaultspec/orchestration/team.py`
   - Line 487: change `member_name = card.name or url` to `member_key = url.rstrip("/")`
   - Line 488: change `members[member_name]` to `members[member_key]`
@@ -80,32 +88,36 @@ Three bugs were identified during live A2A team testing and cross-referenced aga
 - Anywhere `session.members[name]` is used to look up by name must be updated to look up by URL key, or a secondary name-to-url index must be maintained for display purposes.
 
 **Tests**:
+
 - `src/vaultspec/orchestration/tests/test_team.py`
   - Add test: two agents with same `card.name` at different URLs → both present in `members`
   - Add test: lookup by URL key succeeds after form_team
   - Add test: `TeamMember.name` still holds the display name from `card.name`
 
----
+______________________________________________________________________
 
 ## Tasks
 
 - `phase-1: Bug C2 (Gemini session resume)`
-    1. Remove `_session_ids` cache fields from `GeminiA2AExecutor.__init__`
-    2. Remove `prev_session` lookup and `resume_session_id` kwarg from `execute()`
-    3. Remove session caching in success path
-    4. Update `test_gemini_executor.py` with regression tests
+
+  1. Remove `_session_ids` cache fields from `GeminiA2AExecutor.__init__`
+  1. Remove `prev_session` lookup and `resume_session_id` kwarg from `execute()`
+  1. Remove session caching in success path
+  1. Update `test_gemini_executor.py` with regression tests
 
 - `phase-2: Bug M1 (Name collision)`
-    1. Change member dict key from `card.name` to normalized URL in `team.py`
-    2. Audit all `session.members[x]` access sites for key type assumptions
-    3. Update `test_team.py` with collision tests
+
+  1. Change member dict key from `card.name` to normalized URL in `team.py`
+  1. Audit all `session.members[x]` access sites for key type assumptions
+  1. Update `test_team.py` with collision tests
 
 - `phase-3: Bug C1 (Claude executor env ordering)`
-    1. Move `sdk_env` construction before `kwargs` assembly in `claude_executor.py`
-    2. Pass `env=sdk_env` in kwargs so `_options_factory` receives clean env
-    3. Remove post-construction `options.env = sdk_env` assignment
-    4. Add belt-and-suspenders env strip in `claude_bridge.py` child spawn
-    5. Update `test_claude_executor.py` with env-stripping tests
+
+  1. Move `sdk_env` construction before `kwargs` assembly in `claude_executor.py`
+  1. Pass `env=sdk_env` in kwargs so `_options_factory` receives clean env
+  1. Remove post-construction `options.env = sdk_env` assignment
+  1. Add belt-and-suspenders env strip in `claude_bridge.py` child spawn
+  1. Update `test_claude_executor.py` with env-stripping tests
 
 ## Parallelization
 
@@ -118,10 +130,10 @@ Phase 3 (C1) touches `claude_executor.py` which is separate from both. It can al
 Mission success requires:
 
 1. **Unit tests pass** for all three modified executor/team files with no new skips or mocks.
-2. **Regression guard**: `GeminiA2AExecutor` test confirms `resume_session_id` is never forwarded on second turn.
-3. **Name collision guard**: `test_team.py` confirms two same-named agents at different URLs both survive `form_team`.
-4. **Env stripping guard**: `test_claude_executor.py` confirms `CLAUDECODE` is absent from the options object at construction time, not just after `connect()`.
-5. **Integration**: `test_integration_a2a.py` and `test_team_lifecycle.py` pass without modification.
-6. **Live smoke test** (if possible): `vaultspec team create` with two agents at different URLs, verify both members appear in `list` output.
+1. **Regression guard**: `GeminiA2AExecutor` test confirms `resume_session_id` is never forwarded on second turn.
+1. **Name collision guard**: `test_team.py` confirms two same-named agents at different URLs both survive `form_team`.
+1. **Env stripping guard**: `test_claude_executor.py` confirms `CLAUDECODE` is absent from the options object at construction time, not just after `connect()`.
+1. **Integration**: `test_integration_a2a.py` and `test_team_lifecycle.py` pass without modification.
+1. **Live smoke test** (if possible): `vaultspec team create` with two agents at different URLs, verify both members appear in `list` output.
 
 Note: Bug C1 may require live diagnosis under a real Claude Code session to confirm the exact failure mode. If the env-ordering fix does not resolve it, deeper investigation of `ClaudeAgentOptions` constructor behavior is required before marking C1 resolved.

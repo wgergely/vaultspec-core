@@ -1,21 +1,22 @@
 ---
 tags:
-  - "#plan"
-  - "#cli-output"
-date: "2026-02-23"
+  - '#plan'
+  - '#cli-output'
+date: '2026-02-23'
 related:
-  - "[[2026-02-23-cli-output-architecture-adr]]"
-  - "[[2026-02-23-cli-output-architecture-research]]"
-  - "[[2026-02-22-cli-logging-adr]]"
-  - "[[2026-02-22-cli-logging-research]]"
+  - '[[2026-02-23-cli-output-architecture-adr]]'
+  - '[[2026-02-23-cli-output-architecture-research]]'
+  - '[[2026-02-22-cli-logging-adr]]'
+  - '[[2026-02-22-cli-logging-research]]'
 ---
+
 # `cli-output` phase-1 plan
 
 Introduce a `Printer` class that owns both stdout (program output) and stderr
 (human messaging) as distinct `Console` instances, wire it into `setup_logging()`,
 and fix the ~10 call sites where the wrong channel is used — silently breaking
-pipeable output. See [[2026-02-23-cli-output-architecture-adr]] for the full
-rationale and [[2026-02-23-cli-output-architecture-research]] for the call-site
+pipeable output. See \[[2026-02-23-cli-output-architecture-adr]\] for the full
+rationale and \[[2026-02-23-cli-output-architecture-research]\] for the call-site
 audit.
 
 ## Proposed Changes
@@ -32,12 +33,16 @@ two `Console` instances — one writing to `sys.stdout` (`stderr=False`), one to
 `sys.stderr` (`stderr=True`) — and exposes five methods:
 
 - `out(*args, **kwargs)` — routes to the stdout `Console`; never suppressed.
+
 - `out_json(data, *, indent=2)` — serializes `data` with `json.dumps` and
   calls `out()`; never suppressed.
+
 - `status(msg, *args, **kwargs)` — routes to the stderr `Console`; gated by
   `self.quiet`.
+
 - `warn(msg, *args, **kwargs)` — routes to the stderr `Console` with
   `style="yellow bold"`; never suppressed.
+
 - `error(msg, *args, **kwargs)` — routes to the stderr `Console` with
   `style="red bold"`; never suppressed.
 
@@ -96,8 +101,7 @@ both calls to `args.printer.out(...)`. The results path already uses `print()`
 block (lines 387–393) uses six `logger.info()` calls (`"Index complete:"`,
 `"  Total documents: %d"`, etc.). These carry program output — the index
 results — and must go to stdout. Change each call to `args.printer.out(...)`.
-The progress messages before indexing (`"Device: ..."`, `"Running full
-index..."`) at lines 358 and 364 are legitimate status messaging; leave those
+The progress messages before indexing (`"Device: ..."`, `"Running full index..."`) at lines 358 and 364 are legitimate status messaging; leave those
 as `logger.info()`.
 
 **`src/vaultspec/core/commands.py` — `hooks_list()`:** The empty-state block
@@ -123,14 +127,15 @@ even when DEBUG is not enabled. Convert each to `%s` lazy formatting:
 
 - Line 266: `logger.debug(f"Agent Response: {res}")` →
   `logger.debug("Agent Response: %s", res)`
+
 - Line 274: `logger.debug(f"Process exited with {proc.returncode}")` →
   `logger.debug("Process exited with %s", proc.returncode)`
+
 - Line 497: `logger.debug(f"Handshake Result: {init_res}")` →
   `logger.debug("Handshake Result: %s", init_res)`
 
 **`src/vaultspec/mcp_server/app.py` — missing `configure_logging()` call:** The
-`main()` function (line 85) calls `logger.info("Starting vaultspec-mcp server
-root=%s", root_dir)` but never calls `configure_logging()`. Under the default
+`main()` function (line 85) calls `logger.info("Starting vaultspec-mcp server root=%s", root_dir)` but never calls `configure_logging()`. Under the default
 Python root logger (WARNING level, `logging.lastResort`), the message is
 silently dropped. This means even `--debug` terminal sessions never see the
 startup message. Add `configure_logging(debug=...)` at the top of `main()`,
@@ -150,18 +155,20 @@ correctness fix. Deferred to a future plan document.
 ## Tasks
 
 - phase-1 (sub-phase a — infrastructure)
-    1. Create `src/vaultspec/printer.py` with the `Printer` class
-    2. Extend `setup_logging()` in `src/vaultspec/cli_common.py` to attach `args.printer`
-    3. Export `Printer` from `src/vaultspec/__init__.py`
-    4. Write unit tests in `src/vaultspec/tests/cli/test_printer.py`
+
+  1. Create `src/vaultspec/printer.py` with the `Printer` class
+  1. Extend `setup_logging()` in `src/vaultspec/cli_common.py` to attach `args.printer`
+  1. Export `Printer` from `src/vaultspec/__init__.py`
+  1. Write unit tests in `src/vaultspec/tests/cli/test_printer.py`
 
 - phase-2 (sub-phase b — fix inconsistencies, parallel after phase-1)
-    1. Fix `handle_search()` empty-state in `src/vaultspec/vault_cli.py`
-    2. Fix `handle_index()` summary block in `src/vaultspec/vault_cli.py`
-    3. Fix `hooks_list()` empty-state in `src/vaultspec/core/commands.py`
-    4. Remove duplicate `logger.info()` mirror in `init_run()` in `src/vaultspec/core/commands.py`
-    5. Convert three f-string `logger.debug()` calls in `src/vaultspec/orchestration/subagent.py`
-    6. Add `configure_logging()` call in `src/vaultspec/mcp_server/app.py`
+
+  1. Fix `handle_search()` empty-state in `src/vaultspec/vault_cli.py`
+  1. Fix `handle_index()` summary block in `src/vaultspec/vault_cli.py`
+  1. Fix `hooks_list()` empty-state in `src/vaultspec/core/commands.py`
+  1. Remove duplicate `logger.info()` mirror in `init_run()` in `src/vaultspec/core/commands.py`
+  1. Convert three f-string `logger.debug()` calls in `src/vaultspec/orchestration/subagent.py`
+  1. Add `configure_logging()` call in `src/vaultspec/mcp_server/app.py`
 
 ## Step Records
 
@@ -178,27 +185,40 @@ Step records for this plan are stored under:
 ### phase-1 — infrastructure (sequential, must complete first)
 
 - Name: create-printer-module
+
 - Step summary: `2026-02-23-cli-output-phase1-step1.md`
+
 - Executing sub-agent: `vaultspec-standard-executor`
-- References: [[2026-02-23-cli-output-architecture-adr]] (sub-phase A),
-  [[2026-02-23-cli-output-architecture-research]] (testability section)
+
+- References: \[[2026-02-23-cli-output-architecture-adr]\] (sub-phase A),
+  \[[2026-02-23-cli-output-architecture-research]\] (testability section)
 
 - Name: wire-printer-into-setup-logging
+
 - Step summary: `2026-02-23-cli-output-phase1-step2.md`
+
 - Executing sub-agent: `vaultspec-standard-executor`
-- References: [[2026-02-23-cli-output-architecture-adr]] (sub-phase A),
+
+- References: \[[2026-02-23-cli-output-architecture-adr]\] (sub-phase A),
   `src/vaultspec/cli_common.py` (`setup_logging()` function)
 
 - Name: export-printer-from-package
+
 - Step summary: `2026-02-23-cli-output-phase1-step3.md`
+
 - Executing sub-agent: `vaultspec-standard-executor`
+
 - References: `src/vaultspec/__init__.py`
 
 - Name: write-printer-unit-tests
+
 - Step summary: `2026-02-23-cli-output-phase1-step4.md`
+
 - Executing sub-agent: `vaultspec-standard-executor`
-- References: [[2026-02-23-cli-output-architecture-research]] (testability
-  section), [[2026-02-23-cli-output-architecture-adr]] (constraints: no mocking)
+
+- References: \[[2026-02-23-cli-output-architecture-research]\] (testability
+  section), \[[2026-02-23-cli-output-architecture-adr]\] (constraints: no mocking)
+
 - File: `src/vaultspec/tests/cli/test_printer.py`
 
 ### phase-2 — fix inconsistencies (two parallel streams after phase-1 completes)
@@ -206,41 +226,59 @@ Step records for this plan are stored under:
 Agent 2 (vault_cli.py + commands.py printer fixes):
 
 - Name: fix-handle-search-empty-state
+
 - Step summary: `2026-02-23-cli-output-phase2-step1.md`
+
 - Executing sub-agent: `vaultspec-standard-executor`
-- References: [[2026-02-23-cli-output-architecture-adr]] (sub-phase B, item 1),
+
+- References: \[[2026-02-23-cli-output-architecture-adr]\] (sub-phase B, item 1),
   `src/vaultspec/vault_cli.py` lines 444–447
 
 - Name: fix-handle-index-summary-block
+
 - Step summary: `2026-02-23-cli-output-phase2-step2.md`
+
 - Executing sub-agent: `vaultspec-standard-executor`
-- References: [[2026-02-23-cli-output-architecture-adr]] (sub-phase B, item 2),
+
+- References: \[[2026-02-23-cli-output-architecture-adr]\] (sub-phase B, item 2),
   `src/vaultspec/vault_cli.py` lines 387–393
 
 - Name: fix-hooks-list-empty-state
+
 - Step summary: `2026-02-23-cli-output-phase2-step3.md`
+
 - Executing sub-agent: `vaultspec-standard-executor`
-- References: [[2026-02-23-cli-output-architecture-adr]] (sub-phase B, item 3),
+
+- References: \[[2026-02-23-cli-output-architecture-adr]\] (sub-phase B, item 3),
   `src/vaultspec/core/commands.py` lines 619–623
 
 - Name: remove-init-run-duplicate-logger
+
 - Step summary: `2026-02-23-cli-output-phase2-step4.md`
+
 - Executing sub-agent: `vaultspec-standard-executor`
-- References: [[2026-02-23-cli-output-architecture-adr]] (sub-phase B, item 4),
+
+- References: \[[2026-02-23-cli-output-architecture-adr]\] (sub-phase B, item 4),
   `src/vaultspec/core/commands.py` lines 238–242
 
 Agent 3 (subagent.py + mcp_server/app.py fixes, runs in parallel with Agent 2):
 
 - Name: convert-fstring-debug-calls
+
 - Step summary: `2026-02-23-cli-output-phase2-step5.md`
+
 - Executing sub-agent: `vaultspec-standard-executor`
-- References: [[2026-02-23-cli-output-architecture-adr]] (sub-phase B, item 5),
+
+- References: \[[2026-02-23-cli-output-architecture-adr]\] (sub-phase B, item 5),
   `src/vaultspec/orchestration/subagent.py` lines 266, 274, 497
 
 - Name: add-configure-logging-mcp-server
+
 - Step summary: `2026-02-23-cli-output-phase2-step6.md`
+
 - Executing sub-agent: `vaultspec-standard-executor`
-- References: [[2026-02-23-cli-output-architecture-adr]] (MCP server safety),
+
+- References: \[[2026-02-23-cli-output-architecture-adr]\] (MCP server safety),
   `src/vaultspec/mcp_server/app.py` `main()` function
 
 ## Parallelization
@@ -296,6 +334,7 @@ python -m pytest src/vaultspec/tests/cli/test_printer.py -v
 Expected: all pass. The tests exercise `out()`, `out_json()`, `status()`,
 `warn()`, and `error()` using `StringIO`-backed `Console` instances. They
 verify:
+
 - `out()` always writes to the stdout stream regardless of `quiet`.
 - `status()` writes when `quiet=False`, is silent when `quiet=True`.
 - `warn()` and `error()` always write to the stderr stream regardless of `quiet`.
@@ -312,25 +351,37 @@ python -m pytest src/vaultspec/ -x -q
 After phase-2, verify the pipeline-correctness fixes are live:
 
 ```bash
+
 # search empty-state now goes to stdout (was stderr)
+
 python -m vaultspec vault search "nonexistent-query-xyz" 2>/dev/null
+
 # must print "No results found..." to stdout — not empty
 
 # search empty-state stderr is clean
+
 python -m vaultspec vault search "nonexistent-query-xyz" 2>&1 1>/dev/null
+
 # must print nothing to stderr (no logger.info noise)
 
 # hooks empty-state now goes to stdout (was stderr)
+
 python -m vaultspec hooks list 2>/dev/null
+
 # must print hook guidance to stdout — not empty
 
 # audit summary goes to stdout (correct baseline, regression check)
+
 python -m vaultspec vault audit --summary 2>/dev/null
+
 # must print "Vault Summary:" table to stdout
 
 # audit stderr is clean under quiet
+
 python -m vaultspec vault audit --summary --quiet 2>&1 1>/dev/null
+
 # must print nothing
+
 ```
 
 ### mcp server
@@ -352,14 +403,23 @@ verification that is outside the scope of this plan.
 The following criteria, taken directly from the ADR, define completion:
 
 1. `printer.py` exists and all five public methods behave as documented.
-2. `args.printer` is available in all command handlers after `setup_logging()`.
-3. `vaultspec vault search` produces consistent stdout output in both the
+
+1. `args.printer` is available in all command handlers after `setup_logging()`.
+
+1. `vaultspec vault search` produces consistent stdout output in both the
    empty-state and results cases.
-4. `vaultspec vault index` summary table appears on stdout (not stderr).
-5. `vaultspec hooks list` empty-state appears on stdout (not stderr).
-6. `init_run()` does not duplicate output across both channels.
-7. Three `logger.debug(f"...")` calls in `subagent.py` have been converted to
+
+1. `vaultspec vault index` summary table appears on stdout (not stderr).
+
+1. `vaultspec hooks list` empty-state appears on stdout (not stderr).
+
+1. `init_run()` does not duplicate output across both channels.
+
+1. Three `logger.debug(f"...")` calls in `subagent.py` have been converted to
    lazy `%s` format.
-8. `mcp_server/app.py` calls `configure_logging()` in `main()`.
-9. All existing tests pass without modification.
-10. No mocks or stubs are introduced in any test file.
+
+1. `mcp_server/app.py` calls `configure_logging()` in `main()`.
+
+1. All existing tests pass without modification.
+
+1. No mocks or stubs are introduced in any test file.

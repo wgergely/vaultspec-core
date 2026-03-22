@@ -1,15 +1,13 @@
 ---
 tags:
-  - "#research"
-  - "#install-cmds"
-  - "#provider-grounding"
-  - "#antigravity"
-date: "2026-03-16"
+  - '#research'
+  - '#install-cmds'
+date: '2026-03-16'
 related:
-  - "[[2026-03-15-install-cmds-plan]]"
-  - "[[2026-03-15-claude-code-provider-research]]"
-  - "[[2026-03-15-gemini-cli-provider-research]]"
-  - "[[2026-03-15-codex-cli-provider-research]]"
+  - '[[2026-03-15-install-cmds-plan]]'
+  - '[[2026-03-15-claude-code-provider-research]]'
+  - '[[2026-03-15-gemini-cli-provider-research]]'
+  - '[[2026-03-15-codex-cli-provider-research]]'
 ---
 
 # Antigravity provider grounding research
@@ -21,24 +19,32 @@ Developers Forum, and community sources on 2026-03-16.
 ## Root config file
 
 - **Filename:** `GEMINI.md` — shared with Gemini CLI
+
 - **Project-level:** `GEMINI.md` at project root (same file Gemini CLI reads)
+
 - **Global:** `~/.gemini/GEMINI.md` (shared with Gemini CLI — known
   conflict per github.com/google-gemini/gemini-cli/issues/16058)
+
 - **No `AGENTS.md`** — Antigravity does NOT use AGENTS.md. AGENTS.md is
   Codex-only.
+
 - **Source:** https://codelabs.developers.google.com/getting-started-google-antigravity,
   https://github.com/google-gemini/gemini-cli/issues/16058
 
 ## Workspace directory
 
 - **Canonical path:** `.agents/` (plural)
+
 - **Legacy `.agent/` (singular) is NOT supported by vaultspec** — any
   references to `.agent/` in the codebase are erroneous and must be
   removed. vaultspec does not maintain backward compatibility with the
   deprecated singular form.
+
 - **Confirmed by Google staff:** "Going forward, `.agents` (plural) should
   be used as Antigravity team has moved towards that."
+
 - **Subdirectories:** `rules/`, `workflows/`, `skills/`
+
 - **Source:** https://discuss.ai.google.dev/t/new-folder-for-rules/126165
 
 ## Rules
@@ -53,30 +59,42 @@ Developers Forum, and community sources on 2026-03-16.
 ## Workflows
 
 - **Path:** `.agents/workflows/*.md` (workspace/project level)
+
 - **Global:** `~/.gemini/antigravity/global_workflows/*.md`
+
 - **Format:** Markdown files — saved prompts
+
 - **Behavior:** User-triggered on demand with `/` prefix (not agent-triggered)
+
 - **Note:** This is a new resource type that vaultspec does not currently
   model. `Resource.WORKFLOWS` does not exist in enums.py.
+
 - **Source:** https://codelabs.developers.google.com/getting-started-google-antigravity
 
 ## Skills
 
 - **Workspace:** `.agents/skills/<name>/SKILL.md`
+
 - **Global:** `~/.gemini/antigravity/skills/<name>/SKILL.md`
+
 - **Format:** `SKILL.md` with YAML frontmatter (`name`, `description`),
   optional subdirectories: `scripts/`, `references/`, `assets/`
+
 - **Behavior:** Agent-triggered via progressive disclosure — metadata
   loaded first, full SKILL.md on activation
+
 - **Shared:** Same `.agents/skills/` directory used by Gemini CLI (alias)
   and Codex CLI
+
 - **Source:** https://codelabs.developers.google.com/getting-started-with-antigravity-skills
 
 ## Agents
 
 - **No user-managed agent definition directory documented**
+
 - Antigravity has built-in agent modes (autopilot, review-driven,
   agent-assisted) but no `.agents/agents/` folder for custom definitions
+
 - **No `.agents/agents/` should be scaffolded**
 
 ## System prompt
@@ -95,31 +113,34 @@ Developers Forum, and community sources on 2026-03-16.
 
 - `.agents/skills/` is shared across Antigravity, Gemini CLI (as alias),
   and Codex CLI (as primary path)
+
 - `.agents/rules/` is Antigravity-specific — Gemini CLI does NOT read
   rules from `.agents/rules/` (it uses `.gemini/policies/*.toml`)
+
 - `.agents/workflows/` is Antigravity-specific
+
 - `GEMINI.md` at project root is shared between Antigravity and Gemini CLI
 
 ## Capability matrix
 
-| Capability | Supported | Notes |
-|-----------|-----------|-------|
-| RULES | Yes | `.agents/rules/*.md`, always-on behavioral guidelines |
-| SKILLS | Yes | `.agents/skills/<name>/SKILL.md`, shared with Gemini/Codex |
-| WORKFLOWS | Yes | `.agents/workflows/*.md`, user-triggered saved prompts |
-| AGENTS | No | No user-managed agent definitions |
-| ROOT_CONFIG | Yes (shared) | `GEMINI.md` at root, shared with Gemini CLI |
-| SYSTEM | No | Rules serve this purpose |
-| HOOKS | No | IDE, not CLI |
+| Capability  | Supported    | Notes                                                      |
+| ----------- | ------------ | ---------------------------------------------------------- |
+| RULES       | Yes          | `.agents/rules/*.md`, always-on behavioral guidelines      |
+| SKILLS      | Yes          | `.agents/skills/<name>/SKILL.md`, shared with Gemini/Codex |
+| WORKFLOWS   | Yes          | `.agents/workflows/*.md`, user-triggered saved prompts     |
+| AGENTS      | No           | No user-managed agent definitions                          |
+| ROOT_CONFIG | Yes (shared) | `GEMINI.md` at root, shared with Gemini CLI                |
+| SYSTEM      | No           | Rules serve this purpose                                   |
+| HOOKS       | No           | IDE, not CLI                                               |
 
 ## Path summary
 
-| Artifact | Project Path | User Path |
-|----------|-------------|-----------|
-| Root config | `./GEMINI.md` (shared with Gemini) | `~/.gemini/GEMINI.md` (shared, conflict) |
-| Rules | `.agents/rules/*.md` | Via `~/.gemini/GEMINI.md` |
-| Skills | `.agents/skills/<name>/SKILL.md` | `~/.gemini/antigravity/skills/` |
-| Workflows | `.agents/workflows/*.md` | `~/.gemini/antigravity/global_workflows/` |
+| Artifact    | Project Path                       | User Path                                 |
+| ----------- | ---------------------------------- | ----------------------------------------- |
+| Root config | `./GEMINI.md` (shared with Gemini) | `~/.gemini/GEMINI.md` (shared, conflict)  |
+| Rules       | `.agents/rules/*.md`               | Via `~/.gemini/GEMINI.md`                 |
+| Skills      | `.agents/skills/<name>/SKILL.md`   | `~/.gemini/antigravity/skills/`           |
+| Workflows   | `.agents/workflows/*.md`           | `~/.gemini/antigravity/global_workflows/` |
 
 ## Known issues for vaultspec
 

@@ -13,6 +13,8 @@ pytestmark = [pytest.mark.unit]
 
 
 class TestVaultSummary:
+    """Unit tests for :class:`~vaultspec_core.metrics.api.VaultSummary` construction."""
+
     def test_dataclass_creation(self):
         summary = VaultSummary(
             total_docs=10,
@@ -25,6 +27,11 @@ class TestVaultSummary:
 
 
 class TestGetVaultMetrics:
+    """Integration tests for :func:`~vaultspec_core.metrics.api.get_vault_metrics`.
+
+    Runs against the real fixture vault.
+    """
+
     def test_counts_documents(self, vault_root):
         result = get_vault_metrics(vault_root)
         assert result.total_docs > 80
@@ -71,7 +78,7 @@ class TestVaultSummaryEdgeCases:
 
     def test_features_deduplicated(self, vault_root):
         """Same feature across multiple docs counted once."""
-        from ...verification import list_features
+        from ...vaultcore.scanner import list_features
 
         features = list_features(vault_root)
         # list_features returns a set, so features are inherently unique

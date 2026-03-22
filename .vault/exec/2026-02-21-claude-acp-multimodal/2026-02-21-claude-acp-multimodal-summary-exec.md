@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#claude-acp-multimodal"
-date: "2026-02-21"
+  - '#exec'
+  - '#claude-acp-multimodal'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-acp-claude-multimodal-plan]]"
+  - '[[2026-02-21-acp-claude-multimodal-plan]]'
 ---
+
 # Phase Summary: Multi-Modal Prompt Support
 
 ## Overview
@@ -14,16 +15,16 @@ Successfully implemented multi-modal prompt support for the Claude ACP bridge. T
 
 ## Completed Work
 
-1.  **Capability Advertisement:**
-    *   Updated `initialize()` to advertise `image` and `embedded_context` support.
-2.  **Prompt Payload Construction:**
-    *   Replaced the lossy `_extract_prompt_text` function with `_build_sdk_message_payload`.
-    *   Implemented mapping for `ImageContentBlock` (to base64 image dicts) and `ResourceContentBlock` (to `@path` text references).
-3.  **Execution Path:**
-    *   Updated `prompt()` to pass a structured async iterable of messages to the SDK, bypassing the simple string check.
-4.  **Testing:**
-    *   Created `src/vaultspec/protocol/acp/tests/test_bridge_prompt.py`.
-    *   Verified all 6 tests pass.
+1. **Capability Advertisement:**
+   - Updated `initialize()` to advertise `image` and `embedded_context` support.
+1. **Prompt Payload Construction:**
+   - Replaced the lossy `_extract_prompt_text` function with `_build_sdk_message_payload`.
+   - Implemented mapping for `ImageContentBlock` (to base64 image dicts) and `ResourceContentBlock` (to `@path` text references).
+1. **Execution Path:**
+   - Updated `prompt()` to pass a structured async iterable of messages to the SDK, bypassing the simple string check.
+1. **Testing:**
+   - Created `src/vaultspec/protocol/acp/tests/test_bridge_prompt.py`.
+   - Verified all 6 tests pass.
 
 ## Outcome
 
@@ -31,4 +32,4 @@ The bridge now has feature parity with the reference implementation regarding pr
 
 ## Next Steps
 
-*   None. This task is complete.
+- None. This task is complete.

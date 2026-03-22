@@ -1,29 +1,30 @@
 ---
 tags:
-  - "#research"
-  - "#framework"
-date: "2026-02-07"
+  - '#research'
+  - '#framework'
+date: '2026-02-07'
 ---
+
 # Multi-Agent Orchestration Patterns -- Survey
 
 **Date:** 2026-02-07
 **Source:** Research agent -- multi-agent orchestration patterns
 **Scope:** Cross-framework survey of agent team/delegation architectures
 
----
+______________________________________________________________________
 
 ## Protocol Layer Summary
 
-| Protocol | Layer | Purpose | Status |
-|---|---|---|---|
-| **MCP** | Tool | Connect models to tools/resources | De facto standard |
-| **A2A** | Agent | Peer agent communication | Linux Foundation standard |
-| **ACP** (IBM) | Agent | Structured intra-cluster messaging | **Merged into A2A** |
-| **ACP** (Zed) | Client | Editor-to-agent communication | Production, independent |
+| Protocol      | Layer  | Purpose                            | Status                    |
+| ------------- | ------ | ---------------------------------- | ------------------------- |
+| **MCP**       | Tool   | Connect models to tools/resources  | De facto standard         |
+| **A2A**       | Agent  | Peer agent communication           | Linux Foundation standard |
+| **ACP** (IBM) | Agent  | Structured intra-cluster messaging | **Merged into A2A**       |
+| **ACP** (Zed) | Client | Editor-to-agent communication      | Production, independent   |
 
 **Key insight**: MCP and A2A are complementary. MCP connects an agent to its tools. A2A connects agents to each other.
 
----
+______________________________________________________________________
 
 ## Claude Code Agent Teams
 
@@ -65,7 +66,7 @@ Team lead creates tasks via `TaskCreate`, assigns with `TaskUpdate(owner)`. Task
 - Multiple teammates editing same file causes conflicts
 - Experimental status
 
----
+______________________________________________________________________
 
 ## OpenAI Agents SDK
 
@@ -87,7 +88,7 @@ Function-based handoffs. LLM sees handoffs as callable tools (`transfer_to_{agen
 - **No parallelism** -- single thread of execution
 - **No shared state** -- context travels with conversation
 
----
+______________________________________________________________________
 
 ## LangGraph Supervisor Pattern
 
@@ -108,7 +109,7 @@ Graph-based routing. Supervisor calls `create_handoff_tool` to delegate. Workers
 - **Supervisor re-routes** based on worker results
 - **Shared memory** via `InMemoryStore` key-value storage
 
----
+______________________________________________________________________
 
 ## Microsoft Magentic-One (AutoGen)
 
@@ -132,7 +133,7 @@ Orchestrator (Outer Loop: Task Ledger)
 
 Five patterns: Sequential, Concurrent, Handoff, GroupChat, Magentic.
 
----
+______________________________________________________________________
 
 ## CrewAI
 
@@ -149,7 +150,7 @@ Agents with `allow_delegation=True` get two built-in tools:
 - Task context chain: `context=[other_task]` for dependency injection
 - Processes: `sequential` or `hierarchical`
 
----
+______________________________________________________________________
 
 ## Google ADK + A2A
 
@@ -176,21 +177,21 @@ a2a_app = to_a2a(root_agent)  # Wrap as A2A server
 
 Remote agents appear identical to local sub-agents from the root's perspective.
 
----
+______________________________________________________________________
 
 ## Comparative Matrix
 
-| Dimension | Claude Teams | OpenAI SDK | LangGraph | Magentic-One | CrewAI | ADK+A2A |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| Topology | Star + P2P | Chain | Star | Star | Star | Tree + Remote |
-| Peer DMs | Yes | No | No | No | Yes | No |
-| Shared Tasks | Yes | No | Graph state | Ledgers | Task context | A2A tasks |
-| Parallel | Yes | No | Via nodes | One-at-a-time | Sequential/Hierarchical | Via sub-agents |
-| Cross-process | Yes | No | No | No | No | Yes (HTTP) |
-| Cross-network | No | No | No | No | No | Yes (A2A) |
-| Protocol Standard | Proprietary | Proprietary | Proprietary | Proprietary | Proprietary | A2A (open) |
+| Dimension         | Claude Teams | OpenAI SDK  |  LangGraph  | Magentic-One  |         CrewAI          |    ADK+A2A     |
+| ----------------- | :----------: | :---------: | :---------: | :-----------: | :---------------------: | :------------: |
+| Topology          |  Star + P2P  |    Chain    |    Star     |     Star      |          Star           | Tree + Remote  |
+| Peer DMs          |     Yes      |     No      |     No      |      No       |           Yes           |       No       |
+| Shared Tasks      |     Yes      |     No      | Graph state |    Ledgers    |      Task context       |   A2A tasks    |
+| Parallel          |     Yes      |     No      |  Via nodes  | One-at-a-time | Sequential/Hierarchical | Via sub-agents |
+| Cross-process     |     Yes      |     No      |     No      |      No       |           No            |   Yes (HTTP)   |
+| Cross-network     |      No      |     No      |     No      |      No       |           No            |   Yes (A2A)    |
+| Protocol Standard | Proprietary  | Proprietary | Proprietary |  Proprietary  |       Proprietary       |   A2A (open)   |
 
----
+______________________________________________________________________
 
 ## Five Dominant Patterns
 
@@ -200,7 +201,7 @@ Remote agents appear identical to local sub-agents from the root's perspective.
 - **Dual-Loop Planning** (Magentic-One) -- most sophisticated, heaviest overhead
 - **Protocol-Mediated Federation** (ADK + A2A) -- only cross-boundary approach
 
----
+______________________________________________________________________
 
 ## Key Takeaways
 
@@ -210,7 +211,7 @@ Remote agents appear identical to local sub-agents from the root's perspective.
 - Google ADK + A2A is the only cross-boundary solution
 - Industry converging on supervisor/orchestrator pattern
 
----
+______________________________________________________________________
 
 ## Sources
 

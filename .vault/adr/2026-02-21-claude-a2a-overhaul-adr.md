@@ -1,18 +1,19 @@
 ---
 tags:
-  - "#adr"
-  - "#claude-a2a-overhaul"
-date: "2026-02-22"
+  - '#adr'
+  - '#claude-a2a-overhaul'
+date: '2026-02-22'
 related:
-  - "[[2026-02-21-claude-a2a-overhaul-research]]"
-  - "[[2026-02-21-protocol-gap-analysis-research]]"
-  - "[[2026-02-21-a2a-layer-audit-research]]"
-  - "[[2026-02-21-claude-sdk-rate-limit-research]]"
-  - "[[2026-02-22-claude-team-management-reference]]"
-  - "[[2026-02-22-claude-team-management-adr]]"
-  - "[[2026-02-22-claude-team-management-plan]]"
-  - "[[2026-02-20-a2a-team-adr]]"
+  - '[[2026-02-21-claude-a2a-overhaul-research]]'
+  - '[[2026-02-21-protocol-gap-analysis-research]]'
+  - '[[2026-02-21-a2a-layer-audit-research]]'
+  - '[[2026-02-21-claude-sdk-rate-limit-research]]'
+  - '[[2026-02-22-claude-team-management-reference]]'
+  - '[[2026-02-22-claude-team-management-adr]]'
+  - '[[2026-02-22-claude-team-management-plan]]'
+  - '[[2026-02-20-a2a-team-adr]]'
 ---
+
 # `claude-a2a-overhaul` adr: Claude A2A Executor, Team Tools, and Process Lifecycle | (**status:** `superseded`)
 
 **SUPERSEDED** — This ADR is fully superseded by
@@ -76,13 +77,15 @@ All of these are required for Claude to do actual work as a team member.
 
 ### Reference Architecture
 
-Per [[2026-02-22-claude-team-management-reference]], the reference implementation
+Per \[[2026-02-22-claude-team-management-reference]\], the reference implementation
 (`python-a2a`) has three components we lack:
 
 - **`AgentManager`**: Spawns agent processes via `subprocess`, tracks PIDs, monitors
   health, auto-discovers ports. Maps to our `TeamCoordinator` + new spawn capability.
+
 - **`AgentNetwork`**: High-level agent grouping with `network.add(name, url)` and
   `network.get_agent(name).ask(query)`. Maps to our `TeamCoordinator.dispatch_parallel()`.
+
 - **MCP tools**: The reference exposes agent management as callable tools. Maps to
   our empty `team_tools.py` stub.
 
@@ -97,10 +100,14 @@ persistence via JSON in `.vault/logs/teams/`. The team tools should wrap the sam
 ## Constraints
 
 - **No mocks in tests.** DI-injected test doubles only. Extend existing patterns.
+
 - **claude-agent-sdk stays.** Required for MCP injection, tool use, and sandboxing.
+
 - **Backward compatibility.** `TeamCoordinator` public API (`form_team`,
   `dispatch_parallel`, `collect_results`, `dissolve_team`) must not break.
+
 - **Test baseline.** 69/69 non-E2E tests pass. No regressions.
+
 - **MCP pattern consistency.** Follow `subagent_server/server.py` registration pattern.
 
 ## Implementation
@@ -153,15 +160,15 @@ data or `AssistantMessage.error == "rate_limit"`. After retries exhausted, fail 
 Implement `src/vaultspec/mcp_tools/team_tools.py` following the `subagent_server/server.py`
 registration pattern. Seven tools wrapping `TeamCoordinator` + new spawn capability:
 
-| Tool | TeamCoordinator Method | Description |
-|------|----------------------|-------------|
-| `create_team` | `form_team()` | Form a team from agent URLs |
-| `team_status` | session inspection | Get status of a running team |
-| `list_teams` | session file listing | List active teams |
-| `dispatch_task` | `dispatch_parallel()` | Assign a task to a team member |
-| `broadcast_message` | `dispatch_parallel()` (all) | Send message to all members |
-| `send_message` | `_dispatch_one()` / `relay_output()` | Message a specific member |
-| `dissolve_team` | `dissolve_team()` | Dissolve a running team |
+| Tool                | TeamCoordinator Method               | Description                    |
+| ------------------- | ------------------------------------ | ------------------------------ |
+| `create_team`       | `form_team()`                        | Form a team from agent URLs    |
+| `team_status`       | session inspection                   | Get status of a running team   |
+| `list_teams`        | session file listing                 | List active teams              |
+| `dispatch_task`     | `dispatch_parallel()`                | Assign a task to a team member |
+| `broadcast_message` | `dispatch_parallel()` (all)          | Send message to all members    |
+| `send_message`      | `_dispatch_one()` / `relay_output()` | Message a specific member      |
+| `dissolve_team`     | `dissolve_team()`                    | Dissolve a running team        |
 
 Each tool follows the imperative registration pattern:
 
@@ -246,20 +253,28 @@ shutdown. `subprocess.Popen` would require threading or polling for process mana
 
 - Claude can create teams, spawn agents, dispatch tasks, and dissolve teams — all via
   natural language through MCP tools.
+
 - E2E `test_claude_a2a_responds` should pass with the SDK fix.
+
 - Multi-turn A2A conversations via session resume.
+
 - Non-destructive cancel preserves sessions.
+
 - Streaming progress gives observability into long-running tasks.
+
 - Team tools available to all MCP clients, not just A2A executor.
 
 ### Negative
 
 - `claude-agent-sdk` pinned to git main is less stable than a release version. Must
   monitor for 0.1.40 release and switch back.
+
 - Process spawning adds complexity to `TeamCoordinator`. Must handle process crashes,
   orphaned processes, port conflicts.
+
 - Team tools share session storage with `team_cli.py`. Concurrent access (CLI + MCP)
   could cause conflicts. Consider file locking in a future phase.
+
 - In-memory `_session_ids` and `_conversations` grow unbounded. Consider eviction
   for long-lived executors.
 

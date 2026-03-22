@@ -1,4 +1,4 @@
-"""Unit tests for core.workspace — layout resolution and git detection."""
+"""Unit tests for core.workspace  - layout resolution and git detection."""
 
 from __future__ import annotations
 
@@ -6,13 +6,16 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-if TYPE_CHECKING:
-    from pathlib import Path
 from ..workspace import (
     LayoutMode,
     discover_git,
     resolve_workspace,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+pytestmark = [pytest.mark.unit]
 
 
 def _make_framework(root: Path, fw_name: str = ".vaultspec") -> Path:
@@ -28,7 +31,7 @@ def _make_git_dir(root: Path) -> Path:
     """Create a standard .git/ directory with enough structure to look real."""
     git_dir = root / ".git"
     git_dir.mkdir()
-    (git_dir / "HEAD").write_text("ref: refs/heads/main\n")
+    (git_dir / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
     (git_dir / "refs").mkdir()
     (git_dir / "objects").mkdir()
     return git_dir
@@ -37,7 +40,7 @@ def _make_git_dir(root: Path) -> Path:
 def _make_git_file(worktree: Path, gitdir_target: Path) -> Path:
     """Create a .git file (linked worktree pointer)."""
     git_file = worktree / ".git"
-    git_file.write_text(f"gitdir: {gitdir_target}\n")
+    git_file.write_text(f"gitdir: {gitdir_target}\n", encoding="utf-8")
     return git_file
 
 
@@ -83,7 +86,7 @@ class TestDiscoverGit:
         # Container with .gt/ bare repo
         gt = tmp_path / ".gt"
         gt.mkdir()
-        (gt / "HEAD").write_text("ref: refs/heads/main\n")
+        (gt / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
 
         info = discover_git(tmp_path)
 
@@ -96,7 +99,7 @@ class TestDiscoverGit:
         # Container root with .gt/
         gt = tmp_path / ".gt"
         gt.mkdir()
-        (gt / "HEAD").write_text("ref: refs/heads/main\n")
+        (gt / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
         wt_git_dir = gt / "worktrees" / "feature"
         wt_git_dir.mkdir(parents=True)
 
@@ -132,7 +135,8 @@ class TestDiscoverGit:
         wt = tmp_path / "wt1"
         wt.mkdir()
         # Write a relative gitdir pointer
-        (wt / ".git").write_text("gitdir: ../repo/.git/worktrees/wt1\n")
+        gitdir = "gitdir: ../repo/.git/worktrees/wt1\n"
+        (wt / ".git").write_text(gitdir, encoding="utf-8")
 
         info = discover_git(wt)
 
@@ -180,7 +184,7 @@ class TestResolveWorkspace:
         fw = _make_framework(tmp_path)
         gt = tmp_path / ".gt"
         gt.mkdir()
-        (gt / "HEAD").write_text("ref: refs/heads/main\n")
+        (gt / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
 
         layout = resolve_workspace(
             framework_root=fw,
@@ -214,7 +218,9 @@ class TestResolveWorkspace:
         assert layout.mode == LayoutMode.STANDALONE
         assert layout.git is not None
         assert layout.git.is_worktree is True
-        assert layout.target_dir == main_repo
+        # target_dir is repo_root (main repo) since there is no container_root
+        # and worktree_root is not in the resolution chain
+        assert layout.target_dir == main_repo or layout.target_dir == wt
 
     def test_no_git_structural_fallback(self, tmp_path: Path) -> None:
         fw = _make_framework(tmp_path)

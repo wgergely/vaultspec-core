@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#research"
-  - "#cli-ecosystem-factoring"
-date: "2026-02-22"
+  - '#research'
+  - '#cli-ecosystem-factoring'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-codebase-audit-research]]"
+  - '[[2026-02-22-codebase-audit-research]]'
 ---
+
 # cli-ecosystem-factoring research: CLI module decomposition and shared infrastructure
 
 The goal of this research is to prepare for a refactoring of all four CLI
@@ -44,24 +45,24 @@ full fallback YAML parser), `vaultspec.protocol.providers`
 
 **Functional domains** (grouped by responsibility):
 
-| Domain | Functions | Lines (approx) |
-|:---|:---|:---|
-| YAML handling | `_yaml_load`, `_yaml_dump`, `_LiteralStr`, `_literal_representer` | 60-110 (fallback) |
-| Path init | `init_paths` | 85 |
-| Version | `_get_version` | 8 |
-| Utility | `build_file`, `ensure_dir`, `atomic_write`, `_launch_editor` | 20 |
-| Model resolution | `resolve_model` | 10 |
-| Rules CRUD | `collect_rules`, `transform_rule`, `rules_list`, `rules_add`, `rules_sync` | ~100 |
-| Agents CRUD | `collect_agents`, `transform_agent`, `agents_list`, `agents_add`, `agents_set_tier`, `agents_sync` | ~130 |
-| Skills CRUD | `collect_skills`, `transform_skill`, `skill_dest_path`, `skills_list`, `skills_add`, `skills_sync` | ~130 |
-| Generic resource ops | `resource_show`, `resource_edit`, `resource_remove`, `resource_rename` | ~120 |
-| Sync engine | `sync_files`, `sync_skills`, `print_summary`, `SyncResult` | ~140 |
-| Config generation | `_collect_rule_refs`, `_xml_to_heading`, `_generate_agents_md`, `_generate_config`, `_is_cli_managed`, `config_show`, `config_sync` | ~160 |
-| System prompt gen | `collect_system_parts`, `_collect_agent_listing`, `_collect_skill_listing`, `_generate_system_prompt`, `_generate_system_rules`, `system_show`, `system_sync` | ~200 |
-| Diagnostics | `test_run`, `doctor_run`, `readiness_run` | ~310 |
-| Init | `init_run` | ~55 |
-| Hooks | `hooks_list`, `hooks_run` | ~55 |
-| Parser/dispatch | `add_sync_flags`, `main` | ~335 |
+| Domain               | Functions                                                                                                                                                     | Lines (approx)    |
+| :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------ | :---------------- |
+| YAML handling        | `_yaml_load`, `_yaml_dump`, `_LiteralStr`, `_literal_representer`                                                                                             | 60-110 (fallback) |
+| Path init            | `init_paths`                                                                                                                                                  | 85                |
+| Version              | `_get_version`                                                                                                                                                | 8                 |
+| Utility              | `build_file`, `ensure_dir`, `atomic_write`, `_launch_editor`                                                                                                  | 20                |
+| Model resolution     | `resolve_model`                                                                                                                                               | 10                |
+| Rules CRUD           | `collect_rules`, `transform_rule`, `rules_list`, `rules_add`, `rules_sync`                                                                                    | ~100              |
+| Agents CRUD          | `collect_agents`, `transform_agent`, `agents_list`, `agents_add`, `agents_set_tier`, `agents_sync`                                                            | ~130              |
+| Skills CRUD          | `collect_skills`, `transform_skill`, `skill_dest_path`, `skills_list`, `skills_add`, `skills_sync`                                                            | ~130              |
+| Generic resource ops | `resource_show`, `resource_edit`, `resource_remove`, `resource_rename`                                                                                        | ~120              |
+| Sync engine          | `sync_files`, `sync_skills`, `print_summary`, `SyncResult`                                                                                                    | ~140              |
+| Config generation    | `_collect_rule_refs`, `_xml_to_heading`, `_generate_agents_md`, `_generate_config`, `_is_cli_managed`, `config_show`, `config_sync`                           | ~160              |
+| System prompt gen    | `collect_system_parts`, `_collect_agent_listing`, `_collect_skill_listing`, `_generate_system_prompt`, `_generate_system_rules`, `system_show`, `system_sync` | ~200              |
+| Diagnostics          | `test_run`, `doctor_run`, `readiness_run`                                                                                                                     | ~310              |
+| Init                 | `init_run`                                                                                                                                                    | ~55               |
+| Hooks                | `hooks_list`, `hooks_run`                                                                                                                                     | ~55               |
+| Parser/dispatch      | `add_sync_flags`, `main`                                                                                                                                      | ~335              |
 
 **Key dataclasses**: `ToolConfig`, `SyncResult`
 
@@ -97,8 +98,7 @@ async/network code. It is a purely synchronous, filesystem-oriented tool.
 
 **Core imports**: `WorkspaceLayout`, `resolve_workspace`, `configure_logging`
 
-**Runtime imports**: `vaultspec.orchestration.team.{MemberStatus, TeamCoordinator,
-TeamMember, TeamSession, TeamStatus}`
+**Runtime imports**: `vaultspec.orchestration.team.{MemberStatus, TeamCoordinator, TeamMember, TeamSession, TeamStatus}`
 
 **Commands**: `create`, `status`, `list`, `assign`, `broadcast`, `message`,
 `spawn`, `dissolve`
@@ -120,8 +120,7 @@ then calls `asyncio.run(_fn())`.
 **Core imports**: `WorkspaceLayout`, `resolve_workspace`, `configure_logging`
 
 **Domain imports**: `vaultspec.graph.VaultGraph`,
-`vaultspec.metrics.get_vault_metrics`, `vaultspec.vaultcore.{DocType,
-get_template_path, hydrate_template}`, `vaultspec.verification.*`
+`vaultspec.metrics.get_vault_metrics`, `vaultspec.vaultcore.{DocType, get_template_path, hydrate_template}`, `vaultspec.verification.*`
 
 **Commands**: `audit`, `create`, `index`, `search`
 
@@ -134,12 +133,12 @@ accepts an optional `root_dir` parameter.
 
 #### 2.1 `_get_version()` -- 4 copies
 
-| Module | Signature | Root source |
-|:---|:---|:---|
-| `cli.py:263` | `_get_version() -> str` | `_default_layout.output_root` |
-| `subagent_cli.py:29` | `_get_version() -> str` | `ROOT_DIR` |
-| `team_cli.py:33` | `_get_version() -> str` | `ROOT_DIR` |
-| `vault_cli.py:31` | `_get_version(root_dir: Path | None = None) -> str` | `root_dir or ROOT_DIR` |
+| Module               | Signature                      | Root source                   |
+| :------------------- | :----------------------------- | :---------------------------- |
+| `cli.py:263`         | `_get_version() -> str`        | `_default_layout.output_root` |
+| `subagent_cli.py:29` | `_get_version() -> str`        | `ROOT_DIR`                    |
+| `team_cli.py:33`     | `_get_version() -> str`        | `ROOT_DIR`                    |
+| `vault_cli.py:31`    | \`\_get_version(root_dir: Path | None = None) -> str\`         |
 
 All four parse `pyproject.toml` with the same line-scanning logic. The
 `vault_cli.py` variant adds an optional `root_dir` parameter -- the most
@@ -180,6 +179,7 @@ This appears in `cli.py:2346-2354`, `subagent_cli.py:439-447`, and
 `team_cli.py:571-579`.
 
 `vault_cli.py:180-185` uses a simpler variant:
+
 ```python
 if args.debug:
     configure_logging(level="DEBUG")
@@ -238,7 +238,9 @@ try:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", ResourceWarning)
         result = asyncio.run(_fn())
+
     # process result
+
 except Exception as e:
     logger.error("Error: %s", e)
     if args.debug:
@@ -254,13 +256,17 @@ This exact structure appears 6 times in `team_cli.py` (lines 201-216,
 #### 2.7 Windows asyncio workarounds -- 2 different implementations
 
 **subagent_cli.py** (manual loop):
+
 ```python
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
+
 # ... loop.run_until_complete(...)
+
 # Finally:
+
 if sys.platform == "win32":
     with contextlib.suppress(Exception):
         loop.run_until_complete(asyncio.sleep(0.250))
@@ -268,26 +274,26 @@ loop.close()
 ```
 
 **team_cli.py** (asyncio.run):
+
 ```python
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", ResourceWarning)
     result = asyncio.run(_fn())
 ```
 
-Also, `subagent_cli.py` main() applies a `warnings.filterwarnings("ignore",
-category=ResourceWarning, message="unclosed transport")` at the top level
+Also, `subagent_cli.py` main() applies a `warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed transport")` at the top level
 (line 452), which `team_cli.py` does not.
 
 ### 3. Inconsistency Catalog
 
 #### 3.1 Logging format differences
 
-| Module | Initial `configure_logging()` call | Format |
-|:---|:---|:---|
-| `cli.py` | `configure_logging()` | Default: `%(asctime)s [%(name)s] %(levelname)s: %(message)s` |
-| `subagent_cli.py` | `configure_logging(log_format="%(message)s")` | Bare message only |
-| `team_cli.py` | `configure_logging()` | Default |
-| `vault_cli.py` | `configure_logging()` (conditional) | Default |
+| Module            | Initial `configure_logging()` call            | Format                                                       |
+| :---------------- | :-------------------------------------------- | :----------------------------------------------------------- |
+| `cli.py`          | `configure_logging()`                         | Default: `%(asctime)s [%(name)s] %(levelname)s: %(message)s` |
+| `subagent_cli.py` | `configure_logging(log_format="%(message)s")` | Bare message only                                            |
+| `team_cli.py`     | `configure_logging()`                         | Default                                                      |
+| `vault_cli.py`    | `configure_logging()` (conditional)           | Default                                                      |
 
 The `subagent_cli.py` format override (`%(message)s`) means subagent output
 has no timestamps, no logger name, and no level indicator. This is intentional
@@ -304,10 +310,13 @@ testable.
 
 - `subagent_cli.py`: `logger.error("Error: --agent is required for 'run'")`
   (prefixed with "Error: ")
+
 - `team_cli.py`: `logger.error("Error: --agents must specify at least one agent")`
   (prefixed with "Error: ")
+
 - `vault_cli.py`: `logger.error("Error: No template found for type '%s'", ...)`
   (prefixed with "Error: ")
+
 - `cli.py`: `logger.error("Error: Rule '%s' exists. Use --force to overwrite.", ...)`
   (prefixed with "Error: ")
 
@@ -347,9 +356,13 @@ functionality, or redefine entire modules inline.
 ```python
 try:
     import yaml
+
     # ... _yaml_load, _yaml_dump, _LiteralStr definitions (~25 lines)
+
 except ImportError:
+
     # ... ENTIRE REIMPLEMENTATION of _yaml_load and _yaml_dump (~50 lines)
+
 ```
 
 `PyYAML>=6.0` is declared in `pyproject.toml` `dependencies` (line 25). It is
@@ -395,8 +408,7 @@ except ImportError:
 ```
 
 `skills_ref` is NOT in `pyproject.toml` dependencies (neither core nor
-optional). This is a genuinely optional third-party package. The `to_prompt =
-None` fallback is checked at call sites (`_collect_skill_listing`). This
+optional). This is a genuinely optional third-party package. The `to_prompt = None` fallback is checked at call sites (`_collect_skill_listing`). This
 pattern is acceptable for a truly optional dependency, but the `import html`
 bundled inside the same `try` block is wrong — `html` is stdlib and can never
 fail. It should be a top-level import.
@@ -417,7 +429,9 @@ installation status. These are in `[project.optional-dependencies]` under the
 ##### 3.6.5 Fail-fast guards in subagent_cli.py and team_cli.py
 
 ```python
+
 # subagent_cli.py:38-46
+
 try:
     from vaultspec.orchestration.subagent import run_subagent, ...
     from vaultspec.protocol.acp import SubagentClient
@@ -427,6 +441,7 @@ except ImportError as e:
     sys.exit(1)
 
 # team_cli.py:41-53
+
 try:
     from vaultspec.orchestration.team import TeamCoordinator, ...
 except ImportError as e:
@@ -444,7 +459,9 @@ traceback.
 ##### 3.6.6 Lazy RAG imports in vault_cli.py (lines 377-383, 428-433)
 
 ```python
+
 # vault_cli.py:377-383
+
 try:
     from vaultspec.rag.api import index
     from vaultspec.rag.embeddings import get_device_info
@@ -464,16 +481,16 @@ error message. Consider extracting the repeated error message into a helper.
 
 ##### Summary table
 
-| Location | Import | In deps? | Fallback behavior | Verdict |
-|:---|:---|:---|:---|:---|
-| cli.py:34 | `yaml` | Yes (core) | 50-line reimplementation | **Delete fallback** |
-| cli.py:120 | `protocol.providers` | First-party | Silent `PROVIDERS = {}` + logger bug | **Delete fallback** |
-| cli.py:28 | `skills_ref.prompt` | No | `to_prompt = None` | Acceptable (truly optional) |
-| cli.py:28 | `html` | Stdlib | Bundled in wrong try block | **Move to top-level** |
-| cli.py:1593+ | `torch`, `lancedb`, etc. | Optional (`rag`) | Diagnostic probing | **Legitimate** |
-| subagent_cli.py:38 | `orchestration.*` | First-party | `sys.exit(1)` | **Delete guard** |
-| team_cli.py:41 | `orchestration.team.*` | First-party | `sys.exit(1)` | **Delete guard** |
-| vault_cli.py:377 | `rag.api`, `rag.embeddings` | Optional (`rag`) | User-facing error + exit | **Legitimate** |
+| Location           | Import                      | In deps?         | Fallback behavior                    | Verdict                     |
+| :----------------- | :-------------------------- | :--------------- | :----------------------------------- | :-------------------------- |
+| cli.py:34          | `yaml`                      | Yes (core)       | 50-line reimplementation             | **Delete fallback**         |
+| cli.py:120         | `protocol.providers`        | First-party      | Silent `PROVIDERS = {}` + logger bug | **Delete fallback**         |
+| cli.py:28          | `skills_ref.prompt`         | No               | `to_prompt = None`                   | Acceptable (truly optional) |
+| cli.py:28          | `html`                      | Stdlib           | Bundled in wrong try block           | **Move to top-level**       |
+| cli.py:1593+       | `torch`, `lancedb`, etc.    | Optional (`rag`) | Diagnostic probing                   | **Legitimate**              |
+| subagent_cli.py:38 | `orchestration.*`           | First-party      | `sys.exit(1)`                        | **Delete guard**            |
+| team_cli.py:41     | `orchestration.team.*`      | First-party      | `sys.exit(1)`                        | **Delete guard**            |
+| vault_cli.py:377   | `rag.api`, `rag.embeddings` | Optional (`rag`) | User-facing error + exit             | **Legitimate**              |
 
 ### 4. Core Foundation Assessment
 
@@ -502,15 +519,20 @@ The following cross-cutting concerns are duplicated across CLI modules but
 absent from the core package:
 
 - **Version reading**: `_get_version()` -- no canonical implementation exists.
+
 - **Logging bootstrap**: The `configure_logging()` + `reset_logging()` dance
   is in `vaultspec.logging_config` but the "initial call + conditional
   reconfigure" pattern is repeated in every CLI module.
+
 - **Common argparse arguments**: `--root`, `--content-dir`, `--verbose`,
   `--debug`, `--version` are defined 4 times.
+
 - **Post-parse workspace resolution**: The "if args.root or args.content_dir
   then re-resolve" block is repeated 3 times.
+
 - **Async execution wrapper**: The `asyncio.run()` + ResourceWarning
   suppression + debug traceback pattern appears 7+ times.
+
 - **Windows asyncio policy setup**: The ProactorEventLoop policy setting
   appears in 3+ files.
 
@@ -562,11 +584,13 @@ vault_cli.py
 ```
 
 **Shared across all four**:
+
 - `vaultspec.core` (`WorkspaceLayout`, `resolve_workspace`)
 - `vaultspec.logging_config` (`configure_logging`)
 - `argparse`, `logging`, `sys`, `pathlib.Path`
 
 **Shared across subagent + team (async modules)**:
+
 - `asyncio`, `warnings`
 - Windows ProactorEventLoop workaround
 - ResourceWarning suppression
@@ -619,12 +643,12 @@ cli_common.py
 
 **Impact per module**:
 
-| Module | Current bootstrap lines | After factoring |
-|:---|:---|:---|
-| `subagent_cli.py` | ~45 (imports, workspace, version, logging, async) | ~10 |
-| `team_cli.py` | ~40 (imports, workspace, version, logging) | ~10 |
-| `vault_cli.py` | ~25 (imports, workspace, version, logging) | ~8 |
-| `cli.py` | ~30 (imports, workspace, version, logging) | ~10 |
+| Module            | Current bootstrap lines                           | After factoring |
+| :---------------- | :------------------------------------------------ | :-------------- |
+| `subagent_cli.py` | ~45 (imports, workspace, version, logging, async) | ~10             |
+| `team_cli.py`     | ~40 (imports, workspace, version, logging)        | ~10             |
+| `vault_cli.py`    | ~25 (imports, workspace, version, logging)        | ~8              |
+| `cli.py`          | ~30 (imports, workspace, version, logging)        | ~10             |
 
 **Estimated deduplication**: ~100-130 lines of boilerplate eliminated across
 the four modules.
@@ -653,15 +677,18 @@ src/vaultspec/cli/
 ```
 
 **Benefits**:
+
 - Each file is 100-420 lines (manageable, testable)
 - Domain boundaries are clear
 - New resource types (e.g., "templates") follow an established pattern
 - `main.py` becomes a pure parser/dispatch layer
 
 **Risks**:
+
 - The 13 mutable module-level globals (`ROOT_DIR`, `RULES_SRC_DIR`, etc.)
   create coupling. They would need to live in `types.py` and be imported
   everywhere, or be refactored into a `CLIContext` dataclass.
+
 - The `init_paths()` function mutates these globals and must be called before
   any resource operations. This init-order dependency is fragile.
 
@@ -677,11 +704,14 @@ class CLIContext:
     rules_src_dir: Path
     agents_src_dir: Path
     skills_src_dir: Path
+
     # ... etc.
 
     @classmethod
     def from_layout(cls, layout: WorkspaceLayout) -> CLIContext:
+
         # replaces init_paths()
+
 ```
 
 Every function currently reading module globals would accept `ctx: CLIContext`.
@@ -699,6 +729,7 @@ cleaner architecture.
 #### 7.1 Entry point stability
 
 `pyproject.toml` defines four entry points:
+
 ```toml
 vaultspec = "vaultspec.cli:main"
 vaultspec-vault = "vaultspec.vault_cli:main"
@@ -717,6 +748,7 @@ package's `__init__.py`).
 All four modules execute `resolve_workspace()` at import time (module level).
 This means importing any CLI module triggers git detection and filesystem
 traversal. This is a design choice for convenience but creates issues:
+
 - Tests that import CLI modules get workspace resolution as a side effect
 - Import order matters if globals are mutated
 - `cli.py` goes further by calling `init_paths()` and attempting to import
@@ -745,8 +777,7 @@ this would raise a `NameError`. In practice this does not occur because
 Python executes module-level statements sequentially and the try/except block
 at lines 120-131 runs before line 136.
 
-**This is actually a real bug**: If `from vaultspec.protocol.providers import
-ClaudeProvider, GeminiProvider` raises `ImportError`, line 129 will execute
+**This is actually a real bug**: If `from vaultspec.protocol.providers import ClaudeProvider, GeminiProvider` raises `ImportError`, line 129 will execute
 `logger.warning(...)` but `logger` is not defined until line 136.
 
 #### 7.5 Mutable globals and `init_paths()` coupling
@@ -755,6 +786,7 @@ ClaudeProvider, GeminiProvider` raises `ImportError`, line 129 will execute
 is called once at module level (line 274) and again in `main()` if `--root` or
 `--content-dir` is provided (line 2362). This double-initialization pattern is
 fragile:
+
 - Any function called between import time and `main()` sees the default layout
 - Functions do not declare their dependency on these globals
 - Tests must call `init_paths()` to set up correct state
@@ -762,19 +794,25 @@ fragile:
 ### 8. Recommended Factoring Sequence
 
 **Phase 1** -- Shared foundation (`cli_common.py`):
+
 - Extract `get_version()`, `add_common_args()`, `setup_logging()`,
   `resolve_args_workspace()`
+
 - Refactor all four CLI modules to use them
+
 - Fix the `logger` bug in `cli.py`
+
 - Estimated net line change: +120 (new module), -130 (removed duplication) = -10
 
 **Phase 2** -- Async wrapper:
+
 - Extract `run_async()` and `cli_error_handler()` into `cli_common.py`
 - Refactor `subagent_cli.py` and `team_cli.py` to use them
 - Unify Windows asyncio handling
 - Estimated net line change: +40 (new functions), -80 (removed duplication) = -40
 
 **Phase 3** -- Decompose `cli.py` into package:
+
 - Create `src/vaultspec/cli/` package
 - Move each domain into its own module
 - Update entry point and `__main__.py`
@@ -782,6 +820,7 @@ fragile:
   improved cohesion
 
 **Phase 4** (optional) -- Context object:
+
 - Replace module-level globals with `CLIContext`
 - Update all ~60 functions to accept `ctx` parameter
 - Highest-effort, highest-reward for testability

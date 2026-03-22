@@ -1,13 +1,11 @@
 ---
 tags:
-  - "#research"
-  - "#install-cmds"
-  - "#provider-grounding"
-  - "#claude"
-date: "2026-03-15"
+  - '#research'
+  - '#install-cmds'
+date: '2026-03-15'
 related:
-  - "[[2026-03-15-install-cmds-plan]]"
-  - "[[2026-03-11-codex-integration-research]]"
+  - '[[2026-03-15-install-cmds-plan]]'
+  - '[[2026-03-11-codex-integration-research]]'
 ---
 
 # Claude Code provider grounding research
@@ -102,25 +100,25 @@ code.claude.com on 2026-03-15.
 
 ## Capability matrix
 
-| Capability | Supported | Notes |
-|-----------|-----------|-------|
-| RULES | Yes | `.claude/rules/*.md` |
-| SKILLS | Yes | `.claude/skills/<name>/SKILL.md` |
-| AGENTS | Yes | `.claude/agents/<name>.md` |
-| ROOT_CONFIG | Yes | `CLAUDE.md` at root or `.claude/CLAUDE.md` |
-| SYSTEM | No | No native system file |
-| HOOKS | Yes | In settings.json, not a directory |
-| TEAMS | Yes (experimental) | Dynamic, not file-synced |
-| SCHEDULED_TASKS | Yes | Session-scoped, not file-synced |
+| Capability      | Supported          | Notes                                      |
+| --------------- | ------------------ | ------------------------------------------ |
+| RULES           | Yes                | `.claude/rules/*.md`                       |
+| SKILLS          | Yes                | `.claude/skills/<name>/SKILL.md`           |
+| AGENTS          | Yes                | `.claude/agents/<name>.md`                 |
+| ROOT_CONFIG     | Yes                | `CLAUDE.md` at root or `.claude/CLAUDE.md` |
+| SYSTEM          | No                 | No native system file                      |
+| HOOKS           | Yes                | In settings.json, not a directory          |
+| TEAMS           | Yes (experimental) | Dynamic, not file-synced                   |
+| SCHEDULED_TASKS | Yes                | Session-scoped, not file-synced            |
 
 ## Path summary
 
-| Artifact | Project Path | User Path |
-|----------|-------------|-----------|
-| Root config | `./CLAUDE.md` or `./.claude/CLAUDE.md` | `~/.claude/CLAUDE.md` |
-| Rules | `.claude/rules/*.md` | `~/.claude/rules/*.md` |
-| Skills | `.claude/skills/<name>/SKILL.md` | `~/.claude/skills/<name>/SKILL.md` |
-| Agents | `.claude/agents/<name>.md` | `~/.claude/agents/<name>.md` |
-| Hooks | `.claude/settings.json` | `~/.claude/settings.json` |
-| Teams | N/A (dynamic) | `~/.claude/teams/` |
-| Scheduled tasks | N/A (session-scoped) | N/A |
+| Artifact        | Project Path                           | User Path                          |
+| --------------- | -------------------------------------- | ---------------------------------- |
+| Root config     | `./CLAUDE.md` or `./.claude/CLAUDE.md` | `~/.claude/CLAUDE.md`              |
+| Rules           | `.claude/rules/*.md`                   | `~/.claude/rules/*.md`             |
+| Skills          | `.claude/skills/<name>/SKILL.md`       | `~/.claude/skills/<name>/SKILL.md` |
+| Agents          | `.claude/agents/<name>.md`             | `~/.claude/agents/<name>.md`       |
+| Hooks           | `.claude/settings.json`                | `~/.claude/settings.json`          |
+| Teams           | N/A (dynamic)                          | `~/.claude/teams/`                 |
+| Scheduled tasks | N/A (session-scoped)                   | N/A                                |

@@ -1,22 +1,26 @@
 """Implement the top-level operational commands mounted into the root CLI.
 
 This module contains the business logic behind workspace initialization,
-readiness and health checks, and test execution. It sits above the lower-level
-resource-management modules and provides the user-facing command behaviors that
-do not belong to a dedicated nested Typer namespace.
+install, uninstall, and sync. It sits above the lower-level resource-management
+modules and provides the user-facing command behaviors that do not belong
+to a dedicated nested Typer namespace.
 """
 
 from __future__ import annotations
 
+import contextvars
 import logging
-import subprocess
-import sys
+from dataclasses import replace
 from pathlib import Path
-
-import typer
+from typing import Any
 
 from . import types as _t
 from .enums import ProviderCapability, Tool
+from .exceptions import (
+    ProviderError,
+    ProviderNotInstalledError,
+    WorkspaceNotInitializedError,
+)
 from .helpers import ensure_dir
 
 logger = logging.getLogger(__name__)
@@ -34,229 +38,134 @@ _PROVIDER_TO_TOOLS: dict[str, list[Tool]] = {
     "core": [],
 }
 
-VALID_CATEGORIES = {"all", "unit", "api", "quality"}
-
-# Paths relative to the vaultspec-core package dir (dev src-layout + installed)
-MODULE_PATHS = {
-    "cli": ["tests/cli"],
-    "vault": ["vaultcore/tests"],
-    "protocol": [
-        "protocol/tests",
-    ],
-    "core": ["core/tests"],
-}
-
-
-def _get_package_dir() -> Path:
-    """Return the vaultspec-core package directory, whether src-layout or installed."""
-    src_dir = _t.TARGET_DIR / "src" / "vaultspec_core"
-    if src_dir.is_dir():
-        return src_dir
-    import vaultspec_core
-
-    return Path(vaultspec_core.__file__).parent
-
-
-def test_run(
-    category: str = "all",
-    module: str | None = None,
-    extra_args: list[str] | None = None,
-) -> None:
-    """Run the pytest test suite, optionally filtered by category and module."""
-    category = category or "all"
-    extra = extra_args or []
-
-    cmd = ["uv", "run", "pytest"]
-
-    if category != "all":
-        cmd.extend(["-m", category])
-
-    pkg_dir = _get_package_dir()
-
-    if module:
-        if module not in MODULE_PATHS:
-            valid = ", ".join(sorted(MODULE_PATHS))
-            logger.error("Error: Unknown module '%s'. Valid: %s", module, valid)
-            raise typer.Exit(code=1)
-        for p in MODULE_PATHS[module]:
-            cmd.append(str(pkg_dir / p))
-    else:
-        cmd.append(str(pkg_dir))
-        tests_dir = _t.TARGET_DIR / "tests"
-        if tests_dir.is_dir():
-            cmd.append(str(tests_dir))
-
-    cmd.extend(extra)
-
-    logger.info("Running: %s", " ".join(cmd))
-    result = subprocess.run(cmd, cwd=str(_t.TARGET_DIR))
-
-    # Explicitly cast to int to satisfy ty type checker
-    raw_code = getattr(result, "exit_code", None)
-    if raw_code is None:
-        raw_code = result.returncode
-
-    exit_code: int = int(raw_code)
-    raise typer.Exit(code=exit_code)
-
-
-def doctor_run() -> None:
-    """Check prerequisites and overall system health."""
-    import importlib
-
-    from vaultspec_core.console import get_console
-
-    console = get_console()
-    issues = []
-
-    console.print(f"Workspace Root: {_t.TARGET_DIR}")
-
-    # Python version
-    ver = sys.version_info
-    ver_str = f"{ver.major}.{ver.minor}.{ver.micro}"
-    if ver >= (3, 13):
-        console.print(f"Python: {ver_str}  [bold green]✓ OK[/bold green]")
-    else:
-        console.print(
-            f"Python: {ver_str}  [bold yellow]⚠ WARN[/bold yellow] 3.13+ recommended"
-        )
-        logger.warning("Python 3.13+ recommended")
-        issues.append("Python 3.13+ recommended")
-
-    # Optional deps
-    for pkg, group in [
-        ("pytest", "dev"),
-        ("ruff", "dev"),
-    ]:
-        try:
-            importlib.import_module(pkg)
-            console.print(f"{pkg}: installed  [bold green]✓ OK[/bold green]")
-        except ImportError:
-            console.print(
-                f"{pkg}: not installed  [bold yellow]⚠ WARN[/bold yellow]"
-                f" (uv sync --extra {group})"
-            )
-            logger.warning("%s not installed", pkg)
-            issues.append(f"{pkg} not installed")
-
-    # Summary
-    if issues:
-        console.print(f"\n[bold]{len(issues)} issue(s) found:[/bold]")
-        for issue in issues:
-            console.print(f"  [dim]-[/dim] {issue}")
-    else:
-        console.print("\n[bold green]All checks passed.[/bold green]")
-
 
 def _rel(target: Path, p: Path) -> str:
     return str(p.relative_to(target)).replace("\\", "/")
 
 
-def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[str]:
-    """Scaffold the .vaultspec/ and .vault/ directory structures.
+def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, str]]:
+    """Scaffold the ``.vaultspec/`` and ``.vault/`` directory structures.
 
-    When *dry_run* is True, returns the manifest without writing anything.
+    Args:
+        target: Workspace root directory.
+        dry_run: When ``True``, returns the manifest without creating anything.
+
+    Returns:
+        List of ``(relative_path, label)`` tuples for all directories created
+        or that would be created.
     """
     fw_dir = target / ".vaultspec"
     vault_dir = target / ".vault"
-    created: list[str] = []
+    created: list[tuple[str, str]] = []
 
-    for subdir in [
-        "rules/rules",
-        "rules/skills",
-        "rules/agents",
-        "rules/templates",
-        "rules/system",
-    ]:
+    # Dynamically discover resource categories from the builtins package
+    # so that new categories (e.g. hooks) are scaffolded automatically.
+    from vaultspec_core.builtins import _builtins_root
+
+    builtins_root = _builtins_root()
+    subdirs = sorted(
+        f"rules/{d.name}"
+        for d in builtins_root.iterdir()
+        if d.is_dir() and d.name not in ("__pycache__",)
+    )
+    for subdir in subdirs:
         d = fw_dir / subdir
         if not dry_run:
             ensure_dir(d)
-        created.append(_rel(target, d))
+        created.append((_rel(target, d), "core (.vaultspec)"))
 
     for subdir in ["adr", "audit", "exec", "plan", "reference", "research"]:
         d = vault_dir / subdir
         if not dry_run:
             ensure_dir(d)
-        created.append(_rel(target, d))
-
-    sys_dir = fw_dir / "rules" / "system"
-    fw_md = sys_dir / "framework.md"
-    if not fw_md.exists():
-        if not dry_run:
-            ensure_dir(sys_dir)
-            fw_md.write_text(
-                "# Framework Configuration\n\nAdd framework bootstrap content here.\n",
-                encoding="utf-8",
-            )
-        created.append(_rel(target, fw_md))
-
-    proj_md = sys_dir / "project.md"
-    if not proj_md.exists():
-        if not dry_run:
-            proj_md.write_text(
-                "# Project Configuration\n\nAdd project-specific content here.\n",
-                encoding="utf-8",
-            )
-        created.append(_rel(target, proj_md))
+        created.append((_rel(target, d), "vault (.vault)"))
 
     return created
 
 
-def _scaffold_provider(target: Path, tool: Tool, *, dry_run: bool = False) -> list[str]:
-    """Scaffold directories for a single provider based on its ToolConfig.
+def _scaffold_provider(
+    target: Path, tool: Tool, *, dry_run: bool = False
+) -> list[tuple[str, str]]:
+    """Scaffold directories for a single provider.
 
-    When *dry_run* is True, returns the manifest without writing anything.
+    Uses its :class:`~vaultspec_core.core.types.ToolConfig`.
+
+    Args:
+        target: Workspace root directory.
+        tool: :class:`~vaultspec_core.core.enums.Tool` to scaffold.
+        dry_run: When ``True``, returns the manifest without creating anything.
+
+    Returns:
+        Deduplicated list of ``(relative_path, label)`` tuples, one per
+        directory or file created (or that would be created).
     """
-    cfg = _t.TOOL_CONFIGS.get(tool)
+    cfg = _t.get_context().tool_configs.get(tool)
     if cfg is None:
         return []
 
-    created: list[str] = []
+    created: list[tuple[str, str]] = []
     caps = cfg.capabilities
+    label = tool.value
+    seen_rels: set[str] = set()
+
+    def _add(rel: str, sublabel: str) -> None:
+        if rel not in seen_rels:
+            seen_rels.add(rel)
+            created.append((rel, f"{label} ({sublabel})"))
 
     if ProviderCapability.RULES in caps and cfg.rules_dir:
         if not dry_run:
             ensure_dir(cfg.rules_dir)
-        created.append(_rel(target, cfg.rules_dir))
+        _add(_rel(target, cfg.rules_dir), "rules")
 
     if ProviderCapability.SKILLS in caps and cfg.skills_dir:
         if not dry_run:
             ensure_dir(cfg.skills_dir)
-        rel = _rel(target, cfg.skills_dir)
-        if rel not in created:
-            created.append(rel)
+        _add(_rel(target, cfg.skills_dir), "skills")
 
     if ProviderCapability.AGENTS in caps and cfg.agents_dir:
         if not dry_run:
             ensure_dir(cfg.agents_dir)
-        created.append(_rel(target, cfg.agents_dir))
+        _add(_rel(target, cfg.agents_dir), "agents")
 
     if ProviderCapability.WORKFLOWS in caps:
         wf_dir = target / ".agents" / "workflows"
         if not dry_run:
             ensure_dir(wf_dir)
-        rel = _rel(target, wf_dir)
-        if rel not in created:
-            created.append(rel)
+        _add(_rel(target, wf_dir), "workflows")
 
     if cfg.config_file:
-        created.append(_rel(target, cfg.config_file))
+        if not dry_run and not cfg.config_file.exists():
+            ensure_dir(cfg.config_file.parent)
+            cfg.config_file.write_text("", encoding="utf-8")
+        _add(_rel(target, cfg.config_file), "config")
 
     if cfg.rule_ref_config_file:
-        created.append(_rel(target, cfg.rule_ref_config_file))
+        _add(_rel(target, cfg.rule_ref_config_file), "config")
 
     if cfg.native_config_file:
         if not dry_run:
             ensure_dir(cfg.native_config_file.parent)
             if not cfg.native_config_file.exists():
                 cfg.native_config_file.write_text("", encoding="utf-8")
-        created.append(_rel(target, cfg.native_config_file))
+        _add(_rel(target, cfg.native_config_file), "config")
 
     return created
 
 
-def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[str]:
-    """Scaffold .mcp.json for MCP server integration."""
+def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[tuple[str, str]]:
+    """Scaffold ``.mcp.json`` for MCP server integration.
+
+    Creates ``.mcp.json`` only if it does not already exist.
+
+    Args:
+        target: Workspace root directory.
+        dry_run: When ``True``, returns the manifest without writing anything.
+
+    Returns:
+        List with a single ``(".mcp.json", "mcp")`` tuple, or empty if the
+        file already exists.
+    """
     import json
 
     mcp_json = target / ".mcp.json"
@@ -267,94 +176,177 @@ def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[str]:
         mcp_config = {
             "mcpServers": {
                 "vaultspec-core": {
-                    "command": "vaultspec-mcp",
-                    "args": [],
-                    "env": {"VAULTSPEC_TARGET_DIR": str(target.resolve())},
+                    "command": "uv",
+                    "args": ["run", "vaultspec-mcp"],
                 }
             }
         }
         mcp_json.write_text(json.dumps(mcp_config, indent=2) + "\n", encoding="utf-8")
-    return [".mcp.json"]
+    return [(".mcp.json", "mcp")]
 
 
-def init_run(force: bool = False, provider: str = "all") -> None:
-    """Scaffold the .vaultspec/ and .vault/ directory structure."""
+def _validate_provider(provider: str) -> None:
+    """Validate that *provider* is a known provider name.
+
+    Raises:
+        ProviderError: If *provider* is not in :data:`VALID_PROVIDERS`.
+    """
+    if provider not in VALID_PROVIDERS:
+        raise ProviderError(
+            f"Unknown provider '{provider}'. "
+            f"Valid: {', '.join(sorted(VALID_PROVIDERS))}"
+        )
+
+
+def _validate_skip(skip: set[str] | None) -> set[str]:
+    """Validate and normalise a *skip* set.
+
+    Raises:
+        ProviderError: If any value in *skip* is not a valid component name.
+    """
+    if not skip:
+        return set()
+    # "all" is not a valid skip target  - you'd just not run the command.
+    allowed = VALID_PROVIDERS - {"all"}
+    bad = skip - allowed
+    if bad:
+        raise ProviderError(
+            f"Invalid --skip value(s): {', '.join(sorted(bad))}. "
+            f"Valid: {', '.join(sorted(allowed))}"
+        )
+    return skip
+
+
+def _filter_tools(tools: list[Tool], skip: set[str]) -> list[Tool]:
+    """Remove tools whose provider name is in *skip*."""
+    if not skip:
+        return tools
+    return [t for t in tools if t.value not in skip]
+
+
+def init_run(
+    force: bool = False, provider: str = "all", skip: set[str] | None = None
+) -> list[tuple[str, str]]:
+    """Scaffold the .vaultspec/ and .vault/ directory structure.
+
+    Args:
+        force: Override contents if already exists.
+        provider: Provider to install.
+        skip: Set of component names to skip (``core`` and/or provider names).
+
+    Returns:
+        A deduplicated list of ``(relative_path, label)`` tuples for all
+        created directories and files.
+    """
     from vaultspec_core.config import get_config, reset_config
     from vaultspec_core.config.workspace import resolve_workspace
     from vaultspec_core.core.types import init_paths
 
+    from .exceptions import ResourceExistsError
+
+    skip = skip or set()
+    skip_core = "core" in skip
+
     cfg = get_config()
-    fw_dir = _t.TARGET_DIR / cfg.framework_dir
+    target = _t.get_context().target_dir
+    fw_dir = target / cfg.framework_dir
 
-    if fw_dir.exists() and not force:
-        logger.error("Error: %s already exists. Use --force to overwrite.", fw_dir)
-        raise typer.Exit(code=1)
+    created: list[tuple[str, str]] = []
 
-    created = _scaffold_core(_t.TARGET_DIR)
+    if not skip_core:
+        if fw_dir.exists() and not force:
+            raise ResourceExistsError(
+                f"{fw_dir} already exists. Use --force to overwrite."
+            )
 
-    # Re-resolve workspace after writing framework.md stubs
+        created = _scaffold_core(target)
+
+        # Seed builtin content into .vaultspec/rules/
+        from vaultspec_core.builtins import seed_builtins
+
+        rules_dir = fw_dir / "rules"
+        seeded = seed_builtins(rules_dir, force=force)
+        for rel in seeded:
+            created.append((f".vaultspec/rules/{rel}", "builtin"))
+
+        # Snapshot builtins for revert support
+        from .revert import snapshot_builtins
+
+        snapshot_builtins(fw_dir)
+
+    # Re-resolve workspace after scaffolding
     reset_config()
-    layout = resolve_workspace(target_override=_t.TARGET_DIR)
+    layout = resolve_workspace(target_override=target)
     init_paths(layout)
 
     # Scaffold provider directories
-    tools = _PROVIDER_TO_TOOLS.get(provider, [])
+    tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
     for tool in tools:
-        created.extend(_scaffold_provider(_t.TARGET_DIR, tool))
+        created.extend(_scaffold_provider(target, tool))
 
-    created.extend(_scaffold_mcp_json(_t.TARGET_DIR))
+    created.extend(_scaffold_mcp_json(target))
 
     # Write provider manifest
     from .manifest import add_providers
 
     provider_names = [t.value for t in tools]
     if provider_names:
-        add_providers(_t.TARGET_DIR, provider_names)
+        add_providers(target, provider_names)
 
-    from vaultspec_core.console import get_console
+    # Deduplicate by relative path, preserving order
+    seen: dict[str, str] = {}
+    for rel, label in created:
+        seen.setdefault(rel, label)
 
-    console = get_console()
-    console.print("[bold]Initialized vaultspec-core structure:[/bold]")
-    for path in dict.fromkeys(created):
-        console.print(f"  {path}")
-    console.print(
-        f"Created [bold]{len(created)}[/bold] directories/files. "
-        "Run [bold]vaultspec-core sync[/bold] to sync."
-    )
+    return list(seen.items())
 
 
 def _ensure_tool_configs(path: Path) -> None:
     """Ensure TOOL_CONFIGS is populated, bootstrapping if needed.
 
-    On a fresh project where ``.vaultspec/`` doesn't exist yet, temporarily
-    creates the minimal structure so ``init_paths()`` can resolve the
-    workspace layout and populate TOOL_CONFIGS.  The temporary files are
-    cleaned up afterward.
+    On a fresh project where ``.vaultspec/`` doesn't exist yet, uses a
+    temporary directory as the workspace root so ``init_paths()`` can resolve
+    the layout and populate TOOL_CONFIGS without touching the real filesystem.
     """
+    import tempfile
+
     from vaultspec_core.config import reset_config
     from vaultspec_core.config.workspace import resolve_workspace
     from vaultspec_core.core.types import init_paths
 
-    if _t.TOOL_CONFIGS:
-        return
+    try:
+        if _t.get_context().tool_configs:
+            return
+    except LookupError:
+        pass
 
     fw_dir = path / ".vaultspec"
-    temp_scaffold = not fw_dir.exists()
-    fw_md = fw_dir / "rules" / "system" / "framework.md"
-
-    if temp_scaffold:
-        fw_md.parent.mkdir(parents=True, exist_ok=True)
-        fw_md.write_text("# placeholder", encoding="utf-8")
-
-    try:
+    if fw_dir.exists():
         reset_config()
         layout = resolve_workspace(target_override=path)
         init_paths(layout)
-    finally:
-        if temp_scaffold:
-            import shutil
+        return
 
-            shutil.rmtree(fw_dir, ignore_errors=True)
+    # Bootstrap in a temporary directory to avoid TOCTOU on the real path.
+    # Resolve workspace against the temp dir, then re-initialize with the
+    # real target so tool_config paths reference the actual workspace.
+    tmp = Path(tempfile.mkdtemp())
+    tmp_fw = tmp / ".vaultspec"
+    tmp_fw.mkdir(parents=True, exist_ok=True)
+
+    reset_config()
+    layout = resolve_workspace(target_override=tmp)
+    # Replace the temp target with the real path so tool_configs point correctly
+    from vaultspec_core.config.workspace import WorkspaceLayout
+
+    real_layout = WorkspaceLayout(
+        target_dir=path,
+        vault_dir=path / ".vault",
+        vaultspec_dir=path / ".vaultspec",
+        mode=layout.mode,
+        git=layout.git,
+    )
+    init_paths(real_layout)
 
 
 def install_run(
@@ -362,7 +354,9 @@ def install_run(
     provider: str = "all",
     upgrade: bool = False,
     dry_run: bool = False,
-) -> None:
+    force: bool = False,
+    skip: set[str] | None = None,
+) -> dict[str, Any]:
     """Deploy the vaultspec framework to a project directory.
 
     Args:
@@ -370,92 +364,157 @@ def install_run(
         provider: Provider to install (``all``, ``core``, ``claude``, etc.).
         upgrade: Re-sync builtin rules without re-scaffolding.
         dry_run: Preview the manifest of files that would be created.
+        force: Override contents if installation already exists.
+        skip: Set of component names to skip (``core`` and/or provider names).
+
+    Returns:
+        A dict describing the result:
+        - ``"action"``: ``"dry_run"``, ``"upgrade"``, or ``"install"``
+        - ``"items"``: list of ``(path, label)`` tuples (for dry_run)
+        - ``"seeded_count"``: number of re-seeded files (for upgrade)
+
+    Raises:
+        ProviderError: If *provider* is invalid.
+        ResourceExistsError: If already installed and *force*/*upgrade* not set.
     """
     from vaultspec_core.config import reset_config
     from vaultspec_core.config.workspace import WorkspaceError, resolve_workspace
-    from vaultspec_core.console import get_console
     from vaultspec_core.core.types import init_paths
 
-    if provider not in VALID_PROVIDERS:
-        logger.error(
-            "Unknown provider '%s'. Valid: %s",
-            provider,
-            ", ".join(sorted(VALID_PROVIDERS)),
-        )
-        raise typer.Exit(code=1)
+    from .exceptions import ResourceExistsError
+    from .guards import guard_dev_repo
 
-    console = get_console()
-    _t.TARGET_DIR = path
+    _validate_provider(provider)
+    skip = _validate_skip(skip)
+
+    guard_dev_repo(path)
+
+    # Bootstrap a minimal context so downstream code can read target_dir
+    _t.set_context(
+        _t.WorkspaceContext(
+            root_dir=path,
+            target_dir=path,
+            rules_src_dir=path,
+            skills_src_dir=path,
+            agents_src_dir=path,
+            system_src_dir=path,
+            templates_dir=path,
+            hooks_dir=path,
+        )
+    )
+
+    skip_core = "core" in skip
 
     if dry_run:
         _ensure_tool_configs(path)
 
-        manifest = _scaffold_core(path, dry_run=True)
-        tools = _PROVIDER_TO_TOOLS.get(provider, [])
+        manifest: list[tuple[str, str]] = []
+
+        if not skip_core:
+            manifest = _scaffold_core(path, dry_run=True)
+
+            # Include builtin files that would be seeded
+            from vaultspec_core.builtins import list_builtins
+
+            for builtin_rel in list_builtins():
+                manifest.append((f".vaultspec/rules/{builtin_rel}", "builtin"))
+
+        tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
         for tool in tools:
             manifest.extend(_scaffold_provider(path, tool, dry_run=True))
         manifest.extend(_scaffold_mcp_json(path, dry_run=True))
 
-        # Deduplicate preserving order
-        seen: dict[str, None] = {}
-        for item in manifest:
-            seen.setdefault(item, None)
+        # Deduplicate preserving order (by relative path)
+        seen: dict[str, str] = {}
+        for rel, label in manifest:
+            seen.setdefault(rel, label)
 
-        console.print("[bold]Would create:[/bold]")
-        for item in seen:
-            console.print(f"  {item}")
-        console.print(f"\n[bold]Dry run:[/bold] {len(seen)} items")
-        return
+        return {"action": "dry_run", "items": list(seen.items()), "path": path}
 
     if upgrade:
         try:
             layout = resolve_workspace(target_override=path)
             init_paths(layout)
         except WorkspaceError as e:
-            logger.error("Cannot upgrade: %s", e)
-            logger.error("Run 'vaultspec-core install %s' first.", path)
-            raise typer.Exit(code=1) from e
+            raise WorkspaceNotInitializedError(
+                f"Cannot upgrade: {e}",
+                hint=f"Run 'vaultspec-core install {path}' first.",
+            ) from e
 
-        console.print(f"[bold]Upgrading vaultspec framework at {path}[/bold]")
+        seeded: list[str] = []
+        if not skip_core:
+            # Re-seed builtins (force=True overwrites existing)
+            from vaultspec_core.builtins import seed_builtins
 
-        from vaultspec_core.spec_cli import _sync_provider
+            fw_dir = path / ".vaultspec"
+            seeded = seed_builtins(fw_dir / "rules", force=True)
 
-        sync_target = provider if provider not in ("all", "core") else "all"
-        _sync_provider(sync_target, force=True)
-        console.print("[bold green]Upgrade complete.[/bold green]")
-    else:
-        fw_dir = path / ".vaultspec"
-        if fw_dir.exists():
-            logger.error(
-                "vaultspec is already installed at %s. "
-                "Use --upgrade to update, or remove it first with "
-                "'vaultspec-core uninstall %s'.",
-                path,
-                path,
-            )
-            raise typer.Exit(code=1)
+            # Re-snapshot builtins for revert support
+            from .revert import snapshot_builtins
 
-        console.print(f"[bold]Installing vaultspec framework to {path}[/bold]")
-        init_run(force=False, provider=provider)
-
-        reset_config()
-        layout = resolve_workspace(target_override=path)
-        init_paths(layout)
-
-        from vaultspec_core.spec_cli import _sync_provider
+            snapshot_builtins(fw_dir)
 
         sync_target = provider if provider not in ("all", "core") else "all"
-        _sync_provider(sync_target)
-        console.print("[bold green]Installation complete.[/bold green]")
+        sync_provider(sync_target, force=True)
+        return {"action": "upgrade", "seeded_count": len(seeded), "path": path}
+
+    fw_dir = path / ".vaultspec"
+    if fw_dir.exists() and not force and not skip_core:
+        raise ResourceExistsError(
+            f"vaultspec is already installed at {path}. "
+            "Use --upgrade to update, --force to override, or remove it "
+            f"first with 'vaultspec-core uninstall {path}'."
+        )
+
+    created = init_run(force=force, provider=provider, skip=skip)
+
+    reset_config()
+    layout = resolve_workspace(target_override=path)
+    init_paths(layout)
+
+    sync_target = provider if provider not in ("all", "core") else "all"
+    sync_provider(sync_target)
+
+    # Count actual source resources (what the user authored)
+    from .agents import collect_agents
+    from .rules import collect_rules
+    from .skills import collect_skills
+
+    source_counts = {
+        "rules": len(collect_rules()),
+        "skills": len(collect_skills()),
+        "agents": len(collect_agents()),
+    }
+
+    tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
+    provider_names = [t.value for t in tools]
+    has_mcp = (path / ".mcp.json").exists()
+
+    return {
+        "action": "install",
+        "items": created,
+        "source_counts": source_counts,
+        "providers": provider_names,
+        "has_mcp": has_mcp,
+        "path": path,
+    }
 
 
 def _collect_provider_artifacts(
     path: Path, tool: Tool
 ) -> tuple[list[Path], list[Path]]:
-    """Return (directories, files) managed by a single provider."""
+    """Return ``(directories, files)`` managed by a single provider.
+
+    Args:
+        path: Workspace root directory.
+        tool: :class:`~vaultspec_core.core.enums.Tool` to inspect.
+
+    Returns:
+        A two-tuple of ``(directory_paths, file_paths)`` owned by *tool*.
+    """
     from .enums import DirName, FileName
 
-    cfg = _t.TOOL_CONFIGS.get(tool)
+    cfg = _t.get_context().tool_configs.get(tool)
     dirs: list[Path] = []
     files: list[Path] = []
 
@@ -464,7 +523,7 @@ def _collect_provider_artifacts(
         files.append(path / FileName.CLAUDE.value)
     elif tool == Tool.GEMINI:
         dirs.append(path / DirName.GEMINI.value)
-        # Root GEMINI.md is shared with Antigravity — handled below
+        # Root GEMINI.md is shared with Antigravity  - handled below
     elif tool == Tool.ANTIGRAVITY:
         dirs.append(path / DirName.ANTIGRAVITY.value)
         files.append(path / FileName.GEMINI.value)
@@ -483,7 +542,9 @@ def uninstall_run(
     provider: str = "all",
     keep_vault: bool = False,
     dry_run: bool = False,
-) -> None:
+    force: bool = False,
+    skip: set[str] | None = None,
+) -> dict[str, Any]:
     """Remove the vaultspec framework from a project directory.
 
     Args:
@@ -491,29 +552,90 @@ def uninstall_run(
         provider: Provider to uninstall (``all``, ``core``, ``<provider>``).
         keep_vault: Preserve ``.vault/`` documentation directory.
         dry_run: Preview what would be removed without deleting.
+        force: Required to execute. Uninstall is destructive.
+        skip: Set of component names to skip (``core`` and/or provider names).
+
+    Returns:
+        A dict describing the result:
+        - ``"action"``: ``"dry_run"`` or ``"uninstall"``
+        - ``"removed"``: list of ``(path, label)`` tuples
+
+    Raises:
+        ProviderError: If *provider* is invalid or *force* not set.
     """
     import shutil
 
-    from vaultspec_core.console import get_console
+    from .guards import guard_dev_repo
+    from .manifest import providers_sharing_dir, providers_sharing_file, remove_provider
 
-    from .manifest import providers_sharing_dir, remove_provider
+    guard_dev_repo(path)
 
-    _t.TARGET_DIR = path
+    # Validate inputs before any state mutation
+    _validate_provider(provider)
+    skip = _validate_skip(skip)
+
+    # Safety gate: require --force for destructive operations
+    if not force and not dry_run:
+        raise ProviderError(
+            "Uninstall is destructive. Pass --force to confirm, "
+            "or use --dry-run to preview."
+        )
+
+    # Bootstrap a minimal context so _ensure_tool_configs can proceed
+    _t.set_context(
+        _t.WorkspaceContext(
+            root_dir=path,
+            target_dir=path,
+            rules_src_dir=path,
+            skills_src_dir=path,
+            agents_src_dir=path,
+            system_src_dir=path,
+            templates_dir=path,
+            hooks_dir=path,
+        )
+    )
     _ensure_tool_configs(path)
 
-    if provider not in VALID_PROVIDERS:
-        logger.error(
-            "Unknown provider '%s'. Valid: %s",
-            provider,
-            ", ".join(sorted(VALID_PROVIDERS)),
-        )
-        raise typer.Exit(code=1)
+    # Uninstalling "core" cascades to all providers
+    effective_provider = "all" if provider == "core" else provider
 
-    console = get_console()
-    removed: list[str] = []
+    removed: list[tuple[str, str]] = []  # (path, label)
 
-    if provider == "all":
-        # Remove everything
+    # Map directory names → component owners (for skip filtering).
+    # .agents/ is shared by antigravity, gemini, and codex (all place
+    # skills there via init_paths), so it must be preserved when any of
+    # its owners is skipped.
+    _dir_owners: dict[str, list[str]] = {
+        ".vaultspec": ["core"],
+        ".vault": ["vault"],
+        ".claude": ["claude"],
+        ".gemini": ["gemini"],
+        ".agents": ["antigravity", "gemini", "codex"],
+        ".codex": ["codex"],
+    }
+    dir_labels: dict[str, str] = {
+        ".vaultspec": "core",
+        ".vault": "vault",
+        ".claude": "claude",
+        ".gemini": "gemini",
+        ".agents": "antigravity",
+        ".codex": "codex",
+    }
+    file_labels: dict[str, str] = {
+        "CLAUDE.md": "claude (config)",
+        "GEMINI.md": "gemini (config)",
+        "AGENTS.md": "codex (config)",
+        ".mcp.json": "mcp",
+    }
+    # Map file names → owning component for skip checks
+    _file_owner: dict[str, str] = {
+        "CLAUDE.md": "claude",
+        "GEMINI.md": "gemini",
+        "AGENTS.md": "codex",
+    }
+
+    if effective_provider == "all":
+        # Remove everything (respecting skip)
         managed_dirs = [
             path / ".vaultspec",
             path / ".claude",
@@ -532,36 +654,32 @@ def uninstall_run(
         ]
 
         for d in managed_dirs:
+            owners = _dir_owners.get(d.name, [])
+            # Preserve directory if any of its owners is in the skip set
+            if owners and any(o in skip for o in owners):
+                skipped = [o for o in owners if o in skip]
+                logger.info("Skipping %s (--skip %s)", d.name, ", ".join(skipped))
+                continue
+            owner = dir_labels.get(d.name, "")
             if d.exists():
-                rel = str(d.relative_to(path))
-                if dry_run:
-                    console.print(f"  [dim]would remove[/dim] {rel}/")
-                else:
+                if not dry_run:
                     shutil.rmtree(d)
-                removed.append(f"{rel}/")
+                removed.append((str(d).replace("\\", "/") + "/", owner))
 
         for f in managed_files:
+            owner = _file_owner.get(f.name, "")
+            if owner in skip:
+                logger.info("Skipping %s (--skip %s)", f.name, owner)
+                continue
             if f.exists():
-                rel = str(f.relative_to(path))
-                if dry_run:
-                    console.print(f"  [dim]would remove[/dim] {rel}")
-                else:
+                if not dry_run:
                     f.unlink()
-                removed.append(rel)
-
-    elif provider == "core":
-        d = path / ".vaultspec"
-        if d.exists():
-            rel = str(d.relative_to(path))
-            if dry_run:
-                console.print(f"  [dim]would remove[/dim] {rel}/")
-            else:
-                shutil.rmtree(d)
-            removed.append(f"{rel}/")
+                label = file_labels.get(f.name, "")
+                removed.append((str(f).replace("\\", "/"), label))
 
     else:
         # Per-provider uninstall with shared directory protection
-        tools = _PROVIDER_TO_TOOLS.get(provider, [])
+        tools = _filter_tools(_PROVIDER_TO_TOOLS.get(effective_provider, []), skip)
         for tool in tools:
             dirs, files = _collect_provider_artifacts(path, tool)
 
@@ -569,7 +687,7 @@ def uninstall_run(
                 if not d.exists():
                     continue
                 # Check if another installed provider still needs this dir
-                sharing = providers_sharing_dir(path, d, exclude=provider)
+                sharing = providers_sharing_dir(path, d, exclude=effective_provider)
                 if sharing:
                     logger.info(
                         "Preserving %s (still used by: %s)",
@@ -578,377 +696,252 @@ def uninstall_run(
                     )
                     continue
 
-                rel = str(d.relative_to(path))
-                if dry_run:
-                    console.print(f"  [dim]would remove[/dim] {rel}/")
-                else:
+                if not dry_run:
                     shutil.rmtree(d)
-                removed.append(f"{rel}/")
+                removed.append((str(d).replace("\\", "/") + "/", tool.value))
 
             for f in files:
                 if not f.exists():
                     continue
-                rel = str(f.relative_to(path))
-                if dry_run:
-                    console.print(f"  [dim]would remove[/dim] {rel}")
-                else:
+                # Check if another installed provider still needs this file
+                sharing = providers_sharing_file(path, f, exclude=effective_provider)
+                if sharing:
+                    logger.info(
+                        "Preserving %s (still used by: %s)",
+                        f.relative_to(path),
+                        ", ".join(sorted(sharing)),
+                    )
+                    continue
+                if not dry_run:
                     f.unlink()
-                removed.append(rel)
+                removed.append((str(f).replace("\\", "/"), f"{tool.value} (config)"))
 
         # Update manifest
         if not dry_run:
             for tool in tools:
                 remove_provider(path, tool.value)
 
-    if dry_run:
-        console.print(f"\n[bold]Dry run:[/bold] would remove {len(removed)} items")
-    elif removed:
-        console.print("[bold]Removed vaultspec framework:[/bold]")
-        for item in removed:
-            console.print(f"  {item}")
-        console.print(f"Removed [bold]{len(removed)}[/bold] items.")
-        if keep_vault:
-            console.print(
-                "[dim].vault/ preserved (use without --keep-vault to remove)[/dim]"
-            )
-    else:
-        console.print("Nothing to remove — vaultspec is not installed at this path.")
-
-
-def readiness_run(json_output: bool = False) -> None:
-    """Assess codebase governance readiness.
-
-    Scores documentation, framework structure, rules and governance,
-    and test infrastructure on a 1-5 scale each.
-    """
-
-    from vaultspec_core.config import get_config
-
-    cfg = get_config()
-    fw_dir = _t.TARGET_DIR / cfg.framework_dir
-    vault_dir = _t.TARGET_DIR / ".vault"
-
-    # Dimension 1: Documentation (.vault/ health)
-    doc_score = 1
-    doc_detail = "No .vault/ directory"
-    if vault_dir.exists():
-        doc_types = ["adr", "plan", "research", "reference", "exec"]
-        all_docs = list(vault_dir.rglob("*.md"))
-        doc_count = len(all_docs)
-        present_types = {
-            dt
-            for dt in doc_types
-            if (vault_dir / dt).exists() and any((vault_dir / dt).glob("*.md"))
-        }
-
-        if doc_count < 5:
-            doc_score = 2
-            doc_detail = f"{doc_count} docs, needs more coverage"
-        elif doc_count < 20:
-            doc_score = 3
-            missing = set(doc_types) - present_types
-            if missing:
-                doc_detail = f"{doc_count} docs, missing: {', '.join(missing)}"
-            else:
-                doc_detail = f"{doc_count} docs, all types present"
-        elif doc_count < 50:
-            doc_score = 4
-            doc_detail = f"{doc_count} docs, all types present"
-        else:
-            doc_score = 5
-            doc_detail = f"{doc_count} docs, comprehensive coverage"
-
-    # Dimension 2: Framework (.vaultspec/ structure)
-    fw_score = 1
-    fw_detail = "No .vaultspec/ directory"
-    if fw_dir.exists():
-        has_skills = (fw_dir / "rules" / "skills").exists() and any(
-            (fw_dir / "rules" / "skills").glob("*.md")
-        )
-        has_rules = (fw_dir / "rules" / "rules").exists() and any(
-            (fw_dir / "rules" / "rules").glob("*.md")
-        )
-        has_system = (fw_dir / "rules" / "system").exists()
-        has_templates = (fw_dir / "rules" / "templates").exists()
-
-        if any([has_skills, has_rules]):
-            fw_score = 3
-            parts = []
-            if has_skills:
-                parts.append("skills")
-            if has_rules:
-                parts.append("rules")
-            fw_detail = f"Has {', '.join(parts)}"
-        else:
-            fw_score = 2
-            fw_detail = ".vaultspec/ exists but minimal content"
-
-        if has_skills and has_rules and has_system:
-            fw_score = 4
-            fw_detail = "Complete structure with system/"
-
-        if fw_score == 4 and has_templates:
-            custom_count = 0
-            for d in [
-                fw_dir / "rules" / "skills",
-                fw_dir / "rules" / "rules",
-            ]:
-                if d.exists():
-                    custom_count += len(
-                        [
-                            f
-                            for f in d.glob("*.md")
-                            if not f.name.endswith(".builtin.md")
-                        ]
-                    )
-            if custom_count > 0:
-                fw_score = 5
-                fw_detail = f"Complete + {custom_count} custom resources"
-
-    # Dimension 3: Rules & Governance
-    rules_score = 1
-    rules_detail = "No rules defined"
-    if (fw_dir / "rules" / "rules").exists():
-        all_rules = list((fw_dir / "rules" / "rules").glob("*.md"))
-        builtin = [r for r in all_rules if r.name.endswith(".builtin.md")]
-        custom = [r for r in all_rules if not r.name.endswith(".builtin.md")]
-        total_rules = len(all_rules)
-
-        if total_rules == 0:
-            rules_score = 1
-            rules_detail = "No rules defined"
-        elif total_rules <= 2:
-            rules_score = 2
-            rules_detail = f"{total_rules} rule(s)"
-        elif len(custom) == 0:
-            rules_score = 3
-            rules_detail = f"{total_rules} builtin rules"
-        elif len(custom) > 0:
-            rules_score = 4
-            rules_detail = f"{len(builtin)} builtin + {len(custom)} custom"
-
-        if rules_score >= 4:
-            synced_count = 0
-            for cfg_item in _t.TOOL_CONFIGS.values():
-                if (
-                    cfg_item.rules_dir
-                    and cfg_item.rules_dir.exists()
-                    and any(cfg_item.rules_dir.glob("*.md"))
-                ):
-                    synced_count += 1
-            if synced_count >= 2:
-                rules_score = 5
-                rules_detail += ", synced to all tools"
-
-    # Dimension 4: Test Infrastructure
-    test_score = 1
-    test_detail = "No test files found"
-    test_dirs = [
-        _t.TARGET_DIR / "tests",
-        _t.TARGET_DIR / "src",
-    ]
-    test_files = []
-    for test_dir in test_dirs:
-        if test_dir.exists():
-            test_files.extend(list(test_dir.rglob("test_*.py")))
-
-    if test_files:
-        test_score = 2
-        test_detail = f"{len(test_files)} test files"
-
-        has_markers = False
-        for tf in test_files[:10]:
-            content = tf.read_text(encoding="utf-8")
-            if "@pytest.mark." in content:
-                has_markers = True
-                break
-
-        if has_markers:
-            test_score = 3
-            test_detail = f"{len(test_files)} tests with pytest markers"
-
-        conftest_files = []
-        for test_dir in test_dirs:
-            if test_dir.exists():
-                conftest_files.extend(list(test_dir.rglob("conftest.py")))
-        if conftest_files:
-            test_score = 4
-            test_detail = f"{len(test_files)} tests, {len(conftest_files)} fixtures"
-
-        ci_files = [
-            _t.TARGET_DIR / ".github" / "workflows",
-        ]
-        has_ci = any(d.exists() for d in ci_files)
-        if has_ci:
-            test_score = 5
-            test_detail = f"{len(test_files)} tests + CI"
-
-    # Build results
-    dimensions: dict[str, dict[str, int | str]] = {
-        "documentation": {"score": doc_score, "max": 5, "detail": doc_detail},
-        "framework": {"score": fw_score, "max": 5, "detail": fw_detail},
-        "rules_governance": {
-            "score": rules_score,
-            "max": 5,
-            "detail": rules_detail,
-        },
-        "test_infrastructure": {
-            "score": test_score,
-            "max": 5,
-            "detail": test_detail,
-        },
+    action = "dry_run" if dry_run else "uninstall"
+    return {
+        "action": action,
+        "removed": removed,
+        "keep_vault": keep_vault,
+        "path": path,
     }
 
-    total_score = sum(int(d["score"]) for d in dimensions.values())
-    max_total = sum(int(d["max"]) for d in dimensions.values())
-    overall = total_score / max_total * 5 if max_total > 0 else 0
 
-    recommendations = []
-    if doc_score < 4:
-        recommendations.append(
-            "Add more documentation across ADRs, plans, research, references"
-        )
-    if fw_score < 4:
-        recommendations.append("Complete .vaultspec/ structure with rules/system/")
-    if rules_score < 4:
-        recommendations.append("Create custom rules for project conventions")
-    if rules_score == 4:
-        recommendations.append("Run 'vaultspec-core sync' to sync rules to all tools")
-    if test_score < 5:
-        recommendations.append("Add CI pipeline for automated testing")
+def hooks_list_data() -> dict[str, Any]:
+    """Return structured data about all defined hooks.
 
-    if json_output:
-        import json
-
-        result = {
-            "dimensions": dimensions,
-            "overall": round(overall, 1),
-            "total": total_score,
-            "max_total": max_total,
-            "recommendations": recommendations,
-        }
-        typer.echo(json.dumps(result))
-    else:
-        from rich.rule import Rule
-        from rich.table import Table
-
-        from vaultspec_core.console import get_console
-
-        console = get_console()
-
-        def _bar(score: int, max_score: int = 5) -> str:
-            return (
-                "[green]"
-                + "█" * score
-                + "[/green]"
-                + "[dim]"
-                + "░" * (max_score - score)
-                + "[/dim]"
-            )
-
-        console.print("[bold]vaultspec-core Readiness Assessment[/bold]")
-        console.print(Rule())
-        console.print()
-
-        dim_table = Table(box=None, show_header=False, show_edge=False, padding=(0, 1))
-        dim_table.add_column("Label", width=22)
-        dim_table.add_column("Bar")
-        dim_table.add_column("Score", justify="right", width=5)
-        dim_table.add_column("Detail", style="dim")
-
-        labels = [
-            ("Documentation", "documentation"),
-            ("Framework", "framework"),
-            ("Rules & Governance", "rules_governance"),
-            ("Test Infrastructure", "test_infrastructure"),
-        ]
-        for label, key in labels:
-            dim = dimensions[key]
-            bar = _bar(int(dim["score"]), int(dim["max"]))
-            score_str = f"{dim['score']}/{dim['max']}"
-            dim_table.add_row(label, bar, score_str, str(dim["detail"]))
-
-        console.print(dim_table)
-        console.print()
-        console.print(
-            f"[bold]Overall:[/bold] {overall:.1f}/5 ({total_score}/{max_total})"
-        )
-
-        if recommendations:
-            console.print()
-            console.print("[bold]Recommendations:[/bold]")
-            for rec in recommendations:
-                console.print(f"  [dim]-[/dim] {rec}")
-
-
-def hooks_list() -> None:
-    """List all defined hooks."""
-    from rich import box
-    from rich.table import Table
-
-    from vaultspec_core.console import get_console
+    Returns:
+        A dict with:
+        - ``"hooks"``: list of dicts with ``"name"``, ``"enabled"``,
+          ``"event"``, ``"actions"`` keys.
+        - ``"supported_events"``: sorted list of supported event names.
+        - ``"hooks_dir"``: relative path to hooks directory.
+    """
     from vaultspec_core.hooks import SUPPORTED_EVENTS, load_hooks
 
-    console = get_console()
-    hooks = load_hooks(_t.HOOKS_DIR)
-    if not hooks:
-        rel = _t.HOOKS_DIR.relative_to(_t.TARGET_DIR)
-        console.print("No hooks defined.")
-        console.print(f"  Add [dim].yaml[/dim] files to [bold]{rel}/[/bold]")
-        console.print(
-            "\n[dim]Supported events:[/dim] " + ", ".join(sorted(SUPPORTED_EVENTS))
-        )
-        return
-
-    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
-    table.add_column("Name", no_wrap=True)
-    table.add_column("Status")
-    table.add_column("Event")
-    table.add_column("Actions")
-
+    ctx = _t.get_context()
+    hooks = load_hooks(ctx.hooks_dir)
+    hooks_data = []
     for hook in hooks:
-        if hook.enabled:
-            status = "[bold green]enabled[/bold green]"
-        else:
-            status = "[dim]disabled[/dim]"
         actions = ", ".join(a.command for a in hook.actions if a.action_type == "shell")
-        table.add_row(hook.name, status, hook.event, actions)
+        hooks_data.append(
+            {
+                "name": hook.name,
+                "enabled": hook.enabled,
+                "event": hook.event,
+                "actions": actions,
+            }
+        )
 
-    console.print(table)
+    try:
+        rel = str(ctx.hooks_dir.relative_to(ctx.target_dir))
+    except ValueError:
+        # HOOKS_DIR may live in the CWD workspace, not under TARGET_DIR,
+        # when --target points to a separate directory.
+        rel = str(ctx.hooks_dir)
+    return {
+        "hooks": hooks_data,
+        "supported_events": sorted(SUPPORTED_EVENTS),
+        "hooks_dir": rel,
+    }
 
 
-def hooks_run(event: str, path: str | None = None) -> None:
-    """Trigger hooks for an event."""
+def hooks_run(event: str, path: str | None = None) -> list[dict[str, Any]]:
+    """Trigger hooks for an event.
+
+    Returns:
+        A list of result dicts with ``"hook_name"``, ``"action_type"``,
+        ``"success"``, ``"output"``, ``"error"`` keys.
+
+    Raises:
+        ProviderError: If the event is not in SUPPORTED_EVENTS.
+    """
     from vaultspec_core.hooks import SUPPORTED_EVENTS, load_hooks, trigger
 
     if event not in SUPPORTED_EVENTS:
-        logger.error("Unknown event: %s", event)
-        logger.error("Supported: %s", ", ".join(sorted(SUPPORTED_EVENTS)))
-        raise typer.Exit(code=1)
+        raise ProviderError(
+            f"Unknown event: {event}. Supported: {', '.join(sorted(SUPPORTED_EVENTS))}"
+        )
 
-    hooks = load_hooks(_t.HOOKS_DIR)
+    ws_ctx = _t.get_context()
+    hooks = load_hooks(ws_ctx.hooks_dir)
     matching = [h for h in hooks if h.event == event and h.enabled]
     if not matching:
         logger.info("No enabled hooks for event: %s", event)
-        return
+        return []
 
-    ctx = {"root": str(_t.TARGET_DIR), "event": event}
+    ctx = {"root": str(ws_ctx.target_dir), "event": event}
     if path:
         ctx["path"] = path
 
-    from vaultspec_core.console import get_console
-
-    console = get_console()
     logger.info("Triggering %d hook(s) for '%s'...", len(matching), event)
     results = trigger(hooks, event, ctx)
-    for r in results:
-        if r.success:
-            icon = "[bold green]OK[/bold green]"
-        else:
-            icon = "[bold red]FAIL[/bold red]"
-        console.print(f"  {r.hook_name} ({r.action_type}): {icon}")
-        if r.output:
-            for line in r.output.splitlines()[:5]:
-                console.print(f"    {line}")
-        if r.error:
-            console.print(f"    [red]error:[/red] {r.error}")
+    return [
+        {
+            "hook_name": r.hook_name,
+            "action_type": r.action_type,
+            "success": r.success,
+            "output": r.output,
+            "error": r.error,
+        }
+        for r in results
+    ]
+
+
+# Valid sync provider targets exposed to the CLI.
+SYNC_PROVIDERS = {"all", "claude", "gemini", "antigravity", "codex"}
+
+
+def sync_provider(
+    provider: str,
+    *,
+    dry_run: bool = False,
+    force: bool = False,
+    skip: set[str] | None = None,
+) -> list[_t.SyncResult]:
+    """Sync resources for a single provider target.
+
+    ``provider`` must be one of :data:`SYNC_PROVIDERS`.  The special value
+    ``"all"`` syncs every provider and fires post-sync hooks.
+
+    When *force* is ``True``, stale destination files are pruned and
+    user-authored system/config files are overwritten.  When ``False``
+    (the default), the sync is additive-only and any divergences are
+    reported as warnings on the returned :class:`SyncResult` objects.
+
+    Args:
+        provider: Provider target to sync.
+        dry_run: Preview changes without writing.
+        force: Prune stale files and overwrite user-authored content.
+        skip: Set of provider names to exclude from the sync.
+
+    Returns:
+        A list of :class:`SyncResult` objects from each sync pass.
+
+    Raises:
+        ProviderError: If *provider* is invalid.
+        WorkspaceNotInitializedError: If ``.vaultspec/`` does not exist.
+        ProviderNotInstalledError: If the specified provider is not installed.
+    """
+    if provider not in SYNC_PROVIDERS:
+        raise ProviderError(
+            f"Unknown sync target '{provider}'. "
+            f"Valid: {', '.join(sorted(SYNC_PROVIDERS))}"
+        )
+
+    skip = _validate_skip(skip)
+
+    from .agents import agents_sync
+    from .config_gen import config_sync
+    from .guards import guard_dev_repo
+    from .rules import rules_sync
+    from .skills import skills_sync
+    from .system import system_sync
+
+    ctx = _t.get_context()
+    guard_dev_repo(ctx.target_dir)
+
+    def _run_all_syncs() -> list[_t.SyncResult]:
+        return [
+            rules_sync(prune=force, dry_run=dry_run),
+            skills_sync(prune=force, dry_run=dry_run),
+            agents_sync(prune=force, dry_run=dry_run),
+            system_sync(dry_run=dry_run, force=force),
+            config_sync(dry_run=dry_run, force=force),
+        ]
+
+    # Guard: refuse to sync if vaultspec isn't installed at the target
+    vaultspec_dir = ctx.target_dir / ".vaultspec"
+    if not vaultspec_dir.exists():
+        raise WorkspaceNotInitializedError(
+            f"No .vaultspec/ found at {ctx.target_dir}.",
+            hint=f"Run 'vaultspec-core install {ctx.target_dir}' first.",
+        )
+
+    if provider == "all":
+        # When skipping providers, narrow tool_configs in a copied context
+        skipped_tools = {Tool(name) for name in skip if name in {t.value for t in Tool}}
+
+        def _sync_all_with_configs(
+            narrowed_configs: dict[Tool, _t.ToolConfig] | None,
+        ) -> list[_t.SyncResult]:
+            if narrowed_configs is not None:
+                _t.set_context(replace(ctx, tool_configs=narrowed_configs))
+            logger.info("Syncing all resources...")
+            results = _run_all_syncs()
+            if not dry_run:
+                from vaultspec_core.hooks import fire_hooks
+
+                fire_hooks(
+                    "config.synced",
+                    {"root": str(ctx.target_dir), "event": "config.synced"},
+                )
+                logger.info("Done.")
+            return results
+
+        narrowed_configs: dict[Tool, _t.ToolConfig] | None = None
+        if skipped_tools:
+            narrowed_configs = {
+                k: v for k, v in ctx.tool_configs.items() if k not in skipped_tools
+            }
+
+        copied = contextvars.copy_context()
+        return copied.run(_sync_all_with_configs, narrowed_configs)
+
+    # Validate provider is installed
+    from .manifest import read_manifest
+
+    installed = read_manifest(ctx.target_dir)
+    if installed and provider not in installed:
+        raise ProviderNotInstalledError(
+            f"Provider '{provider}' is not installed.",
+            hint=f"Run 'vaultspec-core install . {provider}' first.",
+        )
+
+    # Per-provider sync: filter tool_configs to only the requested tool.
+    requested: set[Tool] = set()
+    if provider == "claude":
+        requested = {Tool.CLAUDE}
+    elif provider == "gemini":
+        requested = {Tool.GEMINI}
+    elif provider == "antigravity":
+        requested = {Tool.ANTIGRAVITY}
+    elif provider == "codex":
+        requested = {Tool.CODEX}
+
+    def _sync_single_provider(
+        provider_configs: dict[Tool, _t.ToolConfig],
+    ) -> list[_t.SyncResult]:
+        _t.set_context(replace(ctx, tool_configs=provider_configs))
+        logger.info("Syncing provider: %s ...", provider)
+        results = _run_all_syncs()
+        if not dry_run:
+            logger.info("Done.")
+        return results
+
+    narrowed = {k: v for k, v in ctx.tool_configs.items() if k in requested}
+    copied = contextvars.copy_context()
+    return copied.run(_sync_single_provider, narrowed)

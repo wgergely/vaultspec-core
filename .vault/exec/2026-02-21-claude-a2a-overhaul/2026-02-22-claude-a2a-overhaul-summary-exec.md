@@ -1,14 +1,15 @@
 ---
 tags:
-  - "#exec"
-  - "#claude-a2a-overhaul"
-date: "2026-02-22"
+  - '#exec'
+  - '#claude-a2a-overhaul'
+date: '2026-02-22'
 related:
-  - "[[2026-02-21-claude-a2a-overhaul-impl-plan]]"
-  - "[[2026-02-21-claude-a2a-overhaul-adr]]"
-  - "[[2026-02-21-claude-a2a-overhaul-research]]"
-  - "[[2026-02-22-claude-team-management-plan]]"
+  - '[[2026-02-21-claude-a2a-overhaul-impl-plan]]'
+  - '[[2026-02-21-claude-a2a-overhaul-adr]]'
+  - '[[2026-02-21-claude-a2a-overhaul-research]]'
+  - '[[2026-02-22-claude-team-management-plan]]'
 ---
+
 # `claude-a2a-overhaul` implementation summary
 
 All five phases complete. Claude is now a viable A2A team member with reliable
@@ -34,13 +35,13 @@ test coverage.
 
 ## Phase breakdown
 
-| Phase | Scope | Tests | Status |
-|-------|-------|-------|--------|
-| 1 | SDK fix + executor hardening | 13/13 | Complete |
-| 2 | team_tools.py MCP module | 24/24 | Complete |
-| 3 | Process spawning | 3/3 | Complete |
-| 4 | Unified server wiring | 1/1 (updated) | Complete |
-| 5 | Integration testing | 3/3 | Complete |
+| Phase | Scope                        | Tests         | Status   |
+| ----- | ---------------------------- | ------------- | -------- |
+| 1     | SDK fix + executor hardening | 13/13         | Complete |
+| 2     | team_tools.py MCP module     | 24/24         | Complete |
+| 3     | Process spawning             | 3/3           | Complete |
+| 4     | Unified server wiring        | 1/1 (updated) | Complete |
+| 5     | Integration testing          | 3/3           | Complete |
 
 ## Tests
 
@@ -55,7 +56,9 @@ test coverage.
 - **Gap 1 (executor reliability)**: Rate limit retry with exponential backoff,
   session resume via `context_id` → `session_id` mapping, non-destructive cancel
   preserving sessions, streaming progress events.
+
 - **Gap 2 (team tools)**: 8 MCP tools wrapping `TeamCoordinator` with session
   persistence in `.vault/logs/teams/`.
+
 - **Gap 3 (process lifecycle)**: `spawn_agent()` using `asyncio.create_subprocess_exec`
   with `sys.executable`, health check polling, clean shutdown in `dissolve_team()`.

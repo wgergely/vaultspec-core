@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from .enums import Tool
 
@@ -24,9 +25,14 @@ def _manifest_path(target: Path) -> Path:
 
 
 def read_manifest(target: Path) -> set[str]:
-    """Read the set of installed provider names from the manifest.
+    """Read installed provider names from ``.vaultspec/providers.json``.
 
-    Returns an empty set if the manifest does not exist or is malformed.
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        Set of installed provider name strings (e.g. ``{"claude", "gemini"}``),
+        or an empty set if the manifest is absent or malformed.
     """
     path = _manifest_path(target)
     if not path.exists():
@@ -40,7 +46,12 @@ def read_manifest(target: Path) -> set[str]:
 
 
 def write_manifest(target: Path, providers: set[str]) -> None:
-    """Write the provider manifest with the given set of provider names."""
+    """Persist *providers* to ``.vaultspec/providers.json``.
+
+    Args:
+        target: Workspace root directory.
+        providers: Set of provider name strings to record as installed.
+    """
     path = _manifest_path(target)
     path.parent.mkdir(parents=True, exist_ok=True)
     data = {
@@ -51,7 +62,15 @@ def write_manifest(target: Path, providers: set[str]) -> None:
 
 
 def add_providers(target: Path, names: list[str]) -> set[str]:
-    """Add providers to the manifest and return the updated set."""
+    """Add *names* to the manifest and return the updated provider set.
+
+    Args:
+        target: Workspace root directory.
+        names: Provider names to add (e.g. ``["claude", "gemini"]``).
+
+    Returns:
+        Updated set of all installed provider names.
+    """
     current = read_manifest(target)
     current.update(names)
     write_manifest(target, current)
@@ -59,11 +78,48 @@ def add_providers(target: Path, names: list[str]) -> set[str]:
 
 
 def remove_provider(target: Path, name: str) -> set[str]:
-    """Remove a provider from the manifest and return the remaining set."""
+    """Remove *name* from the manifest and return the remaining provider set.
+
+    Args:
+        target: Workspace root directory.
+        name: Provider name to remove.
+
+    Returns:
+        Updated set of remaining installed provider names.
+    """
     current = read_manifest(target)
     current.discard(name)
     write_manifest(target, current)
     return current
+
+
+def providers_sharing_file(
+    target: Path, filepath: Path, exclude: str | None = None
+) -> set[str]:
+    """Return installed providers whose config files overlap with *filepath*.
+
+    Checks each installed provider's ``ToolConfig`` to see if any of its
+    config files match *filepath*.  The *exclude* provider (typically the
+    one being uninstalled) is omitted from the result.
+    """
+    from . import types as _t
+
+    installed = read_manifest(target)
+    if exclude:
+        installed.discard(exclude)
+
+    sharing: set[str] = set()
+    for tool in Tool:
+        if tool.value not in installed:
+            continue
+        cfg = _t.get_context().tool_configs.get(tool)
+        if cfg is None:
+            continue
+        for f in (cfg.config_file, cfg.rule_ref_config_file, cfg.native_config_file):
+            if f is not None and f == filepath:
+                sharing.add(tool.value)
+                break
+    return sharing
 
 
 def providers_sharing_dir(
@@ -86,7 +142,7 @@ def providers_sharing_dir(
     for tool in Tool:
         if tool.value not in installed:
             continue
-        cfg = _t.TOOL_CONFIGS.get(tool)
+        cfg = _t.get_context().tool_configs.get(tool)
         if cfg is None:
             continue
         for d in (cfg.rules_dir, cfg.skills_dir, cfg.agents_dir):
@@ -94,6 +150,20 @@ def providers_sharing_dir(
                 sharing.add(tool.value)
                 break
     return sharing
+
+
+def installed_tool_configs() -> dict[Tool, Any]:
+    """Return TOOL_CONFIGS filtered to only installed providers.
+
+    Returns an empty dict when no manifest exists (framework not installed).
+    """
+    from . import types as _t
+
+    ctx = _t.get_context()
+    installed = read_manifest(ctx.target_dir)
+    if not installed:
+        return {}
+    return {k: v for k, v in ctx.tool_configs.items() if v.name in installed}
 
 
 def _is_parent(parent: Path, child: Path) -> bool:

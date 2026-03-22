@@ -1,16 +1,17 @@
 ---
 tags:
-  - "#research"
-  - "#protocol"
-date: "2026-02-07"
+  - '#research'
+  - '#protocol'
+date: '2026-02-07'
 ---
+
 # Protocol Review: ACP vs A2A
 
 **Date:** 2026-02-07
 **Status:** Research / Ideation
 **Scope:** Evaluate whether the current `acp_dispatch.py` architecture correctly uses ACP, and how A2A contrasts.
 
----
+______________________________________________________________________
 
 ## Protocol Summaries
 
@@ -51,7 +52,7 @@ date: "2026-02-07"
 
 **Design intent:** Enable autonomous agents built on different frameworks by different organizations to discover, negotiate, and collaborate — without exposing internal state or tool implementations.
 
----
+______________________________________________________________________
 
 ## Relationship Between Protocols
 
@@ -67,7 +68,7 @@ A2A:  Agent A → [HTTPS] → Agent B → [HTTPS] → Agent C
 
 A full-stack architecture might use ACP at the edges (human ↔ primary agent) and A2A in the middle (primary agent ↔ specialist agents on remote servers).
 
----
+______________________________________________________________________
 
 ## Current Architecture Assessment
 
@@ -111,24 +112,24 @@ When the sub-agent finishes, the dispatcher captures stdout text. There is no st
 
 The dispatcher hard-codes which agent to load, which model to use, and what provider to spawn. ACP doesn't define discovery because the human already chose their agent. A2A defines Agent Cards for exactly this purpose.
 
----
+______________________________________________________________________
 
 ## Capability Gap Analysis
 
-| Need | ACP provides | A2A provides |
-|---|---|---|
-| Spawn local subprocess | Yes | No (assumes independent services) |
-| Filesystem pass-through | Yes | No (agents are self-contained) |
-| Terminal execution | Yes | No |
-| Task lifecycle states | No | Yes (SUBMITTED → WORKING → COMPLETED) |
-| Structured artifacts | No (text stream only) | Yes (typed Parts, Artifacts) |
-| Agent discovery | No | Yes (Agent Cards) |
-| Auth between agents | No (implicit trust) | Yes (OAuth, mTLS) |
-| Human approval | Yes | No (no human in wire) |
+| Need                    | ACP provides          | A2A provides                          |
+| ----------------------- | --------------------- | ------------------------------------- |
+| Spawn local subprocess  | Yes                   | No (assumes independent services)     |
+| Filesystem pass-through | Yes                   | No (agents are self-contained)        |
+| Terminal execution      | Yes                   | No                                    |
+| Task lifecycle states   | No                    | Yes (SUBMITTED → WORKING → COMPLETED) |
+| Structured artifacts    | No (text stream only) | Yes (typed Parts, Artifacts)          |
+| Agent discovery         | No                    | Yes (Agent Cards)                     |
+| Auth between agents     | No (implicit trust)   | Yes (OAuth, mTLS)                     |
+| Human approval          | Yes                   | No (no human in wire)                 |
 
 The dispatcher needs the **process control** of ACP (spawn, stdio, filesystem, terminals) but the **interaction semantics** of A2A (task delegation, structured results, status tracking).
 
----
+______________________________________________________________________
 
 ## Boundary Confusion
 
@@ -144,7 +145,7 @@ Boundary 2 is currently implemented by faking Boundary 1. The cost:
 - No coordination on shared mutable state
 - A dispatcher that simulates an entire editor environment just to send a task to a subprocess
 
----
+______________________________________________________________________
 
 ## Open Questions for Further Work
 

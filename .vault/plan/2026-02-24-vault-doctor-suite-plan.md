@@ -1,11 +1,11 @@
 ---
 tags:
-  - "#plan"
-  - "#vault-doctor-suite"
-date: "2026-02-24"
+  - '#plan'
+  - '#vault-doctor-suite'
+date: '2026-02-24'
 related:
-  - "[[2026-02-24-vault-doctor-suite-research]]"
-  - "[[2026-02-24-vault-doctor-suite-adr]]"
+  - '[[2026-02-24-vault-doctor-suite-research]]'
+  - '[[2026-02-24-vault-doctor-suite-adr]]'
 ---
 
 # `vault-doctor-suite` plan
@@ -21,13 +21,20 @@ arguments or `--input / -i` for pre-commit hook compatibility.
 Key outcomes:
 
 - `vaultspec vault doctor` replaces `vault audit` as the vault health command
+
 - `--input / -i` and positional file args scope any run to specific files (hook-friendly)
+
 - `--dry-run` is a modifier on `--fix` only; default mode is always read-only
+
 - Broken wikilinks and orphaned documents are wired into the doctor pipeline
+
 - Chain integrity is checked: exec→plan, plan→ADR, ADR→research gaps are reported
+
 - Frontmatter format drift (date/feature filename drift, CRLF, unquoted dates, BOM, duplicates)
   is detectable and auto-fixable
+
 - Per-feature coverage matrix is available as a report
+
 - A registered check registry enables future extensibility without CLI churn
 
 ## Tasks
@@ -83,9 +90,12 @@ Key outcomes:
 **P1-T4: Remove `vault audit` from CLI**
 
 - Remove `audit` subcommand and its handler from `vault_cli.py`
+
 - Remove `verify_vertical_integrity()` direct CLI wiring (it will be re-exposed via the CHAIN
   check `feature-plan-coverage` in Phase 3)
+
 - Remove `fix_violations()` direct CLI wiring (fix operations move to `doctor --fix`)
+
 - Update `AGENTS.md` and any CLI reference docs to remove `vault audit` mentions
 
 ### Phase 2 — Structure and Links Checks
@@ -127,11 +137,16 @@ Key outcomes:
 **P2-T4: Tests for structure and links checks**
 
 - Create `src/vaultspec/doctor/tests/test_links.py`
+
 - Test `check_broken_wikilinks` with fixture vault containing a doc linking to non-existent target
+
 - Test `check_orphaned_docs` with fixture containing an isolated doc; assert WARNING result
+
 - Test `check_malformed_related` with doc whose `related` contains `"not-a-wikilink"`; assert
   ERROR and `fixable=True`
+
 - Test `--input` scoping: broken link in file A, but `input_paths=[file_B]` → zero results
+
 - Test dry-run fix: no file write, result has `fix_applied=False` and non-empty `fix_detail`
 
 ### Phase 3 — Chain Integrity Checks
@@ -243,10 +258,14 @@ Key outcomes:
 **P4-T10: Tests for drift checks**
 
 - Create `src/vaultspec/doctor/tests/test_drift.py`
+
 - Parametrized test for each drift type with a crafted fixture file
+
 - For each fixable drift: dry-run produces `fix_applied=False`; wet-run produces `fix_applied=True`
   and modifies the file correctly
+
 - Test `--input` scoping: drift in file A, `input_paths=[file_B]` → zero results
+
 - Edge case: file with multiple drift types applied in one pass
 
 ### Phase 5 — Coverage Matrix and Reporting
@@ -296,7 +315,9 @@ JSON output includes a structured dict per feature.
 - Add to `.pre-commit-config.yaml` opt-in hooks:
 
 ```yaml
+
 # Default: drift + structure checks on staged files only
+
 - id: vault-doctor
   name: Vault Doctor
   entry: uv run python -m vaultspec vault doctor --severity error
@@ -305,6 +326,7 @@ JSON output includes a structured dict per feature.
   pass_filenames: true
 
 # Deep: chain + link checks (slower, requires graph build)
+
 - id: vault-doctor-deep
   name: Vault Doctor (chain + links)
   entry: uv run python -m vaultspec vault doctor --category chain --category links --severity error
@@ -320,8 +342,10 @@ restricts all results to those files.
 **P6-T3: MCP tool integration**
 
 - In `src/vaultspec/mcp_server/vault_tools.py`, expose `vault_doctor` as an MCP tool
+
 - Accepts: `categories` (list), `severity` (str), `fix` (bool), `dry_run` (bool),
   `feature` (str), `input_paths` (list[str])
+
 - Returns: structured JSON matching the `DoctorResult` list schema
 
 **P6-T4: Documentation updates**
@@ -340,23 +364,36 @@ Once Phase 1 is complete:
 - **Phase 6** depends on all prior phases (integration test, documentation)
 
 Recommended parallel execution for a two-agent team:
+
 - Agent A: Phase 1 → Phase 2 → Phase 3
 - Agent B: Phase 1 (shared scaffold) → Phase 4 → Phase 5
 
 ## Verification
 
 - All new checks produce `list[DoctorResult]` (not exceptions) on any valid or invalid vault
+
 - `--dry-run` without `--fix` is rejected with a clear error message
+
 - `--dry-run` with `--fix` never modifies the filesystem (verified by stat-checking before/after)
+
 - `vault doctor --severity error` exits 0 on `test-project/.vault/` with no injected violations
+
 - `vault doctor --fix --dry-run` on a vault with known violations produces non-empty results
   without modifying files
+
 - `vault doctor --category chain` catches exec-without-plan, plan-without-adr, and
   adr-without-research in crafted fixture vaults
+
 - `vault doctor --category drift` catches all eight drift types in parametrized fixture tests
+
 - `vault doctor --category coverage` renders a matrix with correct ✓/✗ for each feature/doctype
+
 - `vault doctor staged_file.md --severity error` produces results scoped to that file only
+
 - Pre-commit hook `vault-doctor` (when enabled) exits 1 on a vault with ERROR-level violations
+
 - MCP `vault_doctor` tool returns valid JSON on both clean and dirty vaults
+
 - No regressions in existing `verification/` and `graph/` test suites
+
 - `vault audit` no longer exists as a CLI command (verified by checking argparse registration)

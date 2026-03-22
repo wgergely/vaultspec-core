@@ -1,17 +1,19 @@
 ---
 tags:
-  - "#exec"
-  - "#packaging-restructure"
-date: "2026-02-21"
+  - '#exec'
+  - '#packaging-restructure'
+date: '2026-02-21'
 related:
-  - "[[2026-02-21-packaging-restructure-p1p2-plan]]"
-  - "[[2026-02-21-packaging-restructure-adr]]"
+  - '[[2026-02-21-packaging-restructure-p1p2-plan]]'
+  - '[[2026-02-21-packaging-restructure-adr]]'
 ---
+
 # Phase 2: Unified MCP Server (Steps 18-22)
 
 ## Step 18: Create `src/vaultspec/server.py`
 
 Created the unified entry point with:
+
 - `create_server()` factory function that instantiates `FastMCP(name="vaultspec-mcp")`
 - `_lifespan()` async context manager composing tool module lifespans
 - `main()` function wired to `[project.scripts] vaultspec-mcp`
@@ -20,6 +22,7 @@ Created the unified entry point with:
 ## Step 19: Refactor `subagent_server/server.py`
 
 Structural refactoring (no behavior changes):
+
 - Removed module-level `mcp = FastMCP(...)` instance
 - Added `_mcp_ref` global set by `register_tools()` for resource management
 - Extracted `register_tools(mcp: FastMCP)` that programmatically registers all 5 tools
@@ -30,6 +33,7 @@ Structural refactoring (no behavior changes):
 ## Step 20: Create `src/vaultspec/mcp_tools/` stubs
 
 Created package with three stub modules:
+
 - `vault_tools.py` -- Phase 3 vault audit/management tools
 - `team_tools.py` -- Phase 4 multi-agent team tools
 - `framework_tools.py` -- Phase 3 framework CLI tools
@@ -39,6 +43,7 @@ Each exposes `register_tools(mcp: FastMCP) -> None` as a no-op.
 ## Step 21: Replace `vs-subagent-mcp` references
 
 Updated 8 files outside `.vault/`:
+
 - `extension.toml` -- entry point and provides
 - `src/vaultspec/orchestration/subagent.py` -- ACP client name
 - `.claude/rules/vaultspec-subagents.builtin.md`

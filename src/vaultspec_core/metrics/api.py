@@ -61,7 +61,7 @@ def get_vault_metrics(root_dir: pathlib.Path) -> VaultSummary:
 
     # We'll use a simplified feature extraction here to avoid double-parsing
     # if we just want quick stats. But for robustness we can import list_features.
-    from ..verification import list_features
+    from ..vaultcore.scanner import list_features
 
     for path in scan_vault(root_dir):
         total += 1

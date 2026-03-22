@@ -5,6 +5,7 @@ description: >-
   or debugging task and need to explore options before implementation,
   structured research and brainstorm.
 ---
+
 # Research & Brainstorm Skill (vaultspec-research)
 
 When to use this skill:
@@ -36,13 +37,18 @@ Persist findings to `.vault/research/...`"
 Every document MUST strictly adhere to the following schema:
 
 - **`tags`**: MUST contain **EXACTLY TWO** tags in a YAML list.
+
   - **Directory Tag**: Exactly `#research`.
   - **Feature Tag**: Exactly one kebab-case `#{feature}` tag.
   - *Syntax:* `tags: ["#research", "#feature"]` (Must be quoted strings in a
     list).
+
 - **`related`**: MUST be a YAML list of quoted `"[[wiki-links]]"`.
+
   - *Constraint:* No relative paths (`../`), no bare strings, no `@ref`.
+
 - **`date`**: MUST use `yyyy-mm-dd` format.
+
 - **No `feature` key**: Use `tags:` exclusively for feature identification.
 
 ## Workflow
@@ -55,5 +61,7 @@ Every document MUST strictly adhere to the following schema:
 
 - Any persisted markdown files must be linked against other persisted
   documents using `[[wiki-links]]`.
+
 - DO NOT use `@ref` style links.
+
 - DO NOT use `[label](path)` style links for internal wiki pages.

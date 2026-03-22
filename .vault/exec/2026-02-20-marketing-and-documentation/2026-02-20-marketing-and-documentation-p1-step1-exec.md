@@ -1,11 +1,12 @@
 ---
 tags:
-  - "#exec"
-  - "#marketing-and-documentation"
-date: "2026-02-20"
+  - '#exec'
+  - '#marketing-and-documentation'
+date: '2026-02-20'
 related:
-  - "[[2026-02-20-marketing-and-documentation-p1-plan]]"
+  - '[[2026-02-20-marketing-and-documentation-p1-plan]]'
 ---
+
 # `marketing-and-documentation` `phase1` `step1`
 
 Created `.vaultspec/docs/` with three sub-chapter files.
@@ -36,6 +37,7 @@ cross-reference line pointing to `cli-reference.md#configuration-reference`.
 ## Tests
 
 Content completeness verified by inspection:
+
 - `concepts.md` contains "health_handler" (tutorial content present)
 - `cli-reference.md` contains "VAULTSPEC_ROOT_DIR" (configuration appendix present)
 - `search-guide.md` does NOT contain "VAULTSPEC_EMBEDDING_MODEL" (config table removed)

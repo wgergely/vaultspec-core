@@ -1,13 +1,14 @@
 ---
 tags:
-  - "#adr"
-  - "#mcp-consolidation"
-date: "2026-02-22"
+  - '#adr'
+  - '#mcp-consolidation'
+date: '2026-02-22'
 related:
-  - "[[2026-02-22-mcp-consolidation-research]]"
-  - "[[2026-02-21-packaging-restructure-adr]]"
-  - "[[2026-02-22-cli-ecosystem-factoring-adr]]"
+  - '[[2026-02-22-mcp-consolidation-research]]'
+  - '[[2026-02-21-packaging-restructure-adr]]'
+  - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
 ---
+
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields
      outside the YAML frontmatter above -->
 
@@ -35,7 +36,7 @@ imports from both `subagent_server` and `mcp_tools`.
 **`mcp_tools/` is a grab-bag.** Only one of its three modules is implemented:
 `team_tools.py` (857 lines, 10 tools). The other two -- `vault_tools.py` and
 `framework_tools.py` -- are no-op stubs awaiting business logic extraction from
-`cli.py` (see [[2026-02-22-cli-ecosystem-factoring-adr]] Phase 3). The package
+`cli.py` (see \[[2026-02-22-cli-ecosystem-factoring-adr]\] Phase 3). The package
 name `mcp_tools` is generic and sits as a peer to `subagent_server` despite
 registering tools onto the same `FastMCP` instance.
 
@@ -59,7 +60,7 @@ The fragmentation creates three concrete problems:
 
 ### Option C (`mcp/` package) -- rejected due to name shadowing
 
-The research in [[2026-02-22-mcp-consolidation-research]] evaluated creating a
+The research in \[[2026-02-22-mcp-consolidation-research]\] evaluated creating a
 `src/vaultspec/mcp/` package as Option C. This option offers the cleanest name
 (`vaultspec.mcp`) but carries a critical defect: the third-party `mcp` PyPI
 package (version >=1.20.0, declared in `pyproject.toml`) is imported via bare
@@ -73,7 +74,7 @@ force external resolution) are fragile and non-idiomatic. Option C is rejected.
 ### Stub readiness
 
 The two stub modules (`vault_tools.py` and `framework_tools.py`) are waiting
-on [[2026-02-22-cli-ecosystem-factoring-adr]] Phase 3, which extracts the
+on \[[2026-02-22-cli-ecosystem-factoring-adr]\] Phase 3, which extracts the
 business logic from `cli.py` into `vaultspec.core` submodules. Until that
 extraction completes, the stubs have no upstream library to call. This
 consolidation moves the stubs into `mcp_server/` as-is, preserving their
@@ -98,8 +99,10 @@ Each module manages its own mutable state independently:
   `CONTENT_ROOT`, `AGENTS_DIR`, `lock_manager`, `task_engine`,
   `_agent_cache`, `_background_tasks`, `_active_clients`, `_refresh_fn`,
   `_run_subagent_fn`, `_mcp_ref`), initialized via `initialize_server()`.
+
 - `mcp_tools/team_tools.py` owns 2 module-level globals (`_root_dir`,
   `_team_task_engine`), initialized via `set_root_dir()`.
+
 - `server.py` calls both initialization functions as the composition root.
 
 Moving these modules into a single package does not merge or alter their
@@ -152,17 +155,17 @@ src/vaultspec/mcp_server/
 
 ### File moves
 
-| Before | After |
-|:---|:---|
-| `src/vaultspec/server.py` | `src/vaultspec/mcp_server/app.py` |
-| `src/vaultspec/subagent_server/server.py` | `src/vaultspec/mcp_server/subagent_tools.py` |
-| `src/vaultspec/subagent_server/__init__.py` | deleted |
-| `src/vaultspec/mcp_tools/team_tools.py` | `src/vaultspec/mcp_server/team_tools.py` |
-| `src/vaultspec/mcp_tools/vault_tools.py` | `src/vaultspec/mcp_server/vault_tools.py` |
+| Before                                       | After                                         |
+| :------------------------------------------- | :-------------------------------------------- |
+| `src/vaultspec/server.py`                    | `src/vaultspec/mcp_server/app.py`             |
+| `src/vaultspec/subagent_server/server.py`    | `src/vaultspec/mcp_server/subagent_tools.py`  |
+| `src/vaultspec/subagent_server/__init__.py`  | deleted                                       |
+| `src/vaultspec/mcp_tools/team_tools.py`      | `src/vaultspec/mcp_server/team_tools.py`      |
+| `src/vaultspec/mcp_tools/vault_tools.py`     | `src/vaultspec/mcp_server/vault_tools.py`     |
 | `src/vaultspec/mcp_tools/framework_tools.py` | `src/vaultspec/mcp_server/framework_tools.py` |
-| `src/vaultspec/mcp_tools/__init__.py` | deleted |
-| `src/vaultspec/subagent_server/tests/*` | `src/vaultspec/mcp_server/tests/*` |
-| `src/vaultspec/mcp_tools/tests/*` | `src/vaultspec/mcp_server/tests/*` |
+| `src/vaultspec/mcp_tools/__init__.py`        | deleted                                       |
+| `src/vaultspec/subagent_server/tests/*`      | `src/vaultspec/mcp_server/tests/*`            |
+| `src/vaultspec/mcp_tools/tests/*`            | `src/vaultspec/mcp_server/tests/*`            |
 
 ### `mcp_server/__init__.py` public API
 
@@ -205,23 +208,26 @@ The legacy standalone `main()` function (lines 905-960 of
 
 ### Import rewrites
 
-| File | Old import | New import |
-|:---|:---|:---|
-| `src/vaultspec/__main__.py` | `from .server import main as run` | `from .mcp_server.app import main as run` |
-| `src/vaultspec/subagent_cli.py` | `from .subagent_server.server import main as server_main` | `from .mcp_server.app import main as server_main` |
-| `mcp_server/tests/test_mcp_tools.py` | `from .. import server as srv` | `from .. import subagent_tools as srv` |
-| `mcp_server/tests/test_mcp_protocol.py` | `from ...server import create_server` | `from ..app import create_server` |
-| `orchestration/tests/test_team_lifecycle.py` | `from ...server import create_server` | `from ...mcp_server.app import create_server` |
-| `orchestration/tests/test_team_lifecycle.py` | `from ...mcp_tools.team_tools import ...` | `from ...mcp_server.team_tools import ...` |
-| `tests/cli/test_team_cli.py` | `from ...mcp_tools.team_tools import ...` | `from ...mcp_server.team_tools import ...` |
+| File                                         | Old import                                                | New import                                        |
+| :------------------------------------------- | :-------------------------------------------------------- | :------------------------------------------------ |
+| `src/vaultspec/__main__.py`                  | `from .server import main as run`                         | `from .mcp_server.app import main as run`         |
+| `src/vaultspec/subagent_cli.py`              | `from .subagent_server.server import main as server_main` | `from .mcp_server.app import main as server_main` |
+| `mcp_server/tests/test_mcp_tools.py`         | `from .. import server as srv`                            | `from .. import subagent_tools as srv`            |
+| `mcp_server/tests/test_mcp_protocol.py`      | `from ...server import create_server`                     | `from ..app import create_server`                 |
+| `orchestration/tests/test_team_lifecycle.py` | `from ...server import create_server`                     | `from ...mcp_server.app import create_server`     |
+| `orchestration/tests/test_team_lifecycle.py` | `from ...mcp_tools.team_tools import ...`                 | `from ...mcp_server.team_tools import ...`        |
+| `tests/cli/test_team_cli.py`                 | `from ...mcp_tools.team_tools import ...`                 | `from ...mcp_server.team_tools import ...`        |
 
 ### `pyproject.toml` changes
 
 ```toml
+
 # Before:
+
 vaultspec-mcp = "vaultspec.server:main"
 
 # After:
+
 vaultspec-mcp = "vaultspec.mcp_server.app:main"
 ```
 
@@ -258,7 +264,7 @@ imports are rewritten in the same commit.
 ## Rationale
 
 Option D (`mcp_server/`) was chosen over the three alternatives evaluated in
-[[2026-02-22-mcp-consolidation-research]] for the following reasons:
+\[[2026-02-22-mcp-consolidation-research]\] for the following reasons:
 
 **Option A (rename `server.py` to `mcp_server.py`) is insufficient.** It
 disambiguates the entry point but does not address the `subagent_server`
@@ -314,7 +320,7 @@ external package or script imports from `vaultspec.subagent_server` or
 
 - **Stub placement is forward-compatible.** The `vault_tools.py` and
   `framework_tools.py` stubs are already in their final location within
-  `mcp_server/`. When [[2026-02-22-cli-ecosystem-factoring-adr]] Phase 3
+  `mcp_server/`. When \[[2026-02-22-cli-ecosystem-factoring-adr]\] Phase 3
   completes the business logic extraction, the stubs can be populated
   in-place without another structural migration.
 
@@ -339,13 +345,13 @@ external package or script imports from `vaultspec.subagent_server` or
 
 ### Future work
 
-- **Phase 3 of [[2026-02-22-cli-ecosystem-factoring-adr]]**: Once the
+- **Phase 3 of \[[2026-02-22-cli-ecosystem-factoring-adr]\]**: Once the
   business logic is extracted from `cli.py` into `vaultspec.core`, the
   `vault_tools.py` and `framework_tools.py` stubs in `mcp_server/` can be
   populated with real tool implementations. This is tracked by the
   cli-ecosystem ADR and does not require a separate structural migration.
 
-- **Phase 3 of [[2026-02-21-packaging-restructure-adr]]**: The packaging
+- **Phase 3 of \[[2026-02-21-packaging-restructure-adr]\]**: The packaging
   restructure ADR's Phase 3 (vault + framework CLI tools as MCP tools)
   originally targeted `mcp_tools/vault_tools.py` and
   `mcp_tools/framework_tools.py`. After this consolidation, the target

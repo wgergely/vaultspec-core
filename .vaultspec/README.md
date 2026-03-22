@@ -1,157 +1,120 @@
-# vaultspec Framework Manual
+# Vaultspec Framework Manual
 
-## Scope
+Vaultspec is a governed development framework for AI-assisted engineering. For installation and project overview, read the [repository README](../README.md).
 
-This manual describes the current shipped product boundary for a `vaultspec` workspace.
+Use this manual to develop features from initial research through to shipped code. Every step produces a durable record in `.vault/`, so you make decisions once and build on them.
 
-- `vaultspec-core` manages the workspace on disk.
-- `vaultspec-mcp` exposes that same workspace to MCP clients.
-- `.vaultspec/` is the framework resource tree: the source material the runtime reads, validates, and syncs into tool-facing surfaces.
-- `.vault/` is the durable project record: research, decisions, plans, execution records, reviews, and related artifacts created within the framework.
+## How to Start a New Feature
 
-This README focuses on what lives under `.vaultspec/`, how the runtime consumes it, and what gets synced out of it.
+Starting a feature means working through a structured sequence: research, decide, plan, execute, and review. You approve each phase before the next begins.
 
-## Directory Map
+### Research
 
-```text
-.vaultspec/
-├─ docs/                  Human-facing reference material for operators and contributors
-└─ rules/                 Runtime-managed framework sources
-   ├─ rules/              Behavioral rules and policy text consumed by generated surfaces
-   ├─ skills/             Task-specific workflow instructions and reusable procedures
-   ├─ agents/             Agent/persona inventory as framework content
-   ├─ system/             Composable system fragments for context, responsibility, and sync outputs
-   ├─ templates/          Templates for durable artifacts written under .vault/
-   └─ hooks/              Hook definitions and hook runtime resources
-```
+Ask your AI tool to research the problem space. Describe what you're trying to build and what you need to understand before committing to an approach.
 
-### What each subtree is for
+> "Research authentication options for the API gateway - compare JWT, session tokens, and OAuth2"
 
-| Path | Purpose |
-| --- | --- |
-| `.vaultspec/docs/` | Reference documentation for humans: concepts, command usage, hooks, querying the vault, and related guides. |
-| `.vaultspec/rules/rules/` | Stable rule text that shapes generated instructions and workspace behavior. |
-| `.vaultspec/rules/skills/` | Reusable skill definitions for focused workflows. |
-| `.vaultspec/rules/agents/` | The current inventory of agent/persona definitions as source content under the framework tree. |
-| `.vaultspec/rules/system/` | System-level prompt fragments and responsibility boundaries assembled into synced outputs. |
-| `.vaultspec/rules/templates/` | Canonical templates for records written into `.vault/`. |
-| `.vaultspec/rules/hooks/` | Hook definitions and resources used by the runtime hook system. |
+The `vaultspec-research` skill explores trade-offs, documents options, and writes structured findings to `.vault/research/`. Review the output, correct any gaps, and approve when you're satisfied the problem space is well understood.
 
-## How The Runtime Uses `.vaultspec/`
+Depending on the complexity of the feature, you may want to do multiple rounds of research. Each round produces its own record, and later stages reference all of them.
 
-`vaultspec-core` treats `.vaultspec/` as a resource tree. It reads these sources, shows the effective state, validates them, and syncs generated outputs for the local workspace.
+### Grounding Research in Code
 
-### Bootstrap and full sync
+If you need to explicitly ground the research against an existing codebase - understanding how a system currently works, finding reference implementations, or auditing existing patterns - invoke the `vaultspec-code-research` skill.
 
-Use `init` to create or normalize the framework tree, and `sync-all` to refresh generated surfaces from the source resources.
+> "How does the notification service currently handle delivery retries? Show me the retry logic and backoff strategy."
 
-```bash
-vaultspec-core init
-vaultspec-core sync-all
-```
+This produces a `.vault/reference/` record with code-grounded analysis: actual snippets, architectural observations, and patterns extracted from the codebase. These reference records feed directly into the next phase alongside your research.
 
-### Inspect resource inventories
+You don't always need code research. For greenfield features or well-understood domains, general research may be enough. For features that touch existing systems, code research prevents decisions based on wrong assumptions.
 
-Use the list/show commands to inspect what the runtime currently sees.
+### Architectural Decisions
 
-```bash
-vaultspec-core rules list
-vaultspec-core skills list
-vaultspec-core agents list
-vaultspec-core config show
-vaultspec-core system show
-vaultspec-core hooks list
-```
+Once you've gathered enough context, formalize it into concrete architectural decisions using the `vaultspec-adr` skill. An Architecture Decision Record (ADR) draws on the research findings and captures binding decisions about the approach.
 
-### Preview sync effects
+> "Create an ADR recommending PostgreSQL full-text search for the REST API based on the research findings"
 
-Use dry runs when you want to inspect planned changes before writing synced outputs.
+The ADR lands in `.vault/adr/` and captures the context, the decision, its consequences, and links back to the research and reference records that informed it. ADRs are binding - they define the boundaries, library dependencies, and shape of the feature. The plan that follows must conform to what the ADR specifies.
 
-```bash
-vaultspec-core config sync --dry-run
-vaultspec-core system sync --dry-run
-```
+Review the ADR carefully. This is where you commit to an approach. Sign off before moving to planning.
 
-### Run hooks from the managed hook tree
+### Planning
 
-Hooks are sourced from `.vaultspec/rules/hooks/`, not from a legacy top-level hooks directory.
+With approved ADRs in hand, call the `vaultspec-write` skill to produce an implementation plan. It reads the ADR and breaks the decision into phased, concrete steps.
+
+> "Write an implementation plan for the search feature based on the ADR"
+
+The plan lands in `.vault/plan/` and defines what gets built, in what order, and with what acceptance criteria. Review the scope - confirm the phases make sense, nothing is missing, and nothing overreaches the ADR's boundaries. Approve before execution begins.
+
+### Execution
+
+Once the plan is approved, you have options for how to execute it.
+
+**Direct execution.** Call the `vaultspec-execute` skill to work through the plan step by step. The AI delegates to specialized agent personas defined in the framework, each with a specific role and tool access level. Step records land in `.vault/exec/`.
+
+> "Execute the search implementation plan"
+
+**Parallel sub-agents.** For larger features, execution can dispatch multiple agents working on independent steps simultaneously, using the agent definitions bundled with the framework.
+
+Regardless of execution mode, code review is mandatory after completing a step or the full plan.
+
+### Review and Auditing
+
+After execution, invoke the `vaultspec-code-review` skill to audit the completed work for safety, intent, and quality.
+
+> "Review the changes from the search implementation"
+
+The review produces a `.vault/audit/` record with issues triaged by severity (LOW, MEDIUM, HIGH, CRITICAL). Critical and high-severity issues must be resolved before the feature closes. A clean review means the work is ready to ship.
+
+For ongoing vault maintenance - fixing broken links, validating frontmatter, cleaning up stale references - use the `vaultspec-curate` skill.
+
+> "Audit the vault for broken links and missing references"
+
+## Customizing the Framework
+
+Everything under `.vaultspec/rules/` is yours to edit. The `spec` CLI group manages these resources without requiring you to touch files directly:
 
 ```bash
-vaultspec-core hooks run vault.document.created --path .vault/research/example.md
+
+# Add a custom rule
+
+vaultspec-core spec rules add --name my-project-conventions
+
+# Add a skill with a description
+
+vaultspec-core spec skills add --name my-deploy --description "Deploy to staging"
+
+# List what you have
+
+vaultspec-core spec rules list
+vaultspec-core spec skills list
+vaultspec-core spec agents list
 ```
 
-## Synced Outputs And Tool Surfaces
-
-The framework source tree is not the same thing as the generated tool surfaces it produces.
-
-`vaultspec-core` can project `.vaultspec/` into workspace-facing outputs such as:
-
-- `AGENTS.md`
-- `.claude/...`
-- `.gemini/...`
-- `.agents/...`
-
-These synced outputs are derived artifacts. The editable source of truth remains under `.vaultspec/`, especially `.vaultspec/rules/` and `.vaultspec/docs/`. When framework resources change, resync the workspace rather than hand-maintaining generated copies.
-
-`vaultspec-mcp` is separate from those synced files. It does not define a second framework tree. Instead, it serves the same workspace model to MCP clients by pointing at the target workspace directory.
-
-Example client configuration:
-
-```json
-{
-  "mcpServers": {
-    "vaultspec-core": {
-      "command": "vaultspec-mcp",
-      "env": {
-        "VAULTSPEC_TARGET_DIR": "/path/to/workspace"
-      }
-    }
-  }
-}
-```
-
-## Relationship To `.vault/`
-
-`.vaultspec/` and `.vault/` serve different roles:
-
-- `.vaultspec/` contains framework resources: rules, skills, agents, system fragments, templates, hooks, and reference docs.
-- `.vault/` contains durable project records created within that framework.
-
-Typical `.vault/` operations use the framework resources defined in `.vaultspec/`:
+After any change, sync pushes your framework content into each provider's config directory (`.claude/`, `.gemini/`, `.agents/`, `.codex/`):
 
 ```bash
-vaultspec-core vault add --type research --feature example-feature --title "Initial research"
-vaultspec-core vault audit --summary
-vaultspec-core readiness
-vaultspec-core doctor
+vaultspec-core sync              # all providers
+vaultspec-core sync claude       # one provider
+vaultspec-core sync --dry-run    # preview without writing
 ```
 
-In practice:
+See the [CLI reference](./CLI.md#spec-commands) for the full `spec` command surface.
 
-- `.vaultspec/rules/templates/` shapes how new records are created.
-- synced system and rule outputs shape how tools interact with those records.
-- audits and readiness checks help verify that the workspace remains coherent.
+## Managing Vault Records
 
-## Documentation Map
+The `vault` CLI group manages documents in `.vault/` - creating from templates, listing, validating, and visualizing dependencies. See the [CLI reference](./CLI.md#vault-commands) for all commands and options.
 
-Use `.vaultspec/docs/` as the human-facing reference set for the framework. The key documents are:
+## MCP Integration
 
-- [Concepts](./docs/concepts.md)
-- [CLI Reference](./docs/cli-reference.md)
-- [Hooks Guide](./docs/hooks-guide.md)
-- [Vault Query Guide](./docs/vault-query-guide.md)
-- [Documentation Workflow](./docs/documentation-workflow.md)
-- [GitHub Workflows](./docs/github-workflows.md)
-- [Release & Deploy Runbook](./docs/release-deploy-runbook.md)
+The `vaultspec-mcp` server is an alternative integration path for MCP-capable clients like Claude Code. It exposes vault discovery and document creation over stdio transport without requiring file-based sync. `vaultspec-core install` scaffolds an `.mcp.json` automatically. See the [MCP reference](./MCP.md) for setup and tool documentation.
 
-This README is the entry point. The detailed operator documentation lives in `.vaultspec/docs/`.
+## Related Documentation
 
-## Non-Goals
+| Document                          | What it covers                                        |
+| --------------------------------- | ----------------------------------------------------- |
+| [Repository README](../README.md) | Project overview, installation, and getting started   |
+| [CLI Reference](./CLI.md)         | All commands, flags, and options for `vaultspec-core` |
+| [MCP Reference](./MCP.md)         | MCP server tools, setup, and configuration            |
 
-This manual does not cover:
-
-- a `subagent` CLI or any `vaultspec-subagent` command surface
-- packaged team or orchestration walkthroughs
-- historical ACP or A2A diagrams
-- stale artifact-choreography diagrams that do not match the current shipped runtime boundary
-- legacy flat `system/...` or `.vaultspec/hooks/` path layouts
+For bug reports and feature requests, open an issue on the [vaultspec-core issue tracker](https://github.com/wgergely/vaultspec-core/issues).

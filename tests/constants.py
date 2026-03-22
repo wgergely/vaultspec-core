@@ -15,7 +15,7 @@ import pathlib
 #: Repository root (one directory above: tests/ -> repo)
 PROJECT_ROOT: pathlib.Path = pathlib.Path(__file__).resolve().parent.parent
 
-#: src/vaultspec_core/ — the library source root
+#: src/vaultspec_core/  - the library source root
 LIB_SRC: pathlib.Path = PROJECT_ROOT / "src" / "vaultspec_core"
 
 #: CLI entry points are now modules inside the vaultspec_core package
