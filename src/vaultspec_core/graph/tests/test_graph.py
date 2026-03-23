@@ -265,10 +265,10 @@ class TestVaultGraphQueries:
         assert isinstance(orphans, list)
         assert orphans == sorted(orphans)
 
-    def test_get_invalid_links(self, vault_root):
+    def test_get_dangling_links(self, vault_root):
         graph = VaultGraph(vault_root)
-        invalid = graph.get_invalid_links()
-        assert isinstance(invalid, list)
+        dangling = graph.get_dangling_links()
+        assert isinstance(dangling, list)
 
     def test_get_feature_rankings(self, vault_root):
         graph = VaultGraph(vault_root)
@@ -563,16 +563,16 @@ class TestVaultGraphPhantom:
         assert m.phantom_count == actual_phantoms
         assert m.phantom_count > 0
 
-    def test_metrics_invalid_link_count(self, vault_root):
+    def test_metrics_dangling_link_count(self, vault_root):
         graph = VaultGraph(vault_root)
         m = graph.metrics()
         edge_count_to_phantoms = sum(
             1
-            for src, tgt in graph._invalid_links
+            for src, tgt in graph._dangling_links
             if tgt in graph.nodes and graph.nodes[tgt].phantom
         )
-        assert m.invalid_link_count == edge_count_to_phantoms
-        assert m.invalid_link_count > 0
+        assert m.dangling_link_count == edge_count_to_phantoms
+        assert m.dangling_link_count > 0
 
     def test_check_schema_ignores_phantom_adr_references(self, vault_root):
         """A plan linking only to phantom targets still reports 'no ADR reference'."""

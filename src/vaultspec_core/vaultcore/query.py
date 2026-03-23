@@ -134,7 +134,7 @@ def list_documents(
         doc_type: Filter by type. Standard types: ``adr``, ``audit``,
             ``exec``, ``plan``, ``reference``, ``research``. Special
             values: ``"orphaned"`` (no incoming links), ``"invalid"``
-            (contains broken outgoing links).
+            (contains dangling outgoing links).
         feature: Filter by feature tag (without ``#`` prefix).
         date: Filter by exact date string (``YYYY-MM-DD``).
 
@@ -154,8 +154,8 @@ def list_documents(
         from ..graph import VaultGraph
 
         graph = VaultGraph(root_dir)
-        invalid_sources = {src for src, _ in graph.get_invalid_links()}
-        docs = [d for d in docs if d.name in invalid_sources]
+        dangling_sources = {src for src, _ in graph.get_dangling_links()}
+        docs = [d for d in docs if d.name in dangling_sources]
     elif doc_type:
         docs = [d for d in docs if d.doc_type == doc_type]
 
@@ -187,7 +187,7 @@ def get_stats(
     Returns:
         Dict with keys: ``total_docs``, ``total_features``,
         ``counts_by_type`` (``dict[str, int]``), ``orphaned_count``,
-        ``invalid_link_count``. Orphan and invalid counts are always
+        ``dangling_link_count``. Orphan and invalid counts are always
         computed against the full unfiltered vault via
         :class:`~vaultspec_core.graph.VaultGraph`.
     """
@@ -206,18 +206,18 @@ def get_stats(
     try:
         graph = VaultGraph(root_dir)
         orphaned_count = len(graph.get_orphaned())
-        invalid_link_count = len(graph.get_invalid_links())
+        dangling_link_count = len(graph.get_dangling_links())
     except (OSError, ValueError) as exc:
         logger.warning("Failed to build vault graph for stats: %s", exc)
         orphaned_count = 0
-        invalid_link_count = 0
+        dangling_link_count = 0
 
     return {
         "total_docs": len(docs),
         "total_features": len(features),
         "counts_by_type": counts_by_type,
         "orphaned_count": orphaned_count,
-        "invalid_link_count": invalid_link_count,
+        "dangling_link_count": dangling_link_count,
     }
 
 

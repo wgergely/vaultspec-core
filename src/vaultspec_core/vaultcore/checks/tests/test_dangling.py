@@ -19,9 +19,9 @@ class TestCheckDangling:
         # Every diagnostic must be ERROR severity
         for diag in result.diagnostics:
             assert diag.severity == Severity.ERROR
-        # The count should match the number of invalid links
-        invalid_links = graph.get_invalid_links()
-        assert len(result.diagnostics) == len(invalid_links)
+        # The count should match the number of dangling links
+        dangling_links = graph.get_dangling_links()
+        assert len(result.diagnostics) == len(dangling_links)
 
     def test_fix_removes_related_entry(self, vault_root, tmp_path):
         """Copy the test vault, run fix, verify related entry removed."""
@@ -30,8 +30,8 @@ class TestCheckDangling:
         shutil.copytree(vault_root, tmp_vault)
 
         graph = VaultGraph(tmp_vault)
-        invalid_before = graph.get_invalid_links()
-        assert len(invalid_before) > 0
+        dangling_before = graph.get_dangling_links()
+        assert len(dangling_before) > 0
 
         result = check_dangling(tmp_vault, graph=graph, fix=True)
         assert result.fixed_count > 0

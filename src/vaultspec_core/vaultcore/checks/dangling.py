@@ -25,7 +25,7 @@ def check_dangling(
 ) -> CheckResult:
     """Find wiki-links in ``related:`` frontmatter that resolve to no document.
 
-    Iterates :meth:`~vaultspec_core.graph.VaultGraph.get_invalid_links` and
+    Iterates :meth:`~vaultspec_core.graph.VaultGraph.get_dangling_links` and
     emits an ERROR-severity diagnostic for each ``(source, target)`` pair.
     When *fix* is ``True``, removes the dangling ``[[target]]`` entry from
     the source document's ``related:`` YAML field only (body wiki-links are
@@ -46,14 +46,14 @@ def check_dangling(
     from ._base import extract_feature_tags
 
     result = CheckResult(check_name="dangling", supports_fix=True)
-    invalid_links = graph.get_invalid_links()
+    dangling_links = graph.get_dangling_links()
 
-    if not invalid_links:
+    if not dangling_links:
         return result
 
     # Group targets by source for efficient fix I/O
     source_targets: dict[str, list[str]] = {}
-    for source_name, target_name in invalid_links:
+    for source_name, target_name in dangling_links:
         source_targets.setdefault(source_name, []).append(target_name)
 
     feat = feature.lstrip("#") if feature else None

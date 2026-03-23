@@ -144,7 +144,7 @@ class GraphMetrics:
         betweenness_centrality: ``nx.betweenness_centrality`` scores.
         phantom_count: Number of phantom (unresolved) nodes in the graph.
         orphan_count: Truly isolated nodes (no links and no feature siblings).
-        invalid_link_count: Edges pointing to phantom (unresolved) targets.
+        dangling_link_count: Edges pointing to phantom (unresolved) targets.
         connected_components: Weakly connected components via networkx.
         nodes_by_type: Document count per ``DocType``.
         nodes_by_feature: Document count per feature tag.
@@ -167,7 +167,7 @@ class GraphMetrics:
     )
     phantom_count: int = 0
     orphan_count: int = 0
-    invalid_link_count: int = 0
+    dangling_link_count: int = 0
     connected_components: int = 0
     nodes_by_type: dict[str, int] = field(default_factory=dict)
     nodes_by_feature: dict[str, int] = field(default_factory=dict)
@@ -263,7 +263,7 @@ class VaultGraph:
         self.root_dir = root_dir
         self.nodes: dict[str, DocNode] = {}
         self._digraph: nx.DiGraph = nx.DiGraph()
-        self._invalid_links: list[tuple[str, str]] = []
+        self._dangling_links: list[tuple[str, str]] = []
         self._build_graph()
 
     # -- Construction --------------------------------------------------------
@@ -380,7 +380,7 @@ class VaultGraph:
                         self.nodes[target_key].in_links.add(name)
                         self._digraph.add_edge(name, target_key)
                         if self.nodes[target_key].phantom:
-                            self._invalid_links.append(
+                            self._dangling_links.append(
                                 (name, target_key),
                             )
                     else:
@@ -397,7 +397,7 @@ class VaultGraph:
                         )
                         phantom.in_links.add(name)
                         self._digraph.add_edge(name, target_key)
-                        self._invalid_links.append(
+                        self._dangling_links.append(
                             (name, target_key),
                         )
             except (OSError, UnicodeDecodeError) as e:
@@ -432,7 +432,7 @@ class VaultGraph:
         2. Stem index lookup  - if the bare stem maps to multiple
            qualified keys, all are returned and a warning is logged.
         3. No match  - returns the original target so it is recorded as
-           an invalid (broken) link.
+           a dangling link.
         """
         # Exact key match (unique stem or qualified reference)
         if target in self.nodes:
@@ -450,7 +450,7 @@ class VaultGraph:
                 )
             return keys
 
-        # No match  - treat as broken link
+        # No match  - treat as dangling link
         return [target]
 
     # -- Direct networkx access ----------------------------------------------
@@ -592,14 +592,14 @@ class VaultGraph:
             and (not node.feature or feature_sizes.get(node.feature, 0) <= 1)
         )
 
-    def get_invalid_links(self) -> list[tuple[str, str]]:
-        """Return all broken link pairs recorded during graph construction.
+    def get_dangling_links(self) -> list[tuple[str, str]]:
+        """Return all dangling link pairs recorded during graph construction.
 
         Returns:
             List of ``(source, target)`` tuples where *target* does not
             exist as a node in the graph.
         """
-        return list(self._invalid_links)
+        return list(self._dangling_links)
 
     def get_feature_nodes(self, feature: str) -> list[DocNode]:
         """Return all nodes tagged with *feature*, sorted by date then name.
@@ -753,11 +753,11 @@ class VaultGraph:
             by_type[dt_key] = by_type.get(dt_key, 0) + 1
             total_words += node.word_count
 
-        # --- networkx orphan / invalid ---
+        # --- networkx orphan / dangling ---
         orphan_count = len(self.get_orphaned())
         invalid_count = sum(
             1
-            for src, tgt in self._invalid_links
+            for src, tgt in self._dangling_links
             if src in nodes and tgt in self.nodes and self.nodes[tgt].phantom
         )
 
@@ -781,7 +781,7 @@ class VaultGraph:
             betweenness_centrality=btwn_cent,
             phantom_count=phantom_count,
             orphan_count=orphan_count,
-            invalid_link_count=invalid_count,
+            dangling_link_count=invalid_count,
             connected_components=components,
             nodes_by_type=dict(sorted(by_type.items())),
             nodes_by_feature=dict(sorted(by_feature.items())),
@@ -912,7 +912,7 @@ class VaultGraph:
                             f"[dim]-> {target}[/dim]  [dim italic]{dt_val}[/dim italic]"
                         )
                     else:
-                        node_branch.add(f"[red dim]-> {target} (broken)[/red dim]")
+                        node_branch.add(f"[red dim]-> {target} (dangling)[/red dim]")
 
     @staticmethod
     def _node_label(node: DocNode) -> str:

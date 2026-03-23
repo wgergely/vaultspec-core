@@ -251,7 +251,7 @@ def cmd_stats(
         if orphaned:
             console.print(f"  Orphaned docs: {stats['orphaned_count']}")
         if invalid:
-            console.print(f"  Invalid links: {stats['invalid_link_count']}")
+            console.print(f"  Dangling links: {stats['dangling_link_count']}")
 
 
 # ---- vault list --------------------------------------------------------------
@@ -408,7 +408,7 @@ def _print_metrics(
         table.add_row("Max out-degree", f"{c}  ({n})")
     table.add_row("Orphans", str(m.orphan_count))
     table.add_row("Phantoms", str(m.phantom_count))
-    table.add_row("Invalid links", str(m.invalid_link_count))
+    table.add_row("Dangling links", str(m.dangling_link_count))
     table.add_row("Components", str(m.connected_components))
 
     console.print(table)
