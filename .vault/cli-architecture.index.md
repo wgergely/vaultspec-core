@@ -11,9 +11,9 @@ related:
   - '[[2026-03-05-cli-grounding-reference]]'
   - '[[2026-03-05-cli-path-resolution-adr]]'
   - '[[2026-03-05-cli-target-refactor-plan]]'
-  - '[[2026-03-21-cli-audit-notes]]'
-  - '[[2026-03-21-cli-contract]]'
-  - '[[2026-03-21-cli-grounding-research]]'
+  - '[[2026-03-21-cli-contract-reference]]'
+  - '[[2026-03-21-cli-grounding-reference]]'
+  - '[[2026-03-21-cli-reference]]'
 ---
 
 # `cli-architecture` feature index
@@ -40,6 +40,6 @@ Auto-generated index of all documents tagged with `#cli-architecture`.
 - `2026-03-05-cli-audit-notes-reference` - CLI Audit Notes
 - `2026-03-05-cli-contract-reference` - vaultspec-core CLI Binding Contract
 - `2026-03-05-cli-grounding-reference` - CLI Grounding Research: Contract vs Implementation
-- `2026-03-21-cli-audit-notes` - CLI Audit Notes
-- `2026-03-21-cli-contract` - vaultspec-core CLI Binding Contract
-- `2026-03-21-cli-grounding-research` - CLI Grounding Research: Contract vs Implementation
+- `2026-03-21-cli-contract-reference` - vaultspec-core CLI Binding Contract
+- `2026-03-21-cli-grounding-reference` - CLI Grounding Research: Contract vs Implementation
+- `2026-03-21-cli-reference` - CLI Audit Notes

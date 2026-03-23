@@ -153,7 +153,7 @@ def check_structure(
                         CheckDiagnostic(
                             path=doc_path.relative_to(root_dir),
                             message=msg,
-                            severity=Severity.WARNING,
+                            severity=Severity.ERROR,
                         )
                     )
         else:
@@ -162,7 +162,7 @@ def check_structure(
                     CheckDiagnostic(
                         path=doc_path.relative_to(root_dir),
                         message=msg,
-                        severity=Severity.WARNING,
+                        severity=Severity.ERROR,
                         fixable=True,
                         fix_description="Run with --fix to attempt auto-rename",
                     )
