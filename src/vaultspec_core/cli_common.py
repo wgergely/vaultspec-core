@@ -5,7 +5,7 @@ surfaces, including version discovery and safe async execution. It supports the
 CLI entry boundary without defining commands itself.
 
 Usage:
-    Use `get_version(...)` to resolve package version text and `run_async(...)`
+    Use `get_version()` to resolve the package version and `run_async(...)`
     to execute async workflows safely from synchronous CLI entrypoints.
 """
 
@@ -16,7 +16,6 @@ import contextlib
 import logging
 import sys
 import warnings
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
@@ -27,33 +26,16 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-def get_version(root_dir: Path | None = None) -> str:
-    """Read the package version, preferring importlib.metadata for pip-installed usage.
+def get_version() -> str:
+    """Return the package version string.
 
-    Tries ``importlib.metadata.version("vaultspec-core")`` first (correct when
-    pip-installed), then falls back to pyproject.toml line-scanning for
-    development mode (running from source without install).
-
-    Args:
-        root_dir: Directory containing ``pyproject.toml`` for the fallback path.
-            Falls back to ``Path.cwd()`` if ``None``.
-
-    Returns:
-        The version string, or ``"unknown"`` if it cannot be determined.
+    Uses :data:`vaultspec_core.__version__` which is derived from
+    ``importlib.metadata`` at import time. Falls back to ``"unknown"``
+    only if the package metadata is completely unavailable.
     """
-    try:
-        from importlib.metadata import version
+    from vaultspec_core import __version__
 
-        return version("vaultspec-core")
-    except Exception:
-        pass
-    search_root = root_dir if root_dir is not None else Path.cwd()
-    toml_path = search_root / "pyproject.toml"
-    if toml_path.exists():
-        for line in toml_path.read_text(encoding="utf-8").splitlines():
-            if line.strip().startswith("version"):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return "unknown"
+    return __version__
 
 
 def run_async[T](coro: Coroutine[Any, Any, T], *, debug: bool = False) -> T:
