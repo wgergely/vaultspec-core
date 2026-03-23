@@ -146,6 +146,17 @@ class TestCheckBodyLinks:
         result = check_body_links(root, snapshot=snapshot)
         assert result.is_clean
 
+    def test_ignores_links_in_html_comments(self):
+        body = (
+            "<!-- LINK RULES:\n"
+            "     - [[wiki-links]] are ONLY for .vault/ documents.\n"
+            "     - NEVER use [[wiki-links]] in the document body. -->\n\n"
+            "Clean body text."
+        )
+        root, snapshot = _snap("comment", body)
+        result = check_body_links(root, snapshot=snapshot)
+        assert result.is_clean
+
     def test_does_not_support_fix(self):
         root, snapshot = _snap("nope", "Body text.")
         result = check_body_links(root, snapshot=snapshot)

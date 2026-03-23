@@ -20,11 +20,13 @@ _CODE_FENCE_RE = re.compile(
     re.MULTILINE | re.DOTALL,
 )
 _INLINE_CODE_RE = re.compile(r"`[^`]+`")
+_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 
 
-def _strip_code(text: str) -> str:
-    """Remove fenced code blocks and inline code spans from text."""
+def _strip_non_prose(text: str) -> str:
+    """Remove code blocks, inline code, and HTML comments from text."""
     stripped = _CODE_FENCE_RE.sub("", text)
+    stripped = _HTML_COMMENT_RE.sub("", stripped)
     return _INLINE_CODE_RE.sub("", stripped)
 
 
@@ -41,8 +43,8 @@ def extract_wiki_links(content: str) -> set[str]:
     Returns:
         Set of unique link target strings with surrounding whitespace stripped.
     """
-    # Strip code blocks/spans so TOML [[headers]] etc. aren't matched
-    prose = _strip_code(content)
+    # Strip code blocks/spans/comments so TOML [[headers]] etc. aren't matched
+    prose = _strip_non_prose(content)
 
     # Matches [[Link Name]] or [[Link Name|Display Name]]
     pattern = r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]"
