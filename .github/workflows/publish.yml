@@ -52,10 +52,10 @@ jobs:
           path: dist/
 
       - name: Smoke test (wheel)
-        run: uv run --isolated --no-project --with dist/*.whl tests/smoke_test.py
+        run: uv run --isolated --no-project --with dist/*.whl tests/smoke_check.py
 
       - name: Smoke test (sdist)
-        run: uv run --isolated --no-project --with dist/*.tar.gz tests/smoke_test.py
+        run: uv run --isolated --no-project --with dist/*.tar.gz tests/smoke_check.py
 
   publish-pypi:
     name: Publish to PyPI
