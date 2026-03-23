@@ -31,6 +31,7 @@ jobs:
         with:
           name: dist
           path: dist/
+          if-no-files-found: error
           retention-days: 5
 
   smoke-test:
@@ -76,4 +77,4 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Publish to PyPI
-        run: uv publish dist/*
+        run: uv publish --check-url https://pypi.org/simple/ dist/*
