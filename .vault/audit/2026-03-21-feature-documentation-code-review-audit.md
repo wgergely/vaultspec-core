@@ -4,7 +4,6 @@ tags:
   - '#feature-documentation'
 date: '2026-03-21'
 related:
-  - '[[2026-03-16-cli-restructure]]'
   - '[[2026-03-21-builtins-build-strategy-adr]]'
 ---
 

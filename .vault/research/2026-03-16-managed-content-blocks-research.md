@@ -4,7 +4,6 @@ tags:
   - '#install-cmds'
 date: '2026-03-16'
 related:
-  - '[[2026-03-16-binding-decisions]]'
   - '[[2026-03-15-install-cmds-capability-audit]]'
 ---
 

@@ -5,7 +5,6 @@ tags:
 date: '2026-02-22'
 related:
   - '[[2026-02-22-cli-ecosystem-factoring-plan]]'
-  - '[[2026-02-22-cli-ecosystem-factoring-phase3-step1]]'
 ---
 
 # cli-ecosystem-factoring phase3 code review

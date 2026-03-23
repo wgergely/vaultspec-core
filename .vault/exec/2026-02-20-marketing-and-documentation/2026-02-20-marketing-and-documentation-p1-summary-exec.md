@@ -5,7 +5,6 @@ tags:
 date: '2026-02-20'
 related:
   - '[[2026-02-20-marketing-and-documentation-p1-plan]]'
-  - '[[2026-02-20-marketing-and-documentation-p1-review]]'
 ---
 
 # `marketing-and-documentation` `phase1` summary
@@ -70,7 +69,7 @@ one-line descriptions. No existing content modified.
 
 ## Tests
 
-Code review (`[[2026-02-20-marketing-and-documentation-p1-review]]`) passed
+Code review (`2026-02-20-marketing-and-documentation-p1-review`) passed
 after two minor revisions:
 
 - `README.md` Project Structure block updated: `docs/` entry replaced with

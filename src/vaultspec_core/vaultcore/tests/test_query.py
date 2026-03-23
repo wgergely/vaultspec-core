@@ -94,9 +94,9 @@ class TestGetStats:
         stats = get_stats(TEST_PROJECT)
         assert "orphaned_count" in stats
 
-    def test_stats_includes_invalid_count(self):
+    def test_stats_includes_dangling_count(self):
         stats = get_stats(TEST_PROJECT)
-        assert "invalid_link_count" in stats
+        assert "dangling_link_count" in stats
 
 
 class TestListFeatureDetails:

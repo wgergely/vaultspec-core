@@ -11,11 +11,11 @@ related:
 
 Phase 1: Remove CLI Commands and MCP Tools. Deleted CLI entry points and MCP tools that have been migrated to the `vaultspec-a2a` repository.
 
-- Deleted: `[[src/vaultspec/team_cli.py]]`
-- Deleted: `[[src/vaultspec/subagent_cli.py]]`
-- Deleted: `[[src/vaultspec/server_cli.py]]`
-- Deleted: `[[src/vaultspec/mcp_server/subagent_tools.py]]`
-- Deleted: `[[src/vaultspec/mcp_server/team_tools.py]]`
+- Deleted: `src/vaultspec/team_cli.py`
+- Deleted: `src/vaultspec/subagent_cli.py`
+- Deleted: `src/vaultspec/server_cli.py`
+- Deleted: `src/vaultspec/mcp_server/subagent_tools.py`
+- Deleted: `src/vaultspec/mcp_server/team_tools.py`
 
 ## Description
 

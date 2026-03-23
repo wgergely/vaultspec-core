@@ -161,7 +161,7 @@ vault.py create --type {adr,exec,plan,reference,research} --feature FEATURE [--t
 
 **Verdict: 8/10.** Creates properly templated files with correct frontmatter, dates, and directory placement. The generated template includes helpful inline comments explaining each field.
 
-**Issue noted:** The template includes `"[[<yyyy-mm-dd-*>]]"` as a placeholder related link, which would fail the verifier if not replaced. This is a known pattern but could be a trap for new users.
+**Issue noted:** The template includes `"`\<yyyy-mm-dd-\*>`"` as a placeholder related link, which would fail the verifier if not replaced. This is a known pattern but could be a trap for new users.
 
 The index and search commands require the `rag` optional dependency (PyTorch, sentence-transformers, lancedb) which in turn requires an NVIDIA GPU with CUDA. This is not documented in the CLI help.
 

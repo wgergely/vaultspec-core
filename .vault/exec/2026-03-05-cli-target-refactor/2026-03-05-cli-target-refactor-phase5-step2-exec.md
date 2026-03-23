@@ -5,16 +5,15 @@ tags:
 date: '2026-03-05'
 related:
   - '[[2026-03-05-cli-target-refactor-plan]]'
-  - '[[2026-03-05-rag-migration-phase-1-plan]]'
 ---
 
 # `cli-target-refactor` `phase5` `step2`
 
 Removed RAG (index, search) CLI commands and residue.
 
-- Modified: `[[src/vaultspec/vault_cli.py]]`
-- Modified: `[[src/vaultspec/core/commands.py]]`
-- Modified: `[[src/vaultspec/tests/cli/test_vault_cli.py]]`
+- Modified: `src/vaultspec/vault_cli.py`
+- Modified: `src/vaultspec/core/commands.py`
+- Modified: `src/vaultspec/tests/cli/test_vault_cli.py`
 
 ## Description
 

@@ -11,10 +11,10 @@ related:
 
 Ported subcommands to Typer.
 
-- Modified: `[[src/vaultspec/vault_cli.py]]`
-- Modified: `[[src/vaultspec/spec_cli.py]]`
-- Modified: `[[src/vaultspec/mcp_server/app.py]]`
-- Modified: `[[src/vaultspec/__main__.py]]`
+- Modified: `src/vaultspec/vault_cli.py`
+- Modified: `src/vaultspec/spec_cli.py`
+- Modified: `src/vaultspec/mcp_server/app.py`
+- Modified: `src/vaultspec/__main__.py`
 
 ## Description
 

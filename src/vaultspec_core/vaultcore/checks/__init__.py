@@ -21,6 +21,7 @@ from ._base import (
     VaultSnapshot,
     render_check_result,
 )
+from .dangling import check_dangling
 from .features import check_features
 from .frontmatter import check_frontmatter
 from .links import check_links
@@ -37,6 +38,7 @@ __all__ = [
     "Severity",
     "VaultDocData",
     "VaultSnapshot",
+    "check_dangling",
     "check_features",
     "check_frontmatter",
     "check_links",
@@ -55,10 +57,10 @@ def run_all_checks(
     feature: str | None = None,
     fix: bool = False,
 ) -> list[CheckResult]:
-    """Run all seven vault health checkers and return their results.
+    """Run all eight vault health checkers and return their results.
 
-    Executes structure, frontmatter, links, orphans, features, references,
-    and schema checks in order. Builds a single
+    Executes structure, frontmatter, links, dangling, orphans, features,
+    references, and schema checks in order. Builds a single
     :class:`~vaultspec_core.graph.VaultGraph` and shares it across
     graph-consuming checkers to avoid redundant I/O.
 
@@ -80,6 +82,7 @@ def run_all_checks(
         check_structure(root_dir, snapshot=snapshot, fix=fix),
         check_frontmatter(root_dir, snapshot=snapshot, feature=feature, fix=fix),
         check_links(root_dir, snapshot=snapshot, feature=feature, fix=fix),
+        check_dangling(root_dir, graph=graph, feature=feature, fix=fix),
         check_orphans(root_dir, graph=graph, feature=feature),
         check_features(root_dir, snapshot=snapshot, feature=feature),
         check_references(root_dir, graph=graph, feature=feature, fix=fix),

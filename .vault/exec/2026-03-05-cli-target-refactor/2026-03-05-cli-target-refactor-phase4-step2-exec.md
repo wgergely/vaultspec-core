@@ -11,7 +11,7 @@ related:
 
 Secured Hook execution context.
 
-- Modified: `[[src/vaultspec/hooks/engine.py]]`
+- Modified: `src/vaultspec/hooks/engine.py`
 
 ## Description
 

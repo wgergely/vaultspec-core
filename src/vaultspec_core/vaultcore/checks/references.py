@@ -112,9 +112,11 @@ def check_references(
 
     result = CheckResult(check_name="references", supports_fix=True)
 
-    # Group nodes by feature
+    # Group nodes by feature (skip phantoms - they have no real doc type)
     by_feature: dict[str, dict[str, list]] = {}
     for _name, node in graph.nodes.items():
+        if node.phantom:
+            continue
         for tag in node.tags:
             if not DocType.from_tag(tag):
                 feat = tag.lstrip("#")
@@ -227,10 +229,10 @@ def check_schema(
 
     result = CheckResult(check_name="schema", supports_fix=True)
 
-    # Pre-build feature→type→nodes index for fix lookups
+    # Pre-build feature->type->nodes index for fix lookups (skip phantoms)
     feat_type_index: dict[str, dict[str, list]] = {}
     for _name, _node in graph.nodes.items():
-        if not _node.doc_type:
+        if _node.phantom or not _node.doc_type:
             continue
         for _tag in _node.tags:
             if not DocType.from_tag(_tag):
@@ -240,7 +242,7 @@ def check_schema(
                 ).append(_node)
 
     for _name, node in sorted(graph.nodes.items()):
-        if not node.doc_type:
+        if not node.doc_type or node.path is None:
             continue
 
         # Apply filters
@@ -253,11 +255,11 @@ def check_schema(
             if feat not in node_features:
                 continue
 
-        # Classify outgoing link targets by doc type
+        # Classify outgoing link targets by doc type (skip phantoms)
         linked_types: set[str] = set()
         for target_name in node.out_links:
             target = graph.nodes.get(target_name)
-            if target and target.doc_type:
+            if target and not target.phantom and target.doc_type:
                 linked_types.add(target.doc_type.value)
 
         rel_path = node.path.relative_to(root_dir)

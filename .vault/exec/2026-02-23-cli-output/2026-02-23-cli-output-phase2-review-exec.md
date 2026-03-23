@@ -6,7 +6,6 @@ date: '2026-02-23'
 related:
   - '[[2026-02-23-cli-output-plan]]'
   - '[[2026-02-23-cli-output-architecture-adr]]'
-  - '[[2026-02-23-cli-output-phase1-steps]]'
 ---
 
 # cli-output code review

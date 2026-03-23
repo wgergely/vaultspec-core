@@ -11,7 +11,7 @@ related:
 
 Fixed init scaffold loops.
 
-- Modified: `[[src/vaultspec/core/commands.py]]`
+- Modified: `src/vaultspec/core/commands.py`
 
 ## Description
 

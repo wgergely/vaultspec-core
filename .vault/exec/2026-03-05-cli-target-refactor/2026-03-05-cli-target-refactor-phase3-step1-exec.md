@@ -11,7 +11,7 @@ related:
 
 Refactored core function signatures.
 
-- Modified: `[[src/vaultspec/core/commands.py]]`
+- Modified: `src/vaultspec/core/commands.py`
 - Modified: Multiple core files (`spec_cli.py`, `vault_cli.py`, etc.)
 
 ## Description

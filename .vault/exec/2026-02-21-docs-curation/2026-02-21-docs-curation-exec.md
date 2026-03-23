@@ -4,9 +4,6 @@ tags:
   - '#docs-curation'
 date: '2026-02-21'
 related:
-  - '[[2026-02-20-team-mcp-integration-p1-adr]]'
-  - '[[2026-02-20-team-mcp-surface-design-reference]]'
-  - '[[2026-02-20-team-mcp-integration-research]]'
 ---
 
 # docs-curation audit: 2026-02-21
@@ -15,9 +12,9 @@ Vault audit scoped to three untracked files in the `team-mcp-integration` featur
 pipeline. All violations were auto-fixed in-place. No files were renamed. No data
 was lost.
 
-- Modified: `[[2026-02-20-team-mcp-integration-p1-adr]]`
-- Modified: `[[2026-02-20-team-mcp-surface-design-reference]]`
-- Modified: `[[2026-02-20-team-mcp-integration-research]]`
+- Modified: `2026-02-20-team-mcp-integration-p1-adr`
+- Modified: `2026-02-20-team-mcp-surface-design-reference`
+- Modified: `2026-02-20-team-mcp-integration-research`
 
 ## Scope
 
@@ -60,16 +57,16 @@ ______________________________________________________________________
 
 Violations found and fixed:
 
-| Class | Violation                                                                              | Fix Applied                                                                                 |
-| ----- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| A     | Unsupported frontmatter key `title`                                                    | Removed from frontmatter; migrated to body as `**Title:**`                                  |
-| A     | Unsupported frontmatter key `subtitle`                                                 | Removed from frontmatter; migrated to body as `**Subtitle:**`                               |
-| A     | Unsupported frontmatter key `authors` (nested object)                                  | Removed from frontmatter; migrated to body as `**Author:**`                                 |
-| A     | Unsupported frontmatter key `references` (list of paths)                               | Removed from frontmatter; migrated to body as `**References:**`                             |
-| A     | Missing mandatory comment block                                                        | Inserted two comment lines before `tags:`                                                   |
-| A     | Missing `related` field entirely                                                       | Added `related:` list                                                                       |
-| B     | `tags` contained 4 invalid unquoted tags: `mcp`, `team`, `a2a`, `surface-design`       | Replaced with `["#reference", "#team-mcp-integration"]`                                     |
-| C     | `related` absent; `references` listed `.vault/adr/2026-02-20-a2a-team-adr.md` (exists) | Added `"[[2026-02-20-a2a-team-adr]]"` to `related`; code path refs omitted (not vault docs) |
+| Class | Violation                                                                              | Fix Applied                                                                               |
+| ----- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| A     | Unsupported frontmatter key `title`                                                    | Removed from frontmatter; migrated to body as `**Title:**`                                |
+| A     | Unsupported frontmatter key `subtitle`                                                 | Removed from frontmatter; migrated to body as `**Subtitle:**`                             |
+| A     | Unsupported frontmatter key `authors` (nested object)                                  | Removed from frontmatter; migrated to body as `**Author:**`                               |
+| A     | Unsupported frontmatter key `references` (list of paths)                               | Removed from frontmatter; migrated to body as `**References:**`                           |
+| A     | Missing mandatory comment block                                                        | Inserted two comment lines before `tags:`                                                 |
+| A     | Missing `related` field entirely                                                       | Added `related:` list                                                                     |
+| B     | `tags` contained 4 invalid unquoted tags: `mcp`, `team`, `a2a`, `surface-design`       | Replaced with `["#reference", "#team-mcp-integration"]`                                   |
+| C     | `related` absent; `references` listed `.vault/adr/2026-02-20-a2a-team-adr.md` (exists) | Added `"`2026-02-20-a2a-team-adr`"` to `related`; code path refs omitted (not vault docs) |
 
 Data migration note: the `title`, `subtitle`, `authors`, and `references` values were
 placed in a `<!-- Migrated from frontmatter -->` comment block immediately after the
@@ -84,18 +81,18 @@ ______________________________________________________________________
 
 Violations found and fixed:
 
-| Class | Violation                                                                                           | Fix Applied                                                             |
-| ----- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| A     | Unsupported frontmatter key `title`                                                                 | Removed from frontmatter; migrated to body as `**Title:**`              |
-| A     | Unsupported frontmatter key `status`                                                                | Removed from frontmatter; migrated to body as `**Status:**`             |
-| A     | Missing mandatory comment block                                                                     | Inserted two comment lines before `tags:`                               |
-| A     | Missing `related` field entirely                                                                    | Added `related:` list                                                   |
-| B     | `tags` used YAML flow/bracket syntax `[team, mcp, integration, audit]` — 4 unquoted invalid tags    | Replaced with block-list `["#research", "#team-mcp-integration"]`       |
-| C     | Body contained `[[2026-02-20-team-mcp-surface-design-reference]]` (target exists); not in `related` | Added `"[[2026-02-20-team-mcp-surface-design-reference]]"` to `related` |
+| Class | Violation                                                                                        | Fix Applied                                                           |
+| ----- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| A     | Unsupported frontmatter key `title`                                                              | Removed from frontmatter; migrated to body as `**Title:**`            |
+| A     | Unsupported frontmatter key `status`                                                             | Removed from frontmatter; migrated to body as `**Status:**`           |
+| A     | Missing mandatory comment block                                                                  | Inserted two comment lines before `tags:`                             |
+| A     | Missing `related` field entirely                                                                 | Added `related:` list                                                 |
+| B     | `tags` used YAML flow/bracket syntax `[team, mcp, integration, audit]` — 4 unquoted invalid tags | Replaced with block-list `["#research", "#team-mcp-integration"]`     |
+| C     | Body contained `2026-02-20-team-mcp-surface-design-reference` (target exists); not in `related`  | Added `"`2026-02-20-team-mcp-surface-design-reference`"` to `related` |
 
 Data migration note: `title` and `status` values were placed in a
 `<!-- Migrated from frontmatter -->` block before the document's first heading.
-Body wiki-link in the Linked Artifacts section left as bare `[[...]]` in markdown
+Body wiki-link in the Linked Artifacts section left as bare `...` in markdown
 body — this is correct; quoting is only required inside YAML frontmatter.
 
 ## Recommendations

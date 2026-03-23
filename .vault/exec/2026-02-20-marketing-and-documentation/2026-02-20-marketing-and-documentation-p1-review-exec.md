@@ -5,7 +5,6 @@ tags:
 date: '2026-02-20'
 related:
   - '[[2026-02-20-marketing-and-documentation-p1-plan]]'
-  - '[[2026-02-20-marketing-and-documentation-p1-summary]]'
 ---
 
 # `marketing-and-documentation` code review

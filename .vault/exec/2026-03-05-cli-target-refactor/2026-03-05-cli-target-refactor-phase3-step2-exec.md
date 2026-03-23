@@ -12,7 +12,7 @@ related:
 IO Purge and Printer Deprecation.
 
 - Modified: Multiple core files (`commands.py`, `resources.py`, etc.)
-- Removed: `[[src/vaultspec/printer.py]]`
+- Removed: `src/vaultspec/printer.py`
 
 ## Description
 

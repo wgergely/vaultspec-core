@@ -251,7 +251,7 @@ def cmd_stats(
         if orphaned:
             console.print(f"  Orphaned docs: {stats['orphaned_count']}")
         if invalid:
-            console.print(f"  Invalid links: {stats['invalid_link_count']}")
+            console.print(f"  Dangling links: {stats['dangling_link_count']}")
 
 
 # ---- vault list --------------------------------------------------------------
@@ -407,7 +407,8 @@ def _print_metrics(
         n, c = m.max_out_degree
         table.add_row("Max out-degree", f"{c}  ({n})")
     table.add_row("Orphans", str(m.orphan_count))
-    table.add_row("Invalid links", str(m.invalid_link_count))
+    table.add_row("Phantoms", str(m.phantom_count))
+    table.add_row("Dangling links", str(m.dangling_link_count))
     table.add_row("Components", str(m.connected_components))
 
     console.print(table)
@@ -508,6 +509,32 @@ def cmd_check_all(
 
     if total_errors:
         raise typer.Exit(code=1)
+
+
+@check_app.command("dangling")
+def cmd_check_dangling(
+    fix: Annotated[
+        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+    ] = False,
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    target: TargetOption = None,
+) -> None:
+    """Find wiki-links in related: frontmatter that resolve to no document."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
+    from vaultspec_core.vaultcore.checks import check_dangling
+
+    graph = VaultGraph(_get_ctx().target_dir)
+    result = check_dangling(
+        _get_ctx().target_dir, graph=graph, feature=feature, fix=fix
+    )
+    _render_and_exit(result, verbose)
 
 
 @check_app.command("orphans")

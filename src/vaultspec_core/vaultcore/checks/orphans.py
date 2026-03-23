@@ -46,6 +46,8 @@ def check_orphans(
 
     for name in sorted(orphan_names):
         node = graph.nodes[name]
+        if node.path is None:
+            continue
 
         if feature:
             feat = feature.lstrip("#")
