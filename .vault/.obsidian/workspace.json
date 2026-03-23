@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "8cc8483f20cb2ad8",
+        "id": "b0071f5b5bb86b25",
         "type": "tabs",
         "children": [
           {
-            "id": "9165a95fdc07e4c7",
+            "id": "e8e7c756970d4144",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -85,37 +85,6 @@
         "type": "tabs",
         "children": [
           {
-            "id": "3464a139cfdcc5ab",
-            "type": "leaf",
-            "state": {
-              "type": "backlink",
-              "state": {
-                "collapseAll": false,
-                "extraContext": false,
-                "sortOrder": "alphabetical",
-                "showSearch": false,
-                "searchQuery": "",
-                "backlinkCollapsed": false,
-                "unlinkedCollapsed": true
-              },
-              "icon": "links-coming-in",
-              "title": "Backlinks"
-            }
-          },
-          {
-            "id": "cbf1b77d36c9c724",
-            "type": "leaf",
-            "state": {
-              "type": "outgoing-link",
-              "state": {
-                "linksCollapsed": false,
-                "unlinkedCollapsed": true
-              },
-              "icon": "links-going-out",
-              "title": "Outgoing links"
-            }
-          },
-          {
             "id": "c2fc5e2e246e150e",
             "type": "leaf",
             "state": {
@@ -157,6 +126,37 @@
               "icon": "lucide-list",
               "title": "Outline"
             }
+          },
+          {
+            "id": "39c9b9addb732b4f",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "c474da3d739f6dfa",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
           }
         ]
       }
@@ -176,8 +176,10 @@
       "bases:Create new base": false
     }
   },
-  "active": "9165a95fdc07e4c7",
+  "active": "e8e7c756970d4144",
   "lastOpenFiles": [
+    "Index.md",
+    "audit/2026-03-11-naming-surface-audit.md",
     "plan/2026-02-22-protocol-stack-deep-audit-plan.md",
     "adr/2026-02-22-mcp-consolidation-adr.md",
     "exec/2026-03-22-graph-hardening/2026-03-22-graph-hardening-summary-exec.md",

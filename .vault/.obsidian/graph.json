@@ -1,22 +1,37 @@
 {
-  "collapse-filter": false,
+  "collapse-filter": true,
   "search": "",
   "showTags": false,
   "showAttachments": false,
-  "hideUnresolved": true,
-  "showOrphans": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
   "collapse-color-groups": false,
-  "colorGroups": [],
+  "colorGroups": [
+    {
+      "query": "tag:#plan  ",
+      "color": {
+        "a": 1,
+        "rgb": 12985380
+      }
+    },
+    {
+      "query": "tag:#exec",
+      "color": {
+        "a": 1,
+        "rgb": 14069084
+      }
+    }
+  ],
   "collapse-display": false,
   "showArrow": false,
   "textFadeMultiplier": 0,
-  "nodeSizeMultiplier": 1,
-  "lineSizeMultiplier": 1,
+  "nodeSizeMultiplier": 1.78702422145329,
+  "lineSizeMultiplier": 1.80397923875433,
   "collapse-forces": false,
-  "centerStrength": 0.518713248970312,
+  "centerStrength": 0.347750865051903,
   "repelStrength": 10,
   "linkStrength": 1,
   "linkDistance": 250,
-  "scale": 0.39710305469796053,
+  "scale": 0.24397715912400983,
   "close": false
 }
