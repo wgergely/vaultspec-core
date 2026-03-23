@@ -17,6 +17,9 @@ related:
   - '[[2026-03-05-cli-target-refactor-phase5-step1-exec]]'
   - '[[2026-03-05-cli-target-refactor-phase5-step2-exec]]'
   - '[[2026-03-05-cli-target-refactor-phase5-summary-exec]]'
+  - '[[2026-03-23-cli-target-refactor-adr]]'
+  - '[[2026-03-23-cli-target-refactor-plan]]'
+  - '[[2026-03-23-cli-target-refactor-research]]'
 ---
 
 # `cli-target-refactor` feature index
@@ -24,6 +27,10 @@ related:
 Auto-generated index of all documents tagged with `#cli-target-refactor`.
 
 ## Documents
+
+### adr
+
+- `2026-03-23-cli-target-refactor-adr` - `cli-target-refactor` adr: `cli target refactor` | (**status:** `{accepted|rejected|deprecated}`)
 
 ### exec
 
@@ -40,3 +47,11 @@ Auto-generated index of all documents tagged with `#cli-target-refactor`.
 - `2026-03-05-cli-target-refactor-phase5-step1-exec` - `cli-target-refactor` `phase5` `step1`
 - `2026-03-05-cli-target-refactor-phase5-step2-exec` - `cli-target-refactor` `phase5` `step2`
 - `2026-03-05-cli-target-refactor-phase5-summary-exec` - `cli-target-refactor` `phase5` `summary`
+
+### plan
+
+- `2026-03-23-cli-target-refactor-plan` - `cli-target-refactor` `cli target refactor` plan
+
+### research
+
+- `2026-03-23-cli-target-refactor-research` - `cli-target-refactor` research: `cli-target-refactor`

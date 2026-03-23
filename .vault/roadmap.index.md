@@ -11,6 +11,8 @@ related:
   - '[[2026-02-17-tech-audit-audit]]'
   - '[[2026-02-17-test-verification-audit]]'
   - '[[2026-02-17-ux-simulation-audit]]'
+  - '[[2026-03-23-roadmap-adr]]'
+  - '[[2026-03-23-roadmap-research]]'
 ---
 
 # `roadmap` feature index
@@ -18,6 +20,10 @@ related:
 Auto-generated index of all documents tagged with `#roadmap`.
 
 ## Documents
+
+### adr
+
+- `2026-03-23-roadmap-adr` - `roadmap` adr: `roadmap` | (**status:** `{accepted|rejected|deprecated}`)
 
 ### audit
 
@@ -31,3 +37,7 @@ Auto-generated index of all documents tagged with `#roadmap`.
 ### plan
 
 - `2026-02-17-roadmap-plan` - vaultspec Roadmap: Wave-Based Rollout Plan
+
+### research
+
+- `2026-03-23-roadmap-research` - `roadmap` research: `roadmap`

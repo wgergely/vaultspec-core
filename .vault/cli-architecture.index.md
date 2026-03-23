@@ -14,6 +14,7 @@ related:
   - '[[2026-03-21-cli-contract-reference]]'
   - '[[2026-03-21-cli-grounding-reference]]'
   - '[[2026-03-21-cli-reference]]'
+  - '[[2026-03-23-cli-architecture-research]]'
 ---
 
 # `cli-architecture` feature index
@@ -43,3 +44,7 @@ Auto-generated index of all documents tagged with `#cli-architecture`.
 - `2026-03-21-cli-contract-reference` - vaultspec-core CLI Binding Contract
 - `2026-03-21-cli-grounding-reference` - CLI Grounding Research: Contract vs Implementation
 - `2026-03-21-cli-reference` - CLI Audit Notes
+
+### research
+
+- `2026-03-23-cli-architecture-research` - `cli-architecture` research: `cli architecture`

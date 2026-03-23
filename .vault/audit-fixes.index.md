@@ -7,6 +7,7 @@ related:
   - '[[2026-02-22-audit-fixes-adr]]'
   - '[[2026-02-22-audit-fixes-execution-summary-exec]]'
   - '[[2026-02-22-audit-fixes-plan]]'
+  - '[[2026-03-23-audit-fixes-research]]'
 ---
 
 # `audit-fixes` feature index
@@ -26,3 +27,7 @@ Auto-generated index of all documents tagged with `#audit-fixes`.
 ### plan
 
 - `2026-02-22-audit-fixes-plan` - Plan: Audit Remediations (Logging & Robustness)
+
+### research
+
+- `2026-03-23-audit-fixes-research` - `audit-fixes` research: `audit fixes`
