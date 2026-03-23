@@ -5,11 +5,12 @@ tags:
 date: '2026-02-22'
 related:
   - '[[2026-02-22-system-prompt-injection-adr]]'
+  - '[[2026-02-22-system-prompt-injection-research]]'
 ---
 
 # Plan: XML-Based System Prompt Injection
 
-This plan executes the refactor of `src/vaultspec/cli.py` to use XML-based injection for skills and sub-agents, as mandated by `[[2026-02-22-system-prompt-injection-adr]]`.
+This plan executes the refactor of `src/vaultspec/cli.py` to use XML-based injection for skills and sub-agents, as mandated by `2026-02-22-system-prompt-injection-adr`.
 
 ## Phase 1: Preparation
 

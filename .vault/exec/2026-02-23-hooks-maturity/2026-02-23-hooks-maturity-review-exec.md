@@ -15,7 +15,7 @@ related:
 
 ## Audit Context
 
-- **Plan:** `[[2026-02-23-hooks-maturity-plan]]`
+- **Plan:** `2026-02-23-hooks-maturity-plan`
 - **Scope (this review pass — Phase 2 wiring, Phase 3a tests, Phase 3b docs):**
   - `src/vaultspec/vault_cli.py` — lifecycle trigger wiring
   - `src/vaultspec/spec_cli.py` — sync-all trigger wiring

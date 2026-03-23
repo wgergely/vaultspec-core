@@ -13,7 +13,7 @@ related:
 
 ## Audit Context
 
-- **Plan:** `[[2026-02-20-marketing-and-documentation-p1-plan]]`
+- **Plan:** `2026-02-20-marketing-and-documentation-p1-plan`
 - **Scope:**
   - CREATED: `.vaultspec/docs/concepts.md`
   - CREATED: `.vaultspec/docs/cli-reference.md`

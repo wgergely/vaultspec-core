@@ -15,7 +15,7 @@ related:
 
 ## Audit Context
 
-- **Plan:** `[[2026-02-21-packaging-restructure-p1p2-plan]]`
+- **Plan:** `2026-02-21-packaging-restructure-p1p2-plan`
 - **Scope:** Steps 14-17 (Phase 1 verification stream D). Covers editable install, test suite, CLI entry points, MCP server importability, bare-import elimination, and packaging config.
 
 ## Step Results

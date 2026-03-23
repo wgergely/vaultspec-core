@@ -12,7 +12,13 @@ import re
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from ._base import CheckDiagnostic, CheckResult, Severity, VaultSnapshot
+from ._base import (
+    CheckDiagnostic,
+    CheckResult,
+    Severity,
+    VaultSnapshot,
+    is_generated_index,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -131,6 +137,10 @@ def check_structure(
         )
 
     for doc_path in snapshot:
+        # Skip generated index files (non-standard naming convention)
+        if is_generated_index(doc_path):
+            continue
+
         doc_type = get_doc_type(doc_path, root_dir)
         errors = VaultConstants.validate_filename(doc_path.name, doc_type)
 
@@ -143,7 +153,7 @@ def check_structure(
                         CheckDiagnostic(
                             path=doc_path.relative_to(root_dir),
                             message=msg,
-                            severity=Severity.WARNING,
+                            severity=Severity.ERROR,
                         )
                     )
         else:
@@ -152,7 +162,7 @@ def check_structure(
                     CheckDiagnostic(
                         path=doc_path.relative_to(root_dir),
                         message=msg,
-                        severity=Severity.WARNING,
+                        severity=Severity.ERROR,
                         fixable=True,
                         fix_description="Run with --fix to attempt auto-rename",
                     )

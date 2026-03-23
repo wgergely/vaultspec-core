@@ -15,11 +15,25 @@ __all__ = ["extract_related_links", "extract_wiki_links"]
 logger = logging.getLogger(__name__)
 
 
+_CODE_FENCE_RE = re.compile(
+    r"^(?:```|~~~)[^\n]*\n.*?^(?:```|~~~)\s*$",
+    re.MULTILINE | re.DOTALL,
+)
+_INLINE_CODE_RE = re.compile(r"`[^`]+`")
+
+
+def _strip_code(text: str) -> str:
+    """Remove fenced code blocks and inline code spans from text."""
+    stripped = _CODE_FENCE_RE.sub("", text)
+    return _INLINE_CODE_RE.sub("", stripped)
+
+
 def extract_wiki_links(content: str) -> set[str]:
     """Extract all ``[[wiki-link]]`` targets from a markdown string.
 
     Handles both ``[[Target]]`` and ``[[Target|Display]]`` forms; only the
-    target (left-hand) portion is returned.
+    target (left-hand) portion is returned.  Links inside fenced code blocks
+    and inline code spans are ignored.
 
     Args:
         content: Raw markdown text to scan.
@@ -27,9 +41,12 @@ def extract_wiki_links(content: str) -> set[str]:
     Returns:
         Set of unique link target strings with surrounding whitespace stripped.
     """
+    # Strip code blocks/spans so TOML [[headers]] etc. aren't matched
+    prose = _strip_code(content)
+
     # Matches [[Link Name]] or [[Link Name|Display Name]]
     pattern = r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]"
-    matches = re.findall(pattern, content)
+    matches = re.findall(pattern, prose)
     targets = set()
     for m in matches:
         target = m.strip()

@@ -11,7 +11,7 @@ related:
 
 **Date**: 2026-02-17
 **Author**: ProductResearch-B (Protocol Ecosystem Analyst)
-**Cross-reference**: [2026-02-17-competitive-landscape-audit.md](2026-02-17-competitive-landscape-audit.md)
+**Cross-reference**: `2026-02-17-competitive-landscape-audit.md`
 
 ______________________________________________________________________
 

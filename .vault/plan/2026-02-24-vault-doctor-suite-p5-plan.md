@@ -5,6 +5,7 @@ related:
   - '[[2026-02-24-vault-doctor-suite-adr]]'
   - '[[2026-02-24-vault-doctor-suite-plan]]'
   - '[[2026-02-24-vault-doctor-suite-p1-plan]]'
+  - '[[2026-02-24-vault-doctor-suite-research]]'
 ---
 
 # `vault-doctor-suite` P5 plan: Coverage Matrix and Reporting

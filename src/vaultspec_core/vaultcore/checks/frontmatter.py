@@ -17,6 +17,7 @@ from ._base import (
     Severity,
     VaultSnapshot,
     extract_feature_tags,
+    is_generated_index,
 )
 
 if TYPE_CHECKING:
@@ -170,6 +171,10 @@ def check_frontmatter(
     result = CheckResult(check_name="frontmatter", supports_fix=True)
 
     for doc_path, (metadata, _body) in snapshot.items():
+        # Skip generated index files (non-standard frontmatter shape)
+        if is_generated_index(doc_path):
+            continue
+
         if doc_type_filter:
             dt = get_doc_type(doc_path, root_dir)
             if dt and dt.value != doc_type_filter:
