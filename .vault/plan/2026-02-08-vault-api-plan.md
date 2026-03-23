@@ -5,6 +5,7 @@ tags:
 date: '2026-02-08'
 related:
   - '[[2026-02-08-vault-api-adr]]'
+  - '[[2026-02-08-vault-api-research]]'
 ---
 
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields outside the YAML frontmatter above -->

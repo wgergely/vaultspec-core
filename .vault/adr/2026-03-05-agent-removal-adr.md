@@ -45,7 +45,7 @@ The implementation will involve removing the following components as identified 
 1. **Configuration:** Remove `a2a_default_port`, `a2a_host`, `agent_mode`, `agent_dir` and related env variables from `config/config.py`.
 1. **Tests:** Remove all tests under `protocol/a2a/tests/`, and specific team/agent tests like `test_team_mixed.py`, `test_team_provider.py`, `test_e2e.py` (A2A parts), and `test_load_agent.py`.
 
-Reference `[[2026-03-05-agent-removal-research]]` and `[[2026-03-05-agent-removal-reference]]` specs.
+Reference `2026-03-05-agent-removal-research` and `2026-03-05-agent-removal-reference` specs.
 
 ## Rationale
 

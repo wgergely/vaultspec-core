@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ._base import CheckDiagnostic, CheckResult, Severity
+from ._base import CheckDiagnostic, CheckResult, Severity, is_generated_index
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -47,6 +47,10 @@ def check_orphans(
     for name in sorted(orphan_names):
         node = graph.nodes[name]
         if node.path is None:
+            continue
+
+        # Skip generated index files (they link out but have no inbound)
+        if is_generated_index(node.path):
             continue
 
         if feature:

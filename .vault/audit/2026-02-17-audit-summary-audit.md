@@ -18,11 +18,11 @@ related:
 **Synthesized by**: MarketingLead
 **Source Reports**:
 
-- [2026-02-17-tech-audit-audit.md](2026-02-17-tech-audit-audit.md) -- Technical Codebase Audit (TechAuditor)
-- [2026-02-17-test-verification-audit.md](2026-02-17-test-verification-audit.md) -- Test Verification Report (TechTester)
-- [2026-02-17-competitive-landscape-audit.md](2026-02-17-competitive-landscape-audit.md) -- Competitive Landscape Analysis (ProductResearch-A)
-- [2026-02-17-protocol-ecosystem-audit.md](2026-02-17-protocol-ecosystem-audit.md) -- Protocol Ecosystem & Feature Gap Analysis (ProductResearch-B)
-- [2026-02-17-marketing-ux-audit.md](2026-02-17-marketing-ux-audit.md) -- Documentation UX Audit (MarketingLead)
+- `2026-02-17-tech-audit-audit.md` -- Technical Codebase Audit (TechAuditor)
+- `2026-02-17-test-verification-audit.md` -- Test Verification Report (TechTester)
+- `2026-02-17-competitive-landscape-audit.md` -- Competitive Landscape Analysis (ProductResearch-A)
+- `2026-02-17-protocol-ecosystem-audit.md` -- Protocol Ecosystem & Feature Gap Analysis (ProductResearch-B)
+- `2026-02-17-marketing-ux-audit.md` -- Documentation UX Audit (MarketingLead)
 
 ______________________________________________________________________
 
@@ -308,14 +308,14 @@ ______________________________________________________________________
 
 ## Report Index
 
-| #   | Report                                                             | Author            | Focus                       | Key Score                  |
-| --- | ------------------------------------------------------------------ | ----------------- | --------------------------- | -------------------------- |
-| 01  | [ux-simulation](2026-02-17-ux-simulation-audit.md)                 | JohnDoe           | First-time user journey     | 5.9/10 weighted            |
-| 02  | [tech-audit](2026-02-17-tech-audit-audit.md)                       | TechAuditor       | Implementation completeness | 46/46 features, 0 stubs    |
-| 03  | [test-verification](2026-02-17-test-verification-audit.md)         | TechTester        | Test execution & coverage   | 976 tests, ~99.5% pass     |
-| 04  | [competitive-landscape](2026-02-17-competitive-landscape-audit.md) | ProductResearch-A | Market positioning          | 20+ competitors profiled   |
-| 05  | [protocol-ecosystem](2026-02-17-protocol-ecosystem-audit.md)       | ProductResearch-B | Protocol & technology gaps  | 3-protocol stack validated |
-| 06  | [marketing-ux-review](2026-02-17-marketing-ux-audit.md)            | MarketingLead     | Documentation UX standards  | 3.05/10 weighted           |
+| #   | Report                                      | Author            | Focus                       | Key Score                  |
+| --- | ------------------------------------------- | ----------------- | --------------------------- | -------------------------- |
+| 01  | `2026-02-17-ux-simulation-audit.md`         | JohnDoe           | First-time user journey     | 5.9/10 weighted            |
+| 02  | `2026-02-17-tech-audit-audit.md`            | TechAuditor       | Implementation completeness | 46/46 features, 0 stubs    |
+| 03  | `2026-02-17-test-verification-audit.md`     | TechTester        | Test execution & coverage   | 976 tests, ~99.5% pass     |
+| 04  | `2026-02-17-competitive-landscape-audit.md` | ProductResearch-A | Market positioning          | 20+ competitors profiled   |
+| 05  | `2026-02-17-protocol-ecosystem-audit.md`    | ProductResearch-B | Protocol & technology gaps  | 3-protocol stack validated |
+| 06  | `2026-02-17-marketing-ux-audit.md`          | MarketingLead     | Documentation UX standards  | 3.05/10 weighted           |
 
 ______________________________________________________________________
 

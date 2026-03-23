@@ -511,6 +511,28 @@ def cmd_check_all(
         raise typer.Exit(code=1)
 
 
+@check_app.command("body-links")
+def cmd_check_body_links(
+    feature: Annotated[
+        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    target: TargetOption = None,
+) -> None:
+    """Find wiki-links and markdown path links in document body text."""
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
+    from vaultspec_core.vaultcore.checks import check_body_links
+
+    graph = VaultGraph(_get_ctx().target_dir)
+    snapshot = graph.to_snapshot()
+    result = check_body_links(_get_ctx().target_dir, snapshot=snapshot, feature=feature)
+    _render_and_exit(result, verbose)
+
+
 @check_app.command("dangling")
 def cmd_check_dangling(
     fix: Annotated[
@@ -749,6 +771,49 @@ def cmd_feature_list(
         console.print(
             f"  [bold]{name}[/bold]  {count} docs  ({types_str}){plan_marker}"
         )
+
+
+# ---- vault feature index -----------------------------------------------------
+
+
+@feature_app.command("index")
+def cmd_feature_index(
+    feature: Annotated[
+        str | None,
+        typer.Option("--feature", "-f", help="Generate index for a specific feature"),
+    ] = None,
+    target: TargetOption = None,
+) -> None:
+    """Generate or update feature index documents.
+
+    Creates a <feature>.index.md in the vault root for each feature tag
+    (or a specific one with --feature). The index links to all documents
+    sharing that feature tag, making implicit feature clusters explicit
+    in the graph.
+    """
+    apply_target(target)
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.graph import VaultGraph
+    from vaultspec_core.vaultcore.index import generate_feature_index
+
+    console = get_console()
+    root_dir = _get_ctx().target_dir
+    graph = VaultGraph(root_dir)
+
+    features = [feature.lstrip("#")] if feature else graph.get_features()
+
+    if not features:
+        console.print("[dim]No features found in vault.[/dim]")
+        return
+
+    for feat in features:
+        nodes = graph.get_feature_nodes(feat)
+        if not nodes:
+            console.print(f"[dim]No documents found for #{feat}.[/dim]")
+            continue
+        path = generate_feature_index(root_dir, feat, nodes=nodes)
+        console.print(f"[green]Index:[/green] {path}")
 
 
 # ---- vault feature archive ---------------------------------------------------

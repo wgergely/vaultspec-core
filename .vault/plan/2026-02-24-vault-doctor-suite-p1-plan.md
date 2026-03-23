@@ -4,6 +4,7 @@ date: '2026-02-24'
 related:
   - '[[2026-02-24-vault-doctor-suite-adr]]'
   - '[[2026-02-24-vault-doctor-suite-plan]]'
+  - '[[2026-02-24-vault-doctor-suite-research]]'
 ---
 
 # `vault-doctor-suite` P1 plan: Foundation — Models, Registry, Safe Writer, CLI Scaffold, Remove `vault audit`

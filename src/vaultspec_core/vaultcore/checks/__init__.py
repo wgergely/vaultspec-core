@@ -3,7 +3,7 @@
 Re-exports the result contract
 (:class:`~vaultspec_core.vaultcore.checks._base.CheckResult`,
 :class:`~vaultspec_core.vaultcore.checks._base.CheckDiagnostic`,
-:class:`~vaultspec_core.vaultcore.checks._base.Severity`) and all seven
+:class:`~vaultspec_core.vaultcore.checks._base.Severity`) and all
 checker functions from their submodules. Use :func:`run_all_checks` for a
 combined pass or call individual checkers. Consumed by
 :mod:`vaultspec_core.cli` and :mod:`vaultspec_core.mcp_server`.
@@ -21,6 +21,7 @@ from ._base import (
     VaultSnapshot,
     render_check_result,
 )
+from .body_links import check_body_links
 from .dangling import check_dangling
 from .features import check_features
 from .frontmatter import check_frontmatter
@@ -38,6 +39,7 @@ __all__ = [
     "Severity",
     "VaultDocData",
     "VaultSnapshot",
+    "check_body_links",
     "check_dangling",
     "check_features",
     "check_frontmatter",
@@ -57,10 +59,10 @@ def run_all_checks(
     feature: str | None = None,
     fix: bool = False,
 ) -> list[CheckResult]:
-    """Run all eight vault health checkers and return their results.
+    """Run all vault health checkers and return their results.
 
-    Executes structure, frontmatter, links, dangling, orphans, features,
-    references, and schema checks in order. Builds a single
+    Executes structure, frontmatter, links, dangling, body-links, orphans,
+    features, references, and schema checks in order. Builds a single
     :class:`~vaultspec_core.graph.VaultGraph` and shares it across
     graph-consuming checkers to avoid redundant I/O.
 
@@ -83,6 +85,7 @@ def run_all_checks(
         check_frontmatter(root_dir, snapshot=snapshot, feature=feature, fix=fix),
         check_links(root_dir, snapshot=snapshot, feature=feature, fix=fix),
         check_dangling(root_dir, graph=graph, feature=feature, fix=fix),
+        check_body_links(root_dir, snapshot=snapshot, feature=feature),
         check_orphans(root_dir, graph=graph, feature=feature),
         check_features(root_dir, snapshot=snapshot, feature=feature),
         check_references(root_dir, graph=graph, feature=feature, fix=fix),

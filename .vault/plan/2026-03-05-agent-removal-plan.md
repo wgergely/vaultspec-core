@@ -15,7 +15,7 @@ Implement the removal of obsolete agent management and A2A protocol from the cor
 
 ## Proposed Changes
 
-Remove all obsolete agent management, A2A protocol, subagent, and team coordination code as detailed in `[[2026-03-05-agent-removal-adr]]`. This code has been migrated to `vaultspec-a2a`, and its removal from the core `vaultspec` repository will reduce bloat, simplify the codebase, and align with our new architecture. The cleanup involves removing CLI commands, MCP tools, orchestration logic, the entire A2A protocol layer, updating core entry points, and removing associated tests.
+Remove all obsolete agent management, A2A protocol, subagent, and team coordination code as detailed in `2026-03-05-agent-removal-adr`. This code has been migrated to `vaultspec-a2a`, and its removal from the core `vaultspec` repository will reduce bloat, simplify the codebase, and align with our new architecture. The cleanup involves removing CLI commands, MCP tools, orchestration logic, the entire A2A protocol layer, updating core entry points, and removing associated tests.
 
 ## Tasks
 
@@ -23,30 +23,30 @@ Remove all obsolete agent management, A2A protocol, subagent, and team coordinat
   - Name: Delete CLI entry points and MCP tools
   - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase1-step1.md`
   - Executing sub-agent: `vaultspec-standard-executor`
-  - References: `[[2026-03-05-agent-removal-adr]]`, `[[2026-03-05-agent-removal-research]]`
+  - References: `2026-03-05-agent-removal-adr`, `2026-03-05-agent-removal-research`
 - Phase 2: Remove Library Code and Protocol Layer
   - Name: Delete orchestration logic and A2A directory
   - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase2-step1.md`
   - Executing sub-agent: `vaultspec-standard-executor`
-  - References: `[[2026-03-05-agent-removal-adr]]`, `[[2026-03-05-agent-removal-reference]]`
+  - References: `2026-03-05-agent-removal-adr`, `2026-03-05-agent-removal-reference`
   - Name: Remove A2A methods from providers
   - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase2-step2.md`
   - Executing sub-agent: `vaultspec-standard-executor`
-  - References: `[[2026-03-05-agent-removal-reference]]`
+  - References: `2026-03-05-agent-removal-reference`
 - Phase 3: Update Core Entry Points and Configuration
   - Name: Clean up __main__, spec_cli, and __init__
   - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase3-step1.md`
   - Executing sub-agent: `vaultspec-complex-executor`
-  - References: `[[2026-03-05-agent-removal-adr]]`, `[[2026-03-05-agent-removal-research]]`
+  - References: `2026-03-05-agent-removal-adr`, `2026-03-05-agent-removal-research`
   - Name: Remove A2A configurations, enums, and types
   - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase3-step2.md`
   - Executing sub-agent: `vaultspec-complex-executor`
-  - References: `[[2026-03-05-agent-removal-research]]`
+  - References: `2026-03-05-agent-removal-research`
 - Phase 4: Clean up Test Suite
   - Name: Delete A2A and agent tests
   - Step summary: `.vault/exec/2026-03-05-agent-removal/2026-03-05-agent-removal-phase4-step1.md`
   - Executing sub-agent: `vaultspec-standard-executor`
-  - References: `[[2026-03-05-agent-removal-reference]]`
+  - References: `2026-03-05-agent-removal-reference`
 
 ## Parallelization
 

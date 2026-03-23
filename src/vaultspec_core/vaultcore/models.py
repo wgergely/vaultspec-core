@@ -210,8 +210,10 @@ class VaultConstants:
                     )
                     errors.append(msg)
             elif item.is_file():
-                # Usually we don't expect files in the root of .vault/
-                if item.name.lower() != "readme.md":
+                # Allow readme and generated feature index files in root
+                if item.name.lower() != "readme.md" and not item.name.endswith(
+                    ".index.md"
+                ):
                     msg = (
                         f"Vault violation: File found in {docs_dir_name}/ root: "
                         f"'{item.name}'. Files should be in subdirectories."

@@ -17,13 +17,13 @@ date: 2026-03-11
 
 Programmatic evidence:
 
-- [pyproject.toml](../../pyproject.toml#L38)
-- [pyproject.toml](../../pyproject.toml#L50)
-- [mcp.json](../../mcp.json#L3)
-- [src/vaultspec_core/cli/root.py](../../src/vaultspec_core/cli/root.py#L43)
-- [src/vaultspec_core/mcp_server/app.py](../../src/vaultspec_core/mcp_server/app.py#L44)
-- [tests/test_package_metadata.py](../../tests/test_package_metadata.py#L17)
-- [tests/test_mcp_config.py](../../tests/test_mcp_config.py#L25)
+- `pyproject.toml#L38`
+- `pyproject.toml#L50`
+- `mcp.json#L3`
+- `src/vaultspec_core/cli/root.py#L43`
+- `src/vaultspec_core/mcp_server/app.py#L44`
+- `tests/test_package_metadata.py#L17`
+- `tests/test_mcp_config.py#L25`
 
 ## Acceptable Versus Stale Uses Of `vaultspec`
 
@@ -60,7 +60,7 @@ Stale or contract-significant drift:
 
    Evidence:
 
-   - [.vaultspec/rules/hooks/example-audit-on-create.yaml](../../.vaultspec/rules/hooks/example-audit-on-create.yaml#L3)
+   - `.vaultspec/rules/hooks/example-audit-on-create.yaml#L3`
 
    Problems:
 
@@ -74,15 +74,15 @@ Stale or contract-significant drift:
 
    Evidence:
 
-   - [.vaultspec/rules/system/03-vaultspec.md](../../.vaultspec/rules/system/03-vaultspec.md#L63)
-   - [.vaultspec/rules/skills/vaultspec-execute/SKILL.md](../../.vaultspec/rules/skills/vaultspec-execute/SKILL.md#L5)
-   - [.vaultspec/rules/skills/vaultspec-execute/SKILL.md](../../.vaultspec/rules/skills/vaultspec-execute/SKILL.md#L27)
-   - [.vaultspec/rules/skills/vaultspec-research/SKILL.md](../../.vaultspec/rules/skills/vaultspec-research/SKILL.md#L25)
-   - [.vaultspec/rules/skills/vaultspec-team/SKILL.md](../../.vaultspec/rules/skills/vaultspec-team/SKILL.md#L26)
-   - [.vaultspec/rules/agents/vaultspec-adr-researcher.md](../../.vaultspec/rules/agents/vaultspec-adr-researcher.md#L18)
-   - [.vaultspec/rules/agents/vaultspec-high-executor.md](../../.vaultspec/rules/agents/vaultspec-high-executor.md#L18)
-   - [.vaultspec/rules/agents/vaultspec-low-executor.md](../../.vaultspec/rules/agents/vaultspec-low-executor.md#L18)
-   - [.vaultspec/rules/agents/vaultspec-standard-executor.md](../../.vaultspec/rules/agents/vaultspec-standard-executor.md#L18)
+   - `.vaultspec/rules/system/03-vaultspec.md#L63`
+   - `.vaultspec/rules/skills/vaultspec-execute/SKILL.md#L5`
+   - `.vaultspec/rules/skills/vaultspec-execute/SKILL.md#L27`
+   - `.vaultspec/rules/skills/vaultspec-research/SKILL.md#L25`
+   - `.vaultspec/rules/skills/vaultspec-team/SKILL.md#L26`
+   - `.vaultspec/rules/agents/vaultspec-adr-researcher.md#L18`
+   - `.vaultspec/rules/agents/vaultspec-high-executor.md#L18`
+   - `.vaultspec/rules/agents/vaultspec-low-executor.md#L18`
+   - `.vaultspec/rules/agents/vaultspec-standard-executor.md#L18`
 
    Problem:
 
@@ -94,7 +94,7 @@ Stale or contract-significant drift:
 
    Evidence:
 
-   - [.env.example](../../.env.example#L1)
+   - `.env.example#L1`
 
    Problems:
 
@@ -112,9 +112,9 @@ Stale or contract-significant drift:
    Evidence:
 
    - `.agents/GEMINI.md` (removed)
-   - [src/vaultspec_core/config/config.py](../../src/vaultspec_core/config/config.py#L1)
-   - [src/vaultspec_core/config/workspace.py](../../src/vaultspec_core/config/workspace.py#L1)
-   - [src/vaultspec_core/core/helpers.py](../../src/vaultspec_core/core/helpers.py#L1)
+   - `src/vaultspec_core/config/config.py#L1`
+   - `src/vaultspec_core/config/workspace.py#L1`
+   - `src/vaultspec_core/core/helpers.py#L1`
 
    Note:
 
@@ -186,7 +186,7 @@ Stale or contract-significant drift:
 ## Addendum: Root CLI `mcp` Dead Branch
 
 - The special-case `ctx.invoked_subcommand == "mcp"` branch in
-  [src/vaultspec_core/cli/root.py](../../src/vaultspec_core/cli/root.py#L1)
+  `src/vaultspec_core/cli/root.py#L1`
   was dead compatibility code for an older root-CLI MCP path.
 
 - The live packaged surface ships MCP through the separate

@@ -15,9 +15,9 @@ Migrate the `vaultspec` CLI from `argparse` to `Typer` + `Rich`, deprecating spl
 
 ## Context
 
-As discovered in the extensive `[[2026-03-05-cli-architecture-audit]]`, the current `argparse` implementation is fundamentally broken regarding global flag inheritance, `--help` intercepts, and `sys.argv` routing. Furthermore, the `agent-removal` plan has stripped out the sub-agent tools, meaning the surviving CLI commands (`vault`, `rules`, `hooks`, `doctor`, `mcp`, `sync`) must be stabilized.
+As discovered in the extensive `2026-03-05-cli-architecture-audit`, the current `argparse` implementation is fundamentally broken regarding global flag inheritance, `--help` intercepts, and `sys.argv` routing. Furthermore, the `agent-removal` plan has stripped out the sub-agent tools, meaning the surviving CLI commands (`vault`, `rules`, `hooks`, `doctor`, `mcp`, `sync`) must be stabilized.
 
-This plan implements both the path resolution overhaul (`[[2026-03-05-cli-path-resolution-adr]]`) and the underlying engine replacement (`[[2026-03-05-cli-engine-typer-adr]]`).
+This plan implements both the path resolution overhaul (`2026-03-05-cli-path-resolution-adr`) and the underlying engine replacement (`2026-03-05-cli-engine-typer-adr`).
 
 ## Prerequisite Blocker
 

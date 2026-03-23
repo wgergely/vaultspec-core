@@ -52,6 +52,13 @@ repos:
         types: [markdown]
         pass_filenames: false
 
+      - id: check-body-links
+        name: Check for links in vault document body text
+        entry: uv run --no-sync python -c "from vaultspec_core.cli import app; app()" vault check body-links
+        language: system
+        types: [markdown]
+        pass_filenames: false
+
       - id: mdformat-check
         name: Check Markdown formatting (mdformat)
         entry: uv run --no-sync mdformat --check

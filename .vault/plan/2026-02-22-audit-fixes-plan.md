@@ -9,7 +9,7 @@ related:
 
 # Plan: Audit Remediations (Logging & Robustness)
 
-This plan executes the fixes mandated by `[[2026-02-22-audit-fixes-adr]]` to improve logging and robustness across the codebase.
+This plan executes the fixes mandated by `2026-02-22-audit-fixes-adr` to improve logging and robustness across the codebase.
 
 ## Phase 1: RAG Resilience
 

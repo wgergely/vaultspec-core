@@ -14,7 +14,7 @@ related:
 
 ## Audit Context
 
-- **Plan:** `[[2026-02-19-workspace-paths-implementation-plan]]`
+- **Plan:** `2026-02-19-workspace-paths-implementation-plan`
 - **Scope:**
   - `.vaultspec/lib/src/core/workspace.py` (new, 381 lines)
   - `.vaultspec/lib/src/core/tests/test_workspace.py` (new, 341 lines)

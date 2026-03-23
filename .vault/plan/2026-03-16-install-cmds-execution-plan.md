@@ -7,6 +7,7 @@ related:
   - '[[2026-03-15-install-cmds-plan]]'
   - '[[2026-03-15-install-cmds-capability-audit]]'
   - '[[2026-03-16-managed-content-blocks-adr]]'
+  - '[[2026-03-15-claude-code-provider-research]]'
 ---
 
 # install-cmds execution plan

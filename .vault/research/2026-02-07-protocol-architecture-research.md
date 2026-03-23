@@ -66,7 +66,7 @@ Client                          Agent
 
 **What ACP is NOT**: A protocol for agent-to-agent communication. It assumes a human operator on the client side, with implicit trust (same machine, same user). No discovery mechanism, no structured task handoff, no cross-network capability.
 
-> Full reference: [2026-02-07-acp-research.md](./2026-02-07-acp-research.md)
+> Full reference: `2026-02-07-acp-research.md`
 
 ### A2A — The Agent-Agent Layer
 
@@ -107,7 +107,7 @@ class AgentExecutor(ABC):
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None: ...
 ```
 
-> Full reference: [2026-02-07-a2a-research.md](./2026-02-07-a2a-research.md)
+> Full reference: `2026-02-07-a2a-research.md`
 
 ### - MCP — The Agent-Tool Layer
 
@@ -178,7 +178,7 @@ Graph-based routing with checkpointing and shared memory (`InMemoryStore`). Supe
 
 Dual-loop planning: outer loop (Task Ledger with facts/plan) and inner loop (Progress Ledger for self-reflection). If progress stalls, re-enters outer loop and replans. Most sophisticated but heaviest overhead.
 
-> Full survey: [2026-02-07-multi-agent-orchestration-research.md](./2026-02-07-multi-agent-orchestration-research.md)
+> Full survey: `2026-02-07-multi-agent-orchestration-research.md`
 
 ______________________________________________________________________
 
@@ -342,13 +342,13 @@ ______________________________________________________________________
 
 ## Reference Documents
 
-| Document                                                                               | Scope                                                                                  |
-| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| [Protocol Review](./2026-02-07-protocol-review-research.md)                            | Initial ACP vs A2A analysis and architectural diagnosis                                |
-| [ACP Protocol Reference](./2026-02-07-acp-research.md)                                 | Full ACP spec: init, sessions, prompts, tools, permissions, proxy chains, SDKs         |
-| [A2A Protocol Reference](./2026-02-07-a2a-research.md)                                 | Full A2A spec: RPCs, task states, data types, Agent Cards, SDKs                        |
-| [Multi-Agent Orchestration Survey](./2026-02-07-multi-agent-orchestration-research.md) | Cross-framework comparison: Claude Teams, OpenAI, LangGraph, Magentic-One, CrewAI, ADK |
-| [Frontier Landscape](./2026-02-07-frontier-landscape-research.md)                      | Three ACPs, proxy chains, SymmACP, IETF drafts, gaps, three-layer stack                |
+| Document                                           | Scope                                                                                  |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `2026-02-07-protocol-review-research.md`           | Initial ACP vs A2A analysis and architectural diagnosis                                |
+| `2026-02-07-acp-research.md`                       | Full ACP spec: init, sessions, prompts, tools, permissions, proxy chains, SDKs         |
+| `2026-02-07-a2a-research.md`                       | Full A2A spec: RPCs, task states, data types, Agent Cards, SDKs                        |
+| `2026-02-07-multi-agent-orchestration-research.md` | Cross-framework comparison: Claude Teams, OpenAI, LangGraph, Magentic-One, CrewAI, ADK |
+| `2026-02-07-frontier-landscape-research.md`        | Three ACPs, proxy chains, SymmACP, IETF drafts, gaps, three-layer stack                |
 
 ______________________________________________________________________
 

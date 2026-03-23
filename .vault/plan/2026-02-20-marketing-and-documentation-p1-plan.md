@@ -18,7 +18,7 @@ the authoritative overview linking to three sub-chapter files.
 
 ## Proposed Changes
 
-Per \[[2026-02-20-marketing-and-documentation-research]\] and the interactive document review:
+Per `2026-02-20-marketing-and-documentation-research` and the interactive document review:
 
 - **Retire** 9 files: `docs/api.md`, `docs/getting-started.md`, `docs/configuration.md`,
   `docs/tutorials/first-governed-feature.md`, `docs/blog/spec-driven-development.md`,

@@ -9,6 +9,7 @@ related:
   - '[[2026-02-24-vault-doctor-suite-p3-plan]]'
   - '[[2026-02-24-vault-doctor-suite-p4-plan]]'
   - '[[2026-02-24-vault-doctor-suite-p5-plan]]'
+  - '[[2026-02-24-vault-doctor-suite-research]]'
 ---
 
 # `vault-doctor-suite` P6 plan: Integration, Pre-commit Hooks, MCP Tool, and Docs

@@ -16,9 +16,9 @@ Successfully audited and refactored the `.vaultspec/rules/skills` directory to c
 ## Actions Taken
 
 1. **Audit:** Identified that skills were flat files missing required metadata.
-1. **Research:** Documented findings in `[[2026-02-22-skill-audit-research]]`.
-1. **Decision:** Formalized the restructure in `[[2026-02-22-skill-audit-adr]]`.
-1. **Plan:** Created execution plan in `[[2026-02-22-skill-audit-plan]]`.
+1. **Research:** Documented findings in `2026-02-22-skill-audit-research`.
+1. **Decision:** Formalized the restructure in `2026-02-22-skill-audit-adr`.
+1. **Plan:** Created execution plan in `2026-02-22-skill-audit-plan`.
 1. **Migration:**
    - Converted all 15 skills from `vaultspec-*.md` to `vaultspec-*/SKILL.md`.
    - Injected `name: <skill-name>` into the YAML frontmatter of each skill.

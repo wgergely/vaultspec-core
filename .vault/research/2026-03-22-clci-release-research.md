@@ -3,8 +3,7 @@ tags:
   - '#research'
   - '#clci-release'
 date: '2026-03-22'
-related:
-  - '[[2026-03-21-cli-release-readiness-audit]]'
+related: []
 ---
 
 # clci-release research: python cli release and distribution pipeline
@@ -545,7 +544,7 @@ static versioning managed by release-please.
 
 ### 11. gaps in current setup
 
-Based on the existing `publish.yml` and \[[2026-03-21-cli-release-readiness-audit]\]:
+Based on the existing `publish.yml` and `2026-03-21-cli-release-readiness-audit`:
 
 - No CI gate before publishing (publish runs independently of lint/test)
 - Static version in pyproject.toml (no dynamic versioning)

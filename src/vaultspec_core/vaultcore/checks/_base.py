@@ -30,6 +30,7 @@ __all__ = [
     "VaultDocData",
     "VaultSnapshot",
     "extract_feature_tags",
+    "is_generated_index",
     "render_check_result",
 ]
 
@@ -99,6 +100,23 @@ class CheckResult:
     def is_clean(self) -> bool:
         """``True`` when no diagnostics were produced."""
         return len(self.diagnostics) == 0
+
+
+def is_generated_index(path: Path) -> bool:
+    """Return ``True`` if *path* is a generated feature index file.
+
+    Index files follow the ``<feature>.index.md`` naming convention and
+    live in the vault root.  They are exempt from most checkers because
+    they have a non-standard frontmatter shape (single feature tag, no
+    directory tag, ``generated: true``).
+
+    Args:
+        path: Absolute or relative path to test.
+
+    Returns:
+        ``True`` when the filename ends with ``.index.md``.
+    """
+    return path.name.endswith(".index.md")
 
 
 def extract_feature_tags(tags: list[str]) -> list[str]:
