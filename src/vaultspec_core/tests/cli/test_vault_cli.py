@@ -24,10 +24,13 @@ class TestGetVersion:
     """Verify version information is correctly retrieved."""
 
     def test_reads_version_from_pyproject(self, test_project):
+        from importlib.metadata import version
+
         from vaultspec_core.cli_common import get_version
 
         v = get_version()
-        assert v == "0.1.0"
+        expected = version("vaultspec-core")
+        assert v == expected
 
     def test_get_version_returns_string(self, test_project):
         from vaultspec_core.cli_common import get_version
