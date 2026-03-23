@@ -8,7 +8,6 @@ related:
   - '[[2026-02-17-tech-audit-audit]]'
   - '[[2026-02-17-test-verification-audit]]'
   - '[[2026-02-17-competitive-landscape-audit]]'
-  - '[[2026-02-17-protocol-ecosystem-audit]]'
   - '[[2026-02-17-marketing-ux-audit]]'
 ---
 

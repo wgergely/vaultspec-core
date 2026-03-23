@@ -10,7 +10,6 @@ related:
   - '[[2026-02-18-marketing-audit-marketing-assessment-research]]'
   - '[[2026-02-18-marketing-audit-packaging-distribution-research]]'
   - '[[2026-02-18-marketing-audit-positioning-usp-research]]'
-  - '[[2026-02-18-marketing-audit-protocol-landscape-research]]'
 ---
 
 ## Marketing Audit: Feature Comparison Table

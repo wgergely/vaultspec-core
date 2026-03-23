@@ -4,7 +4,6 @@ tags:
   - '#rules-path-audit'
 date: '2026-02-20'
 related:
-  - '[[2026-02-15-provider-parity-reference]]'
 ---
 
 # Reference: `.vaultspec/rules/` Path Audit

@@ -7,7 +7,6 @@ related:
   - '[[2026-03-15-install-cmds-plan]]'
   - '[[2026-03-15-claude-code-provider-research]]'
   - '[[2026-03-15-gemini-cli-provider-research]]'
-  - '[[2026-03-15-codex-cli-provider-research]]'
   - '[[2026-03-16-antigravity-provider-research]]'
 ---
 

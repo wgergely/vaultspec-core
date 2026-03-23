@@ -4,8 +4,6 @@ tags:
   - '#framework'
 date: '2026-03-23'
 related:
-  - '[[2026-02-07-frontier-landscape-research]]'
-  - '[[2026-02-07-multi-agent-orchestration-research]]'
   - '[[2026-02-16-env-var-research]]'
   - '[[2026-02-16-environment-variable-adr]]'
   - '[[2026-02-16-environment-variable-research]]'
@@ -13,8 +11,6 @@ related:
   - '[[2026-02-17-bootstrap-prompt-adr]]'
   - '[[2026-02-17-bootstrap-prompt-engineering-research]]'
   - '[[2026-02-17-framework-plan]]'
-  - '[[2026-03-06-mcp-agent-persona-adr]]'
-  - '[[2026-03-06-mcp-agent-persona-research]]'
 ---
 
 # `framework` feature index
@@ -27,7 +23,6 @@ Auto-generated index of all documents tagged with `#framework`.
 
 - `2026-02-16-environment-variable-adr` - ===== ENUMS =====
 - `2026-02-17-bootstrap-prompt-adr` - bootstrap-prompt adr: framework bootstrap prompt redesign | (**status:** accepted)
-- `2026-03-06-mcp-agent-persona-adr` - Architecture Decision Record: MCP Agent Persona Tools
 
 ### plan
 
@@ -35,10 +30,7 @@ Auto-generated index of all documents tagged with `#framework`.
 
 ### research
 
-- `2026-02-07-frontier-landscape-research` - Frontier Landscape: Agent Protocols and Interoperability
-- `2026-02-07-multi-agent-orchestration-research` - Multi-Agent Orchestration Patterns -- Survey
 - `2026-02-16-env-var-research` - Environment Variable Usage Audit Report
 - `2026-02-16-environment-variable-research` - Environment Variable Patterns Analysis — vaultspec
 - `2026-02-16-hardcoded-constants-research` - Environment Audit Task #2: Hardcoded Constants Report
 - `2026-02-17-bootstrap-prompt-engineering-research` - Bootstrap Prompt Engineering Research
-- `2026-03-06-mcp-agent-persona-research` - Framework research: MCP Agent Persona Tools

@@ -10,7 +10,6 @@ related:
   - '[[2026-02-18-marketing-audit-marketing-assessment-research]]'
   - '[[2026-02-18-marketing-audit-packaging-distribution-research]]'
   - '[[2026-02-18-marketing-audit-positioning-usp-research]]'
-  - '[[2026-02-18-marketing-audit-protocol-landscape-research]]'
   - '[[2026-02-18-marketing-research]]'
 ---
 
@@ -28,5 +27,4 @@ Auto-generated index of all documents tagged with `#marketing-audit`.
 - `2026-02-18-marketing-audit-marketing-assessment-research` - 2026-02-18-marketing-audit-marketing-assessment-research
 - `2026-02-18-marketing-audit-packaging-distribution-research` - 2026-02-18-marketing-audit-packaging-distribution-research
 - `2026-02-18-marketing-audit-positioning-usp-research` - 2026-02-18-marketing-audit-positioning-usp-research
-- `2026-02-18-marketing-audit-protocol-landscape-research` - 2026-02-18-marketing-audit-protocol-landscape-research
 - `2026-02-18-marketing-research` - 2026-02-18-marketing-research

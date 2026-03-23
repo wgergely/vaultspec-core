@@ -187,6 +187,9 @@ test-project/*
 !test-project/.vault/
 !test-project/README.md
 
+# Obsidian
+.vault/.obsidian/
+
 # VaultSpec Logs
 .vault/logs/
 
