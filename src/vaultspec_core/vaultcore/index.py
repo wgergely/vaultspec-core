@@ -77,7 +77,7 @@ def generate_feature_index(
 
     # Build related YAML block
     if related_links:
-        related_yaml = "\n".join(f'  - "{link}"' for link in sorted(related_links))
+        related_yaml = "\n".join(f"  - '{link}'" for link in sorted(related_links))
         related_block = f"related:\n{related_yaml}"
     else:
         related_block = "related: []"
