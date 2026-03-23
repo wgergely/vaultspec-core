@@ -6,9 +6,6 @@ date: '2026-02-21'
 related:
   - '[[2026-02-21-pytest-e2e-observability-impl-plan]]'
   - '[[2026-02-21-pytest-e2e-observability-adr]]'
-  - '[[2026-02-21-pytest-e2e-impl-phase1]]'
-  - '[[2026-02-21-pytest-e2e-impl-phase2]]'
-  - '[[2026-02-21-pytest-e2e-impl-phase3]]'
 ---
 
 # `pytest-e2e` `impl` summary
@@ -17,10 +14,10 @@ Added an observability and reliability stack for long-running A2A/E2E tests.
 Three new pytest plugins, built-in live logging, advanced timeout config,
 retry markers, and structured logging for LLM metrics capture.
 
-- Modified: `[[pyproject.toml]]`
-- Modified: `[[test_e2e_a2a.py]]`
-- Modified: `[[test_french_novel_relay.py]]`
-- Modified: `[[.gitignore]]`
+- Modified: `pyproject.toml`
+- Modified: `test_e2e_a2a.py`
+- Modified: `test_french_novel_relay.py`
+- Modified: `.gitignore`
 
 ## Description
 

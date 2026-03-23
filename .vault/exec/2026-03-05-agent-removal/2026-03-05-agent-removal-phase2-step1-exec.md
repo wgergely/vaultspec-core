@@ -11,11 +11,11 @@ related:
 
 Phase 2: Remove Library Code and Protocol Layer. Deleted orchestration logic and A2A protocol directory.
 
-- Deleted: `[[src/vaultspec/orchestration/subagent.py]]`
-- Deleted: `[[src/vaultspec/orchestration/team.py]]`
-- Deleted: `[[src/vaultspec/orchestration/team_session.py]]`
-- Deleted: `[[src/vaultspec/orchestration/team_task_engine.py]]`
-- Deleted: `[[src/vaultspec/protocol/a2a/]]` (directory)
+- Deleted: `src/vaultspec/orchestration/subagent.py`
+- Deleted: `src/vaultspec/orchestration/team.py`
+- Deleted: `src/vaultspec/orchestration/team_session.py`
+- Deleted: `src/vaultspec/orchestration/team_task_engine.py`
+- Deleted: `src/vaultspec/protocol/a2a/` (directory)
 
 ## Description
 

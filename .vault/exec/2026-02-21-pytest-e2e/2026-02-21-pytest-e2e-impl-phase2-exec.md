@@ -13,9 +13,9 @@ Instrumented E2E test classes with retry markers and structured logging.
 Removed `pytest-harvest` (`results_bag`) due to incompatibility with
 `@flaky` reruns.
 
-- Modified: `[[test_e2e_a2a.py]]`
-- Modified: `[[test_french_novel_relay.py]]`
-- Modified: `[[pyproject.toml]]`
+- Modified: `test_e2e_a2a.py`
+- Modified: `test_french_novel_relay.py`
+- Modified: `pyproject.toml`
 
 ## Description
 

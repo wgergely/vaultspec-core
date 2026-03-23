@@ -118,7 +118,8 @@ class TestVaultGraphBuilding:
 
         file_count = sum(1 for _ in scan_vault(vault_root))
         graph = VaultGraph(vault_root)
-        assert len(graph.nodes) == file_count
+        real_count = sum(1 for n in graph.nodes.values() if not n.phantom)
+        assert real_count == file_count
 
     def test_colliding_stems_get_qualified_keys(self, vault_root):
         graph = VaultGraph(vault_root)
@@ -264,10 +265,10 @@ class TestVaultGraphQueries:
         assert isinstance(orphans, list)
         assert orphans == sorted(orphans)
 
-    def test_get_invalid_links(self, vault_root):
+    def test_get_dangling_links(self, vault_root):
         graph = VaultGraph(vault_root)
-        invalid = graph.get_invalid_links()
-        assert isinstance(invalid, list)
+        dangling = graph.get_dangling_links()
+        assert isinstance(dangling, list)
 
     def test_get_feature_rankings(self, vault_root):
         graph = VaultGraph(vault_root)
@@ -487,3 +488,129 @@ class TestVaultGraphJSON:
         for edge in d["edges"]:
             assert "source" in edge
             assert "target" in edge
+
+
+# ---------------------------------------------------------------------------
+# DocNode  - phantom defaults
+# ---------------------------------------------------------------------------
+
+
+class TestDocNodePhantom:
+    def test_defaults_include_phantom_false(self):
+        node = DocNode(path=Path("test.md"), name="test")
+        assert node.phantom is False
+
+    def test_to_nx_attrs_includes_phantom_field(self):
+        node = DocNode(path=Path("x.md"), name="x")
+        d = node.to_nx_attrs()
+        assert "phantom" in d
+        assert d["phantom"] is False
+
+    def test_to_nx_attrs_phantom_true(self):
+        node = DocNode(path=None, name="ghost", phantom=True)
+        d = node.to_nx_attrs()
+        assert d["phantom"] is True
+
+
+# ---------------------------------------------------------------------------
+# VaultGraph  - phantom nodes
+# ---------------------------------------------------------------------------
+
+
+class TestVaultGraphPhantom:
+    def test_builds_many_nodes_includes_phantoms(self, vault_root):
+        """Total node count includes both real and phantom nodes."""
+        graph = VaultGraph(vault_root)
+        real = sum(1 for n in graph.nodes.values() if not n.phantom)
+        phantoms = sum(1 for n in graph.nodes.values() if n.phantom)
+        assert len(graph.nodes) == real + phantoms
+        assert phantoms > 0
+
+    def test_phantom_nodes_created_for_unresolved_targets(self, vault_root):
+        graph = VaultGraph(vault_root)
+        phantoms = [n for n in graph.nodes.values() if n.phantom]
+        assert len(phantoms) > 0
+        for node in phantoms:
+            assert node.phantom is True
+            assert node.name in graph.nodes
+            assert node.name in graph._digraph
+
+    def test_phantom_nodes_have_incoming_edges(self, vault_root):
+        graph = VaultGraph(vault_root)
+        phantoms = [n for n in graph.nodes.values() if n.phantom]
+        for node in phantoms:
+            assert len(node.in_links) > 0
+            for source in node.in_links:
+                assert graph._digraph.has_edge(source, node.name)
+
+    def test_get_orphaned_excludes_phantoms(self, vault_root):
+        graph = VaultGraph(vault_root)
+        orphans = graph.get_orphaned()
+        for name in orphans:
+            assert not graph.nodes[name].phantom
+
+    def test_to_snapshot_excludes_phantoms(self, vault_root):
+        graph = VaultGraph(vault_root)
+        snapshot = graph.to_snapshot()
+        phantom_names = {n.name for n in graph.nodes.values() if n.phantom}
+        snapshot_stems = {p.stem for p in snapshot}
+        assert not phantom_names & snapshot_stems
+
+    def test_metrics_phantom_count(self, vault_root):
+        graph = VaultGraph(vault_root)
+        m = graph.metrics()
+        actual_phantoms = sum(1 for n in graph.nodes.values() if n.phantom)
+        assert m.phantom_count == actual_phantoms
+        assert m.phantom_count > 0
+
+    def test_metrics_dangling_link_count(self, vault_root):
+        graph = VaultGraph(vault_root)
+        m = graph.metrics()
+        edge_count_to_phantoms = sum(
+            1
+            for src, tgt in graph._dangling_links
+            if tgt in graph.nodes and graph.nodes[tgt].phantom
+        )
+        assert m.dangling_link_count == edge_count_to_phantoms
+        assert m.dangling_link_count > 0
+
+    def test_check_schema_ignores_phantom_adr_references(self, vault_root):
+        """A plan linking only to phantom targets still reports 'no ADR reference'."""
+        from ...vaultcore.checks.references import check_schema
+
+        graph = VaultGraph(vault_root)
+        result = check_schema(vault_root, graph=graph)
+        # 2026-02-04-displaymap-integration-plan links only to phantoms
+        plan_name = "2026-02-04-displaymap-integration-plan"
+        node = graph.nodes[plan_name]
+        assert node.doc_type == DocType.PLAN
+        # All its out_link targets are phantom
+        assert all(graph.nodes[t].phantom for t in node.out_links if t in graph.nodes)
+        # check_schema should report an error for this plan
+        plan_diags = [
+            d
+            for d in result.diagnostics
+            if d.path is not None and plan_name in str(d.path)
+        ]
+        assert any("no references to ADR" in d.message for d in plan_diags)
+
+    def test_tree_rendering_shows_not_created_for_phantoms(self, vault_root):
+        from io import StringIO
+
+        from rich.console import Console
+
+        graph = VaultGraph(vault_root)
+        tree = graph.render_tree()
+        buf = StringIO()
+        console = Console(file=buf, force_terminal=True, width=200)
+        console.print(tree)
+        output = buf.getvalue()
+        assert "(not created)" in output
+
+    def test_json_output_includes_phantom_flag(self, vault_root):
+        graph = VaultGraph(vault_root)
+        d = graph.to_dict()
+        phantom_dicts = [n for n in d["nodes"] if n.get("phantom") is True]
+        assert len(phantom_dicts) > 0
+        for pd in phantom_dicts:
+            assert pd["phantom"] is True

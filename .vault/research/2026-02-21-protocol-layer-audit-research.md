@@ -4,7 +4,6 @@ tags:
   - '#protocol-audit'
 date: '2026-02-21'
 related:
-  - '[[2026-02-20-a2a-team-protocol-research]]'
   - '[[2026-02-07-protocol-architecture-research]]'
   - '[[2026-02-07-protocol-review-research]]'
 ---

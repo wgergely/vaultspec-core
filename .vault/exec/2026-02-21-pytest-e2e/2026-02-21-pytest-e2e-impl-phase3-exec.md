@@ -11,7 +11,7 @@ related:
 
 Housekeeping: updated .gitignore and verified test suite integrity.
 
-- Modified: `[[.gitignore]]`
+- Modified: `.gitignore`
 
 ## Description
 

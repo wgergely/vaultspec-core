@@ -4,7 +4,6 @@ tags:
   - '#module-exports'
 date: '2026-02-21'
 related:
-  - '[[2026-02-21-module-exports-p1-plan]]'
 ---
 
 # Step 7: Add `__all__`, `__init__.py` re-exports for `subagent_server/` and rewrite consumers

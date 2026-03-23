@@ -65,7 +65,7 @@ class DocNode:
     metadata so that consumers never need to re-read the filesystem.
 
     Attributes:
-        path: Filesystem path to the document file.
+        path: Filesystem path to the document file, or ``None`` for phantoms.
         name: Document stem (filename without extension), used as graph key.
         doc_type: Categorised document type from vault folder location.
         feature: Feature tag (without ``#`` prefix), or ``None``.
@@ -77,9 +77,11 @@ class DocNode:
         word_count: Approximate word count of the body.
         out_links: Names of documents this document links to.
         in_links: Names of documents that link to this document.
+        phantom: ``True`` for unresolved wiki-link targets that have no
+            backing file.  Mirrors Obsidian's "not created" node concept.
     """
 
-    path: pathlib.Path
+    path: pathlib.Path | None
     name: str
     doc_type: DocType | None = None
     feature: str | None = None
@@ -91,6 +93,7 @@ class DocNode:
     word_count: int = 0
     out_links: set[str] = field(default_factory=set)
     in_links: set[str] = field(default_factory=set)
+    phantom: bool = False
 
     def to_nx_attrs(self) -> dict[str, Any]:
         """Return a networkx-compatible node attribute dict.
@@ -105,7 +108,7 @@ class DocNode:
         """
         return {
             "name": self.name,
-            "path": str(self.path),
+            "path": str(self.path) if self.path else None,
             "doc_type": (self.doc_type.value if self.doc_type else None),
             "feature": self.feature,
             "date": self.date,
@@ -115,6 +118,7 @@ class DocNode:
             "word_count": self.word_count,
             "out_links": sorted(self.out_links),
             "in_links": sorted(self.in_links),
+            "phantom": self.phantom,
         }
 
 
@@ -138,8 +142,9 @@ class GraphMetrics:
         max_out_degree: Highest outgoing edge count (with node name).
         in_degree_centrality: ``nx.in_degree_centrality`` scores.
         betweenness_centrality: ``nx.betweenness_centrality`` scores.
+        phantom_count: Number of phantom (unresolved) nodes in the graph.
         orphan_count: Truly isolated nodes (no links and no feature siblings).
-        invalid_link_count: Edges pointing to non-existent targets.
+        dangling_link_count: Edges pointing to phantom (unresolved) targets.
         connected_components: Weakly connected components via networkx.
         nodes_by_type: Document count per ``DocType``.
         nodes_by_feature: Document count per feature tag.
@@ -160,8 +165,9 @@ class GraphMetrics:
     betweenness_centrality: dict[str, float] = field(
         default_factory=dict,
     )
+    phantom_count: int = 0
     orphan_count: int = 0
-    invalid_link_count: int = 0
+    dangling_link_count: int = 0
     connected_components: int = 0
     nodes_by_type: dict[str, int] = field(default_factory=dict)
     nodes_by_feature: dict[str, int] = field(default_factory=dict)
@@ -257,7 +263,7 @@ class VaultGraph:
         self.root_dir = root_dir
         self.nodes: dict[str, DocNode] = {}
         self._digraph: nx.DiGraph = nx.DiGraph()
-        self._invalid_links: list[tuple[str, str]] = []
+        self._dangling_links: list[tuple[str, str]] = []
         self._build_graph()
 
     # -- Construction --------------------------------------------------------
@@ -347,8 +353,13 @@ class VaultGraph:
             sum(1 for v in self._stem_index.values() if len(v) > 1),
         )
 
-        # Pass 2: extract links -> edges
-        for name, node in self.nodes.items():
+        # Pass 2: extract links -> edges.  Unresolved targets become
+        # phantom nodes so the graph mirrors Obsidian's "not created"
+        # link model.  Iterate over a snapshot of the real-node keys
+        # because the dict grows as phantoms are added.
+        real_node_keys = list(self.nodes.keys())
+        for name in real_node_keys:
+            node = self.nodes[name]
             try:
                 links = extract_wiki_links(node.body)
                 links.update(
@@ -368,8 +379,25 @@ class VaultGraph:
                     if target_key in self.nodes:
                         self.nodes[target_key].in_links.add(name)
                         self._digraph.add_edge(name, target_key)
+                        if self.nodes[target_key].phantom:
+                            self._dangling_links.append(
+                                (name, target_key),
+                            )
                     else:
-                        self._invalid_links.append(
+                        # Create a phantom node (deduplicated).
+                        phantom = DocNode(
+                            path=None,
+                            name=target_key,
+                            phantom=True,
+                        )
+                        self.nodes[target_key] = phantom
+                        self._digraph.add_node(
+                            target_key,
+                            **phantom.to_nx_attrs(),
+                        )
+                        phantom.in_links.add(name)
+                        self._digraph.add_edge(name, target_key)
+                        self._dangling_links.append(
                             (name, target_key),
                         )
             except (OSError, UnicodeDecodeError) as e:
@@ -404,7 +432,7 @@ class VaultGraph:
         2. Stem index lookup  - if the bare stem maps to multiple
            qualified keys, all are returned and a warning is logged.
         3. No match  - returns the original target so it is recorded as
-           an invalid (broken) link.
+           a dangling link.
         """
         # Exact key match (unique stem or qualified reference)
         if target in self.nodes:
@@ -422,7 +450,7 @@ class VaultGraph:
                 )
             return keys
 
-        # No match  - treat as broken link
+        # No match  - treat as dangling link
         return [target]
 
     # -- Direct networkx access ----------------------------------------------
@@ -490,7 +518,7 @@ class VaultGraph:
         Returns:
             ``(name, in_link_count)`` tuples sorted descending.
         """
-        filtered = list(self.nodes.values())
+        filtered = [n for n in self.nodes.values() if not n.phantom]
 
         if doc_type:
             filtered = [n for n in filtered if n.doc_type == doc_type]
@@ -520,6 +548,8 @@ class VaultGraph:
         """
         scores: dict[str, int] = {}
         for node in self.nodes.values():
+            if node.phantom:
+                continue
             score = len(node.in_links)
             for tag in node.tags:
                 if not DocType.from_tag(tag):
@@ -555,20 +585,21 @@ class VaultGraph:
         return sorted(
             name
             for name, node in self.nodes.items()
-            if name.lower() != "readme"
+            if not node.phantom
+            and name.lower() != "readme"
             and not node.in_links
             and not node.out_links
             and (not node.feature or feature_sizes.get(node.feature, 0) <= 1)
         )
 
-    def get_invalid_links(self) -> list[tuple[str, str]]:
-        """Return all broken link pairs recorded during graph construction.
+    def get_dangling_links(self) -> list[tuple[str, str]]:
+        """Return all dangling link pairs recorded during graph construction.
 
         Returns:
             List of ``(source, target)`` tuples where *target* does not
             exist as a node in the graph.
         """
-        return list(self._invalid_links)
+        return list(self._dangling_links)
 
     def get_feature_nodes(self, feature: str) -> list[DocNode]:
         """Return all nodes tagged with *feature*, sorted by date then name.
@@ -580,7 +611,7 @@ class VaultGraph:
             List of :class:`DocNode` instances sorted by ``(date, name)``.
         """
         tag = f"#{feature}" if not feature.startswith("#") else feature
-        nodes = [n for n in self.nodes.values() if tag in n.tags]
+        nodes = [n for n in self.nodes.values() if not n.phantom and tag in n.tags]
         return sorted(
             nodes,
             key=lambda n: (n.date or "", n.name),
@@ -590,7 +621,7 @@ class VaultGraph:
         """Return a sorted list of all feature names in the graph."""
         features: set[str] = set()
         for node in self.nodes.values():
-            if node.feature:
+            if not node.phantom and node.feature:
                 features.add(node.feature)
         return sorted(features)
 
@@ -609,6 +640,8 @@ class VaultGraph:
 
         snapshot: VaultSnapshot = {}
         for node in self.nodes.values():
+            if node.phantom or node.path is None:
+                continue
             raw_related = node.frontmatter.get("related", [])
             if not isinstance(raw_related, list):
                 raw_related = []
@@ -675,12 +708,20 @@ class VaultGraph:
         n_nodes = g.number_of_nodes()
         n_edges = g.number_of_edges()
 
-        # --- networkx degree analysis ---
+        # --- networkx degree analysis (exclude phantoms) ---
         max_in: tuple[str, int] = ("", 0)
         max_out: tuple[str, int] = ("", 0)
         if n_nodes:
-            in_degs = dict(g.in_degree())
-            out_degs = dict(g.out_degree())
+            in_degs = {
+                k: v
+                for k, v in g.in_degree()
+                if k not in self.nodes or not self.nodes[k].phantom
+            }
+            out_degs = {
+                k: v
+                for k, v in g.out_degree()
+                if k not in self.nodes or not self.nodes[k].phantom
+            }
             if in_degs:
                 top = max(in_degs, key=lambda k: in_degs[k])
                 max_in = (top, in_degs[top])
@@ -695,12 +736,16 @@ class VaultGraph:
             in_cent = _top_n(nx.in_degree_centrality(g))
             btwn_cent = _top_n(nx.betweenness_centrality(g))
 
-        # --- feature / type counts ---
+        # --- feature / type counts (excludes phantoms) ---
         features: set[str] = set()
         by_type: dict[str, int] = {}
         by_feature: dict[str, int] = {}
         total_words = 0
+        phantom_count = 0
         for node in nodes.values():
+            if node.phantom:
+                phantom_count += 1
+                continue
             if node.feature:
                 features.add(node.feature)
                 by_feature[node.feature] = by_feature.get(node.feature, 0) + 1
@@ -708,9 +753,13 @@ class VaultGraph:
             by_type[dt_key] = by_type.get(dt_key, 0) + 1
             total_words += node.word_count
 
-        # --- networkx orphan / invalid ---
+        # --- networkx orphan / dangling ---
         orphan_count = len(self.get_orphaned())
-        invalid_count = sum(1 for src, _tgt in self._invalid_links if src in nodes)
+        invalid_count = sum(
+            1
+            for src, tgt in self._dangling_links
+            if src in nodes and tgt in self.nodes and self.nodes[tgt].phantom
+        )
 
         # --- networkx connected components ---
         try:
@@ -719,7 +768,7 @@ class VaultGraph:
             components = 0
 
         return GraphMetrics(
-            total_nodes=n_nodes,
+            total_nodes=n_nodes - phantom_count,
             total_edges=n_edges,
             total_features=len(features),
             total_words=total_words,
@@ -730,8 +779,9 @@ class VaultGraph:
             max_out_degree=max_out,
             in_degree_centrality=in_cent,
             betweenness_centrality=btwn_cent,
+            phantom_count=phantom_count,
             orphan_count=orphan_count,
-            invalid_link_count=invalid_count,
+            dangling_link_count=invalid_count,
             connected_components=components,
             nodes_by_type=dict(sorted(by_type.items())),
             nodes_by_feature=dict(sorted(by_feature.items())),
@@ -799,7 +849,7 @@ class VaultGraph:
             )
             self._add_typed_nodes(feat_branch, feat_nodes)
 
-        untagged = [n for n in self.nodes.values() if not n.feature]
+        untagged = [n for n in self.nodes.values() if not n.feature and not n.phantom]
         if untagged:
             branch = root.add(
                 "[bold yellow](untagged)[/bold yellow]"
@@ -849,7 +899,12 @@ class VaultGraph:
 
                 for target in sorted(node.out_links):
                     target_node = self.nodes.get(target)
-                    if target_node:
+                    if target_node and target_node.phantom:
+                        node_branch.add(
+                            f"[dim]-> {target}[/dim]  "
+                            f"[yellow italic](not created)[/yellow italic]"
+                        )
+                    elif target_node:
                         dt_val = (
                             target_node.doc_type.value if target_node.doc_type else "?"
                         )
@@ -857,7 +912,7 @@ class VaultGraph:
                             f"[dim]-> {target}[/dim]  [dim italic]{dt_val}[/dim italic]"
                         )
                     else:
-                        node_branch.add(f"[red dim]-> {target} (broken)[/red dim]")
+                        node_branch.add(f"[red dim]-> {target} (dangling)[/red dim]")
 
     @staticmethod
     def _node_label(node: DocNode) -> str:

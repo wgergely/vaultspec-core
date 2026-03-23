@@ -4,7 +4,6 @@ tags:
   - '#module-exports'
 date: '2026-02-21'
 related:
-  - '[[2026-02-21-module-exports-p1-plan]]'
 ---
 
 # Step 8: Retarget entry point imports and add `__all__` to top-level modules

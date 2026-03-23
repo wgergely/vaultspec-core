@@ -4,7 +4,6 @@ tags:
   - '#acp-claude-reliability'
 date: '2026-02-21'
 related:
-  - '[[2026-02-21-acp-claude-reliability-plan]]'
 ---
 
 # Claude SDK Verification Findings

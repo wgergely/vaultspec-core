@@ -4,8 +4,6 @@ tags:
   - '#test-quality'
 date: '2026-02-20'
 related:
-  - '[[scout-alpha-report]]'
-  - '[[scout-beta-report]]'
 ---
 
 # Test Quality Enforcement: Strict Audit Verdict
@@ -14,7 +12,7 @@ related:
 
 ## Audit Context
 
-- **Scout Reports:** `[[scout-alpha-report]]`, `[[scout-beta-report]]`
+- **Scout Reports:** `scout-alpha-report`, `scout-beta-report`
 - **Scope:** All test files in orchestration/, protocol/a2a/, protocol/acp/, subagent_server/, CLI, and e2e directories
 - **Auditor:** strict-auditor
 - **Rule:** Every test must exercise the real production code path. No mocks that replace the thing under test. No trivially self-fulfilling assertions. No skips without hard runtime dependency checks.

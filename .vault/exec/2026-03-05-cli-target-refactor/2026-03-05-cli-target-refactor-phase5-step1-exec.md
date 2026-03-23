@@ -11,13 +11,13 @@ related:
 
 Migrated the test suite to `CliRunner` and unified pathing.
 
-- Modified: `[[src/vaultspec/tests/cli/conftest.py]]`
-- Modified: `[[src/vaultspec/tests/cli/test_main_cli.py]]`
-- Modified: `[[src/vaultspec/tests/cli/test_spec_cli.py]]`
-- Modified: `[[src/vaultspec/tests/cli/test_vault_cli.py]]`
-- Modified: `[[src/vaultspec/tests/cli/test_sync_operations.py]]`
-- Modified: `[[src/vaultspec/tests/cli/test_sync_incremental.py]]`
-- Modified: `[[src/vaultspec/tests/cli/test_sync_collect.py]]`
+- Modified: `src/vaultspec/tests/cli/conftest.py`
+- Modified: `src/vaultspec/tests/cli/test_main_cli.py`
+- Modified: `src/vaultspec/tests/cli/test_spec_cli.py`
+- Modified: `src/vaultspec/tests/cli/test_vault_cli.py`
+- Modified: `src/vaultspec/tests/cli/test_sync_operations.py`
+- Modified: `src/vaultspec/tests/cli/test_sync_incremental.py`
+- Modified: `src/vaultspec/tests/cli/test_sync_collect.py`
 
 ## Description
 

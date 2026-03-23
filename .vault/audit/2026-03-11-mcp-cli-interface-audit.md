@@ -9,7 +9,6 @@ related:
   - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
   - '[[2026-02-22-mcp-consolidation-adr]]'
   - '[[2026-02-22-mcp-testing-adr]]'
-  - '[[2026-02-24-cli-protocols-research]]'
   - '[[2026-03-05-cli-architecture-audit]]'
 ---
 

@@ -4,7 +4,6 @@ tags:
   - '#cli-architecture'
 date: 2026-03-05
 related:
-  - '[[vaultspec-cli]]'
 ---
 
 # Vaultspec CLI Architecture Audit

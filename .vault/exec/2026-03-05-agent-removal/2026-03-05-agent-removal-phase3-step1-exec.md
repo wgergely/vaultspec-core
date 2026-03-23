@@ -11,9 +11,9 @@ related:
 
 Phase 3: Update Core Entry Points and Configuration. Cleaned up `__main__`, `spec_cli`, and `__init__`.
 
-- Modified: `[[src/vaultspec/__main__.py]]`
-- Modified: `[[src/vaultspec/spec_cli.py]]`
-- Modified: `[[src/vaultspec/__init__.py]]`
+- Modified: `src/vaultspec/__main__.py`
+- Modified: `src/vaultspec/spec_cli.py`
+- Modified: `src/vaultspec/__init__.py`
 
 ## Description
 

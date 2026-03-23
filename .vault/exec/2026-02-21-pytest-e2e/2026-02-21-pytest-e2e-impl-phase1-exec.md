@@ -11,7 +11,7 @@ related:
 
 Added pytest observability config and four new test dependencies.
 
-- Modified: `[[pyproject.toml]]`
+- Modified: `pyproject.toml`
 
 ## Description
 

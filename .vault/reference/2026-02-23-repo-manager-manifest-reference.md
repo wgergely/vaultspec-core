@@ -135,15 +135,15 @@ pub struct ExtensionConfig {
 the tests in `manifest.rs` read `ext["ref"]` from the raw `Value` map because
 the `Manifest.extensions` field stores raw `Value`, not `ExtensionConfig`.
 
-### `[[hooks]]` array
+### `hooks` array
 
 ```toml
-[[hooks]]
+`hooks`
 event   = "post-branch-create"
 command = "npm"
 args    = ["install"]
 
-[[hooks]]
+`hooks`
 event       = "pre-sync"
 command     = "sh"
 args        = ["-c", "echo syncing"]
@@ -497,7 +497,7 @@ when the extension activation pipeline runs.
 
 ### gap 4 — post-install hook for `uv sync`
 
-**Current state:** `Manifest.hooks` (`[[hooks]]`) supports 6 lifecycle events
+**Current state:** `Manifest.hooks` (`hooks`) supports 6 lifecycle events
 (`pre/post-branch-create`, `pre/post-branch-delete`, `pre/post-sync`). There
 is no `post-extension-install` or `post-extension-activate` event.
 

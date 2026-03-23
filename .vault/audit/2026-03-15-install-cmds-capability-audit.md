@@ -9,7 +9,6 @@ related:
   - '[[2026-03-15-gemini-cli-provider-research]]'
   - '[[2026-03-15-codex-cli-provider-research]]'
   - '[[2026-03-16-antigravity-provider-research]]'
-  - '[[2026-03-16-binding-decisions]]'
 ---
 
 # install-cmds capability audit
@@ -29,7 +28,7 @@ discovered during the grounding research phase of the install-cmds feature.
 ## Binding decisions status
 
 All 8 binding decisions approved on 2026-03-16. Full details at
-`[[2026-03-16-binding-decisions]]`.
+`2026-03-16-binding-decisions`.
 
 | #   | Decision                                                          | Status   |
 | --- | ----------------------------------------------------------------- | -------- |

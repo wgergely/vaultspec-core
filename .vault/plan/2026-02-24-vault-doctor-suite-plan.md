@@ -121,7 +121,7 @@ Key outcomes:
   - Calls `VaultGraph.get_orphaned()`, wraps each orphan as `Severity.WARNING`
   - Filter to `input_paths` if provided
 - `check_malformed_related(root_dir, input_paths) -> list[DoctorResult]`
-  - Per-file scan for `related` entries not in valid `[[wikilink]]` format
+  - Per-file scan for `related` entries not in valid `wikilink` format
   - Severity `ERROR`, `fixable=True`
   - If `input_paths` provided, scan only those files
 - Register all three under `CheckCategory.LINKS`

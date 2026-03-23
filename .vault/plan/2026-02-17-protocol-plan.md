@@ -4,12 +4,7 @@ tags:
   - '#protocol'
 date: '2026-02-17'
 related:
-  - '[[2026-02-15-a2a-adr]]'
-  - '[[2026-02-15-cross-agent-adr]]'
-  - '[[2026-02-15-subagent-adr]]'
   - '[[2026-02-15-provider-feature-parity-adr]]'
-  - '[[2026-02-07-a2a-research]]'
-  - '[[2026-02-07-acp-research]]'
   - '[[2026-02-07-protocol-architecture-research]]'
   - '[[2026-02-07-protocol-review-research]]'
 ---

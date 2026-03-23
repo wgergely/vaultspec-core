@@ -6,7 +6,6 @@ date: '2026-02-20'
 related:
   - '[[2026-02-17-marketing-ux-audit]]'
   - '[[2026-02-17-roadmap-plan]]'
-  - '[[2026-02-18-marketing-audit-documentation-quality]]'
 ---
 
 # `marketing-and-documentation` research: Gap analysis after Wave 2

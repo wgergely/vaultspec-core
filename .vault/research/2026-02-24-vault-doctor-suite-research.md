@@ -17,7 +17,7 @@ The verification system lives across three modules:
 - **`src/vaultspec/verification/api.py`** — primary validation and repair entry point
 - **`src/vaultspec/graph/api.py`** — graph-based link analysis
 - **`src/vaultspec/vaultcore/models.py`** — schema definitions and per-field validation
-- **`src/vaultspec/vaultcore/links.py`** — `[[wikilink]]` extraction
+- **`src/vaultspec/vaultcore/links.py`** — `wikilink` extraction
 - **`src/vaultspec/vaultcore/scanner.py`** — vault directory walking
 
 The surface exposed via CLI is `vaultspec vault audit` with flags `--verify`, `--fix`, `--graph`,
@@ -39,7 +39,7 @@ staged markdown files.
 - Directory tag matches the file's actual directory
 - Exactly one feature tag matching `^#[a-z0-9-]+$`
 - Date field present and ISO 8601 (`YYYY-MM-DD`)
-- All `related` entries are valid `[[wikilink]]` format
+- All `related` entries are valid `wikilink` format
 
 #### Integrity Checks (`verify_vertical_integrity`)
 
@@ -79,7 +79,7 @@ renames.
 
 #### Gap B — Broken Wikilinks Not in Verify Pipeline
 
-`VaultGraph.get_invalid_links()` detects `[[target]]` entries where `target` has no corresponding
+`VaultGraph.get_invalid_links()` detects `target` entries where `target` has no corresponding
 vault document. This check exists but is only surfaced via `--graph`, not `--verify`. Broken links
 therefore do not block pre-commit hooks.
 
