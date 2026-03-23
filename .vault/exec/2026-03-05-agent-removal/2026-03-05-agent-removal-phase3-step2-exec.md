@@ -11,9 +11,9 @@ related:
 
 Phase 3: Update Core Entry Points and Configuration. Removed A2A configurations, enums, and types.
 
-- Modified: `[[src/vaultspec/core/enums.py]]`
-- Modified: `[[src/vaultspec/core/types.py]]`
-- Modified: `[[src/vaultspec/config/config.py]]`
+- Modified: `src/vaultspec/core/enums.py`
+- Modified: `src/vaultspec/core/types.py`
+- Modified: `src/vaultspec/config/config.py`
 
 ## Description
 

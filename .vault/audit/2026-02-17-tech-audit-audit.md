@@ -50,7 +50,7 @@ ______________________________________________________________________
 | **Core Configuration**       | `core/config.py`                            | Complete | 30+ configurable variables, env var resolution, validation, singleton               |
 | **YAML Frontmatter Parsing** | `vault/parser.py`                           | Complete | PyYAML with fallback to minimal parser; handles colons in values                    |
 | **Vault Document Scanning**  | `vault/scanner.py`                          | Complete | Recursive .md scan, .obsidian filtering, DocType inference                          |
-| **Wiki-link Extraction**     | `vault/links.py`                            | Complete | `[[link]]` and `[[link\|alias]]` patterns, related field parsing                    |
+| **Wiki-link Extraction**     | `vault/links.py`                            | Complete | `link` and `link\` patterns, related field parsing                                  |
 | **Template Hydration**       | `vault/hydration.py`                        | Complete | Placeholder replacement for `<feature>`, `<yyyy-mm-dd>`, `<title>`                  |
 | **Document Models**          | `vault/models.py`                           | Complete | DocType enum (5 types), DocumentMetadata validation, VaultConstants                 |
 | **Filename Validation**      | `vault/models.py`                           | Complete | Regex pattern `yyyy-mm-dd-<feature>-<type>.md`                                      |

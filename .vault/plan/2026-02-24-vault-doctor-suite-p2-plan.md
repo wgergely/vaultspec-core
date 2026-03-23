@@ -40,7 +40,7 @@ Three new check functions are introduced in `src/vaultspec/doctor/checks/`:
   `Severity.WARNING` per orphan node. No fix.
 
 - `check_malformed_related` — per-file scan of `related` entries that are not
-  valid `[[wikilink]]` format. `Severity.ERROR`, `fixable=True`.
+  valid `wikilink` format. `Severity.ERROR`, `fixable=True`.
 
 **fixes/frontmatter.py** (partial — extended in P4)
 
@@ -125,7 +125,7 @@ function references the check's output contract). S5 depends on all of S1–S4.
   `fix_applied = False` and a non-empty `fix_detail`; file content unchanged.
 
 - `fix_malformed_related(path, dry_run=False)` returns `fix_applied = True`;
-  `related` field contains only valid `[[wikilink]]` entries.
+  `related` field contains only valid `wikilink` entries.
 
 - No regressions in `src/vaultspec/graph/tests/` or
   `src/vaultspec/verification/tests/` test suites.

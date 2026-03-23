@@ -4,7 +4,6 @@ tags:
   - '#graph-hardening'
 date: '2026-03-22'
 related:
-  - '[[2026-02-21-claude-a2a-overhaul-impl-plan]]'
 ---
 
 # `graph-hardening` research: phantom nodes and broken-link visibility
@@ -21,9 +20,9 @@ paths, and identifies the gaps.
 The document `2026-02-21-claude-a2a-overhaul-impl-plan` has six `related:`
 entries. Three targets do not exist as files:
 
-- `[[2026-02-22-claude-team-management-reference]]`
-- `[[2026-02-22-claude-team-management-adr]]`
-- `[[2026-02-22-claude-team-management-plan]]`
+- `2026-02-22-claude-team-management-reference`
+- `2026-02-22-claude-team-management-adr`
+- `2026-02-22-claude-team-management-plan`
 
 Obsidian renders these as "not created" links. The CLI reports
 `links: clean` and no checker flags them.

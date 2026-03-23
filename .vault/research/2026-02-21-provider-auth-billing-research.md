@@ -4,7 +4,6 @@ tags:
   - '#acp-bridge-auth'
 date: '2026-02-21'
 related:
-  - '[[2026-02-21-acp-bridge-auth-research]]'
   - '[[2026-02-21-gemini-bridge-auth-research]]'
 ---
 

@@ -11,8 +11,8 @@ related:
 
 Unified the CLI logging by utilizing `rich.logging.RichHandler`.
 
-- Modified: `[[src/vaultspec/logging_config.py]]`
-- Modified: `[[src/vaultspec/cli.py]]`
+- Modified: `src/vaultspec/logging_config.py`
+- Modified: `src/vaultspec/cli.py`
 
 ## Description
 

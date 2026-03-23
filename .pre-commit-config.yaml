@@ -45,15 +45,12 @@ repos:
         types: [markdown]
         pass_filenames: false
 
-      # TODO: Enable after vault dangling links are resolved.
-      # The check_dangling checker exists and works via 'vault check dangling'.
-      # Uncomment when the vault reaches zero dangling links.
-      # - id: check-dangling
-      #   name: Check for dangling wiki-links in vault
-      #   entry: uv run --no-sync python -c "from vaultspec_core.cli import app; app()" vault check dangling
-      #   language: system
-      #   types: [markdown]
-      #   pass_filenames: false
+      - id: check-dangling
+        name: Check for dangling wiki-links in vault
+        entry: uv run --no-sync python -c "from vaultspec_core.cli import app; app()" vault check dangling
+        language: system
+        types: [markdown]
+        pass_filenames: false
 
       - id: mdformat-check
         name: Check Markdown formatting (mdformat)

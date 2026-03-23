@@ -7,7 +7,6 @@ related:
   - '[[2026-02-18-health-audit-deep-contracts-abstractions-audit]]'
   - '[[2026-02-18-health-audit-deep-error-propagation-audit]]'
   - '[[2026-02-18-health-audit-investigator1-core-vault-orch-audit]]'
-  - '[[2026-02-18-health-audit-investigator2-protocol-subagent-audit]]'
   - '[[2026-02-18-health-audit-investigator3-data-functional-audit]]'
   - '[[2026-02-18-health-audit-summary-audit]]'
 ---

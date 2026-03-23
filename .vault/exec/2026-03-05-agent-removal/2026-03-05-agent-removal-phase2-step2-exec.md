@@ -11,10 +11,10 @@ related:
 
 Phase 2: Remove Library Code and Protocol Layer. Removed A2A methods and references from providers.
 
-- Modified: `[[src/vaultspec/protocol/providers/base.py]]`
-- Modified: `[[src/vaultspec/protocol/providers/claude.py]]`
-- Modified: `[[src/vaultspec/protocol/providers/gemini.py]]`
-- Modified: `[[src/vaultspec/protocol/providers/__init__.py]]`
+- Modified: `src/vaultspec/protocol/providers/base.py`
+- Modified: `src/vaultspec/protocol/providers/claude.py`
+- Modified: `src/vaultspec/protocol/providers/gemini.py`
+- Modified: `src/vaultspec/protocol/providers/__init__.py`
 
 ## Description
 

@@ -293,12 +293,12 @@ ref_pin = "v0.1.0"
 [extensions."other-ext"]
 source = "https://github.com/org/other-ext.git"
 
-[[hooks]]
+`hooks`
 event = "post-branch-create"
 command = "npm"
 args = ["install"]
 
-[[hooks]]
+`hooks`
 event = "pre-sync"
 command = "sh"
 args = ["-c", "echo sync starting"]

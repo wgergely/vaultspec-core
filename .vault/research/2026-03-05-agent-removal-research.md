@@ -4,7 +4,6 @@ tags:
   - '#agent-removal'
 date: '2026-03-05'
 related:
-  - '[[2026-02-24-a2a-adr]]'
 ---
 
 # `agent-removal` research: `obsolete-agent-management-audit`

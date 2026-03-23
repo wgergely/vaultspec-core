@@ -178,11 +178,11 @@ pre-commit hooks (`pass_filenames: true`). `--input` / `-i` is useful for script
 
 #### LINKS (requires graph construction)
 
-| Check               | Severity | Fixable | Notes                                          |
-| ------------------- | -------- | ------- | ---------------------------------------------- |
-| `broken-wikilinks`  | ERROR    | No      | `get_invalid_links()` wired into doctor        |
-| `orphaned-docs`     | WARNING  | No      | `get_orphaned()` wired into doctor             |
-| `malformed-related` | ERROR    | Yes     | `related` entries not in `[[wikilink]]` format |
+| Check               | Severity | Fixable | Notes                                      |
+| ------------------- | -------- | ------- | ------------------------------------------ |
+| `broken-wikilinks`  | ERROR    | No      | `get_invalid_links()` wired into doctor    |
+| `orphaned-docs`     | WARNING  | No      | `get_orphaned()` wired into doctor         |
+| `malformed-related` | ERROR    | Yes     | `related` entries not in `wikilink` format |
 
 #### CHAIN (requires graph + doc-type awareness)
 

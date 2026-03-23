@@ -11,9 +11,9 @@ related:
 
 Bootstrapped the Typer engine for the Vaultspec CLI.
 
-- Modified: `[[pyproject.toml]]`
-- Modified: `[[uv.lock]]`
-- Created: `[[src/vaultspec/cli.py]]`
+- Modified: `pyproject.toml`
+- Modified: `uv.lock`
+- Created: `src/vaultspec/cli.py`
 
 ## Description
 

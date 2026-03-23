@@ -4,7 +4,6 @@ tags:
   - '#startup-fixes'
 date: '2026-02-20'
 related:
-  - '[[2026-02-20-containerization-research]]'
   - '[[2026-02-20-startup-fixes-p1-plan]]'
 ---
 

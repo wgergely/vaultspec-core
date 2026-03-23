@@ -4,8 +4,6 @@ tags:
   - '#protocol'
 date: '2026-02-07'
 related:
-  - '[[2026-02-07-acp-research]]'
-  - '[[2026-02-07-a2a-research]]'
   - '[[2026-02-07-multi-agent-orchestration-research]]'
   - '[[2026-02-07-frontier-landscape-research]]'
   - '[[2026-02-07-protocol-review-research]]'

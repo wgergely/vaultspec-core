@@ -4,10 +4,6 @@ tags:
   - '#a2a'
 date: '2026-02-21'
 related:
-  - '[[2026-02-21-acp-ref-impl-research]]'
-  - '[[2026-02-21-a2a-ref-impl-research]]'
-  - '[[2026-02-21-a2a-layer-audit-research]]'
-  - '[[2026-02-21-acp-layer-audit-research]]'
 ---
 
 # Protocol Layer Gap Analysis

@@ -4,8 +4,6 @@ tags:
   - '#agent-logging'
 date: '2026-02-19'
 related:
-  - '[[2026-02-15-cross-agent-bidirectional-communication]]'
-  - '[[2026-02-15-cross-agent-adr]]'
 ---
 
 # Agent Logging P1 Plan
