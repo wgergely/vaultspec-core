@@ -38,10 +38,14 @@ _CODE_FENCE_RE = re.compile(
 # Inline code spans (`...`)
 _INLINE_CODE_RE = re.compile(r"`[^`]+`")
 
+# HTML comments (<!-- ... -->), may span multiple lines
+_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 
-def _strip_code(body: str) -> str:
-    """Remove fenced code blocks and inline code spans from body text."""
+
+def _strip_non_prose(body: str) -> str:
+    """Remove code blocks, inline code, and HTML comments from body."""
     stripped = _CODE_FENCE_RE.sub("", body)
+    stripped = _HTML_COMMENT_RE.sub("", stripped)
     return _INLINE_CODE_RE.sub("", stripped)
 
 
@@ -86,7 +90,7 @@ def check_body_links(
         rel_path = doc_path.relative_to(root_dir)
 
         # Strip code blocks and inline code before scanning
-        prose = _strip_code(body)
+        prose = _strip_non_prose(body)
 
         # Detect wiki-links in body
         for match in _WIKI_LINK_RE.finditer(prose):

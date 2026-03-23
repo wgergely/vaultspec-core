@@ -7,6 +7,7 @@ related:
   - '[[2026-03-05-cli-path-resolution-adr]]'
   - '[[2026-03-05-cli-engine-typer-adr]]'
   - '[[2026-03-05-cli-architecture-audit]]'
+  - '[[2026-03-23-cli-architecture-research]]'
 ---
 
 # `cli-target-refactor` plan
