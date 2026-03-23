@@ -22,8 +22,8 @@ related:
 
 Brief summary of work done.
 
-- Modified: `[[{file1}]]`
-- Created: `[[{file2}]]`
+- Modified: `{file1}`
+- Created: `{file2}`
 
 ## Description
 
