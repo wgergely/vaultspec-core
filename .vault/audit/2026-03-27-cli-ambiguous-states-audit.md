@@ -266,6 +266,141 @@ Ambiguous paths requiring improvement:
 | R3-UX6 | Mixed content conflict      | Doesn't explain which files or what "user content" means |
 | R3-UX7 | Doctor "unknown" fallback   | Silent degradation, doesn't show actual signal value     |
 
+## Round 4: Backend production readiness (5 agents)
+
+Full-codebase audit assessing transactional safety, filesystem
+atomicity, exception boundaries, concurrency, and overall production
+readiness. Scope: entire `src/vaultspec_core/`, not just new feature.
+
+### Transactional safety: MISSING
+
+Zero transaction boundaries, rollback, or compensation in the entire
+codebase. Every multi-step operation is a linear sequence of side
+effects.
+
+| ID    | Severity | Finding                                                                                                                                                  | Status |
+| ----- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| R4-T1 | CRITICAL | `uninstall_run` deletes `.vaultspec/` (manifest) FIRST, before provider dirs. A failure after this point leaves the workspace with no recovery metadata. | OPEN   |
+| R4-T2 | HIGH     | `install_run` has 6 sequential phases with no error handling between them. Phase 3 failure leaves phases 1-2 committed with no cleanup.                  | OPEN   |
+| R4-T3 | HIGH     | `sync_provider` evaluates 5 sync passes as a plain list literal. If `skills_sync` raises, `rules_sync` already wrote files, remaining syncs never run.   | OPEN   |
+| R4-T4 | HIGH     | `seed_builtins` and `snapshot_builtins` write files one by one with no rollback on partial failure.                                                      | OPEN   |
+| R4-T5 | MEDIUM   | `_ensure_tool_configs` creates a `tempfile.mkdtemp()` for bootstrap but never cleans it up in a `finally` block.                                         | OPEN   |
+
+### Filesystem mutation inventory: 54 operations audited
+
+| Category                       | Count | Atomic | Backup |
+| ------------------------------ | ----- | ------ | ------ |
+| Writes via `atomic_write`      | 12    | YES    | NO     |
+| Raw `write_text`/`write_bytes` | 18    | NO     | NO     |
+| `shutil.rmtree`                | 4     | N/A    | NO     |
+| `Path.unlink`                  | 4     | N/A    | NO     |
+| `shutil.copy2` / `shutil.move` | 4     | N/A    | NO     |
+| `Path.mkdir`                   | 10    | N/A    | N/A    |
+
+| ID     | Severity | Finding                                                                                                                                                                   | Status |
+| ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| R4-FS1 | HIGH     | 18 raw `write_text`/`write_bytes` calls (non-atomic) including vault doc auto-fixes, `.gitignore`, skill supporting files, revert module. Crash truncates target.         | OPEN   |
+| R4-FS2 | HIGH     | Vault document auto-fix checks (`dangling.py`, `links.py`, `frontmatter.py`, `references.py`) modify user documents via raw `write_text` with no backup and no atomicity. | OPEN   |
+| R4-FS3 | MEDIUM   | `atomic_write` temp file naming not unique per-process. Two concurrent writes use same `.tmp` name, causing corruption.                                                   | OPEN   |
+| R4-FS4 | MEDIUM   | `atomic_write` Windows fallback (`copyfile` + `unlink`) is not atomic. Crash between copy and unlink leaves orphaned `.tmp`.                                              | OPEN   |
+
+### Exception safety: 22 broad catches, 4 silent swallows
+
+| ID     | Severity | Finding                                                                                                              | Status |
+| ------ | -------- | -------------------------------------------------------------------------------------------------------------------- | ------ |
+| R4-EX1 | HIGH     | `resource_show/remove/rename` raise `PermissionError`/`OSError` that escapes all CLI catch blocks as raw tracebacks. | OPEN   |
+| R4-EX2 | HIGH     | `vault check/list/stats/graph` commands have no exception handling at all. `OSError` propagates as raw traceback.    | OPEN   |
+| R4-EX3 | HIGH     | `sync.py:57` - `except Exception: pass` - total silence on file comparison failure.                                  | OPEN   |
+| R4-EX4 | MEDIUM   | `_run_preflight` logs diagnosis failures at DEBUG only - invisible without `--debug`.                                | OPEN   |
+| R4-EX5 | MEDIUM   | `config_gen.py:100` - `except Exception: continue` silently skips corrupted config metadata.                         | OPEN   |
+| R4-EX6 | MEDIUM   | `TagError`, `WorkspaceError`, `RelatedResolutionError` live outside `VaultSpecError` hierarchy.                      | OPEN   |
+| R4-EX7 | LOW      | Duplicate `_handle_error` definition in `spec_cmd.py` (DRY violation).                                               | OPEN   |
+
+### Concurrency: no locking
+
+| ID    | Severity | Finding                                                                                                   | Status |
+| ----- | -------- | --------------------------------------------------------------------------------------------------------- | ------ |
+| R4-C1 | MEDIUM   | No file locking anywhere. Manifest read-modify-write races possible with concurrent CLI invocations.      | OPEN   |
+| R4-C2 | MEDIUM   | `sync_provider` performs up to 3 separate read-modify-write cycles on manifest, widening the race window. | OPEN   |
+| R4-C3 | LOW      | Config singleton `_cached_config` not thread-safe (benign race).                                          | OPEN   |
+
+### Production readiness ratings
+
+| Area                    | Rating                                     |
+| ----------------------- | ------------------------------------------ |
+| Type safety             | PRODUCTION_READY                           |
+| Code organization       | PRODUCTION_READY                           |
+| Modern Python practices | PRODUCTION_READY                           |
+| Configuration           | PRODUCTION_READY                           |
+| Test quality            | ADEQUATE (717 tests, no coverage tracking) |
+| Logging                 | ADEQUATE                                   |
+| Dependency hygiene      | ADEQUATE                                   |
+| Transactional safety    | MISSING                                    |
+| Filesystem atomicity    | NEEDS_WORK                                 |
+| Exception boundaries    | NEEDS_WORK                                 |
+| Concurrent access       | NEEDS_WORK                                 |
+
+## Round 5: Silent degradation swarm (5 agents)
+
+Focused audit on error swallowing, return value lies, silent
+degradation, and whether errors actually reach the user. Scope:
+entire `src/vaultspec_core/`.
+
+### The worst anti-pattern: SyncResult.errors never displayed
+
+The CLI rendering layer in `root.py` iterates `r.warnings` with
+bullet points but **never iterates `r.errors`**. Error messages
+(e.g. `"some-file.md: Permission denied"`) are appended to
+`SyncResult.errors` by the sync engine but silently dropped by
+every CLI handler. Only the count appears in `format_summary`
+(e.g. `"Rules: 9 added, 1 errors"`). Exit code is always 0
+regardless of errors.
+
+### Silent error swallowing inventory
+
+59 `except` clauses audited across entire codebase. No bare
+`except:` found. Breakdown:
+
+| Pattern                            | Count | Logged | Silent |
+| ---------------------------------- | ----- | ------ | ------ |
+| `except Exception: pass`           | 3     | 0      | 3      |
+| `except ...: continue`             | 6     | 4      | 2      |
+| `except ...: return` (no log)      | 10    | 0      | 10     |
+| `except Exception` (broad, logged) | 35    | 33     | 2      |
+| `except (specific):`               | 5     | 2      | 3      |
+
+### Critical silent paths (errors never reach user)
+
+| ID    | Severity | Finding                                                                                                                                                                                                         | Status |
+| ----- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| R5-S1 | CRITICAL | `SyncResult.errors` messages never displayed by any CLI handler. Only count shown via `format_summary`. Exit code unaffected.                                                                                   | OPEN   |
+| R5-S2 | CRITICAL | `fire_hooks()` catches all exceptions at DEBUG level only. Return value of `trigger()` discarded by `sync_provider` caller. Post-sync hook failures completely invisible.                                       | OPEN   |
+| R5-S3 | HIGH     | `_run_preflight` logs diagnosis failures at DEBUG only. Entire preflight silently abandoned. Corrupt workspace gets no warning before command proceeds.                                                         | OPEN   |
+| R5-S4 | HIGH     | `config_gen.py:100` - `except Exception: continue` with ZERO logging. Silently drops config metadata from malformed source files.                                                                               | OPEN   |
+| R5-S5 | HIGH     | `mcp_server/vault_tools.py:172` - `except Exception: entry["body"] = ""`. Feeds empty body to MCP/LLM consumers with ZERO logging. LLM sees empty document.                                                     | OPEN   |
+| R5-S6 | HIGH     | `collect_md_resources` / `collect_skills` / `collect_system_parts` skip unparseable source files with `logger.error` + `continue`. No error propagated to SyncResult. Sync appears to succeed with fewer files. | OPEN   |
+
+### Return value lies (functions report success on failure)
+
+| ID    | Severity | The Lie                                                       | The Truth                                | Status |
+| ----- | -------- | ------------------------------------------------------------- | ---------------------------------------- | ------ |
+| R5-L1 | HIGH     | `cmd_sync` exits 0 with sync errors                           | Files failed to sync                     | OPEN   |
+| R5-L2 | HIGH     | `read_manifest_data` returns empty ManifestData on corruption | Manifest is corrupt, not absent          | OPEN   |
+| R5-L3 | HIGH     | `ensure_gitignore_block` returns False on write failure       | Write was denied, not "no change needed" | OPEN   |
+| R5-L4 | MEDIUM   | `_run_preflight` returns silently on crash                    | Diagnosis itself failed                  | OPEN   |
+| R5-L5 | MEDIUM   | `_is_managed` returns False on read error                     | Could not determine ownership            | OPEN   |
+| R5-L6 | MEDIUM   | `collect_*` returns MISSING/NO_FILE on OSError                | Item exists but is unreadable            | OPEN   |
+
+### Silent degradation paths
+
+| ID    | Severity | Degradation                                                                                                                                                      | Status |
+| ----- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| R5-D1 | HIGH     | Source file parse failure silently shrinks the collection. User has 10 rules but sync only processes 9. Summary shows "9 added" with no hint about the 10th.     | OPEN   |
+| R5-D2 | HIGH     | `@include` resolution failure produces `<!-- ERROR: Missing include -->` HTML comment in generated rule. AI tool receives incomplete rules. No sync-level error. | OPEN   |
+| R5-D3 | MEDIUM   | Manifest v1.0 silently upgraded to v2.0 on next write. Unknown fields from future v3.0 silently dropped on round-trip.                                           | OPEN   |
+| R5-D4 | MEDIUM   | Skill directory without `SKILL.md` completely invisible. No warning during sync.                                                                                 | OPEN   |
+| R5-D5 | LOW      | MCP `find` tool falls back to empty rankings on graph failure. MCP client gets valid but impoverished results.                                                   | OPEN   |
+
 ## Summary statistics
 
 | Round     | Critical | High   | Medium | Low   | Fixed  | Open          |
@@ -275,4 +410,6 @@ Ambiguous paths requiring improvement:
 | R3        | 4        | 7      | 12     | 2     | 0      | 25            |
 | R3-Sec    | 1        | 2      | 3      | 0     | 0      | 6             |
 | R3-UX     | 0        | 0      | 7      | 0     | 0      | 7             |
-| **Total** | **8**    | **23** | **38** | **4** | **21** | **52**        |
+| R4        | 1        | 7      | 7      | 1     | 0      | 16            |
+| R5        | 2        | 7      | 4      | 1     | 0      | 14            |
+| **Total** | **11**   | **37** | **49** | **6** | **21** | **82**        |
