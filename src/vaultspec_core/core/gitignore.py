@@ -20,15 +20,28 @@ def _detect_line_ending(raw: bytes) -> str:
 
 
 def _find_markers(lines: list[str]) -> tuple[int | None, int | None]:
-    """Return ``(begin_index, end_index)`` of the managed block markers."""
+    """Return ``(begin_index, end_index)`` of the managed block markers.
+
+    Returns ``(None, None)`` when markers are duplicated or inverted,
+    treating those cases as corruption (same as orphaned single marker).
+    """
     begin: int | None = None
     end: int | None = None
+    begin_count = 0
+    end_count = 0
     for i, line in enumerate(lines):
         stripped = line.rstrip()
         if stripped == MARKER_BEGIN:
+            begin_count += 1
             begin = i
         elif stripped == MARKER_END:
+            end_count += 1
             end = i
+    # Duplicates or inverted markers are treated as corruption.
+    if begin_count > 1 or end_count > 1:
+        return begin, None  # signal corruption via single-marker path
+    if begin is not None and end is not None and begin > end:
+        return begin, None  # inverted - treat as corruption
     return begin, end
 
 
@@ -86,7 +99,7 @@ def ensure_gitignore_block(
 
     if state == "absent":
         return _remove_block(gi_path, lines, begin, end, eol, bom)
-    return _add_block(gi_path, lines, begin, end, entries, eol, bom, content)
+    return _add_block(gi_path, lines, begin, end, entries, eol, bom)
 
 
 def _add_block(
@@ -97,16 +110,15 @@ def _add_block(
     entries: list[str],
     eol: str,
     bom: bytes,
-    original: str,
 ) -> bool:
     new_block = [MARKER_BEGIN, *entries, MARKER_END]
 
     if begin is not None and end is not None:
         # Replace existing block.
         replaced = lines[:begin] + new_block + lines[end + 1 :]
-        result = eol.join(replaced) + eol
-        if result == original:
+        if replaced == lines:
             return False
+        result = eol.join(replaced) + eol
         _write(gi_path, result, bom)
         return True
 

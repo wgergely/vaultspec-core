@@ -9,11 +9,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from ..enums import Tool
-
+from ..enums import Tool
 from .signals import (
     BuiltinVersionSignal,
     ConfigSignal,

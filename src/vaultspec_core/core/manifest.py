@@ -94,16 +94,15 @@ def write_manifest_data(target: Path, data: ManifestData) -> None:
         target: Workspace root directory.
         data: :class:`ManifestData` instance to persist.
     """
-    data.serial += 1
-    data.version = MANIFEST_VERSION
+    serial = data.serial + 1
 
     path = _manifest_path(target)
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "version": data.version,
+        "version": MANIFEST_VERSION,
         "vaultspec_version": data.vaultspec_version,
         "installed_at": data.installed_at,
-        "serial": data.serial,
+        "serial": serial,
         "installed": sorted(data.installed),
         "provider_state": data.provider_state,
         "gitignore_managed": data.gitignore_managed,
