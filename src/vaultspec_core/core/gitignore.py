@@ -5,8 +5,6 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from .helpers import atomic_write
-
 logger = logging.getLogger(__name__)
 
 MARKER_BEGIN = "# >>> vaultspec-managed (do not edit this block) >>>"
@@ -164,8 +162,10 @@ def _remove_block(
 
 
 def _write(gi_path: Path, content: str, bom: bytes) -> None:
-    """Write *content* to *gi_path*, restoring BOM if originally present."""
-    if bom:
-        gi_path.write_bytes(bom + content.encode("utf-8"))
-    else:
-        atomic_write(gi_path, content)
+    """Write *content* to *gi_path*, restoring BOM if originally present.
+
+    Always writes in binary mode to preserve the caller-chosen line
+    endings.  Using text-mode would double ``\\r`` on Windows when the
+    content already contains ``\\r\\n``.
+    """
+    gi_path.write_bytes(bom + content.encode("utf-8"))
