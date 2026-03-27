@@ -192,7 +192,18 @@ def _resolve_framework(
             )
             return
         if action == "uninstall":
-            plan.warnings.append("Nothing to remove - framework is not installed.")
+            if force:
+                plan.steps.append(
+                    ResolutionStep(
+                        action=ResolutionAction.REPAIR_MANIFEST,
+                        target="manifest",
+                        reason="Corrupted manifest - repairing before uninstall",
+                    )
+                )
+            else:
+                plan.conflicts.append(
+                    "Manifest is corrupted. Use --force to proceed with uninstall."
+                )
             return
 
 
@@ -385,7 +396,21 @@ def _resolve_builtin_version(
     force: bool,
 ) -> None:
     """Apply builtin-version resolution rules."""
-    if signal in (BuiltinVersionSignal.CURRENT, BuiltinVersionSignal.DELETED):
+    if signal == BuiltinVersionSignal.CURRENT:
+        return
+
+    if signal == BuiltinVersionSignal.DELETED:
+        plan.warnings.append(
+            "Builtin resources have been deleted from .vaultspec/rules/."
+        )
+        if force and action == "sync":
+            plan.steps.append(
+                ResolutionStep(
+                    action=ResolutionAction.SYNC,
+                    target="builtins",
+                    reason="Re-seed deleted builtin resources",
+                )
+            )
         return
 
     if signal == BuiltinVersionSignal.NO_SNAPSHOTS:
@@ -470,12 +495,18 @@ def _resolve_gitignore(
 ) -> None:
     """Apply gitignore resolution rules."""
     _ = force  # gitignore repairs are unconditional
-    ok_signals = (
-        GitignoreSignal.COMPLETE,
-        GitignoreSignal.PARTIAL,
-        GitignoreSignal.NO_FILE,
-    )
-    if signal in ok_signals:
+    if signal in (GitignoreSignal.COMPLETE, GitignoreSignal.NO_FILE):
+        return
+
+    if signal == GitignoreSignal.PARTIAL:
+        if action in ("install", "sync"):
+            plan.steps.append(
+                ResolutionStep(
+                    action=ResolutionAction.REPAIR_GITIGNORE,
+                    target=".gitignore",
+                    reason="Managed block entries are stale, updating",
+                )
+            )
         return
 
     if signal == GitignoreSignal.CORRUPTED:
