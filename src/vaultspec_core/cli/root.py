@@ -668,6 +668,7 @@ def _doctor_exit_code(diag: WorkspaceDiagnosis) -> int:
     """
     from vaultspec_core.core.diagnosis import (
         BuiltinVersionSignal,
+        ConfigSignal,
         ContentSignal,
         FrameworkSignal,
         GitignoreSignal,
@@ -688,13 +689,19 @@ def _doctor_exit_code(diag: WorkspaceDiagnosis) -> int:
         has_warn = True
 
     for prov in diag.providers.values():
+        if prov.manifest_entry == ManifestEntrySignal.NOT_INSTALLED:
+            continue
         if prov.manifest_entry == ManifestEntrySignal.ORPHANED:
             has_error = True
         if prov.manifest_entry == ManifestEntrySignal.UNTRACKED:
             has_warn = True
+        if prov.dir_state == ProviderDirSignal.MISSING:
+            has_error = True
         if prov.dir_state == ProviderDirSignal.MIXED:
             has_warn = True
         if prov.dir_state in (ProviderDirSignal.EMPTY, ProviderDirSignal.PARTIAL):
+            has_warn = True
+        if prov.config in (ConfigSignal.MISSING, ConfigSignal.FOREIGN):
             has_warn = True
         for s in prov.content.values():
             if s in (ContentSignal.STALE, ContentSignal.DIVERGED):

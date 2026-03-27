@@ -91,10 +91,19 @@ def resolve(
     _ = dry_run  # reserved for executor phase
     plan = ResolutionPlan()
 
-    _resolve_framework(plan, diagnosis.framework, action, force=force)
+    # Doctor only diagnoses; it never resolves.
+    if action == "doctor":
+        return plan
+
+    # Upgrade = install semantics for framework rules, then sync for the rest.
+    # Resolve framework rules with "install", everything else with "sync".
+    fw_action = "install" if action == "upgrade" else action
+    prov_action = "sync" if action == "upgrade" else action
+
+    _resolve_framework(plan, diagnosis.framework, fw_action, force=force)
     _resolve_version_warning(plan, diagnosis)
-    _resolve_builtin_version(plan, diagnosis.builtin_version, action, force=force)
-    _resolve_gitignore(plan, diagnosis.gitignore, action, force=force)
+    _resolve_builtin_version(plan, diagnosis.builtin_version, prov_action, force=force)
+    _resolve_gitignore(plan, diagnosis.gitignore, prov_action, force=force)
 
     # Per-provider rules
     for tool, prov_diag in diagnosis.providers.items():
@@ -105,28 +114,28 @@ def resolve(
             plan,
             prov_diag.manifest_entry,
             name,
-            action,
+            prov_action,
             force=force,
         )
         _resolve_provider_dir(
             plan,
             prov_diag.dir_state,
             name,
-            action,
+            prov_action,
             force=force,
         )
         _resolve_content(
             plan,
             prov_diag.content,
             name,
-            action,
+            prov_action,
             force=force,
         )
         _resolve_config(
             plan,
             prov_diag.config,
             name,
-            action,
+            prov_action,
             force=force,
         )
 
@@ -206,6 +215,8 @@ def _resolve_framework(
                 )
             return
 
+    logger.warning("Unhandled signal: %s for action %s", signal, action)
+
 
 # ---------------------------------------------------------------------------
 # Manifest entry rules
@@ -224,7 +235,7 @@ def _resolve_manifest_entry(
     if signal in (ManifestEntrySignal.COHERENT, ManifestEntrySignal.NOT_INSTALLED):
         return
 
-    if signal == ManifestEntrySignal.ORPHANED and action == "sync":
+    if signal == ManifestEntrySignal.ORPHANED and action in ("install", "sync"):
         plan.steps.append(
             ResolutionStep(
                 action=ResolutionAction.SCAFFOLD,
@@ -232,13 +243,14 @@ def _resolve_manifest_entry(
                 reason=f"Provider '{tool_name}' in manifest but directory missing",
             )
         )
-        plan.steps.append(
-            ResolutionStep(
-                action=ResolutionAction.SYNC,
-                target=tool_name,
-                reason=f"Sync after scaffolding '{tool_name}'",
+        if action == "sync":
+            plan.steps.append(
+                ResolutionStep(
+                    action=ResolutionAction.SYNC,
+                    target=tool_name,
+                    reason=f"Sync after scaffolding '{tool_name}'",
+                )
             )
-        )
         return
 
     if signal == ManifestEntrySignal.UNTRACKED:
@@ -273,6 +285,23 @@ def _resolve_manifest_entry(
                     f"Use --force to adopt and sync."
                 )
             return
+        if action == "uninstall":
+            if force:
+                plan.steps.append(
+                    ResolutionStep(
+                        action=ResolutionAction.REMOVE,
+                        target=tool_name,
+                        reason=f"Removing untracked directory for '{tool_name}'",
+                    )
+                )
+            else:
+                plan.conflicts.append(
+                    f"Provider '{tool_name}' has an untracked directory. "
+                    f"Use --force to remove."
+                )
+            return
+
+    logger.warning("Unhandled signal: %s for action %s", signal, action)
 
 
 # ---------------------------------------------------------------------------
@@ -318,6 +347,8 @@ def _resolve_provider_dir(
             )
         )
         return
+
+    logger.warning("Unhandled signal: %s for action %s", signal, action)
 
 
 # ---------------------------------------------------------------------------
@@ -382,6 +413,9 @@ def _resolve_content(
                     f"Use --force to overwrite."
                 )
 
+        else:
+            logger.warning("Unhandled signal: %s for action %s", signal, action)
+
 
 # ---------------------------------------------------------------------------
 # Builtin version rules
@@ -433,6 +467,9 @@ def _resolve_builtin_version(
                 "Builtin files have been modified since install. "
                 "Use --force to re-seed."
             )
+        return
+
+    logger.warning("Unhandled signal: %s for action %s", signal, action)
 
 
 # ---------------------------------------------------------------------------
@@ -479,6 +516,9 @@ def _resolve_config(
                 f"Config for '{tool_name}' appears user-authored. "
                 f"Use --force to overwrite."
             )
+        return
+
+    logger.warning("Unhandled signal: %s for action %s", signal, action)
 
 
 # ---------------------------------------------------------------------------
@@ -527,6 +567,9 @@ def _resolve_gitignore(
                 reason="Gitignore has no managed entries",
             )
         )
+        return
+
+    logger.warning("Unhandled signal: %s for action %s", signal, action)
 
 
 # ---------------------------------------------------------------------------

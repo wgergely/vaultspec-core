@@ -58,6 +58,7 @@ class WorkspaceDiagnosis:
     providers: dict[Tool, ProviderDiagnosis] = field(default_factory=dict)
     builtin_version: BuiltinVersionSignal = BuiltinVersionSignal.NO_SNAPSHOTS
     gitignore: GitignoreSignal = GitignoreSignal.NO_FILE
+    mcp: ConfigSignal = ConfigSignal.MISSING
 
 
 def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
@@ -81,6 +82,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         collect_framework_presence,
         collect_gitignore_state,
         collect_manifest_coherence,
+        collect_mcp_config_state,
         collect_provider_dir_state,
     )
 
@@ -97,9 +99,37 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         logger.warning("Gitignore state collector failed", exc_info=True)
         gitignore = GitignoreSignal.NO_FILE
 
-    diag = WorkspaceDiagnosis(framework=framework, gitignore=gitignore)
+    try:
+        mcp = collect_mcp_config_state(target)
+    except Exception:
+        logger.warning("MCP config state collector failed", exc_info=True)
+        mcp = ConfigSignal.MISSING
 
-    if framework != FrameworkSignal.PRESENT:
+    diag = WorkspaceDiagnosis(framework=framework, gitignore=gitignore, mcp=mcp)
+
+    if framework == FrameworkSignal.MISSING:
+        return diag
+
+    if framework == FrameworkSignal.CORRUPTED:
+        # Manifest may be broken but directories may still exist.
+        # Collect what we can without requiring a valid WorkspaceContext.
+        manifest_map: dict[str, ManifestEntrySignal] = {}
+        try:
+            manifest_map = collect_manifest_coherence(target)
+        except Exception:
+            logger.warning("Manifest coherence collector failed", exc_info=True)
+
+        for tool in Tool:
+            entry = manifest_map.get(tool.value, ManifestEntrySignal.NOT_INSTALLED)
+            try:
+                dir_state = collect_provider_dir_state(target, tool.value)
+            except Exception:
+                dir_state = ProviderDirSignal.MISSING
+            diag.providers[tool] = ProviderDiagnosis(
+                tool=tool,
+                dir_state=dir_state,
+                manifest_entry=entry,
+            )
         return diag
 
     # Layer 2: framework is PRESENT - collect manifest and builtin state

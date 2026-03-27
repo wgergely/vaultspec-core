@@ -339,12 +339,19 @@ class TestDiagnose:
         prov = result.providers[Tool.CLAUDE]
         assert prov.manifest_entry == ManifestEntrySignal.COHERENT
 
-    def test_corrupted_framework_stops_early(self, tmp_path: Path) -> None:
-        """When framework is corrupted, providers dict stays empty."""
+    def test_corrupted_framework_collects_partial_diagnosis(
+        self, tmp_path: Path
+    ) -> None:
+        """When framework is corrupted, providers are still diagnosed for
+        directory presence and manifest coherence (but not content integrity)."""
         d = tmp_path / ".vaultspec"
         d.mkdir()
         (d / "providers.json").write_text("{bad", encoding="utf-8")
 
         result = diagnose(tmp_path)
         assert result.framework == FrameworkSignal.CORRUPTED
-        assert result.providers == {}
+        # Providers are populated with basic dir/manifest signals
+        assert len(result.providers) > 0
+        for prov in result.providers.values():
+            # Content integrity is not collected when corrupted
+            assert prov.content == {}

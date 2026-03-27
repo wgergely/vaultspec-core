@@ -473,16 +473,24 @@ def install_run(
         sync_target = provider if provider not in ("all", "core") else "all"
         sync_provider(sync_target, force=True)
 
+        # Update manifest timestamps and version
+        import datetime
+
+        from .manifest import read_manifest_data, write_manifest_data
+
+        mdata = read_manifest_data(path)
+        if not mdata.installed_at:
+            mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
+        mdata.vaultspec_version = _get_package_version()
+
         # Re-opt-in gitignore management on --upgrade --force
         if force:
             from .gitignore import DEFAULT_ENTRIES, ensure_gitignore_block
-            from .manifest import read_manifest_data, write_manifest_data
 
             ensure_gitignore_block(path, DEFAULT_ENTRIES, state="present")
-            mdata = read_manifest_data(path)
             mdata.gitignore_managed = True
-            mdata.vaultspec_version = _get_package_version()
-            write_manifest_data(path, mdata)
+
+        write_manifest_data(path, mdata)
 
         return {"action": "upgrade", "seeded_count": len(seeded), "path": path}
 
@@ -522,14 +530,15 @@ def install_run(
     from .gitignore import DEFAULT_ENTRIES, ensure_gitignore_block
     from .manifest import read_manifest_data, write_manifest_data
 
-    if ensure_gitignore_block(path, DEFAULT_ENTRIES, state="present"):
+    gi_written = ensure_gitignore_block(path, DEFAULT_ENTRIES, state="present")
+    if gi_written:
         logger.info("Added vaultspec managed block to .gitignore")
 
     # Populate v2.0 manifest fields
     import datetime
 
     mdata = read_manifest_data(path)
-    mdata.gitignore_managed = True
+    mdata.gitignore_managed = gi_written
     mdata.vaultspec_version = _get_package_version()
     mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
     for name in provider_names:
@@ -967,26 +976,22 @@ def sync_provider(
         if not dry_run:
             import datetime
 
-            from .gitignore import DEFAULT_ENTRIES, ensure_gitignore_block
+            from .gitignore import DEFAULT_ENTRIES, MARKER_BEGIN, ensure_gitignore_block
             from .manifest import read_manifest_data, write_manifest_data
 
             # Respect gitignore opt-out
             mdata = read_manifest_data(ctx.target_dir)
             if mdata.gitignore_managed:
-                gi_result = ensure_gitignore_block(ctx.target_dir, DEFAULT_ENTRIES)
-                if not gi_result:
-                    # Block already present or file missing -- no action needed
-                    pass
-            elif mdata.gitignore_managed is False and mdata.installed_at:
-                # User may have removed the block -- check and respect opt-out
+                ensure_gitignore_block(ctx.target_dir, DEFAULT_ENTRIES)
+                # Re-check: if markers are absent after ensure, user removed
+                # the block - respect the opt-out.
                 gi_path = ctx.target_dir / ".gitignore"
                 if gi_path.exists():
-                    from .gitignore import MARKER_BEGIN
-
                     content = gi_path.read_text(encoding="utf-8")
                     if MARKER_BEGIN not in content:
-                        # Block was removed by user -- keep opt-out
-                        pass
+                        mdata = read_manifest_data(ctx.target_dir)
+                        mdata.gitignore_managed = False
+                        write_manifest_data(ctx.target_dir, mdata)
 
             # Update last_synced timestamps
             now = datetime.datetime.now(tz=datetime.UTC).isoformat()

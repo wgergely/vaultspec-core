@@ -89,13 +89,14 @@ class TestInstallGitignore:
         assert mdata.gitignore_managed is True
 
     def test_install_no_gitignore_file_does_not_fail(self, tmp_path: Path):
-        # No .gitignore at all -- install should still succeed
+        # No .gitignore at all -- install should still succeed but must not
+        # claim gitignore management when the file does not exist.
         result = install_run(
             path=tmp_path, provider="all", upgrade=False, dry_run=False, force=False
         )
         assert result["action"] == "install"
         mdata = read_manifest_data(tmp_path)
-        assert mdata.gitignore_managed is True
+        assert mdata.gitignore_managed is False
 
 
 class TestInstallManifestV2:

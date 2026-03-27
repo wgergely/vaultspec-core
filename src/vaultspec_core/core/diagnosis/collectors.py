@@ -262,7 +262,13 @@ def collect_mcp_config_state(target: Path) -> ConfigSignal:
     except (json.JSONDecodeError, OSError):
         return ConfigSignal.PARTIAL_MCP
 
-    servers = raw.get("mcpServers", {})
+    if not isinstance(raw, dict):
+        return ConfigSignal.PARTIAL_MCP
+
+    servers = raw.get("mcpServers")
+    if not isinstance(servers, dict):
+        return ConfigSignal.PARTIAL_MCP
+
     if "vaultspec-core" not in servers:
         return ConfigSignal.PARTIAL_MCP
 

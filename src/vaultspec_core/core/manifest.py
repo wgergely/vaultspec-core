@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from .enums import Tool
+from .helpers import atomic_write
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,7 @@ def write_manifest_data(target: Path, data: ManifestData) -> None:
         "provider_state": data.provider_state,
         "gitignore_managed": data.gitignore_managed,
     }
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    atomic_write(path, json.dumps(payload, indent=2) + "\n")
 
 
 def read_manifest(target: Path) -> set[str]:
@@ -175,6 +176,7 @@ def remove_provider(target: Path, name: str) -> set[str]:
     """
     data = read_manifest_data(target)
     data.installed.discard(name)
+    data.provider_state.pop(name, None)
     write_manifest_data(target, data)
     return data.installed
 
