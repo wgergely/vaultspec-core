@@ -109,6 +109,57 @@ def main(
     ctx.obj = {}
 
 
+# ---- Pre-flight helper -------------------------------------------------------
+
+
+def _run_preflight(
+    target: Path,
+    action: str,
+    provider: str = "all",
+    *,
+    force: bool = False,
+    dry_run: bool = False,
+    scope: str = "framework",
+) -> None:
+    """Run diagnosis and resolution pre-flight.
+
+    Displays warnings and blocks on conflicts.
+    Raises :class:`typer.Exit` with code 1 if conflicts are present and
+    *force* is ``False``.
+    """
+    from vaultspec_core.core.diagnosis import diagnose
+    from vaultspec_core.core.resolver import resolve
+
+    try:
+        diag = diagnose(target, scope=scope)
+    except Exception:
+        logger.debug("Pre-flight diagnosis failed", exc_info=True)
+        return
+
+    plan = resolve(diag, action, provider, force=force, dry_run=dry_run)
+
+    if not plan.warnings and not plan.conflicts and not plan.steps:
+        return
+
+    from vaultspec_core.console import get_console
+
+    console = get_console()
+
+    for warning in plan.warnings:
+        console.print(f"  [yellow]![/yellow] {warning}")
+
+    for step in plan.steps:
+        console.print(f"  [dim]>[/dim] {step.reason}")
+
+    if plan.conflicts:
+        console.print()
+        for conflict in plan.conflicts:
+            console.print(f"  [red]x[/red] {conflict}")
+        console.print()
+        if not dry_run:
+            raise typer.Exit(code=1)
+
+
 # ---- Top-level commands ------------------------------------------------------
 
 
@@ -177,6 +228,15 @@ def cmd_install(
             raise typer.Exit(code=1)
         if not dry_run:
             path.mkdir(parents=False, exist_ok=True)
+
+    _run_preflight(
+        path,
+        action="upgrade" if upgrade else "install",
+        provider=provider,
+        force=force,
+        dry_run=dry_run,
+        scope="framework",
+    )
 
     try:
         result = install_run(
@@ -288,6 +348,15 @@ def cmd_uninstall(
         typer.echo(f"Error: Target directory does not exist: {path}", err=True)
         raise typer.Exit(code=1)
 
+    _run_preflight(
+        path,
+        action="uninstall",
+        provider=provider,
+        force=force,
+        dry_run=dry_run,
+        scope="framework",
+    )
+
     try:
         result = uninstall_run(
             path=path,
@@ -376,6 +445,23 @@ def cmd_sync(
             err=True,
         )
         raise typer.Exit(code=1)
+
+    from vaultspec_core.core.types import get_context
+
+    try:
+        ctx = get_context()
+        sync_target = ctx.target_dir
+    except LookupError:
+        sync_target = target or Path.cwd()
+
+    _run_preflight(
+        sync_target,
+        action="sync",
+        provider=provider,
+        force=force,
+        dry_run=dry_run,
+        scope="sync",
+    )
 
     from vaultspec_core.core.commands import sync_provider
     from vaultspec_core.core.exceptions import VaultSpecError
