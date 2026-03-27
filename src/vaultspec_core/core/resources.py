@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+from collections.abc import Callable
 from pathlib import Path
 
 from .exceptions import ResourceExistsError, ResourceNotFoundError
@@ -84,7 +85,7 @@ def resource_remove(
     label: str,
     force: bool = False,
     is_dir: bool = False,
-    confirm_fn: object | None = None,
+    confirm_fn: Callable[[str], bool] | None = None,
 ) -> bool:
     """Delete a resource file (or directory) from disk, with optional confirmation.
 
@@ -109,8 +110,8 @@ def resource_remove(
     if not force:
         if confirm_fn is None:
             return False
-        # confirm_fn is a callable
-        if not confirm_fn(f"Are you sure you want to remove {label} '{name}'?"):  # type: ignore[operator]
+        confirmed = confirm_fn(f"Are you sure you want to remove {label} '{name}'?")
+        if not confirmed:
             return False
 
     if is_dir:

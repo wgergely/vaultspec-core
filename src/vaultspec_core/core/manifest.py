@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -16,16 +17,104 @@ from .enums import Tool
 
 logger = logging.getLogger(__name__)
 
-MANIFEST_VERSION = "1.0"
+MANIFEST_VERSION = "2.0"
 MANIFEST_FILENAME = "providers.json"
+
+
+@dataclass
+class ManifestData:
+    """Structured representation of the v2.0 provider manifest.
+
+    Attributes:
+        version: Manifest schema version string.
+        vaultspec_version: Version of vaultspec-core that last wrote the manifest.
+        installed_at: ISO-8601 timestamp of the initial install.
+        serial: Monotonically increasing write counter.
+        installed: Set of installed provider name strings.
+        provider_state: Per-provider opaque state
+            (e.g. ``{"claude": {"synced": "true"}}``).
+        gitignore_managed: Whether vaultspec manages ``.gitignore``
+            entries.
+    """
+
+    version: str = "2.0"
+    vaultspec_version: str = ""
+    installed_at: str = ""
+    serial: int = 0
+    installed: set[str] = field(default_factory=set)
+    provider_state: dict[str, dict[str, str]] = field(default_factory=dict)
+    gitignore_managed: bool = False
 
 
 def _manifest_path(target: Path) -> Path:
     return target / ".vaultspec" / MANIFEST_FILENAME
 
 
+def read_manifest_data(target: Path) -> ManifestData:
+    """Read the full :class:`ManifestData` from ``.vaultspec/providers.json``.
+
+    Handles v1.0 manifests transparently by using zero-values for fields
+    introduced in v2.0.  Never raises on missing or malformed files - returns
+    a default :class:`ManifestData` with an empty ``installed`` set instead.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        Populated :class:`ManifestData` instance.
+    """
+    path = _manifest_path(target)
+    if not path.exists():
+        return ManifestData()
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("Failed to read provider manifest: %s", e)
+        return ManifestData()
+
+    return ManifestData(
+        version=raw.get("version", "1.0"),
+        vaultspec_version=raw.get("vaultspec_version", ""),
+        installed_at=raw.get("installed_at", ""),
+        serial=int(raw.get("serial", 0)),
+        installed=set(raw.get("installed", [])),
+        provider_state=raw.get("provider_state", {}),
+        gitignore_managed=bool(raw.get("gitignore_managed", False)),
+    )
+
+
+def write_manifest_data(target: Path, data: ManifestData) -> None:
+    """Serialize *data* to ``.vaultspec/providers.json``.
+
+    Auto-increments :attr:`ManifestData.serial` and forces
+    :attr:`ManifestData.version` to the current :data:`MANIFEST_VERSION`
+    before writing.
+
+    Args:
+        target: Workspace root directory.
+        data: :class:`ManifestData` instance to persist.
+    """
+    data.serial += 1
+    data.version = MANIFEST_VERSION
+
+    path = _manifest_path(target)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": data.version,
+        "vaultspec_version": data.vaultspec_version,
+        "installed_at": data.installed_at,
+        "serial": data.serial,
+        "installed": sorted(data.installed),
+        "provider_state": data.provider_state,
+        "gitignore_managed": data.gitignore_managed,
+    }
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
 def read_manifest(target: Path) -> set[str]:
     """Read installed provider names from ``.vaultspec/providers.json``.
+
+    Backward-compatible convenience wrapper around :func:`read_manifest_data`.
 
     Args:
         target: Workspace root directory.
@@ -34,35 +123,30 @@ def read_manifest(target: Path) -> set[str]:
         Set of installed provider name strings (e.g. ``{"claude", "gemini"}``),
         or an empty set if the manifest is absent or malformed.
     """
-    path = _manifest_path(target)
-    if not path.exists():
-        return set()
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return set(data.get("installed", []))
-    except (json.JSONDecodeError, OSError) as e:
-        logger.warning("Failed to read provider manifest: %s", e)
-        return set()
+    return read_manifest_data(target).installed
 
 
 def write_manifest(target: Path, providers: set[str]) -> None:
     """Persist *providers* to ``.vaultspec/providers.json``.
 
+    Backward-compatible convenience wrapper around :func:`write_manifest_data`.
+    Reads the existing manifest first so that v2.0 metadata fields (timestamps,
+    serial, provider state) are preserved across writes.
+
     Args:
         target: Workspace root directory.
         providers: Set of provider name strings to record as installed.
     """
-    path = _manifest_path(target)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    data = {
-        "version": MANIFEST_VERSION,
-        "installed": sorted(providers),
-    }
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    data = read_manifest_data(target)
+    data.installed = set(providers)
+    write_manifest_data(target, data)
 
 
 def add_providers(target: Path, names: list[str]) -> set[str]:
     """Add *names* to the manifest and return the updated provider set.
+
+    Uses :func:`read_manifest_data` / :func:`write_manifest_data` internally
+    so that v2.0 metadata fields are preserved across read-modify-write cycles.
 
     Args:
         target: Workspace root directory.
@@ -71,14 +155,17 @@ def add_providers(target: Path, names: list[str]) -> set[str]:
     Returns:
         Updated set of all installed provider names.
     """
-    current = read_manifest(target)
-    current.update(names)
-    write_manifest(target, current)
-    return current
+    data = read_manifest_data(target)
+    data.installed.update(names)
+    write_manifest_data(target, data)
+    return data.installed
 
 
 def remove_provider(target: Path, name: str) -> set[str]:
     """Remove *name* from the manifest and return the remaining provider set.
+
+    Uses :func:`read_manifest_data` / :func:`write_manifest_data` internally
+    so that v2.0 metadata fields are preserved across read-modify-write cycles.
 
     Args:
         target: Workspace root directory.
@@ -87,10 +174,10 @@ def remove_provider(target: Path, name: str) -> set[str]:
     Returns:
         Updated set of remaining installed provider names.
     """
-    current = read_manifest(target)
-    current.discard(name)
-    write_manifest(target, current)
-    return current
+    data = read_manifest_data(target)
+    data.installed.discard(name)
+    write_manifest_data(target, data)
+    return data.installed
 
 
 def providers_sharing_file(
