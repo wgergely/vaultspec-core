@@ -25,6 +25,17 @@ from .helpers import ensure_dir
 
 logger = logging.getLogger(__name__)
 
+
+def _get_package_version() -> str:
+    """Return the installed vaultspec-core version string."""
+    try:
+        from importlib.metadata import version
+
+        return version("vaultspec-core")
+    except Exception:
+        return "unknown"
+
+
 # Valid provider arguments for install/uninstall commands.
 VALID_PROVIDERS = {"all", "core", "claude", "gemini", "antigravity", "codex"}
 
@@ -461,6 +472,18 @@ def install_run(
 
         sync_target = provider if provider not in ("all", "core") else "all"
         sync_provider(sync_target, force=True)
+
+        # Re-opt-in gitignore management on --upgrade --force
+        if force:
+            from .gitignore import DEFAULT_ENTRIES, ensure_gitignore_block
+            from .manifest import read_manifest_data, write_manifest_data
+
+            ensure_gitignore_block(path, DEFAULT_ENTRIES, state="present")
+            mdata = read_manifest_data(path)
+            mdata.gitignore_managed = True
+            mdata.vaultspec_version = _get_package_version()
+            write_manifest_data(path, mdata)
+
         return {"action": "upgrade", "seeded_count": len(seeded), "path": path}
 
     fw_dir = path / ".vaultspec"
@@ -494,6 +517,25 @@ def install_run(
     tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
     provider_names = [t.value for t in tools]
     has_mcp = (path / ".mcp.json").exists()
+
+    # Manage gitignore block
+    from .gitignore import DEFAULT_ENTRIES, ensure_gitignore_block
+    from .manifest import read_manifest_data, write_manifest_data
+
+    if ensure_gitignore_block(path, DEFAULT_ENTRIES, state="present"):
+        logger.info("Added vaultspec managed block to .gitignore")
+
+    # Populate v2.0 manifest fields
+    import datetime
+
+    mdata = read_manifest_data(path)
+    mdata.gitignore_managed = True
+    mdata.vaultspec_version = _get_package_version()
+    mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
+    for name in provider_names:
+        mdata.provider_state.setdefault(name, {})
+        mdata.provider_state[name]["installed_at"] = mdata.installed_at
+    write_manifest_data(path, mdata)
 
     return {
         "action": "install",
@@ -726,6 +768,12 @@ def uninstall_run(
             for tool in tools:
                 remove_provider(path, tool.value)
 
+    # Remove gitignore managed block on real uninstall of all providers
+    if not dry_run and effective_provider == "all" and not keep_vault:
+        from .gitignore import ensure_gitignore_block
+
+        ensure_gitignore_block(path, [], state="absent")
+
     action = "dry_run" if dry_run else "uninstall"
     return {
         "action": action,
@@ -914,7 +962,43 @@ def sync_provider(
             }
 
         copied = contextvars.copy_context()
-        return copied.run(_sync_all_with_configs, narrowed_configs)
+        results = copied.run(_sync_all_with_configs, narrowed_configs)
+
+        if not dry_run:
+            import datetime
+
+            from .gitignore import DEFAULT_ENTRIES, ensure_gitignore_block
+            from .manifest import read_manifest_data, write_manifest_data
+
+            # Respect gitignore opt-out
+            mdata = read_manifest_data(ctx.target_dir)
+            if mdata.gitignore_managed:
+                gi_result = ensure_gitignore_block(ctx.target_dir, DEFAULT_ENTRIES)
+                if not gi_result:
+                    # Block already present or file missing -- no action needed
+                    pass
+            elif mdata.gitignore_managed is False and mdata.installed_at:
+                # User may have removed the block -- check and respect opt-out
+                gi_path = ctx.target_dir / ".gitignore"
+                if gi_path.exists():
+                    from .gitignore import MARKER_BEGIN
+
+                    content = gi_path.read_text(encoding="utf-8")
+                    if MARKER_BEGIN not in content:
+                        # Block was removed by user -- keep opt-out
+                        pass
+
+            # Update last_synced timestamps
+            now = datetime.datetime.now(tz=datetime.UTC).isoformat()
+            mdata = read_manifest_data(ctx.target_dir)
+            for tool_type in ctx.tool_configs:
+                name = tool_type.value
+                mdata.provider_state.setdefault(name, {})
+                mdata.provider_state[name]["last_synced"] = now
+            mdata.vaultspec_version = _get_package_version()
+            write_manifest_data(ctx.target_dir, mdata)
+
+        return results
 
     # Validate provider is installed
     from .manifest import read_manifest
@@ -949,4 +1033,20 @@ def sync_provider(
 
     narrowed = {k: v for k, v in ctx.tool_configs.items() if k in requested}
     copied = contextvars.copy_context()
-    return copied.run(_sync_single_provider, narrowed)
+    results = copied.run(_sync_single_provider, narrowed)
+
+    if not dry_run:
+        import datetime
+
+        from .manifest import read_manifest_data, write_manifest_data
+
+        now = datetime.datetime.now(tz=datetime.UTC).isoformat()
+        mdata = read_manifest_data(ctx.target_dir)
+        for tool_type in requested:
+            name = tool_type.value
+            mdata.provider_state.setdefault(name, {})
+            mdata.provider_state[name]["last_synced"] = now
+        mdata.vaultspec_version = _get_package_version()
+        write_manifest_data(ctx.target_dir, mdata)
+
+    return results
