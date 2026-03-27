@@ -590,6 +590,10 @@ def _resolve_version_warning(
 
         running_version = pkg_version("vaultspec-core")
     except Exception:
+        logger.debug(
+            "Could not determine running vaultspec-core version",
+            exc_info=True,
+        )
         return
 
     try:
@@ -597,6 +601,7 @@ def _resolve_version_warning(
 
         target = get_context().target_dir
     except LookupError:
+        logger.debug("No workspace context available for version check", exc_info=True)
         return
 
     try:
@@ -604,6 +609,7 @@ def _resolve_version_warning(
 
         manifest = read_manifest_data(target)
     except Exception:
+        logger.debug("Could not read manifest for version check", exc_info=True)
         return
 
     manifest_version = manifest.vaultspec_version
@@ -620,7 +626,7 @@ def _resolve_version_warning(
                 f"but running version is {running_version}."
             )
     except Exception:
-        pass
+        logger.debug("Version comparison failed", exc_info=True)
 
 
 def _parse_version_tuple(version_str: str) -> tuple[int, ...]:

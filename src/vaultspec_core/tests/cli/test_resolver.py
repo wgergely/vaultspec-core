@@ -386,3 +386,124 @@ class TestResolutionPlan:
     def test_not_blocked_with_warnings_only(self):
         plan = ResolutionPlan(warnings=["minor issue"])
         assert plan.blocked is False
+
+
+# ---------------------------------------------------------------------------
+# CORRUPTED framework + uninstall
+# ---------------------------------------------------------------------------
+
+
+class TestCorruptedUninstall:
+    def test_corrupted_uninstall_no_force_conflicts(self):
+        diag = _make_diagnosis(framework=FrameworkSignal.CORRUPTED)
+        plan = resolve(diag, "uninstall", force=False)
+        assert plan.blocked
+        assert any("corrupted" in c.lower() for c in plan.conflicts)
+
+    def test_corrupted_uninstall_force_repairs(self):
+        diag = _make_diagnosis(framework=FrameworkSignal.CORRUPTED)
+        plan = resolve(diag, "uninstall", force=True)
+        assert not plan.blocked
+        actions = [s.action for s in plan.steps]
+        assert ResolutionAction.REPAIR_MANIFEST in actions
+
+
+# ---------------------------------------------------------------------------
+# BuiltinVersionSignal.DELETED
+# ---------------------------------------------------------------------------
+
+
+class TestBuiltinDeleted:
+    def test_deleted_no_force_warns(self):
+        diag = _make_diagnosis(builtin_version=BuiltinVersionSignal.DELETED)
+        plan = resolve(diag, "sync", force=False)
+        assert any("deleted" in w.lower() for w in plan.warnings)
+        assert all(s.target != "builtins" for s in plan.steps)
+
+    def test_deleted_force_sync_reseeds(self):
+        diag = _make_diagnosis(builtin_version=BuiltinVersionSignal.DELETED)
+        plan = resolve(diag, "sync", force=True)
+        assert any("deleted" in w.lower() for w in plan.warnings)
+        actions = [s.action for s in plan.steps]
+        assert ResolutionAction.SYNC in actions
+        assert any(s.target == "builtins" for s in plan.steps)
+
+
+# ---------------------------------------------------------------------------
+# action="upgrade"
+# ---------------------------------------------------------------------------
+
+
+class TestUpgradeAction:
+    def test_upgrade_missing_framework_proceeds(self):
+        """Upgrade uses install semantics for framework: MISSING should proceed."""
+        diag = _make_diagnosis(framework=FrameworkSignal.MISSING)
+        plan = resolve(diag, "upgrade")
+        assert not plan.blocked
+
+    def test_upgrade_partial_provider_syncs(self):
+        """Upgrade uses sync semantics for providers: PARTIAL should produce SYNC."""
+        prov = _make_provider(dir_state=ProviderDirSignal.PARTIAL)
+        diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
+        plan = resolve(diag, "upgrade", provider="claude")
+        actions = [s.action for s in plan.steps]
+        assert ResolutionAction.SYNC in actions
+
+
+# ---------------------------------------------------------------------------
+# action="doctor"
+# ---------------------------------------------------------------------------
+
+
+class TestDoctorAction:
+    def test_doctor_returns_empty_plan(self):
+        """Doctor only diagnoses; it produces no steps, warnings, or conflicts."""
+        prov = _make_provider(
+            dir_state=ProviderDirSignal.EMPTY,
+            manifest_entry=ManifestEntrySignal.ORPHANED,
+        )
+        diag = _make_diagnosis(
+            framework=FrameworkSignal.CORRUPTED,
+            gitignore=GitignoreSignal.CORRUPTED,
+            providers={Tool.CLAUDE: prov},
+        )
+        plan = resolve(diag, "doctor")
+        assert plan.steps == []
+        assert plan.warnings == []
+        assert plan.conflicts == []
+
+
+# ---------------------------------------------------------------------------
+# ORPHANED + install
+# ---------------------------------------------------------------------------
+
+
+class TestOrphanedInstall:
+    def test_orphaned_install_scaffolds(self):
+        prov = _make_provider(manifest_entry=ManifestEntrySignal.ORPHANED)
+        diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
+        plan = resolve(diag, "install", provider="claude")
+        actions = [s.action for s in plan.steps]
+        assert ResolutionAction.SCAFFOLD in actions
+
+
+# ---------------------------------------------------------------------------
+# UNTRACKED + uninstall
+# ---------------------------------------------------------------------------
+
+
+class TestUntrackedUninstall:
+    def test_untracked_uninstall_no_force_conflicts(self):
+        prov = _make_provider(manifest_entry=ManifestEntrySignal.UNTRACKED)
+        diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
+        plan = resolve(diag, "uninstall", provider="claude", force=False)
+        assert plan.blocked
+        assert any("untracked" in c.lower() for c in plan.conflicts)
+
+    def test_untracked_uninstall_force_removes(self):
+        prov = _make_provider(manifest_entry=ManifestEntrySignal.UNTRACKED)
+        diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
+        plan = resolve(diag, "uninstall", provider="claude", force=True)
+        assert not plan.blocked
+        actions = [s.action for s in plan.steps]
+        assert ResolutionAction.REMOVE in actions

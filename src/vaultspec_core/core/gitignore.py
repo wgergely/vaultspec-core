@@ -97,9 +97,15 @@ def ensure_gitignore_block(
     lines = content.splitlines()
     begin, end = _find_markers(lines)
 
-    if state == "absent":
-        return _remove_block(gi_path, lines, begin, end, eol, bom)
-    return _add_block(gi_path, lines, begin, end, entries, eol, bom)
+    try:
+        if state == "absent":
+            return _remove_block(gi_path, lines, begin, end, eol, bom)
+        return _add_block(gi_path, lines, begin, end, entries, eol, bom)
+    except OSError:
+        logger.warning(
+            "Could not write to %s (permission denied or read-only)", gi_path
+        )
+        return False
 
 
 def _add_block(

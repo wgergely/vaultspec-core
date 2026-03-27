@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import stat
 from typing import TYPE_CHECKING
 
 from vaultspec_core.core.gitignore import (
     MARKER_BEGIN,
     MARKER_END,
+    _find_markers,
     ensure_gitignore_block,
 )
 
@@ -185,3 +187,100 @@ class TestFileWithoutNewline:
         text = _read_gi(tmp_path)
         assert MARKER_BEGIN in text
         assert text.endswith("\n")
+
+
+class TestInvertedMarkers:
+    def test_find_markers_inverted_returns_begin_none(self):
+        lines = ["some content", MARKER_END, ".entry/", MARKER_BEGIN]
+        begin, end = _find_markers(lines)
+        assert begin == 3
+        assert end is None
+
+    def test_ensure_removes_orphaned_marker_and_appends_fresh_block(self, tmp_path):
+        content = f"node_modules/\n{MARKER_END}\n.entry/\n{MARKER_BEGIN}\n"
+        _write_gi(tmp_path, content)
+        changed = ensure_gitignore_block(tmp_path, ENTRIES)
+
+        assert changed is True
+        text = _read_gi(tmp_path)
+        # The orphaned BEGIN marker is removed; a fresh block is appended.
+        # The stale END marker remains as inert text (single-marker path
+        # only tracks the begin index returned by _find_markers).
+        assert text.count(MARKER_BEGIN) == 1
+        # Freshly appended block has its own MARKER_END
+        assert MARKER_END in text
+
+
+class TestDuplicateBeginMarkers:
+    def test_find_markers_duplicate_begin_returns_corruption(self):
+        lines = [MARKER_BEGIN, ".entry/", MARKER_BEGIN, ".entry2/", MARKER_END]
+        begin, end = _find_markers(lines)
+        # Duplicates signal corruption: end is None
+        assert begin is not None
+        assert end is None
+
+    def test_ensure_handles_duplicate_begin(self, tmp_path):
+        content = f"{MARKER_BEGIN}\n.entry/\n{MARKER_BEGIN}\n.entry2/\n{MARKER_END}\n"
+        _write_gi(tmp_path, content)
+        changed = ensure_gitignore_block(tmp_path, ENTRIES)
+
+        assert changed is True
+        text = _read_gi(tmp_path)
+        # The last duplicate BEGIN is removed (orphan path); a fresh block
+        # is appended. The first BEGIN and the END remain as inert text
+        # since the single-marker path only tracks one index.
+        assert MARKER_BEGIN in text
+        assert MARKER_END in text
+
+
+class TestDuplicateEndMarkers:
+    def test_find_markers_duplicate_end_returns_corruption(self):
+        lines = [MARKER_BEGIN, ".entry/", MARKER_END, MARKER_END]
+        begin, end = _find_markers(lines)
+        assert begin is not None
+        assert end is None
+
+    def test_ensure_handles_duplicate_end(self, tmp_path):
+        content = f"{MARKER_BEGIN}\n.entry/\n{MARKER_END}\n{MARKER_END}\n"
+        _write_gi(tmp_path, content)
+        changed = ensure_gitignore_block(tmp_path, ENTRIES)
+
+        assert changed is True
+        text = _read_gi(tmp_path)
+        # Duplicate ends: _find_markers returns (begin, None). The orphaned
+        # BEGIN is removed and a fresh block appended. The duplicate END
+        # markers remain as inert text.
+        assert MARKER_BEGIN in text
+        assert MARKER_END in text
+
+
+class TestEmptyEntriesList:
+    def test_empty_entries_writes_markers_only(self, tmp_path):
+        _write_gi(tmp_path, "node_modules/\n")
+        changed = ensure_gitignore_block(tmp_path, [], state="present")
+
+        assert changed is True
+        text = _read_gi(tmp_path)
+        assert MARKER_BEGIN in text
+        assert MARKER_END in text
+        # Nothing between markers
+        lines = text.splitlines()
+        begin_idx = next(i for i, ln in enumerate(lines) if ln.rstrip() == MARKER_BEGIN)
+        end_idx = next(i for i, ln in enumerate(lines) if ln.rstrip() == MARKER_END)
+        assert end_idx == begin_idx + 1
+
+
+class TestReadOnlyGitignore:
+    def test_read_only_returns_false_and_logs_warning(self, tmp_path, caplog):
+        _write_gi(tmp_path, "node_modules/\n")
+        gi = _gi(tmp_path)
+        gi.chmod(stat.S_IREAD)
+        try:
+            changed = ensure_gitignore_block(tmp_path, ENTRIES)
+            assert changed is False
+            assert any(
+                "read-only" in r.message.lower() or "permission" in r.message.lower()
+                for r in caplog.records
+            )
+        finally:
+            gi.chmod(stat.S_IREAD | stat.S_IWRITE)

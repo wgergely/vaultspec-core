@@ -74,6 +74,12 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
     Returns:
         Populated :class:`WorkspaceDiagnosis` instance.
     """
+    valid_scopes = frozenset({"full", "framework", "sync"})
+    if scope not in valid_scopes:
+        raise ValueError(
+            f"Invalid scope '{scope}'. Valid: {', '.join(sorted(valid_scopes))}"
+        )
+
     from ..enums import Tool
     from .collectors import (
         collect_builtin_version_state,

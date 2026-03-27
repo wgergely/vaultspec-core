@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+import pytest
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -355,3 +357,22 @@ class TestDiagnose:
         for prov in result.providers.values():
             # Content integrity is not collected when corrupted
             assert prov.content == {}
+
+
+# ---------------------------------------------------------------------------
+# collect_gitignore_state with inverted markers
+# ---------------------------------------------------------------------------
+class TestGitignoreInvertedMarkers:
+    def test_inverted_markers_returns_corrupted(self, tmp_path: Path) -> None:
+        content = f"node_modules/\n{MARKER_END}\n.entry/\n{MARKER_BEGIN}\n"
+        _write_gitignore(tmp_path, content)
+        assert collect_gitignore_state(tmp_path) == GitignoreSignal.CORRUPTED
+
+
+# ---------------------------------------------------------------------------
+# diagnose() scope validation
+# ---------------------------------------------------------------------------
+class TestDiagnoseScopeValidation:
+    def test_invalid_scope_raises_value_error(self, tmp_path: Path) -> None:
+        with pytest.raises(ValueError, match="Invalid scope"):
+            diagnose(tmp_path, scope="nonsense")

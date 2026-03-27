@@ -33,6 +33,30 @@ _TOOL_DIR: dict[str, str] = {
     "codex": ".codex",
 }
 
+_tool_dir_validated = False
+
+
+def _validate_tool_dir() -> None:
+    """Verify ``_TOOL_DIR`` covers every Tool member.
+
+    Called once on first use to catch drift between the mapping and the enum.
+    """
+    global _tool_dir_validated
+    if _tool_dir_validated:
+        return
+
+    from ..enums import Tool
+
+    enum_values = {t.value for t in Tool}
+    mapping_keys = set(_TOOL_DIR)
+    if mapping_keys != enum_values:
+        missing = enum_values - mapping_keys
+        extra = mapping_keys - enum_values
+        raise RuntimeError(
+            f"_TOOL_DIR is out of sync with Tool enum: missing={missing} extra={extra}"
+        )
+    _tool_dir_validated = True
+
 
 def collect_framework_presence(target: Path) -> FrameworkSignal:
     """Check whether the vaultspec framework directory is present and valid.
@@ -75,6 +99,8 @@ def collect_manifest_coherence(target: Path) -> dict[str, ManifestEntrySignal]:
     """
     from ..enums import Tool
     from ..manifest import read_manifest_data
+
+    _validate_tool_dir()
 
     manifest = read_manifest_data(target)
     result: dict[str, ManifestEntrySignal] = {}
@@ -288,7 +314,7 @@ def collect_gitignore_state(target: Path) -> GitignoreSignal:
         :class:`~vaultspec_core.core.diagnosis.signals.GitignoreSignal`
         reflecting the observed state.
     """
-    from ..gitignore import DEFAULT_ENTRIES, MARKER_BEGIN, MARKER_END
+    from ..gitignore import DEFAULT_ENTRIES, _find_markers
 
     gi_path = target / ".gitignore"
     if not gi_path.exists():
@@ -299,25 +325,11 @@ def collect_gitignore_state(target: Path) -> GitignoreSignal:
     except OSError:
         return GitignoreSignal.NO_FILE
 
-    has_begin = MARKER_BEGIN in content
-    has_end = MARKER_END in content
-
-    if has_begin != has_end:
-        return GitignoreSignal.CORRUPTED
-
-    if not has_begin and not has_end:
-        return GitignoreSignal.NO_ENTRIES
-
-    # Both markers present - extract the block and compare entries
     lines = content.splitlines()
-    begin_idx: int | None = None
-    end_idx: int | None = None
-    for i, line in enumerate(lines):
-        stripped = line.rstrip()
-        if stripped == MARKER_BEGIN:
-            begin_idx = i
-        elif stripped == MARKER_END:
-            end_idx = i
+    begin_idx, end_idx = _find_markers(lines)
+
+    if begin_idx is None and end_idx is None:
+        return GitignoreSignal.NO_ENTRIES
 
     if begin_idx is None or end_idx is None or end_idx <= begin_idx:
         return GitignoreSignal.CORRUPTED

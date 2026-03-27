@@ -73,11 +73,17 @@ def read_manifest_data(target: Path) -> ManifestData:
         logger.warning("Failed to read provider manifest: %s", e)
         return ManifestData()
 
+    try:
+        serial = int(raw.get("serial", 0))
+    except (ValueError, TypeError):
+        logger.warning("Malformed serial in manifest, defaulting to 0")
+        serial = 0
+
     return ManifestData(
         version=raw.get("version", "1.0"),
         vaultspec_version=raw.get("vaultspec_version", ""),
         installed_at=raw.get("installed_at", ""),
-        serial=int(raw.get("serial", 0)),
+        serial=serial,
         installed=set(raw.get("installed", [])),
         provider_state=raw.get("provider_state", {}),
         gitignore_managed=bool(raw.get("gitignore_managed", False)),

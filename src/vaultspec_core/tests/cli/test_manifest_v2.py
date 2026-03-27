@@ -200,3 +200,38 @@ class TestRemoveProvider:
         _write_raw(tmp_path, {"installed": ["claude"]})
         result = remove_provider(tmp_path, "gemini")
         assert result == {"claude"}
+
+    def test_remove_provider_cleans_provider_state(self, tmp_path):
+        payload = {
+            "version": "2.0",
+            "serial": 1,
+            "installed": ["claude", "gemini"],
+            "provider_state": {
+                "claude": {"synced": "true"},
+                "gemini": {"synced": "true"},
+            },
+        }
+        _write_raw(tmp_path, payload)
+
+        remove_provider(tmp_path, "claude")
+
+        data = read_manifest_data(tmp_path)
+        assert "claude" not in data.installed
+        assert "claude" not in data.provider_state
+        assert "gemini" in data.provider_state
+
+
+class TestMalformedSerial:
+    def test_malformed_serial_returns_default(self, tmp_path):
+        payload = {
+            "version": "2.0",
+            "installed": ["claude"],
+            "serial": "abc",
+        }
+        _write_raw(tmp_path, payload)
+
+        data = read_manifest_data(tmp_path)
+        # int("abc") raises ValueError - read_manifest_data should not crash
+        assert isinstance(data, ManifestData)
+        assert data.serial == 0
+        assert data.installed == {"claude"}

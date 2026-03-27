@@ -993,11 +993,13 @@ def sync_provider(
                         mdata.gitignore_managed = False
                         write_manifest_data(ctx.target_dir, mdata)
 
-            # Update last_synced timestamps
+            # Update last_synced timestamps for installed providers only
             now = datetime.datetime.now(tz=datetime.UTC).isoformat()
             mdata = read_manifest_data(ctx.target_dir)
             for tool_type in ctx.tool_configs:
                 name = tool_type.value
+                if name not in mdata.installed:
+                    continue
                 mdata.provider_state.setdefault(name, {})
                 mdata.provider_state[name]["last_synced"] = now
             mdata.vaultspec_version = _get_package_version()
@@ -1049,6 +1051,8 @@ def sync_provider(
         mdata = read_manifest_data(ctx.target_dir)
         for tool_type in requested:
             name = tool_type.value
+            if name not in mdata.installed:
+                continue
             mdata.provider_state.setdefault(name, {})
             mdata.provider_state[name]["last_synced"] = now
         mdata.vaultspec_version = _get_package_version()
