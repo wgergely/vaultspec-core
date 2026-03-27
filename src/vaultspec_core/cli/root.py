@@ -7,11 +7,16 @@ entry point. Depends on :mod:`vaultspec_core.config.workspace` for workspace
 resolution and :mod:`vaultspec_core.core.types` for global path initialization.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
+
+if TYPE_CHECKING:
+    from vaultspec_core.core.diagnosis import ProviderDiagnosis, WorkspaceDiagnosis
 
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import (
@@ -484,6 +489,224 @@ def _infer_label(item_path: str) -> str:
         return f"{provider_name} (system)" if provider_name else "system"
 
     return provider_name or ""
+
+
+@app.command("doctor")
+def cmd_doctor(
+    target: TargetOption = None,
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Output diagnosis as JSON")
+    ] = False,
+    debug: Annotated[
+        bool, typer.Option("--debug", "-d", help="Enable debug logging")
+    ] = False,
+) -> None:
+    """Diagnose workspace health and report issues.
+
+    Runs all diagnostic collectors and reports the state of the framework,
+    providers, builtins, gitignore, and configuration files.
+
+    Exit codes: 0 = all ok, 1 = warnings, 2 = errors.
+
+    Examples:\n
+      vaultspec-core doctor                        # diagnose current directory\n
+      vaultspec-core doctor --target ./my-project  # diagnose specific directory\n
+      vaultspec-core doctor --json                 # machine-readable output\n
+    """
+    import dataclasses
+    import json
+
+    from vaultspec_core.core.diagnosis import (
+        BuiltinVersionSignal,
+        ConfigSignal,
+        ContentSignal,
+        FrameworkSignal,
+        GitignoreSignal,
+        ManifestEntrySignal,
+        diagnose,
+    )
+
+    effective = target or Path.cwd()
+    effective = effective.resolve()
+
+    diag = diagnose(effective, scope="full")
+
+    if json_output:
+        data = dataclasses.asdict(diag)
+        typer.echo(json.dumps(data, indent=2, default=str))
+        exit_code = _doctor_exit_code(diag)
+        raise typer.Exit(code=exit_code)
+
+    from rich.table import Table
+
+    from vaultspec_core.console import get_console
+
+    console = get_console()
+    table = Table(show_header=True, show_edge=False, pad_edge=False)
+    table.add_column("Component", style="bold", min_width=16)
+    table.add_column("Status", min_width=8)
+    table.add_column("Detail")
+
+    # Framework row
+    fw_status, fw_style = _signal_status(
+        diag.framework,
+        {
+            FrameworkSignal.PRESENT: ("ok", "green"),
+            FrameworkSignal.MISSING: ("error", "red"),
+            FrameworkSignal.CORRUPTED: ("error", "red"),
+        },
+    )
+    fw_detail = {
+        FrameworkSignal.PRESENT: ".vaultspec/ present",
+        FrameworkSignal.MISSING: ".vaultspec/ not found",
+        FrameworkSignal.CORRUPTED: ".vaultspec/ corrupted manifest",
+    }.get(diag.framework, str(diag.framework))
+    table.add_row("framework", f"[{fw_style}]{fw_status}[/{fw_style}]", fw_detail)
+
+    # Provider rows
+    for tool, prov in diag.providers.items():
+        prov_status, prov_style = _provider_status(prov)
+        details = []
+        details.append(f"dir: {prov.dir_state.value}")
+        if prov.manifest_entry not in (
+            ManifestEntrySignal.COHERENT,
+            ManifestEntrySignal.NOT_INSTALLED,
+        ):
+            details.append(f"manifest: {prov.manifest_entry.value}")
+        if prov.config not in (ConfigSignal.OK,):
+            details.append(f"config: {prov.config.value}")
+        stale = sum(1 for s in prov.content.values() if s != ContentSignal.CLEAN)
+        if stale:
+            details.append(f"{stale} file(s) need attention")
+        table.add_row(
+            tool.value,
+            f"[{prov_style}]{prov_status}[/{prov_style}]",
+            ", ".join(details),
+        )
+
+    # Builtins row
+    bv_status, bv_style = _signal_status(
+        diag.builtin_version,
+        {
+            BuiltinVersionSignal.CURRENT: ("ok", "green"),
+            BuiltinVersionSignal.MODIFIED: ("warn", "yellow"),
+            BuiltinVersionSignal.DELETED: ("error", "red"),
+            BuiltinVersionSignal.NO_SNAPSHOTS: ("info", "dim"),
+        },
+    )
+    table.add_row(
+        "builtins",
+        f"[{bv_style}]{bv_status}[/{bv_style}]",
+        diag.builtin_version.value,
+    )
+
+    # Gitignore row
+    gi_status, gi_style = _signal_status(
+        diag.gitignore,
+        {
+            GitignoreSignal.COMPLETE: ("ok", "green"),
+            GitignoreSignal.PARTIAL: ("warn", "yellow"),
+            GitignoreSignal.NO_ENTRIES: ("info", "dim"),
+            GitignoreSignal.NO_FILE: ("info", "dim"),
+            GitignoreSignal.CORRUPTED: ("error", "red"),
+        },
+    )
+    table.add_row(
+        "gitignore",
+        f"[{gi_style}]{gi_status}[/{gi_style}]",
+        diag.gitignore.value,
+    )
+
+    console.print(table)
+
+    exit_code = _doctor_exit_code(diag)
+    raise typer.Exit(code=exit_code)
+
+
+def _signal_status(
+    signal: object,
+    mapping: dict,
+) -> tuple[str, str]:
+    """Map a signal value to a (status_label, style) pair."""
+    return mapping.get(signal, ("unknown", "dim"))
+
+
+def _provider_status(prov: ProviderDiagnosis) -> tuple[str, str]:
+    """Derive aggregate status for a provider diagnosis."""
+    from vaultspec_core.core.diagnosis import (
+        ContentSignal,
+        ManifestEntrySignal,
+        ProviderDirSignal,
+    )
+
+    if prov.manifest_entry == ManifestEntrySignal.NOT_INSTALLED:
+        return ("skip", "dim")
+
+    error_signals = (
+        prov.manifest_entry == ManifestEntrySignal.ORPHANED,
+        prov.dir_state == ProviderDirSignal.MISSING,
+    )
+    if any(error_signals):
+        return ("error", "red")
+
+    warn_signals = (
+        prov.dir_state in (ProviderDirSignal.PARTIAL, ProviderDirSignal.MIXED),
+        prov.manifest_entry == ManifestEntrySignal.UNTRACKED,
+        any(s != ContentSignal.CLEAN for s in prov.content.values()),
+    )
+    if any(warn_signals):
+        return ("warn", "yellow")
+
+    return ("ok", "green")
+
+
+def _doctor_exit_code(diag: WorkspaceDiagnosis) -> int:
+    """Compute the doctor exit code from a diagnosis.
+
+    Returns:
+        ``0`` if all ok/info, ``1`` if any warnings, ``2`` if any errors.
+    """
+    from vaultspec_core.core.diagnosis import (
+        BuiltinVersionSignal,
+        ContentSignal,
+        FrameworkSignal,
+        GitignoreSignal,
+        ManifestEntrySignal,
+        ProviderDirSignal,
+    )
+
+    has_error = False
+    has_warn = False
+
+    if diag.framework in (FrameworkSignal.MISSING, FrameworkSignal.CORRUPTED):
+        has_error = True
+    if diag.gitignore == GitignoreSignal.CORRUPTED:
+        has_error = True
+    if diag.builtin_version == BuiltinVersionSignal.DELETED:
+        has_error = True
+    if diag.builtin_version == BuiltinVersionSignal.MODIFIED:
+        has_warn = True
+
+    for prov in diag.providers.values():
+        if prov.manifest_entry == ManifestEntrySignal.ORPHANED:
+            has_error = True
+        if prov.manifest_entry == ManifestEntrySignal.UNTRACKED:
+            has_warn = True
+        if prov.dir_state == ProviderDirSignal.MIXED:
+            has_warn = True
+        if prov.dir_state in (ProviderDirSignal.EMPTY, ProviderDirSignal.PARTIAL):
+            has_warn = True
+        for s in prov.content.values():
+            if s in (ContentSignal.STALE, ContentSignal.DIVERGED):
+                has_warn = True
+            if s == ContentSignal.MISSING:
+                has_warn = True
+
+    if has_error:
+        return 2
+    if has_warn:
+        return 1
+    return 0
 
 
 # ---- Entry point -------------------------------------------------------------
