@@ -6,7 +6,7 @@ Re-exports the signal enums from :mod:`.signals` and the dataclasses from
 
 from __future__ import annotations
 
-from .diagnosis import ProviderDiagnosis, WorkspaceDiagnosis
+from .diagnosis import ProviderDiagnosis, WorkspaceDiagnosis, diagnose
 from .signals import (
     BuiltinVersionSignal,
     ConfigSignal,
@@ -29,4 +29,5 @@ __all__ = [
     "ProviderDirSignal",
     "ResolutionAction",
     "WorkspaceDiagnosis",
+    "diagnose",
 ]

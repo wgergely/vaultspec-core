@@ -148,6 +148,8 @@ target-version = "py313"
     # CLI stub commands accept Typer params that are not yet wired to backends.
     "src/vaultspec_core/cli/root.py" = ["ARG001"]
     "src/vaultspec_core/cli/vault_cmd.py" = ["ARG001"]
+    # Collectors accept `target` for API consistency; some resolve paths via WorkspaceContext.
+    "src/vaultspec_core/core/diagnosis/collectors.py" = ["ARG001"]
 
     [tool.ruff.lint.isort]
     known-first-party = ["vaultspec_core"]
