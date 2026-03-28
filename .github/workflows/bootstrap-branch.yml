@@ -2,17 +2,39 @@ name: Bootstrap Feature Branch
 
 on:
   issues:
-    types: [opened]
+    types: [opened, closed, reopened, edited]
+
+permissions:
+  issues: write
+  contents: read
 
 jobs:
   bootstrap:
     runs-on: [self-hosted, dev-runner]
+    # Skip edited events unless title or body changed
+    if: >-
+      github.event.action != 'edited' ||
+      github.event.changes.title != null ||
+      github.event.changes.body != null
+    concurrency:
+      group: bootstrap-issue-${{ github.event.issue.number }}
+      cancel-in-progress: false
     steps:
       - name: Bootstrap local worktree
+        # SECURITY: All issue data passed via env vars, NOT ${{ }} interpolation
+        # in run blocks. Direct interpolation allows script injection via issue
+        # titles containing shell metacharacters.
+        env:
+          GITHUB_TOKEN: ${{ secrets.DEV_RUNNER_PAT }}
+          ISSUE_ACTION: ${{ github.event.action }}
+          ISSUE_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
           /usr/local/bin/bootstrap.sh \
-            --repo "${{ github.repository }}" \
-            --issue "${{ github.event.issue.number }}" \
-            --title "${{ github.event.issue.title }}" \
-            --body "${{ github.event.issue.body }}"
-
+            --action "$ISSUE_ACTION" \
+            --repo "$ISSUE_REPO" \
+            --issue "$ISSUE_NUMBER" \
+            --title "$ISSUE_TITLE" \
+            --body "$ISSUE_BODY"
