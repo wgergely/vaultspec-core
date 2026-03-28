@@ -102,6 +102,38 @@ class TestInstallMergesMcp:
 # ---------------------------------------------------------------------------
 
 
+class TestInstallManifestFields:
+    """Install must populate v2 manifest metadata fields."""
+
+    def test_install_populates_v2_manifest_fields(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install()
+        manifest = factory.read_manifest()
+        assert manifest.vaultspec_version, "vaultspec_version is empty after install"
+        assert manifest.installed_at, "installed_at is empty after install"
+
+    def test_install_populates_provider_state(self, factory: WorkspaceFactory) -> None:
+        factory.install()
+        manifest = factory.read_manifest()
+        assert manifest.provider_state, "provider_state is empty after install"
+        for provider, state in manifest.provider_state.items():
+            assert "installed_at" in state, (
+                f"provider_state[{provider}] missing installed_at"
+            )
+
+
+class TestVaultspecAsFile:
+    """.vaultspec as a file must block install."""
+
+    def test_vaultspec_as_file_error(self, factory: WorkspaceFactory) -> None:
+        factory.vaultspec_as_file()
+        result = factory.run("install")
+        assert result.exit_code != 0, (
+            f"Expected non-zero exit when .vaultspec is a file, got: {result.output}"
+        )
+
+
 class TestInstallUpgrade:
     """--upgrade must refresh versioned content without full re-scaffold."""
 
@@ -147,6 +179,78 @@ class TestInstallForceCorrupted:
 
         assert factory.manifest_is_valid_json(), "manifest still invalid after --force"
         assert factory.is_installed
+
+
+# ---------------------------------------------------------------------------
+# Upgrade edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestUpgradeEdgeCases:
+    """Upgrade edge cases: re-seed builtins, dry-run, non-installed."""
+
+    def test_upgrade_reseeds_builtins(self, factory: WorkspaceFactory) -> None:
+        factory.install().delete_builtins()
+        # Verify builtins were deleted
+        rules_src = factory.path / ".vaultspec" / "rules" / "rules"
+        assert not list(rules_src.glob("*.builtin.md")), (
+            "Builtins still exist after delete_builtins"
+        )
+
+        factory.run("install", "--upgrade")
+        assert list(rules_src.glob("*.builtin.md")), (
+            "Builtins were not re-seeded by --upgrade"
+        )
+
+    def test_upgrade_dry_run_no_changes(self, factory: WorkspaceFactory) -> None:
+        factory.install()
+        manifest_before = factory.read_manifest()
+        version_before = manifest_before.vaultspec_version
+
+        factory.install(upgrade=True, dry_run=True)
+        manifest_after = factory.read_manifest()
+        assert manifest_after.vaultspec_version == version_before, (
+            "vaultspec_version changed despite dry-run"
+        )
+
+    def test_upgrade_on_non_installed_errors(self, factory: WorkspaceFactory) -> None:
+        result = factory.run("install", "--upgrade")
+        assert result.exit_code != 0, (
+            f"Expected non-zero exit for upgrade on non-installed workspace: "
+            f"{result.output}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Install --skip
+# ---------------------------------------------------------------------------
+
+
+class TestInstallSkip:
+    """--skip must exclude the named component."""
+
+    def test_skip_core_installs_provider_only(self, factory: WorkspaceFactory) -> None:
+        # Pre-create .vaultspec/ so core scaffold is present
+        (factory.root / ".vaultspec" / "rules" / "rules").mkdir(
+            parents=True, exist_ok=True
+        )
+        factory.create_gitignore()
+        factory.install(skip={"core"})
+        # At least one provider dir should exist
+        assert factory.provider_dir_exists("claude") or factory.provider_dir_exists(
+            "gemini"
+        ), "No provider dirs created when skipping core"
+
+    def test_skip_provider_installs_others(self, factory: WorkspaceFactory) -> None:
+        factory.create_gitignore()
+        result = factory.run("install", "--skip", "claude")
+        assert result.exit_code == 0, result.output
+        assert factory.provider_dir_exists("gemini"), (
+            "gemini not installed when skipping claude"
+        )
+        assert not factory.provider_dir_exists("claude"), (
+            "claude was installed despite --skip claude"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -292,6 +396,106 @@ class TestRemoveNonexistent:
         result = factory.run("uninstall", "claude", "--force")
         assert result.exit_code == 0, (
             f"double uninstall failed with code {result.exit_code}: {result.output}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Full lifecycle
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Uninstall single provider
+# ---------------------------------------------------------------------------
+
+
+class TestUninstallSingleProvider:
+    """Per-provider uninstall must update manifest and preserve shared dirs."""
+
+    def test_uninstall_single_provider_updates_manifest(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install()
+        result = factory.run("uninstall", "claude", "--force")
+        assert result.exit_code == 0, result.output
+
+        manifest = factory.read_manifest()
+        assert "claude" not in manifest.installed, (
+            "claude still in manifest after uninstall"
+        )
+
+    def test_uninstall_preserves_shared_agents_dir(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install()
+        result = factory.run("uninstall", "gemini", "--force")
+        assert result.exit_code == 0, result.output
+
+        # .agents/ is used by antigravity and must survive gemini removal
+        agents_dir = factory.path / ".agents"
+        assert agents_dir.is_dir(), ".agents/ was removed by gemini uninstall"
+
+    def test_uninstall_force_removes_dir_with_user_content(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install().add_user_content("claude")
+        result = factory.run("uninstall", "claude", "--force")
+        assert result.exit_code == 0, result.output
+        assert not factory.provider_dir_exists("claude"), (
+            ".claude/ survived --force uninstall despite user content"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Uninstall --dry-run
+# ---------------------------------------------------------------------------
+
+
+class TestUninstallDryRun:
+    """--dry-run must not actually remove anything."""
+
+    def test_uninstall_dry_run_no_changes(self, factory: WorkspaceFactory) -> None:
+        factory.install()
+        result = factory.run("uninstall", "--dry-run", "--force")
+        assert result.exit_code == 0, result.output
+
+        # Everything should still exist
+        assert factory.is_installed, ".vaultspec/ removed despite --dry-run"
+        for provider in ("claude", "gemini", "antigravity", "codex"):
+            assert factory.provider_dir_exists(provider), (
+                f"{provider} dir removed despite --dry-run"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Uninstall with corrupted manifest
+# ---------------------------------------------------------------------------
+
+
+class TestUninstallCorruptedManifest:
+    """Uninstall behaviour when manifest is unparseable."""
+
+    def test_uninstall_corrupted_manifest_force_proceeds(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install().corrupt_manifest()
+        result = factory.run("uninstall", "--force")
+        assert result.exit_code == 0, result.output
+
+        # Provider dirs should be removed
+        for provider in ("claude", "gemini"):
+            assert not factory.provider_dir_exists(provider), (
+                f"{provider} dir survived --force uninstall with corrupted manifest"
+            )
+
+    def test_uninstall_corrupted_manifest_no_force_blocked(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install().corrupt_manifest()
+        result = factory.run("uninstall")
+        assert result.exit_code != 0, (
+            f"Expected non-zero exit for uninstall with corrupted manifest "
+            f"without --force: {result.output}"
         )
 
 

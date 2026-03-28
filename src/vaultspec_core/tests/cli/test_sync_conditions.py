@@ -215,6 +215,84 @@ class TestEmptyProviderDir:
         assert factory.provider_has_rules("claude")
 
 
+class TestSyncWithoutGitignore:
+    """Sync must not crash when .gitignore is absent."""
+
+    def test_sync_without_gitignore_no_crash(self, factory: WorkspaceFactory) -> None:
+        factory.install(skip_gitignore=True)
+        (factory.path / ".gitignore").unlink(missing_ok=True)
+        assert not (factory.path / ".gitignore").exists()
+
+        result = factory.run("sync")
+        assert result.exit_code == 0, result.output
+
+
+class TestSyncForceOverwritesUserConfig:
+    """--force must restore vaultspec-managed config over user content."""
+
+    def test_sync_force_overwrites_user_config(self, factory: WorkspaceFactory) -> None:
+        factory.install().replace_root_config_with_user_content("claude")
+        config = factory.path / "CLAUDE.md"
+        assert "No vaultspec here" in config.read_text(encoding="utf-8")
+
+        result = factory.run("sync", "--force")
+        assert result.exit_code == 0, result.output
+
+        content = config.read_text(encoding="utf-8")
+        assert "AUTO-GENERATED" in content or "<vaultspec" in content, (
+            "CLAUDE.md was not restored to vaultspec-managed content after --force"
+        )
+
+
+class TestSyncSingleProvider:
+    """Sync scoped to a single provider must not touch others."""
+
+    def test_sync_single_provider_only_touches_that_provider(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install()
+        # Modify a gemini rule to detect if sync claude touches it
+        gemini_rules = factory.path / ".gemini" / "rules"
+        sentinel = gemini_rules / "sentinel-gemini.md"
+        sentinel.write_text("UNTOUCHED", encoding="utf-8")
+
+        result = factory.run("sync", "claude")
+        assert result.exit_code == 0, result.output
+        assert sentinel.exists(), "Gemini sentinel was removed by sync claude"
+        assert sentinel.read_text(encoding="utf-8") == "UNTOUCHED"
+
+
+class TestSyncSkipProvider:
+    """--skip must leave the skipped provider unchanged."""
+
+    def test_sync_skip_provider_leaves_it_unchanged(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install()
+        # Mark a claude rule as modified
+        claude_rules = factory.path / ".claude" / "rules"
+        sentinel = claude_rules / "sentinel-claude.md"
+        sentinel.write_text("MODIFIED_BY_USER", encoding="utf-8")
+
+        result = factory.run("sync", "--skip", "claude")
+        assert result.exit_code == 0, result.output
+        assert sentinel.exists(), "Claude sentinel was removed despite --skip claude"
+        assert sentinel.read_text(encoding="utf-8") == "MODIFIED_BY_USER"
+
+
+class TestSyncDryRun:
+    """--dry-run must not modify anything on disk."""
+
+    def test_sync_dry_run_no_changes(self, factory: WorkspaceFactory) -> None:
+        factory.install().add_stale_rule("claude")
+        stale_path = factory.path / ".claude" / "rules" / "stale-orphan.md"
+        assert stale_path.exists()
+
+        result = factory.run("sync", "--dry-run")
+        assert result.exit_code == 0, result.output
+        assert stale_path.exists(), "Stale file was removed despite --dry-run"
+
+
 class TestMultipleIssues:
     """Compound corruption repaired in a single --force sync."""
 
