@@ -235,7 +235,8 @@ def _validate_skip(skip: set[str] | None) -> set[str]:
     if not skip:
         return set()
     # "all" is not a valid skip target  - you'd just not run the command.
-    allowed = VALID_PROVIDERS - {"all"}
+    # "mcp" is a valid skip target but is not a provider.
+    allowed = (VALID_PROVIDERS - {"all"}) | {"mcp"}
     bad = skip - allowed
     if bad:
         raise ProviderError(
@@ -312,7 +313,8 @@ def init_run(
     for tool in tools:
         created.extend(_scaffold_provider(target, tool))
 
-    created.extend(_scaffold_mcp_json(target))
+    if "mcp" not in skip:
+        created.extend(_scaffold_mcp_json(target))
 
     # Write provider manifest
     from .manifest import add_providers
@@ -464,7 +466,8 @@ def install_run(
         tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
         for tool in tools:
             manifest.extend(_scaffold_provider(path, tool, dry_run=True))
-        manifest.extend(_scaffold_mcp_json(path, dry_run=True))
+        if "mcp" not in skip:
+            manifest.extend(_scaffold_mcp_json(path, dry_run=True))
 
         # Deduplicate preserving order (by relative path)
         seen: dict[str, str] = {}
@@ -497,7 +500,11 @@ def install_run(
             snapshot_builtins(fw_dir)
 
         sync_target = provider if provider not in ("all", "core") else "all"
-        sync_provider(sync_target, force=True)
+        sync_provider(sync_target, force=True, skip=skip)
+
+        # Re-scaffold MCP entry if missing (repair)
+        if "mcp" not in skip:
+            _scaffold_mcp_json(path)
 
         # Update manifest timestamps and version
         import datetime
@@ -535,7 +542,7 @@ def install_run(
     init_paths(layout)
 
     sync_target = provider if provider not in ("all", "core") else "all"
-    sync_provider(sync_target)
+    sync_provider(sync_target, skip=skip)
 
     # Count actual source resources (what the user authored)
     from .agents import collect_agents
@@ -1055,6 +1062,10 @@ def sync_provider(
 
             from .gitignore import DEFAULT_ENTRIES, MARKER_BEGIN, ensure_gitignore_block
             from .manifest import read_manifest_data, write_manifest_data
+
+            # Repair MCP entry if missing (unless mcp is skipped)
+            if "mcp" not in skip:
+                _scaffold_mcp_json(ctx.target_dir)
 
             # Respect gitignore opt-out
             mdata = read_manifest_data(ctx.target_dir)

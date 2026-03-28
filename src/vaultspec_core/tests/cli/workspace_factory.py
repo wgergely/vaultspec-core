@@ -410,6 +410,23 @@ class WorkspaceFactory:
         mcp.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
         return self
 
+    def delete_mcp_json(self) -> Self:
+        """Delete ``.mcp.json`` entirely."""
+        mcp = self.root / ".mcp.json"
+        if mcp.exists():
+            mcp.unlink()
+        return self
+
+    def remove_mcp_vaultspec_entry(self) -> Self:
+        """Remove only the ``vaultspec-core`` key from ``.mcp.json``."""
+        mcp = self.root / ".mcp.json"
+        if mcp.exists():
+            raw = json.loads(mcp.read_text(encoding="utf-8"))
+            servers = raw.get("mcpServers", {})
+            servers.pop("vaultspec-core", None)
+            mcp.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+        return self
+
     # ---- Framework conditions ----------------------------------------------
 
     def delete_vaultspec_dir(self) -> Self:

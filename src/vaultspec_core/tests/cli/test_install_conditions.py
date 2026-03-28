@@ -516,3 +516,112 @@ class TestFullLifecycle:
         assert factory.manifest_is_valid_json()
         for provider in ("claude", "gemini", "antigravity", "codex"):
             assert factory.provider_dir_exists(provider)
+
+
+# ---------------------------------------------------------------------------
+# Install --skip mcp
+# ---------------------------------------------------------------------------
+
+
+class TestInstallSkipMcp:
+    """--skip mcp must prevent MCP scaffolding."""
+
+    def test_skip_mcp_prevents_mcp_json_creation(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.create_gitignore()
+        result = factory.run("install", "--skip", "mcp")
+        assert result.exit_code == 0, result.output
+        assert not factory.mcp_has_vaultspec_entry(), (
+            ".mcp.json vaultspec entry created despite --skip mcp"
+        )
+
+    def test_skip_mcp_still_installs_providers(self, factory: WorkspaceFactory) -> None:
+        factory.create_gitignore()
+        result = factory.run("install", "--skip", "mcp")
+        assert result.exit_code == 0, result.output
+        assert factory.provider_dir_exists("claude"), (
+            "claude dir missing when --skip mcp"
+        )
+
+    def test_skip_mcp_dry_run_excludes_mcp(self, factory: WorkspaceFactory) -> None:
+        factory.create_gitignore()
+        result = factory.run("install", "--skip", "mcp", "--dry-run")
+        assert result.exit_code == 0, result.output
+        assert not factory.mcp_has_vaultspec_entry(), (
+            ".mcp.json should not exist after --skip mcp --dry-run"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Sync repairs missing MCP entry
+# ---------------------------------------------------------------------------
+
+
+class TestSyncRepairsMcp:
+    """Sync must repair a missing MCP entry."""
+
+    def test_sync_repairs_deleted_mcp_json(self, factory: WorkspaceFactory) -> None:
+        factory.install().delete_mcp_json()
+        assert not (factory.root / ".mcp.json").exists()
+
+        factory.sync()
+
+        assert factory.mcp_has_vaultspec_entry(), (
+            "sync did not repair missing .mcp.json"
+        )
+
+    def test_sync_repairs_missing_vaultspec_entry(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install().remove_mcp_vaultspec_entry()
+        assert not factory.mcp_has_vaultspec_entry()
+
+        factory.sync()
+
+        assert factory.mcp_has_vaultspec_entry(), (
+            "sync did not repair missing vaultspec-core entry"
+        )
+
+    def test_sync_preserves_user_entries_on_repair(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install().add_user_mcp_servers().remove_mcp_vaultspec_entry()
+
+        factory.sync()
+
+        assert factory.mcp_has_vaultspec_entry(), "vaultspec entry not repaired"
+        assert factory.mcp_has_user_entry("my-custom-server"), (
+            "user entry lost during MCP repair"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Upgrade re-scaffolds MCP
+# ---------------------------------------------------------------------------
+
+
+class TestUpgradeRepairsMcp:
+    """--upgrade must repair a missing MCP entry."""
+
+    def test_upgrade_repairs_deleted_mcp_json(self, factory: WorkspaceFactory) -> None:
+        factory.install().delete_mcp_json()
+        assert not (factory.root / ".mcp.json").exists()
+
+        factory.run("install", "--upgrade")
+
+        assert factory.mcp_has_vaultspec_entry(), (
+            "--upgrade did not repair missing .mcp.json"
+        )
+
+    def test_upgrade_repairs_missing_vaultspec_entry(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install().remove_mcp_vaultspec_entry()
+        assert not factory.mcp_has_vaultspec_entry()
+
+        factory.run("install", "--upgrade")
+
+        assert factory.mcp_has_vaultspec_entry(), (
+            "--upgrade did not repair missing vaultspec-core entry"
+        )
