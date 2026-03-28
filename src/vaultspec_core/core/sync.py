@@ -53,8 +53,8 @@ def _sync_supporting_files(
             try:
                 if dest_file.read_bytes() == src_file.read_bytes():
                     continue
-            except Exception:
-                pass
+            except OSError:
+                logger.debug("Could not compare %s, will overwrite", dest_file)
 
         if not dry_run:
             ensure_dir(dest_file.parent)

@@ -133,7 +133,7 @@ def _run_preflight(
     try:
         diag = diagnose(target, scope=scope)
     except Exception:
-        logger.debug("Pre-flight diagnosis failed", exc_info=True)
+        logger.warning("Pre-flight diagnosis failed", exc_info=True)
         return
 
     plan = resolve(diag, action, provider, force=force, dry_run=dry_run)
@@ -229,6 +229,15 @@ def cmd_install(
         if not dry_run:
             path.mkdir(parents=False, exist_ok=True)
 
+    fw_path = path / ".vaultspec"
+    if fw_path.exists() and not fw_path.is_dir():
+        typer.echo(
+            f"Error: {fw_path} exists but is a file, not a directory.\n"
+            "  Remove the file and re-run install.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
     _run_preflight(
         path,
         action="upgrade" if upgrade else "install",
@@ -250,6 +259,9 @@ def cmd_install(
     except VaultSpecError as exc:
         _handle_error(exc)
         return  # unreachable, but satisfies type checker
+    except OSError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
 
     # Render result
     from vaultspec_core.console import get_console
@@ -369,6 +381,9 @@ def cmd_uninstall(
     except VaultSpecError as exc:
         _handle_error(exc)
         return
+    except OSError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
 
     # Render result
     from vaultspec_core.console import get_console
@@ -472,6 +487,9 @@ def cmd_sync(
     except VaultSpecError as exc:
         _handle_error(exc)
         return
+    except OSError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
 
     from vaultspec_core.console import get_console
 
@@ -526,6 +544,16 @@ def cmd_sync(
             )
             for warning in all_warnings:
                 console.print(f"  [yellow]•[/yellow] {warning}")
+
+        # Collect and display errors from all sync passes
+        all_errors = []
+        for r in results:
+            all_errors.extend(r.errors)
+        if all_errors:
+            console.print(f"\n  [red]Errors ({len(all_errors)}):[/red]")
+            for err in all_errors:
+                console.print(f"    [red]x[/red] {err}")
+            raise typer.Exit(code=1)
 
         # Warn if sync produced 0 files
         total_changes = sum(r.added + r.updated for r in results)

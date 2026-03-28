@@ -170,6 +170,10 @@ def register_tools(mcp: FastMCP) -> None:
                 try:
                     entry["body"] = doc.path.read_text(encoding="utf-8")
                 except Exception:
+                    logger.warning(
+                        "Failed to read body of %s",
+                        entry.get("name", "unknown"),
+                    )
                     entry["body"] = ""
             results.append(entry)
 
