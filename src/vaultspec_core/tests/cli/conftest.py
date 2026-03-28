@@ -101,6 +101,14 @@ def run_spec(runner, *args, target=None):
     return runner.invoke(app, args_list)
 
 
+@pytest.fixture
+def factory(tmp_path):
+    """Return a :class:`WorkspaceFactory` for composing on-disk test states."""
+    from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+    return WorkspaceFactory(tmp_path)
+
+
 @pytest.fixture(autouse=True)
 def _isolate_state():
     """Save and restore workspace context and console between tests.

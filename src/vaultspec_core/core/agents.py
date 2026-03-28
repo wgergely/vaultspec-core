@@ -284,6 +284,7 @@ def agents_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
         total.pruned += result.pruned
         total.skipped += result.skipped
         total.errors.extend(result.errors)
+        total.warnings.extend(result.warnings)
         total.items.extend(result.items)
 
     from .manifest import installed_tool_configs

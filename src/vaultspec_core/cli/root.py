@@ -7,11 +7,16 @@ entry point. Depends on :mod:`vaultspec_core.config.workspace` for workspace
 resolution and :mod:`vaultspec_core.core.types` for global path initialization.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
+
+if TYPE_CHECKING:
+    from vaultspec_core.core.diagnosis import ProviderDiagnosis, WorkspaceDiagnosis
 
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import (
@@ -104,6 +109,77 @@ def main(
     ctx.obj = {}
 
 
+# ---- Pre-flight helper -------------------------------------------------------
+
+
+def _run_preflight(
+    target: Path,
+    action: str,
+    provider: str = "all",
+    *,
+    force: bool = False,
+    dry_run: bool = False,
+    scope: str = "framework",
+) -> None:
+    """Run diagnosis and resolution pre-flight.
+
+    Executes preflight-safe resolution steps (manifest repair, gitignore
+    repair, scaffold, adopt) and displays their outcomes. Non-preflight
+    steps are shown as informational. Blocks on conflicts unless
+    *dry_run* is ``True``.
+
+    Raises :class:`typer.Exit` with code 1 if conflicts are present and
+    *dry_run* is ``False``, or if any preflight execution step fails.
+    """
+    from vaultspec_core.core.diagnosis import diagnose
+    from vaultspec_core.core.executor import PREFLIGHT_ACTIONS, execute_plan
+    from vaultspec_core.core.resolver import resolve
+
+    try:
+        diag = diagnose(target, scope=scope)
+    except Exception:
+        logger.warning("Pre-flight diagnosis failed", exc_info=True)
+        return
+
+    plan = resolve(diag, action, provider, force=force, dry_run=dry_run)
+
+    if not plan.warnings and not plan.conflicts and not plan.steps:
+        return
+
+    from vaultspec_core.console import get_console
+
+    console = get_console()
+
+    for warning in plan.warnings:
+        console.print(f"  [yellow]![/yellow] {warning}")
+
+    # Execute preflight-safe resolution steps
+    if plan.steps and not plan.blocked:
+        exec_result = execute_plan(plan, target, dry_run=dry_run)
+
+        for sr in exec_result.results:
+            if sr.success:
+                console.print(f"  [green]ok[/green] {sr.step.reason}")
+            else:
+                console.print(f"  [red]FAIL[/red] {sr.step.reason}: {sr.error}")
+
+        if exec_result.failed and not dry_run:
+            raise typer.Exit(code=1)
+
+    # Show non-preflight steps as informational
+    non_preflight = [s for s in plan.steps if s.action not in PREFLIGHT_ACTIONS]
+    for step in non_preflight:
+        console.print(f"  [dim]>[/dim] {step.reason}")
+
+    if plan.conflicts:
+        console.print()
+        for conflict in plan.conflicts:
+            console.print(f"  [red]x[/red] {conflict}")
+        console.print()
+        if not dry_run:
+            raise typer.Exit(code=1)
+
+
 # ---- Top-level commands ------------------------------------------------------
 
 
@@ -173,6 +249,24 @@ def cmd_install(
         if not dry_run:
             path.mkdir(parents=False, exist_ok=True)
 
+    fw_path = path / ".vaultspec"
+    if fw_path.exists() and not fw_path.is_dir():
+        typer.echo(
+            f"Error: {fw_path} exists but is a file, not a directory.\n"
+            "  Remove the file and re-run install.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    _run_preflight(
+        path,
+        action="upgrade" if upgrade else "install",
+        provider=provider,
+        force=force,
+        dry_run=dry_run,
+        scope="framework",
+    )
+
     try:
         result = install_run(
             path=path,
@@ -185,6 +279,9 @@ def cmd_install(
     except VaultSpecError as exc:
         _handle_error(exc)
         return  # unreachable, but satisfies type checker
+    except OSError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
 
     # Render result
     from vaultspec_core.console import get_console
@@ -283,6 +380,15 @@ def cmd_uninstall(
         typer.echo(f"Error: Target directory does not exist: {path}", err=True)
         raise typer.Exit(code=1)
 
+    _run_preflight(
+        path,
+        action="uninstall",
+        provider=provider,
+        force=force,
+        dry_run=dry_run,
+        scope="framework",
+    )
+
     try:
         result = uninstall_run(
             path=path,
@@ -295,6 +401,9 @@ def cmd_uninstall(
     except VaultSpecError as exc:
         _handle_error(exc)
         return
+    except OSError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
 
     # Render result
     from vaultspec_core.console import get_console
@@ -372,6 +481,23 @@ def cmd_sync(
         )
         raise typer.Exit(code=1)
 
+    from vaultspec_core.core.types import get_context
+
+    try:
+        ctx = get_context()
+        sync_target = ctx.target_dir
+    except LookupError:
+        sync_target = target or Path.cwd()
+
+    _run_preflight(
+        sync_target,
+        action="sync",
+        provider=provider,
+        force=force,
+        dry_run=dry_run,
+        scope="sync",
+    )
+
     from vaultspec_core.core.commands import sync_provider
     from vaultspec_core.core.exceptions import VaultSpecError
     from vaultspec_core.core.sync import format_summary
@@ -381,6 +507,9 @@ def cmd_sync(
     except VaultSpecError as exc:
         _handle_error(exc)
         return
+    except OSError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
 
     from vaultspec_core.console import get_console
 
@@ -436,6 +565,16 @@ def cmd_sync(
             for warning in all_warnings:
                 console.print(f"  [yellow]•[/yellow] {warning}")
 
+        # Collect and display errors from all sync passes
+        all_errors = []
+        for r in results:
+            all_errors.extend(r.errors)
+        if all_errors:
+            console.print(f"\n  [red]Errors ({len(all_errors)}):[/red]")
+            for err in all_errors:
+                console.print(f"    [red]x[/red] {err}")
+            raise typer.Exit(code=1)
+
         # Warn if sync produced 0 files
         total_changes = sum(r.added + r.updated for r in results)
         total_skipped = sum(r.skipped for r in results)
@@ -484,6 +623,235 @@ def _infer_label(item_path: str) -> str:
         return f"{provider_name} (system)" if provider_name else "system"
 
     return provider_name or ""
+
+
+@app.command("doctor")
+def cmd_doctor(
+    target: TargetOption = None,
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Output diagnosis as JSON")
+    ] = False,
+    debug: Annotated[
+        bool, typer.Option("--debug", "-d", help="Enable debug logging")
+    ] = False,
+) -> None:
+    """Diagnose workspace health and report issues.
+
+    Runs all diagnostic collectors and reports the state of the framework,
+    providers, builtins, gitignore, and configuration files.
+
+    Exit codes: 0 = all ok, 1 = warnings, 2 = errors.
+
+    Examples:\n
+      vaultspec-core doctor                        # diagnose current directory\n
+      vaultspec-core doctor --target ./my-project  # diagnose specific directory\n
+      vaultspec-core doctor --json                 # machine-readable output\n
+    """
+    import dataclasses
+    import json
+
+    from vaultspec_core.core.diagnosis import (
+        BuiltinVersionSignal,
+        ConfigSignal,
+        ContentSignal,
+        FrameworkSignal,
+        GitignoreSignal,
+        ManifestEntrySignal,
+        diagnose,
+    )
+
+    effective = target or Path.cwd()
+    effective = effective.resolve()
+
+    try:
+        diag = diagnose(effective, scope="full")
+    except Exception as exc:
+        typer.echo(f"Error: diagnosis failed: {exc}", err=True)
+        raise typer.Exit(code=2) from None
+
+    if json_output:
+        data = dataclasses.asdict(diag)
+        typer.echo(json.dumps(data, indent=2, default=str))
+        exit_code = _doctor_exit_code(diag)
+        raise typer.Exit(code=exit_code)
+
+    from rich.table import Table
+
+    from vaultspec_core.console import get_console
+
+    console = get_console()
+    table = Table(show_header=True, show_edge=False, pad_edge=False)
+    table.add_column("Component", style="bold", min_width=16)
+    table.add_column("Status", min_width=8)
+    table.add_column("Detail")
+
+    # Framework row
+    fw_status, fw_style = _signal_status(
+        diag.framework,
+        {
+            FrameworkSignal.PRESENT: ("ok", "green"),
+            FrameworkSignal.MISSING: ("error", "red"),
+            FrameworkSignal.CORRUPTED: ("error", "red"),
+        },
+    )
+    fw_detail = {
+        FrameworkSignal.PRESENT: ".vaultspec/ present",
+        FrameworkSignal.MISSING: ".vaultspec/ not found",
+        FrameworkSignal.CORRUPTED: ".vaultspec/ corrupted manifest",
+    }.get(diag.framework, str(diag.framework))
+    table.add_row("framework", f"[{fw_style}]{fw_status}[/{fw_style}]", fw_detail)
+
+    # Provider rows
+    for tool, prov in diag.providers.items():
+        prov_status, prov_style = _provider_status(prov)
+        details = []
+        details.append(f"dir: {prov.dir_state.value}")
+        if prov.manifest_entry not in (
+            ManifestEntrySignal.COHERENT,
+            ManifestEntrySignal.NOT_INSTALLED,
+        ):
+            details.append(f"manifest: {prov.manifest_entry.value}")
+        if prov.config not in (ConfigSignal.OK,):
+            details.append(f"config: {prov.config.value}")
+        stale = sum(1 for s in prov.content.values() if s != ContentSignal.CLEAN)
+        if stale:
+            details.append(f"{stale} file(s) need attention")
+        table.add_row(
+            tool.value,
+            f"[{prov_style}]{prov_status}[/{prov_style}]",
+            ", ".join(details),
+        )
+
+    # Builtins row
+    bv_status, bv_style = _signal_status(
+        diag.builtin_version,
+        {
+            BuiltinVersionSignal.CURRENT: ("ok", "green"),
+            BuiltinVersionSignal.MODIFIED: ("warn", "yellow"),
+            BuiltinVersionSignal.DELETED: ("error", "red"),
+            BuiltinVersionSignal.NO_SNAPSHOTS: ("info", "dim"),
+        },
+    )
+    table.add_row(
+        "builtins",
+        f"[{bv_style}]{bv_status}[/{bv_style}]",
+        diag.builtin_version.value,
+    )
+
+    # Gitignore row
+    gi_status, gi_style = _signal_status(
+        diag.gitignore,
+        {
+            GitignoreSignal.COMPLETE: ("ok", "green"),
+            GitignoreSignal.PARTIAL: ("warn", "yellow"),
+            GitignoreSignal.NO_ENTRIES: ("info", "dim"),
+            GitignoreSignal.NO_FILE: ("info", "dim"),
+            GitignoreSignal.CORRUPTED: ("error", "red"),
+        },
+    )
+    table.add_row(
+        "gitignore",
+        f"[{gi_style}]{gi_status}[/{gi_style}]",
+        diag.gitignore.value,
+    )
+
+    console.print(table)
+
+    exit_code = _doctor_exit_code(diag)
+    raise typer.Exit(code=exit_code)
+
+
+def _signal_status(
+    signal: object,
+    mapping: dict,
+) -> tuple[str, str]:
+    """Map a signal value to a (status_label, style) pair."""
+    return mapping.get(signal, ("unknown", "dim"))
+
+
+def _provider_status(prov: ProviderDiagnosis) -> tuple[str, str]:
+    """Derive aggregate status for a provider diagnosis."""
+    from vaultspec_core.core.diagnosis import (
+        ContentSignal,
+        ManifestEntrySignal,
+        ProviderDirSignal,
+    )
+
+    if prov.manifest_entry == ManifestEntrySignal.NOT_INSTALLED:
+        return ("skip", "dim")
+
+    error_signals = (
+        prov.manifest_entry == ManifestEntrySignal.ORPHANED,
+        prov.dir_state == ProviderDirSignal.MISSING,
+    )
+    if any(error_signals):
+        return ("error", "red")
+
+    warn_signals = (
+        prov.dir_state in (ProviderDirSignal.PARTIAL, ProviderDirSignal.MIXED),
+        prov.manifest_entry == ManifestEntrySignal.UNTRACKED,
+        any(s != ContentSignal.CLEAN for s in prov.content.values()),
+    )
+    if any(warn_signals):
+        return ("warn", "yellow")
+
+    return ("ok", "green")
+
+
+def _doctor_exit_code(diag: WorkspaceDiagnosis) -> int:
+    """Compute the doctor exit code from a diagnosis.
+
+    Returns:
+        ``0`` if all ok/info, ``1`` if any warnings, ``2`` if any errors.
+    """
+    from vaultspec_core.core.diagnosis import (
+        BuiltinVersionSignal,
+        ConfigSignal,
+        ContentSignal,
+        FrameworkSignal,
+        GitignoreSignal,
+        ManifestEntrySignal,
+        ProviderDirSignal,
+    )
+
+    has_error = False
+    has_warn = False
+
+    if diag.framework in (FrameworkSignal.MISSING, FrameworkSignal.CORRUPTED):
+        has_error = True
+    if diag.gitignore == GitignoreSignal.CORRUPTED:
+        has_error = True
+    if diag.builtin_version == BuiltinVersionSignal.DELETED:
+        has_error = True
+    if diag.builtin_version == BuiltinVersionSignal.MODIFIED:
+        has_warn = True
+
+    for prov in diag.providers.values():
+        if prov.manifest_entry == ManifestEntrySignal.NOT_INSTALLED:
+            continue
+        if prov.manifest_entry == ManifestEntrySignal.ORPHANED:
+            has_error = True
+        if prov.manifest_entry == ManifestEntrySignal.UNTRACKED:
+            has_warn = True
+        if prov.dir_state == ProviderDirSignal.MISSING:
+            has_error = True
+        if prov.dir_state == ProviderDirSignal.MIXED:
+            has_warn = True
+        if prov.dir_state in (ProviderDirSignal.EMPTY, ProviderDirSignal.PARTIAL):
+            has_warn = True
+        if prov.config in (ConfigSignal.MISSING, ConfigSignal.FOREIGN):
+            has_warn = True
+        for s in prov.content.values():
+            if s in (ContentSignal.STALE, ContentSignal.DIVERGED):
+                has_warn = True
+            if s == ContentSignal.MISSING:
+                has_warn = True
+
+    if has_error:
+        return 2
+    if has_warn:
+        return 1
+    return 0
 
 
 # ---- Entry point -------------------------------------------------------------

@@ -12,12 +12,11 @@ or ``sync_files()`` when a caller already knows the exact destination.
 from __future__ import annotations
 
 import logging
-import shutil
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from .helpers import atomic_write, ensure_dir
+from .helpers import _rmtree_robust, atomic_write, ensure_dir
 from .types import SyncResult
 
 logger = logging.getLogger(__name__)
@@ -54,8 +53,8 @@ def _sync_supporting_files(
             try:
                 if dest_file.read_bytes() == src_file.read_bytes():
                     continue
-            except Exception:
-                pass
+            except OSError:
+                logger.debug("Could not compare %s, will overwrite", dest_file)
 
         if not dry_run:
             ensure_dir(dest_file.parent)
@@ -176,7 +175,7 @@ def sync_files(
                     result.items.append((abs_path, "[DELETE]"))
                 else:
                     if is_skill:
-                        shutil.rmtree(item)
+                        _rmtree_robust(item)
                     else:
                         item.unlink()
                 result.pruned += 1
@@ -265,7 +264,9 @@ def sync_to_all_tools(
         Accumulated :class:`SyncResult` across all tool destinations.
     """
     if dest_path_fn is None:
-        dest_path_fn = lambda dest_dir, name: dest_dir / name  # noqa: E731
+
+        def dest_path_fn(dest_dir: Path, name: str) -> Path:
+            return dest_dir / name
 
     from .manifest import installed_tool_configs
 

@@ -148,8 +148,7 @@ class TestVaultGraphBuilding:
         collisions = {
             stem: keys for stem, keys in graph._stem_index.items() if len(keys) > 1
         }
-        if not collisions:
-            pytest.skip("No stem collisions in test vault")
+        assert collisions, "Test vault must have stem collisions"
         # Check that at least one qualified key has incoming links
         for _stem, keys in collisions.items():
             has_edges = any(

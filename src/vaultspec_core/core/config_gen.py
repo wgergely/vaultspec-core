@@ -98,6 +98,7 @@ def _read_codex_config_meta() -> dict[str, object]:
             if meta.get("pipeline") == "config":
                 merged.update(meta)
         except Exception:
+            logger.warning("Failed to parse config metadata from %s", f, exc_info=True)
             continue
     return merged
 
