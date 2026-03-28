@@ -9,6 +9,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/add-to-project@v1
+        id: add
         with:
           project-url: https://github.com/users/wgergely/projects/3
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+
+      - name: Set target date to created_at + 30 days
+        env:
+          GH_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+        run: |
+          DEADLINE=$(date -d "+30 days" +%Y-%m-%d)
+          gh project item-edit \
+            --project-id PVT_kwHOAKyuWc4BS9uc \
+            --id ${{ steps.add.outputs.itemId }} \
+            --field-id PVTF_lAHOAKyuWc4BS9uczhAaFWg \
+            --date "$DEADLINE"
+
