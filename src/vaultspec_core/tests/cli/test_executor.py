@@ -20,7 +20,7 @@ from vaultspec_core.core.resolver import ResolutionPlan, ResolutionStep
 if TYPE_CHECKING:
     from pathlib import Path
 
-pytestmark = [pytest.mark.unit]
+pytestmark = [pytest.mark.integration]
 
 
 @pytest.fixture

@@ -33,6 +33,8 @@ from vaultspec_core.core.diagnosis.signals import (
 from vaultspec_core.core.enums import Tool
 from vaultspec_core.core.gitignore import DEFAULT_ENTRIES, MARKER_BEGIN, MARKER_END
 
+pytestmark = [pytest.mark.unit]
+
 
 def _write_manifest(root: Path, installed: list[str]) -> None:
     """Write a minimal valid providers.json manifest."""

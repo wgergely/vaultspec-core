@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from vaultspec_core.core.diagnosis.diagnosis import (
     ProviderDiagnosis,
     WorkspaceDiagnosis,
@@ -18,6 +20,8 @@ from vaultspec_core.core.diagnosis.signals import (
 )
 from vaultspec_core.core.enums import Tool
 from vaultspec_core.core.resolver import ResolutionPlan, resolve
+
+pytestmark = [pytest.mark.unit]
 
 
 def _make_diagnosis(

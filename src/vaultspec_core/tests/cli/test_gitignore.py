@@ -5,6 +5,8 @@ from __future__ import annotations
 import stat
 from typing import TYPE_CHECKING
 
+import pytest
+
 from vaultspec_core.core.gitignore import (
     MARKER_BEGIN,
     MARKER_END,
@@ -14,6 +16,8 @@ from vaultspec_core.core.gitignore import (
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+pytestmark = [pytest.mark.unit]
 
 ENTRIES = [".vaultspec/_snapshots/"]
 

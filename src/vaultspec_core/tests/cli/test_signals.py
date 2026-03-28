@@ -20,6 +20,8 @@ from vaultspec_core.core.diagnosis.signals import (
 )
 from vaultspec_core.core.enums import Tool
 
+pytestmark = [pytest.mark.unit]
+
 
 @pytest.mark.parametrize(
     ("enum_cls", "expected_members"),

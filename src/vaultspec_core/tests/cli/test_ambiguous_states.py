@@ -20,7 +20,7 @@ from vaultspec_core.core.manifest import read_manifest_data, write_manifest_data
 if TYPE_CHECKING:
     from pathlib import Path
 
-pytestmark = [pytest.mark.unit]
+pytestmark = [pytest.mark.integration]
 
 
 @pytest.fixture

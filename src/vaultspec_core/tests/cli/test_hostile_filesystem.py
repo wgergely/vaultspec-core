@@ -18,7 +18,7 @@ from vaultspec_core.cli import app
 from vaultspec_core.core.gitignore import MARKER_BEGIN, MARKER_END
 from vaultspec_core.core.manifest import read_manifest_data
 
-pytestmark = [pytest.mark.unit]
+pytestmark = [pytest.mark.integration]
 
 
 @pytest.fixture

@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+import pytest
+
 from vaultspec_core.core.manifest import (
     MANIFEST_VERSION,
     ManifestData,
@@ -18,6 +20,8 @@ from vaultspec_core.core.manifest import (
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+pytestmark = [pytest.mark.unit]
 
 
 def _manifest_path(root: Path) -> Path:

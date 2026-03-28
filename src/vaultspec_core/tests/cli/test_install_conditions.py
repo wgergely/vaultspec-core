@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 from vaultspec_core.core.enums import DirName
 
 if TYPE_CHECKING:
     from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+pytestmark = [pytest.mark.integration]
 
 
 # ---------------------------------------------------------------------------

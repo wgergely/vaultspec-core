@@ -9,7 +9,7 @@ import pytest
 if TYPE_CHECKING:
     from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
-pytestmark = [pytest.mark.unit]
+pytestmark = [pytest.mark.integration]
 
 
 class TestCleanSync:

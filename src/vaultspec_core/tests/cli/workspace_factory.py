@@ -21,7 +21,6 @@ import json
 import shutil
 from typing import TYPE_CHECKING, Self
 
-import pytest
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
@@ -68,6 +67,13 @@ class WorkspaceFactory:
         self._installed = False
         self._runner = CliRunner(env={"NO_COLOR": "1"})
 
+    @classmethod
+    def wrap(cls, root: Path) -> WorkspaceFactory:
+        """Wrap an existing directory with factory inspection/mutation."""
+        f = cls(root)
+        f._installed = (root / ".vaultspec").is_dir()
+        return f
+
     # ---- Properties --------------------------------------------------------
 
     @property
@@ -90,10 +96,12 @@ class WorkspaceFactory:
     def run(self, *args: str) -> Result:
         """Invoke a CLI command against this workspace.
 
-        Automatically prepends ``-t <root>`` to the argument list.
-        Returns the Typer/Click ``Result`` object.
+        Passes ``-t <root>`` at the root level **and** ``--target <root>``
+        after the subcommand so both the root callback (``set_root_target``)
+        and per-command ``TargetOption`` parameters receive the path.
         """
-        cmd = ["-t", str(self.root), *args]
+        target = str(self.root)
+        cmd = ["-t", target, *args, "--target", target]
         return self._runner.invoke(app, cmd)
 
     # ---- State inspection --------------------------------------------------
@@ -163,6 +171,7 @@ class WorkspaceFactory:
         self,
         provider: str = "all",
         *,
+        skip_gitignore: bool = False,
         upgrade: bool = False,
         force: bool = False,
         dry_run: bool = False,
@@ -171,11 +180,13 @@ class WorkspaceFactory:
         """Run a real ``install_run``.
 
         Creates a minimal ``.gitignore`` first if one does not exist so
-        the gitignore block writer has something to append to.
+        the gitignore block writer has something to append to.  Pass
+        ``skip_gitignore=True`` to suppress automatic ``.gitignore``
+        creation.
         """
         from vaultspec_core.core.commands import install_run
 
-        if not (self.root / ".gitignore").exists():
+        if not skip_gitignore and not (self.root / ".gitignore").exists():
             self.create_gitignore()
         install_run(
             path=self.root,
@@ -186,6 +197,46 @@ class WorkspaceFactory:
             skip=skip,
         )
         self._installed = True
+        return self
+
+    def sync(
+        self,
+        provider: str = "all",
+        *,
+        force: bool = False,
+        dry_run: bool = False,
+        skip: set[str] | None = None,
+    ) -> Self:
+        """Run a real ``sync_provider``."""
+        from vaultspec_core.config import reset_config
+        from vaultspec_core.config.workspace import resolve_workspace
+        from vaultspec_core.core.commands import sync_provider
+        from vaultspec_core.core.types import init_paths
+
+        reset_config()
+        layout = resolve_workspace(target_override=self.root)
+        init_paths(layout)
+        sync_provider(provider, force=force, dry_run=dry_run, skip=skip)
+        return self
+
+    def uninstall(
+        self,
+        provider: str = "all",
+        *,
+        force: bool = True,
+        keep_vault: bool = True,
+        dry_run: bool = False,
+    ) -> Self:
+        """Run a real ``uninstall_run``."""
+        from vaultspec_core.core.commands import uninstall_run
+
+        uninstall_run(
+            path=self.root,
+            provider=provider,
+            keep_vault=keep_vault,
+            dry_run=dry_run,
+            force=force,
+        )
         return self
 
     # ---- Manifest conditions -----------------------------------------------
@@ -399,9 +450,3 @@ class WorkspaceFactory:
     def preset_pre_existing_provider(self, provider: str) -> Self:
         """Provider directory that existed before vaultspec was installed."""
         return self.create_bare_provider_dir(provider).add_user_content(provider)
-
-
-@pytest.fixture
-def factory(tmp_path: Path) -> WorkspaceFactory:
-    """Return a :class:`WorkspaceFactory` rooted at a fresh temp directory."""
-    return WorkspaceFactory(tmp_path)
