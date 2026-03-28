@@ -13,6 +13,7 @@ import shutil
 import stat
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -111,7 +112,11 @@ def _rmtree_robust(path: Path) -> None:
         path.unlink()
         return
 
-    def _on_error(func, fpath, exc_info):  # type: ignore[no-untyped-def]
+    def _on_error(
+        func: Callable[..., object],
+        fpath: str,
+        exc_info: tuple[type, BaseException, object],
+    ) -> None:
         if os.name == "nt":
             os.chmod(fpath, stat.S_IWRITE)
             func(fpath)

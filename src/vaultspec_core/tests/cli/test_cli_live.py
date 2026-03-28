@@ -516,8 +516,9 @@ class TestSpecRules:
         snapshot = (
             project / ".vaultspec" / "_snapshots" / "rules" / "vaultspec.builtin.md"
         )
-        if not snapshot.exists():
-            pytest.skip("No snapshot available for revert test")
+        assert snapshot.exists(), (
+            "Snapshot missing after install - snapshot_builtins should have run"
+        )
         original = src.read_text(encoding="utf-8")
         src.write_text("MODIFIED CONTENT", encoding="utf-8")
 

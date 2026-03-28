@@ -264,7 +264,9 @@ def sync_to_all_tools(
         Accumulated :class:`SyncResult` across all tool destinations.
     """
     if dest_path_fn is None:
-        dest_path_fn = lambda dest_dir, name: dest_dir / name  # noqa: E731
+
+        def dest_path_fn(dest_dir: Path, name: str) -> Path:
+            return dest_dir / name
 
     from .manifest import installed_tool_configs
 

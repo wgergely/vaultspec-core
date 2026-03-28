@@ -1,6 +1,8 @@
 """Tests for console singleton."""
 
-from unittest.mock import patch
+from __future__ import annotations
+
+import io
 
 import pytest
 
@@ -27,27 +29,23 @@ class TestConsole:
         """Console must handle Unicode without UnicodeEncodeError."""
         console = get_console()
         # These are the exact characters that caused the cp1252 crash
-        console.print("\u2713")  # ✓
-        console.print("\u26a0")  # ⚠
-        console.print("\u2588")  # █
-        console.print("\u2591")  # ░
+        console.print("\u2713")  # check mark
+        console.print("\u26a0")  # warning
+        console.print("\u2588")  # full block
+        console.print("\u2591")  # light shade
         # If we get here without UnicodeEncodeError, the test passes
 
-    def test_safe_box_on_non_utf8_terminal(self):
+    def test_safe_box_on_non_utf8_terminal(self, monkeypatch):
         """safe_box must be True when terminal encoding is not UTF-8."""
-        import io
-
         fake_stdout = type(
             "FakeStdout",
             (),
             {"encoding": "cp1252", "buffer": io.BytesIO()},
         )()
-        with patch("vaultspec_core.console.sys") as mock_sys:
-            mock_sys.stdout = fake_stdout
-            mock_sys.stdout.encoding = "cp1252"
-            reset_console()
-            console = get_console()
-            assert console.safe_box is True
+        monkeypatch.setattr("vaultspec_core.console.sys.stdout", fake_stdout)
+        reset_console()
+        console = get_console()
+        assert console.safe_box is True
         reset_console()
 
     def test_no_color_env_var(self, monkeypatch):
