@@ -123,11 +123,16 @@ def _run_preflight(
 ) -> None:
     """Run diagnosis and resolution pre-flight.
 
-    Displays warnings and blocks on conflicts.
+    Executes preflight-safe resolution steps (manifest repair, gitignore
+    repair, scaffold, adopt) and displays their outcomes. Non-preflight
+    steps are shown as informational. Blocks on conflicts unless
+    *dry_run* is ``True``.
+
     Raises :class:`typer.Exit` with code 1 if conflicts are present and
-    *force* is ``False``.
+    *dry_run* is ``False``, or if any preflight execution step fails.
     """
     from vaultspec_core.core.diagnosis import diagnose
+    from vaultspec_core.core.executor import PREFLIGHT_ACTIONS, execute_plan
     from vaultspec_core.core.resolver import resolve
 
     try:
@@ -148,7 +153,22 @@ def _run_preflight(
     for warning in plan.warnings:
         console.print(f"  [yellow]![/yellow] {warning}")
 
-    for step in plan.steps:
+    # Execute preflight-safe resolution steps
+    if plan.steps and not plan.blocked:
+        exec_result = execute_plan(plan, target, dry_run=dry_run)
+
+        for sr in exec_result.results:
+            if sr.success:
+                console.print(f"  [green]ok[/green] {sr.step.reason}")
+            else:
+                console.print(f"  [red]FAIL[/red] {sr.step.reason}: {sr.error}")
+
+        if exec_result.failed and not dry_run:
+            raise typer.Exit(code=1)
+
+    # Show non-preflight steps as informational
+    non_preflight = [s for s in plan.steps if s.action not in PREFLIGHT_ACTIONS]
+    for step in non_preflight:
         console.print(f"  [dim]>[/dim] {step.reason}")
 
     if plan.conflicts:

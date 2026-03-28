@@ -2,11 +2,14 @@
 
 Exercises the full path through the CLI, verifying that diagnosis + resolution
 pre-flight is transparent for clean workspaces, blocks on conflicts, and
-displays warnings as expected.
+displays warnings as expected. Assertions verify ACTUAL FILESYSTEM STATE,
+not just CLI output strings.
 """
 
 from __future__ import annotations
 
+import json
+import shutil
 from typing import TYPE_CHECKING
 
 import pytest
@@ -83,6 +86,23 @@ class TestCorruptedManifestInstall:
         )
         assert result.exit_code == 0
 
+    def test_install_force_on_corrupted_actually_installs(
+        self, tmp_path: Path, runner: CliRunner
+    ):
+        """Install --force on corrupted workspace repairs and installs."""
+        (tmp_path / ".vaultspec").mkdir()
+        (tmp_path / ".vaultspec" / "providers.json").write_text(
+            "CORRUPT", encoding="utf-8"
+        )
+        (tmp_path / ".gitignore").write_text("# user\n", encoding="utf-8")
+
+        result = runner.invoke(app, ["-t", str(tmp_path), "install", "--force"])
+        assert result.exit_code == 0
+
+        mdata = read_manifest_data(tmp_path)
+        assert len(mdata.installed) > 0
+        assert (tmp_path / ".claude" / "rules").exists()
+
 
 # ---- (c) Corrupted manifest - sync shows remediation ------------------------
 
@@ -100,6 +120,19 @@ class TestCorruptedManifestSync:
         output = result.output.lower()
         # Sync with CORRUPTED framework always generates repair steps (per ADR)
         assert "repair" in output or "manifest" in output
+
+    def test_sync_corrupted_manifest_actually_repairs(
+        self, installed_workspace: Path, runner: CliRunner
+    ):
+        """Sync on corrupted manifest repairs it before syncing."""
+        manifest_path = installed_workspace / ".vaultspec" / "providers.json"
+        manifest_path.write_text("CORRUPT", encoding="utf-8")
+
+        runner.invoke(app, ["-t", str(installed_workspace), "sync", "--force"])
+
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert "installed" in raw
+        assert len(raw["installed"]) > 0
 
 
 # ---- (d) Untracked directory - sync warns ------------------------------------
@@ -194,3 +227,21 @@ class TestUninstallPreflight:
             app, ["-t", str(installed_workspace), "uninstall", "--force"]
         )
         assert result.exit_code == 0
+
+
+# ---- Preflight scaffolds orphaned providers ----------------------------------
+
+
+class TestPreflightScaffoldsOrphaned:
+    """Orphaned manifest entries trigger SCAFFOLD during preflight."""
+
+    def test_sync_rescaffolds_deleted_provider_dir(
+        self, installed_workspace: Path, runner: CliRunner
+    ):
+        """Delete .claude/ (making it orphaned), sync, verify .claude/ recreated."""
+        shutil.rmtree(installed_workspace / ".claude")
+        assert not (installed_workspace / ".claude").exists()
+
+        runner.invoke(app, ["-t", str(installed_workspace), "sync"])
+
+        assert (installed_workspace / ".claude").exists()
