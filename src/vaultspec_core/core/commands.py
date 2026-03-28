@@ -19,6 +19,7 @@ from .enums import ProviderCapability, Tool
 from .exceptions import (
     ProviderError,
     ProviderNotInstalledError,
+    VaultSpecError,
     WorkspaceNotInitializedError,
 )
 from .helpers import _rmtree_robust, ensure_dir
@@ -431,6 +432,20 @@ def install_run(
     )
 
     skip_core = "core" in skip
+
+    if skip_core and not (path / ".vaultspec").exists():
+        raise VaultSpecError(
+            f"Cannot skip core: .vaultspec/ does not exist at {path}.",
+            hint="Install core first, then use --skip core on subsequent installs.",
+        )
+
+    if upgrade and dry_run:
+        _ensure_tool_configs(path)
+        return {
+            "action": "dry_run",
+            "upgrade": True,
+            "items": [],
+        }
 
     if dry_run:
         _ensure_tool_configs(path)
@@ -980,13 +995,22 @@ def sync_provider(
     guard_dev_repo(ctx.target_dir)
 
     def _run_all_syncs() -> list[_t.SyncResult]:
-        return [
-            rules_sync(prune=force, dry_run=dry_run),
-            skills_sync(prune=force, dry_run=dry_run),
-            agents_sync(prune=force, dry_run=dry_run),
-            system_sync(dry_run=dry_run, force=force),
-            config_sync(dry_run=dry_run, force=force),
-        ]
+        results: list[_t.SyncResult] = []
+        for sync_fn, label in [
+            (lambda: rules_sync(prune=force, dry_run=dry_run), "rules"),
+            (lambda: skills_sync(prune=force, dry_run=dry_run), "skills"),
+            (lambda: agents_sync(prune=force, dry_run=dry_run), "agents"),
+            (lambda: system_sync(dry_run=dry_run, force=force), "system"),
+            (lambda: config_sync(dry_run=dry_run, force=force), "config"),
+        ]:
+            try:
+                results.append(sync_fn())
+            except Exception as exc:
+                logger.error("Sync pass '%s' failed: %s", label, exc)
+                error_result = _t.SyncResult()
+                error_result.errors.append(f"{label} sync failed: {exc}")
+                results.append(error_result)
+        return results
 
     # Guard: refuse to sync if vaultspec isn't installed at the target
     vaultspec_dir = ctx.target_dir / ".vaultspec"
