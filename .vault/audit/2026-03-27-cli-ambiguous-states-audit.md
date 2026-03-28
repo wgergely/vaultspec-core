@@ -412,4 +412,45 @@ regardless of errors.
 | R3-UX     | 0        | 0      | 7      | 0     | 0      | 7             |
 | R4        | 1        | 7      | 7      | 1     | 0      | 16            |
 | R5        | 2        | 7      | 4      | 1     | 0      | 14            |
-| **Total** | **11**   | **37** | **49** | **6** | **21** | **82**        |
+| R6        | 0        | 3      | 4      | 2     | 0      | 9             |
+| **Total** | **11**   | **40** | **53** | **8** | **21** | **91**        |
+
+## Round 6: Systemic deep-dive (5 agents, final round)
+
+Final audit round targeting systemic issues: data flow integrity,
+state invariants, command ordering, cross-provider interference, and
+config generation correctness.
+
+### Data flow: SyncResult.errors exit code + agents_sync warnings dropped
+
+| ID     | Severity | Finding                                                                                                                                             | Status |
+| ------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| R6-DF1 | HIGH     | `cmd_sync` exit code ignores `SyncResult.errors` - always exits 0 even when files failed to sync. Exit code should be non-zero when errors present. | OPEN   |
+| R6-DF2 | HIGH     | `agents.py:281-287` `_merge()` is missing `total.warnings.extend(result.warnings)` - agent stale-file warnings silently dropped.                    | OPEN   |
+
+### State invariants: path traversal + TOCTOU
+
+| ID     | Severity | Finding                                                                                                                                                                                                                       | Status |
+| ------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| R6-SI1 | HIGH     | Tool directories not validated as descendants of workspace root. A malicious config with `gemini_dir = "../../etc/evil"` could cause sync to write files or uninstall to rmtree outside workspace. No path containment check. | OPEN   |
+| R6-SI2 | MEDIUM   | `_sync_supporting_files` crashes on `FileNotFoundError` if source file deleted between enumeration and read (TOCTOU). `collect_md_resources` handles this gracefully but supporting files do not.                             | OPEN   |
+| R6-SI3 | MEDIUM   | Phantom manifest entries block shared-dir uninstall. Manual deletion of `.claude/` leaves it in manifest; `providers_sharing_dir` counts it as still sharing.                                                                 | OPEN   |
+| R6-SI4 | LOW      | `SyncResult` counts exclude errored files. `added + updated + skipped + pruned` undercounts by error count. No consumer relies on totals.                                                                                     | OPEN   |
+| R6-SI5 | LOW      | Shared dir double-sync inflates `skipped` count when gemini + antigravity both sync to `.agents/skills/`. Functionally benign.                                                                                                | OPEN   |
+
+### Config generation: circular includes + TagError crash
+
+| ID     | Severity | Finding                                                                                                                                                                                         | Status |
+| ------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| R6-CG1 | MEDIUM   | `resolve_includes` has no circular include guard. File A including file B including file A causes `RecursionError` (stack overflow).                                                            | OPEN   |
+| R6-CG2 | MEDIUM   | `_sync_managed_md` does not catch `TagError` from `upsert_block`. Broken tags in `CLAUDE.md`/`GEMINI.md` crash sync instead of skipping gracefully. The TOML path handles this but MD does not. | OPEN   |
+
+### Command ordering: confirmed correct
+
+No ordering bugs found. Key invariants verified:
+
+- `.vaultspec/` created before `resolve_workspace`/`init_paths`
+- `add_providers` (manifest) runs before `sync_provider`
+- Manifest v2 metadata written last (crash-safe)
+- Config sync deduplicates shared files (GEMINI.md, AGENTS.md)
+- Context isolation via `contextvars.copy_context()` is correct
