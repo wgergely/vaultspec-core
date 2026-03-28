@@ -12,12 +12,11 @@ or ``sync_files()`` when a caller already knows the exact destination.
 from __future__ import annotations
 
 import logging
-import shutil
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from .helpers import atomic_write, ensure_dir
+from .helpers import _rmtree_robust, atomic_write, ensure_dir
 from .types import SyncResult
 
 logger = logging.getLogger(__name__)
@@ -176,7 +175,7 @@ def sync_files(
                     result.items.append((abs_path, "[DELETE]"))
                 else:
                     if is_skill:
-                        shutil.rmtree(item)
+                        _rmtree_robust(item)
                     else:
                         item.unlink()
                 result.pruned += 1

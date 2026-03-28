@@ -13,7 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from .exceptions import ResourceExistsError, ResourceNotFoundError
-from .helpers import _launch_editor, ensure_dir
+from .helpers import _launch_editor, _rmtree_robust, ensure_dir
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +115,7 @@ def resource_remove(
             return False
 
     if is_dir:
-        shutil.rmtree(check_path)
+        _rmtree_robust(check_path)
     else:
         file_path.unlink()
     logger.info("Removed %s: %s", label, name)

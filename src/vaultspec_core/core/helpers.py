@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -94,6 +95,30 @@ def ensure_dir(path: Path) -> None:
         path: Directory path to create.
     """
     path.mkdir(parents=True, exist_ok=True)
+
+
+def _rmtree_robust(path: Path) -> None:
+    """Remove a directory tree, handling symlinks and Windows read-only files.
+
+    Symlinks are unlinked directly rather than followed. On Windows, a
+    read-only attribute on a child file is cleared before retrying the
+    removal so that NTFS-protected trees can be deleted.
+
+    Args:
+        path: Directory (or symlink to directory) to remove.
+    """
+    if path.is_symlink():
+        path.unlink()
+        return
+
+    def _on_error(func, fpath, exc_info):  # type: ignore[no-untyped-def]
+        if os.name == "nt":
+            os.chmod(fpath, stat.S_IWRITE)
+            func(fpath)
+        else:
+            raise exc_info[1]
+
+    shutil.rmtree(path, onerror=_on_error)
 
 
 def atomic_write(path: Path, content: str) -> None:

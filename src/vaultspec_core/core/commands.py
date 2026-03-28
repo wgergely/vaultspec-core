@@ -21,7 +21,7 @@ from .exceptions import (
     ProviderNotInstalledError,
     WorkspaceNotInitializedError,
 )
-from .helpers import ensure_dir
+from .helpers import _rmtree_robust, ensure_dir
 
 logger = logging.getLogger(__name__)
 
@@ -165,39 +165,50 @@ def _scaffold_provider(
 
 
 def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[tuple[str, str]]:
-    """Scaffold ``.mcp.json`` for MCP server integration.
+    """Scaffold or merge ``vaultspec-core`` into ``.mcp.json``.
 
-    Creates ``.mcp.json`` only if it does not already exist.
+    If ``.mcp.json`` already exists the function merges the ``vaultspec-core``
+    server entry into the existing ``mcpServers`` dict, preserving user entries.
+    When the entry already exists the file is left untouched.
 
     Args:
         target: Workspace root directory.
         dry_run: When ``True``, returns the manifest without writing anything.
 
     Returns:
-        List with a single ``(".mcp.json", "mcp")`` tuple, or empty if the
-        file already exists.
+        List with a single ``(".mcp.json", "mcp")`` tuple when a write
+        occurred (or would occur), otherwise empty.
     """
     import json
 
+    from .helpers import atomic_write
+
     mcp_json = target / ".mcp.json"
+    server_entry = {
+        "command": "uv",
+        "args": ["run", "python", "-m", "vaultspec_core.mcp_server.app"],
+    }
+
     if mcp_json.exists():
-        return []
+        try:
+            raw = json.loads(mcp_json.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return []
+        if not isinstance(raw, dict):
+            return []
+        servers = raw.setdefault("mcpServers", {})
+        if not isinstance(servers, dict):
+            return []
+        if "vaultspec-core" in servers:
+            return []
+        servers["vaultspec-core"] = server_entry
+        if not dry_run:
+            atomic_write(mcp_json, json.dumps(raw, indent=2) + "\n")
+        return [(".mcp.json", "mcp")]
 
     if not dry_run:
-        mcp_config = {
-            "mcpServers": {
-                "vaultspec-core": {
-                    "command": "uv",
-                    "args": [
-                        "run",
-                        "python",
-                        "-m",
-                        "vaultspec_core.mcp_server.app",
-                    ],
-                }
-            }
-        }
-        mcp_json.write_text(json.dumps(mcp_config, indent=2) + "\n", encoding="utf-8")
+        mcp_config = {"mcpServers": {"vaultspec-core": server_entry}}
+        atomic_write(mcp_json, json.dumps(mcp_config, indent=2) + "\n")
     return [(".mcp.json", "mcp")]
 
 
@@ -527,7 +538,7 @@ def install_run(
     has_mcp = (path / ".mcp.json").exists()
 
     # Manage gitignore block
-    from .gitignore import DEFAULT_ENTRIES, ensure_gitignore_block
+    from .gitignore import DEFAULT_ENTRIES, MARKER_BEGIN, ensure_gitignore_block
     from .manifest import read_manifest_data, write_manifest_data
 
     gi_written = ensure_gitignore_block(path, DEFAULT_ENTRIES, state="present")
@@ -537,8 +548,11 @@ def install_run(
     # Populate v2.0 manifest fields
     import datetime
 
+    gi_path = path / ".gitignore"
     mdata = read_manifest_data(path)
-    mdata.gitignore_managed = gi_written
+    mdata.gitignore_managed = gi_written or (
+        gi_path.exists() and MARKER_BEGIN in gi_path.read_text(encoding="utf-8")
+    )
     mdata.vaultspec_version = _get_package_version()
     mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
     for name in provider_names:
@@ -619,8 +633,6 @@ def uninstall_run(
     Raises:
         ProviderError: If *provider* is invalid or *force* not set.
     """
-    import shutil
-
     from .guards import guard_dev_repo
     from .manifest import providers_sharing_dir, providers_sharing_file, remove_provider
 
@@ -690,10 +702,16 @@ def uninstall_run(
         "AGENTS.md": "codex",
     }
 
+    errors: list[str] = []
+
     if effective_provider == "all":
-        # Remove everything (respecting skip)
+        import json
+
+        from .helpers import atomic_write
+
+        # Remove everything (respecting skip).
+        # .vaultspec is deleted LAST so the manifest survives partial failures.
         managed_dirs = [
-            path / ".vaultspec",
             path / ".claude",
             path / ".gemini",
             path / ".agents",
@@ -701,17 +719,16 @@ def uninstall_run(
         ]
         if not keep_vault:
             managed_dirs.append(path / ".vault")
+        managed_dirs.append(path / ".vaultspec")
 
         managed_files = [
             path / "CLAUDE.md",
             path / "GEMINI.md",
             path / "AGENTS.md",
-            path / ".mcp.json",
         ]
 
         for d in managed_dirs:
             owners = _dir_owners.get(d.name, [])
-            # Preserve directory if any of its owners is in the skip set
             if owners and any(o in skip for o in owners):
                 skipped = [o for o in owners if o in skip]
                 logger.info("Skipping %s (--skip %s)", d.name, ", ".join(skipped))
@@ -719,7 +736,11 @@ def uninstall_run(
             owner = dir_labels.get(d.name, "")
             if d.exists():
                 if not dry_run:
-                    shutil.rmtree(d)
+                    try:
+                        _rmtree_robust(d)
+                    except OSError as exc:
+                        errors.append(f"Failed to remove {_rel(path, d)}: {exc}")
+                        continue
                 removed.append((str(d).replace("\\", "/") + "/", owner))
 
         for f in managed_files:
@@ -729,9 +750,32 @@ def uninstall_run(
                 continue
             if f.exists():
                 if not dry_run:
-                    f.unlink()
+                    try:
+                        f.unlink()
+                    except OSError as exc:
+                        errors.append(f"Failed to remove {_rel(path, f)}: {exc}")
+                        continue
                 label = file_labels.get(f.name, "")
                 removed.append((str(f).replace("\\", "/"), label))
+
+        # Surgical .mcp.json cleanup: remove only the vaultspec-core key
+        mcp_path = path / ".mcp.json"
+        if mcp_path.exists() and not dry_run:
+            try:
+                raw = json.loads(mcp_path.read_text(encoding="utf-8"))
+                if isinstance(raw, dict):
+                    servers = raw.get("mcpServers", {})
+                    if isinstance(servers, dict) and "vaultspec-core" in servers:
+                        del servers["vaultspec-core"]
+                        if servers:
+                            atomic_write(mcp_path, json.dumps(raw, indent=2) + "\n")
+                        else:
+                            mcp_path.unlink()
+                        removed.append((_rel(path, mcp_path), "mcp"))
+            except (json.JSONDecodeError, OSError):
+                pass
+        elif mcp_path.exists() and dry_run:
+            removed.append((_rel(path, mcp_path), "mcp"))
 
     else:
         # Per-provider uninstall with shared directory protection
@@ -742,7 +786,6 @@ def uninstall_run(
             for d in dirs:
                 if not d.exists():
                     continue
-                # Check if another installed provider still needs this dir
                 sharing = providers_sharing_dir(path, d, exclude=effective_provider)
                 if sharing:
                     logger.info(
@@ -753,13 +796,16 @@ def uninstall_run(
                     continue
 
                 if not dry_run:
-                    shutil.rmtree(d)
+                    try:
+                        _rmtree_robust(d)
+                    except OSError as exc:
+                        errors.append(f"Failed to remove {_rel(path, d)}: {exc}")
+                        continue
                 removed.append((str(d).replace("\\", "/") + "/", tool.value))
 
             for f in files:
                 if not f.exists():
                     continue
-                # Check if another installed provider still needs this file
                 sharing = providers_sharing_file(path, f, exclude=effective_provider)
                 if sharing:
                     logger.info(
@@ -769,7 +815,11 @@ def uninstall_run(
                     )
                     continue
                 if not dry_run:
-                    f.unlink()
+                    try:
+                        f.unlink()
+                    except OSError as exc:
+                        errors.append(f"Failed to remove {_rel(path, f)}: {exc}")
+                        continue
                 removed.append((str(f).replace("\\", "/"), f"{tool.value} (config)"))
 
         # Update manifest
@@ -784,12 +834,15 @@ def uninstall_run(
         ensure_gitignore_block(path, [], state="absent")
 
     action = "dry_run" if dry_run else "uninstall"
-    return {
+    result: dict[str, Any] = {
         "action": action,
         "removed": removed,
         "keep_vault": keep_vault,
         "path": path,
     }
+    if errors:
+        result["errors"] = errors
+    return result
 
 
 def hooks_list_data() -> dict[str, Any]:
