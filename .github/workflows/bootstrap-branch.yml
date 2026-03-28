@@ -1,0 +1,18 @@
+name: Bootstrap Feature Branch
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  bootstrap:
+    runs-on: [self-hosted, dev-runner]
+    steps:
+      - name: Bootstrap local worktree
+        run: |
+          /usr/local/bin/bootstrap.sh \
+            --repo "${{ github.repository }}" \
+            --issue "${{ github.event.issue.number }}" \
+            --title "${{ github.event.issue.title }}" \
+            --body "${{ github.event.issue.body }}"
+
