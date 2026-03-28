@@ -30,6 +30,10 @@ from vaultspec_core.core.enums import DirName, FileName
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from click.testing import Result
+
+    from vaultspec_core.core.manifest import ManifestData
+
 # Provider name -> top-level directory mapping derived from DirName.
 _PROVIDER_DIR: dict[str, str] = {
     "claude": DirName.CLAUDE,
@@ -83,7 +87,7 @@ class WorkspaceFactory:
 
     # ---- CLI runner integration --------------------------------------------
 
-    def run(self, *args: str) -> object:
+    def run(self, *args: str) -> Result:
         """Invoke a CLI command against this workspace.
 
         Automatically prepends ``-t <root>`` to the argument list.
@@ -94,7 +98,7 @@ class WorkspaceFactory:
 
     # ---- State inspection --------------------------------------------------
 
-    def read_manifest(self) -> object:
+    def read_manifest(self) -> ManifestData:
         """Read and return the current :class:`ManifestData`."""
         from vaultspec_core.core.manifest import read_manifest_data
 
