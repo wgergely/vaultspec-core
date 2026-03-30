@@ -70,6 +70,13 @@ def _scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, st
     vault_dir = target / ".vault"
     created: list[tuple[str, str]] = []
 
+    # Ensure the framework root exists unconditionally before builtins
+    # discovery.  In editable installs _builtins_root() resolves to
+    # .vaultspec/rules/ which may not yet exist after a full uninstall.
+    if not dry_run:
+        ensure_dir(fw_dir / "rules")
+    created.append((_rel(target, fw_dir / "rules"), "core (.vaultspec)"))
+
     # Dynamically discover resource categories from the builtins package
     # so that new categories (e.g. hooks) are scaffolded automatically.
     from vaultspec_core.builtins import _builtins_root

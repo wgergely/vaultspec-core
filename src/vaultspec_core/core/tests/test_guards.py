@@ -59,8 +59,9 @@ def test_ignores_pyproject_without_project_table(tmp_path):
 # ── guard_dev_repo ─────────────────────────────────────────────────
 
 
-def test_guard_raises_on_dev_repo(tmp_path):
+def test_guard_raises_on_dev_repo(tmp_path, monkeypatch):
     """guard_dev_repo raises DevRepoProtectionError for the dev repo."""
+    monkeypatch.delenv("VAULTSPEC_ALLOW_DEV_WRITES", raising=False)
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text('[project]\nname = "vaultspec-core"\n', encoding="utf-8")
     with pytest.raises(DevRepoProtectionError, match="source repository"):
