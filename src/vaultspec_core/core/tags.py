@@ -24,6 +24,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from .exceptions import VaultSpecError
+
 # Patterns for matching opening and closing tags.
 # Opening: <vaultspec type="TYPE"> or # <vaultspec type="TYPE">
 _OPEN_RE = re.compile(
@@ -36,7 +38,7 @@ _CLOSE_RE = re.compile(r"^(?P<prefix>#\s*)?</vaultspec>\s*$")
 _FENCE_RE = re.compile(r"^(`{3,}|~{3,})")
 
 
-class TagError(Exception):
+class TagError(VaultSpecError):
     """Raised when ``<vaultspec>`` managed tags are in an invalid state.
 
     Attributes:

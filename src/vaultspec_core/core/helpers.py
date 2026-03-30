@@ -141,7 +141,7 @@ def atomic_write(path: Path, content: str) -> None:
     """
     tmp = path.with_suffix(path.suffix + f".{os.getpid()}.tmp")
     try:
-        tmp.write_text(content, encoding="utf-8")
+        tmp.write_bytes(content.encode("utf-8"))
         try:
             tmp.replace(path)
         except PermissionError as exc:

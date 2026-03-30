@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 from . import types as _t
 from .enums import FileName, Tool
 from .exceptions import ResourceExistsError
-from .helpers import _launch_editor, build_file, ensure_dir
+from .helpers import _launch_editor, atomic_write, build_file, ensure_dir
 from .sync import sync_to_all_tools
 
 if TYPE_CHECKING:
@@ -61,6 +61,14 @@ def collect_skills(
                     if warnings is not None:
                         warnings.append(f"Failed to read/parse {skill_md}: {e}")
                     continue
+            else:
+                msg = (
+                    f"Skill directory '{path.name}' has no SKILL.md "
+                    f"entrypoint and will be skipped."
+                )
+                logger.warning(msg)
+                if warnings is not None:
+                    warnings.append(msg)
     return sources
 
 
@@ -163,7 +171,7 @@ def skills_add(
     is_interactive = interactive if interactive is not None else sys.stdin.isatty()
 
     if is_interactive:
-        file_path.write_text(scaffold, encoding="utf-8")
+        atomic_write(file_path, scaffold)
         from ..config import get_config
 
         editor = get_config().editor
@@ -174,7 +182,7 @@ def skills_add(
         except Exception as e:
             logger.error("Error opening editor: %s", e, exc_info=True)
     else:
-        file_path.write_text(scaffold, encoding="utf-8")
+        atomic_write(file_path, scaffold)
         logger.info("Created skill: %s", file_path)
 
     return file_path

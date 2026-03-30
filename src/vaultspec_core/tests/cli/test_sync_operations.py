@@ -103,7 +103,10 @@ class TestSyncFiles:
     def test_prune_removes_stale(self, test_project):
         dest = test_project / "dest"
         dest.mkdir()
-        (dest / "stale.md").write_text("old", encoding="utf-8")
+        (dest / "stale.md").write_text(
+            "---\nname: stale\ntrigger: always_on\n---\n\nold stale content",
+            encoding="utf-8",
+        )
         sources = self._make_sources(test_project, ["a.md"])
         result = sync_files(
             sources=sources,

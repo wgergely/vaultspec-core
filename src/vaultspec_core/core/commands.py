@@ -23,7 +23,7 @@ from .exceptions import (
     VaultSpecError,
     WorkspaceNotInitializedError,
 )
-from .helpers import _rmtree_robust, ensure_dir
+from .helpers import _rmtree_robust, atomic_write, ensure_dir
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +157,7 @@ def _scaffold_provider(
     if cfg.config_file:
         if not dry_run and not cfg.config_file.exists():
             ensure_dir(cfg.config_file.parent)
-            cfg.config_file.write_text("", encoding="utf-8")
+            atomic_write(cfg.config_file, "")
         _add(_rel(target, cfg.config_file), "config")
 
     if cfg.rule_ref_config_file:
@@ -167,7 +167,7 @@ def _scaffold_provider(
         if not dry_run:
             ensure_dir(cfg.native_config_file.parent)
             if not cfg.native_config_file.exists():
-                cfg.native_config_file.write_text("", encoding="utf-8")
+                atomic_write(cfg.native_config_file, "")
         _add(_rel(target, cfg.native_config_file), "config")
 
     return created
@@ -1122,7 +1122,10 @@ def sync_provider(
     if installed and provider not in installed:
         raise ProviderNotInstalledError(
             f"Provider '{provider}' is not installed.",
-            hint=f"Run 'vaultspec-core install . {provider}' first.",
+            hint=(
+                f"Run 'vaultspec-core install "
+                f"--target {ctx.target_dir} {provider}' first."
+            ),
         )
 
     # Per-provider sync: filter tool_configs to only the requested tool.

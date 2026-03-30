@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -396,6 +397,7 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
 
 
 _cached_config: VaultSpecConfig | None = None
+_config_lock = threading.Lock()
 
 
 def get_config(overrides: dict[str, Any] | None = None) -> VaultSpecConfig:
@@ -403,6 +405,8 @@ def get_config(overrides: dict[str, Any] | None = None) -> VaultSpecConfig:
 
     If *overrides* is provided a fresh instance is created (not cached).
     Otherwise the cached singleton is returned, creating it on first call.
+    Thread-safe: concurrent callers from the MCP server will not race
+    on the read-modify of ``_cached_config``.
 
     Args:
         overrides: Optional attribute overrides passed directly to
@@ -417,12 +421,14 @@ def get_config(overrides: dict[str, Any] | None = None) -> VaultSpecConfig:
     if overrides is not None:
         return VaultSpecConfig.from_environment(overrides)
 
-    if _cached_config is None:
-        _cached_config = VaultSpecConfig.from_environment()
-    return _cached_config
+    with _config_lock:
+        if _cached_config is None:
+            _cached_config = VaultSpecConfig.from_environment()
+        return _cached_config
 
 
 def reset_config() -> None:
     """Clear the cached singleton so the next :func:`get_config` recreates it."""
     global _cached_config
-    _cached_config = None
+    with _config_lock:
+        _cached_config = None

@@ -37,6 +37,7 @@ def resolve_includes(
     base_dir: pathlib.Path,
     root_dir: pathlib.Path,
     warnings: list[str] | None = None,
+    visited: set[str] | None = None,
 ) -> str:
     """Recursively resolve ``@path/to/file.md`` includes within Markdown content.
 
@@ -54,6 +55,9 @@ def resolve_includes(
         warnings: Optional list to append include-failure messages to, so
             callers can propagate them into
             :class:`~vaultspec_core.core.types.SyncResult`.
+        visited: Set of already-resolved absolute path strings used to
+            detect circular includes. Callers should omit this; it is
+            populated automatically during recursion.
 
     Returns:
         Markdown string with all include directives replaced by the content
@@ -61,6 +65,8 @@ def resolve_includes(
         source path. Missing or out-of-bounds includes are replaced with
         an HTML error comment.
     """
+    if visited is None:
+        visited = set()
     resolved_root = root_dir.resolve()
     lines = content.split("\n")
     resolved_lines = []
@@ -120,6 +126,19 @@ def resolve_includes(
                 )
                 continue
 
+            resolved_key = str(include_path)
+            if resolved_key in visited:
+                msg = (
+                    f"Circular include detected: {include_path_str}"
+                    f" (already included in this chain)"
+                )
+                logger.warning("Circular include detected: %s", include_path_str)
+                if warnings is not None:
+                    warnings.append(msg)
+                resolved_lines.append(line)
+                continue
+
+            visited.add(resolved_key)
             included_content = include_path.read_text(encoding="utf-8")
             display_path = str(include_path.relative_to(resolved_root)).replace(
                 "\\", "/"
@@ -127,7 +146,7 @@ def resolve_includes(
             resolved_lines.append(f"\n<!-- Included from {display_path} -->\n")
             resolved_lines.append(
                 resolve_includes(
-                    included_content, include_path.parent, root_dir, warnings
+                    included_content, include_path.parent, root_dir, warnings, visited
                 )
             )
             resolved_lines.append(f"\n<!-- End of {display_path} -->\n")

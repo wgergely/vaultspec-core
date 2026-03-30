@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from .helpers import _rmtree_robust, atomic_write, ensure_dir
-from .types import SyncResult
+from .types import CONFIG_HEADER, SyncResult
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ def _sync_supporting_files(
 
         if not dry_run:
             ensure_dir(dest_file.parent)
-            dest_file.write_bytes(src_data)
+            atomic_write(dest_file, src_data.decode("utf-8"))
 
 
 def sync_files(
@@ -149,6 +149,7 @@ def sync_files(
                 _sync_supporting_files(src_skill_dir, dest_skill_dir, dry_run=dry_run)
 
         except Exception as e:
+            result.errored += 1
             result.errors.append(f"{name}: {e}")
             logger.error("    [ERROR] %s: %s", name, e, exc_info=True)
 
@@ -177,6 +178,28 @@ def sync_files(
 
             abs_path = str(item).replace("\\", "/")
             if prune:
+                # Content-ownership guard: only prune .md files that
+                # vaultspec created (have a matching source or carry the
+                # AUTO-GENERATED marker).  User-authored files are skipped.
+                if not is_skill and item.is_file() and item.suffix == ".md":
+                    has_source = item.name in source_names
+                    if not has_source:
+                        try:
+                            head = item.read_text(encoding="utf-8")[:512]
+                        except OSError:
+                            head = ""
+                        is_managed = (
+                            CONFIG_HEADER in head
+                            or "<vaultspec " in head
+                            or "trigger:" in head
+                        )
+                        if not is_managed:
+                            result.warnings.append(
+                                f"Skipped pruning user file: {abs_path} "
+                                f"(not managed by vaultspec)"
+                            )
+                            continue
+
                 if dry_run:
                     result.items.append((abs_path, "[DELETE]"))
                 else:
@@ -277,10 +300,17 @@ def sync_to_all_tools(
     from .manifest import installed_tool_configs
 
     total = SyncResult()
+    seen_dest_dirs: set[Path] = set()
     for tool_type, cfg in installed_tool_configs().items():
         dest_dir = getattr(cfg, dir_attr)
         if dest_dir is None:
             continue
+        # When multiple providers share a directory (e.g. .agents/skills/),
+        # skip the duplicate sync entirely to avoid inflating skipped counts.
+        resolved = dest_dir.resolve()
+        if resolved in seen_dest_dirs:
+            continue
+        seen_dest_dirs.add(resolved)
         result = sync_files(
             sources=sources,
             dest_dir=dest_dir,
@@ -297,6 +327,7 @@ def sync_to_all_tools(
         total.updated += result.updated
         total.pruned += result.pruned
         total.skipped += result.skipped
+        total.errored += result.errored
         total.errors.extend(result.errors)
         total.items.extend(result.items)
         total.warnings.extend(result.warnings)
@@ -319,6 +350,8 @@ def format_summary(resource: str, result: SyncResult) -> str:
         parts.append(f"{result.pruned} pruned")
     if result.skipped:
         parts.append(f"{result.skipped} skipped")
+    if result.errored:
+        parts.append(f"{result.errored} errored")
     if result.errors:
         parts.append(f"{len(result.errors)} errors")
     summary = ", ".join(parts) if parts else "no changes"

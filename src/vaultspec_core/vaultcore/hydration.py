@@ -244,8 +244,10 @@ def create_vault_doc(
                     f"Choose a different name to avoid graph key collisions."
                 )
 
+    from ..core.helpers import atomic_write
+
     target_dir.mkdir(parents=True, exist_ok=True)
-    target_path.write_text(hydrated, encoding="utf-8")
+    atomic_write(target_path, hydrated)
     logger.info("Created %s", target_path)
     return target_path
 

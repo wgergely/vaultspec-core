@@ -11,6 +11,8 @@ import logging
 import shutil
 from pathlib import Path
 
+from .helpers import atomic_write
+
 logger = logging.getLogger(__name__)
 
 _BUILTIN_SUFFIX = ".builtin.md"
@@ -112,7 +114,7 @@ def revert_resource(vaultspec_dir: Path, category: str, filename: str) -> dict:
 
     target = vaultspec_dir / "rules" / category / filename
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(original, encoding="utf-8")
+    atomic_write(target, original)
     logger.info("Reverted %s/%s to snapshot original.", category, filename)
     return {"reverted": True, "reason": "Restored to install snapshot."}
 

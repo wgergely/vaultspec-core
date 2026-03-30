@@ -256,7 +256,7 @@ def agents_add(
 
         editor = get_config().editor
         content = build_file(fm, body)
-        file_path.write_text(content, encoding="utf-8")
+        atomic_write(file_path, content)
         logger.info("Opening editor (%s) for %s...", editor, file_path)
         try:
             _launch_editor(editor, str(file_path))
@@ -264,7 +264,7 @@ def agents_add(
             logger.error("Error opening editor: %s", e)
     else:
         content = build_file(fm, body)
-        file_path.write_text(content, encoding="utf-8")
+        atomic_write(file_path, content)
 
     logger.info("Created agent: %s", file_path)
     return file_path

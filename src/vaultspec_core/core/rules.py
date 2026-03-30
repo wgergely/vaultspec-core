@@ -15,7 +15,13 @@ from typing import TYPE_CHECKING, Any
 from . import types as _t
 from .enums import Tool
 from .exceptions import ResourceExistsError
-from .helpers import _launch_editor, build_file, collect_md_resources, ensure_dir
+from .helpers import (
+    _launch_editor,
+    atomic_write,
+    build_file,
+    collect_md_resources,
+    ensure_dir,
+)
 from .sync import sync_to_all_tools
 
 if TYPE_CHECKING:
@@ -127,7 +133,7 @@ def rules_add(
 
             editor = get_config().editor
             scaffold = f"---\nname: {name}\n---\n\n# Rule content\n"
-            file_path.write_text(scaffold, encoding="utf-8")
+            atomic_write(file_path, scaffold)
             logger.info("Opening editor (%s) for %s...", editor, file_path)
             try:
                 _launch_editor(editor, str(file_path))
@@ -140,7 +146,7 @@ def rules_add(
 
     fm = {"name": name}
     full = build_file(fm, (rule_content or "").lstrip())
-    file_path.write_text(full, encoding="utf-8")
+    atomic_write(file_path, full)
     logger.info("Created custom rule: %s", file_path)
     return file_path
 

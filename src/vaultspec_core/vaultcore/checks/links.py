@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from ...core.helpers import atomic_write
 from ._base import CheckDiagnostic, CheckResult, Severity, VaultSnapshot
 
 if TYPE_CHECKING:
@@ -73,7 +74,15 @@ def check_links(
                 lambda m: f"[[{m.group(1)}{m.group(2) or ''}]]",
                 content,
             )
-            doc_path.write_text(fixed_content, encoding="utf-8")
+            bak = doc_path.with_suffix(doc_path.suffix + ".bak")
+            bak.write_bytes(doc_path.read_bytes())
+            try:
+                atomic_write(doc_path, fixed_content)
+            except Exception:
+                if bak.exists():
+                    bak.replace(doc_path)
+                raise
+            bak.unlink(missing_ok=True)
             result.fixed_count += 1
             result.diagnostics.append(
                 CheckDiagnostic(

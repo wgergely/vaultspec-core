@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from vaultspec_core.core.exceptions import VaultSpecError
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -273,7 +275,7 @@ def discover_git(start: Path) -> GitInfo | None:
     )
 
 
-class WorkspaceError(Exception):
+class WorkspaceError(VaultSpecError):
     """Raised when workspace layout resolution or validation fails.
 
     Typically indicates a missing ``.vaultspec/`` directory or an unreachable
