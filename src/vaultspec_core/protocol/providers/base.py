@@ -33,7 +33,10 @@ __all__ = [
 
 
 def resolve_includes(
-    content: str, base_dir: pathlib.Path, root_dir: pathlib.Path
+    content: str,
+    base_dir: pathlib.Path,
+    root_dir: pathlib.Path,
+    warnings: list[str] | None = None,
 ) -> str:
     """Recursively resolve ``@path/to/file.md`` includes within Markdown content.
 
@@ -48,6 +51,9 @@ def resolve_includes(
             resolution first).
         root_dir: Workspace root used as the fallback resolution base and as
             the security boundary.
+        warnings: Optional list to append include-failure messages to, so
+            callers can propagate them into
+            :class:`~vaultspec_core.core.types.SyncResult`.
 
     Returns:
         Markdown string with all include directives replaced by the content
@@ -85,10 +91,13 @@ def resolve_includes(
                 include_path = candidate
 
         if include_path is None:
+            msg = f"Include resolution failed: {include_path_str} - path not found"
             logger.warning(
                 "Include resolution failed: %s  - path not found",
                 include_path_str,
             )
+            if warnings is not None:
+                warnings.append(msg)
             resolved_lines.append(
                 f"<!-- ERROR: Missing include: {include_path_str} -->"
             )
@@ -96,10 +105,16 @@ def resolve_includes(
 
         try:
             if not include_path.is_relative_to(resolved_root):
+                msg = (
+                    f"Include resolution failed: {include_path_str}"
+                    " - path outside workspace"
+                )
                 logger.warning(
                     "Include resolution failed: %s  - path outside workspace",
                     include_path_str,
                 )
+                if warnings is not None:
+                    warnings.append(msg)
                 resolved_lines.append(
                     f"<!-- ERROR: Path outside workspace: {include_path_str} -->"
                 )
@@ -111,11 +126,16 @@ def resolve_includes(
             )
             resolved_lines.append(f"\n<!-- Included from {display_path} -->\n")
             resolved_lines.append(
-                resolve_includes(included_content, include_path.parent, root_dir)
+                resolve_includes(
+                    included_content, include_path.parent, root_dir, warnings
+                )
             )
             resolved_lines.append(f"\n<!-- End of {display_path} -->\n")
         except Exception as e:
+            msg = f"Include resolution failed: {include_path_str} - {e}"
             logger.warning("Include resolution failed: %s  - %s", include_path_str, e)
+            if warnings is not None:
+                warnings.append(msg)
             resolved_lines.append(f"<!-- ERROR: Include failed: {e} -->")
 
     return "\n".join(resolved_lines)

@@ -25,12 +25,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def collect_skills() -> dict[str, tuple[Path, dict[str, Any], str]]:
+def collect_skills(
+    warnings: list[str] | None = None,
+) -> dict[str, tuple[Path, dict[str, Any], str]]:
     """Collect skill definitions from .vaultspec/rules/skills/*/SKILL.md.
 
     Any subdirectory of the skills source directory that contains a
-    ``SKILL.md`` file is treated as a skill  - no naming convention is
+    ``SKILL.md`` file is treated as a skill - no naming convention is
     required.
+
+    Args:
+        warnings: Optional list to append parse-error messages to, so callers
+            can propagate them into :class:`~vaultspec_core.core.types.SyncResult`.
 
     Returns:
         A mapping of skill directory name to a three-tuple of
@@ -52,6 +58,8 @@ def collect_skills() -> dict[str, tuple[Path, dict[str, Any], str]]:
                     sources[path.name] = (skill_md, meta, body)
                 except Exception as e:
                     logger.error("Failed to read/parse %s: %s", skill_md, e)
+                    if warnings is not None:
+                        warnings.append(f"Failed to read/parse {skill_md}: {e}")
                     continue
     return sources
 
@@ -184,8 +192,9 @@ def skills_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
         Accumulated :class:`~vaultspec_core.core.types.SyncResult` across
         all active tool destinations.
     """
-    return sync_to_all_tools(
-        sources=collect_skills(),
+    parse_warnings: list[str] = []
+    result = sync_to_all_tools(
+        sources=collect_skills(warnings=parse_warnings),
         dir_attr="skills_dir",
         transform_fn=transform_skill,
         label="Skills",
@@ -194,3 +203,5 @@ def skills_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
         dest_path_fn=skill_dest_path,
         is_skill=True,
     )
+    result.warnings.extend(parse_warnings)
+    return result

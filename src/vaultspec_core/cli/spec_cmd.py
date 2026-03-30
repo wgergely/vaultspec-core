@@ -25,13 +25,16 @@ spec_app = typer.Typer(
 
 
 def _handle_error(exc: Exception) -> None:
-    """Convert a domain exception to a CLI error exit."""
+    """Convert a domain or OS exception to a CLI error exit."""
     from vaultspec_core.core.exceptions import VaultSpecError
 
     if isinstance(exc, VaultSpecError):
         typer.echo(f"Error: {exc}", err=True)
         if exc.hint:
             typer.echo(f"  Hint: {exc.hint}", err=True)
+        raise typer.Exit(code=1) from exc
+    if isinstance(exc, OSError):
+        typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
     raise exc
 
@@ -103,7 +106,7 @@ def cmd_rules_show(
             name=name, base_dir=get_context().rules_src_dir, label="Rule"
         )
         typer.echo(content)
-    except VaultSpecError as exc:
+    except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
 
 
@@ -144,7 +147,7 @@ def cmd_rules_remove(
             force=force,
             confirm_fn=typer.confirm,
         )
-    except VaultSpecError as exc:
+    except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
 
 
@@ -167,7 +170,7 @@ def cmd_rules_rename(
             base_dir=get_context().rules_src_dir,
             label="Rule",
         )
-    except VaultSpecError as exc:
+    except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
 
 
@@ -291,7 +294,7 @@ def cmd_skills_show(
             name=name, base_dir=get_context().skills_src_dir, label="Skill", is_dir=True
         )
         typer.echo(content)
-    except VaultSpecError as exc:
+    except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
 
 
@@ -335,7 +338,7 @@ def cmd_skills_remove(
             is_dir=True,
             confirm_fn=typer.confirm,
         )
-    except VaultSpecError as exc:
+    except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
 
 
@@ -359,7 +362,7 @@ def cmd_skills_rename(
             label="Skill",
             is_dir=True,
         )
-    except VaultSpecError as exc:
+    except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
 
 
@@ -480,7 +483,7 @@ def cmd_agents_show(
             name=name, base_dir=get_context().agents_src_dir, label="Agent"
         )
         typer.echo(content)
-    except VaultSpecError as exc:
+    except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
 
 
@@ -521,7 +524,7 @@ def cmd_agents_remove(
             force=force,
             confirm_fn=typer.confirm,
         )
-    except VaultSpecError as exc:
+    except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
 
 
@@ -544,7 +547,7 @@ def cmd_agents_rename(
             base_dir=get_context().agents_src_dir,
             label="Agent",
         )
-    except VaultSpecError as exc:
+    except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
 
 

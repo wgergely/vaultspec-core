@@ -78,7 +78,8 @@ def collect_framework_presence(target: Path) -> FrameworkSignal:
 
     try:
         raw = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Cannot read manifest %s: %s", manifest_path, exc)
         return FrameworkSignal.CORRUPTED
 
     if "installed" not in raw:
@@ -151,7 +152,8 @@ def collect_provider_dir_state(target: Path, tool_value: str) -> ProviderDirSign
     # Check if directory is empty
     try:
         children = list(provider_dir.iterdir())
-    except OSError:
+    except OSError as exc:
+        logger.warning("Cannot read provider directory %s: %s", provider_dir, exc)
         return ProviderDirSignal.MISSING
 
     if not children:
@@ -259,7 +261,8 @@ def collect_config_state(target: Path, tool_value: str) -> ConfigSignal:
 
     try:
         content = config_file.read_text(encoding="utf-8")
-    except OSError:
+    except OSError as exc:
+        logger.warning("Cannot read config %s: %s", config_file, exc)
         return ConfigSignal.MISSING
 
     # Detect both legacy AUTO-GENERATED header and current <vaultspec> tags
@@ -285,7 +288,8 @@ def collect_mcp_config_state(target: Path) -> ConfigSignal:
 
     try:
         raw = json.loads(mcp_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Cannot read MCP config %s: %s", mcp_path, exc)
         return ConfigSignal.PARTIAL_MCP
 
     if not isinstance(raw, dict):
@@ -322,7 +326,8 @@ def collect_gitignore_state(target: Path) -> GitignoreSignal:
 
     try:
         content = gi_path.read_text(encoding="utf-8")
-    except OSError:
+    except OSError as exc:
+        logger.warning("Cannot read .gitignore %s: %s", gi_path, exc)
         return GitignoreSignal.NO_FILE
 
     lines = content.splitlines()

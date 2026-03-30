@@ -51,8 +51,12 @@ def snapshot_builtins(vaultspec_dir: Path) -> int:
     for builtin in rules_dir.rglob(f"*{_BUILTIN_SUFFIX}"):
         rel = builtin.relative_to(rules_dir)
         dest = snapshot_dir / rel
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(str(builtin), str(dest))
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(str(builtin), str(dest))
+        except OSError as exc:
+            logger.warning("Failed to snapshot %s: %s", rel, exc)
+            continue
         count += 1
         logger.debug("Snapshotted %s", rel)
 

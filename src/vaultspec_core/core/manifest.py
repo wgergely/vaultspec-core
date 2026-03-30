@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from .enums import Tool
+from .exceptions import VaultSpecError
 from .helpers import atomic_write
 
 logger = logging.getLogger(__name__)
@@ -51,18 +52,28 @@ def _manifest_path(target: Path) -> Path:
     return target / ".vaultspec" / MANIFEST_FILENAME
 
 
-def read_manifest_data(target: Path) -> ManifestData:
+def read_manifest_data(target: Path, *, strict: bool = False) -> ManifestData:
     """Read the full :class:`ManifestData` from ``.vaultspec/providers.json``.
 
     Handles v1.0 manifests transparently by using zero-values for fields
-    introduced in v2.0.  Never raises on missing or malformed files - returns
-    a default :class:`ManifestData` with an empty ``installed`` set instead.
+    introduced in v2.0.  Returns a default :class:`ManifestData` with an
+    empty ``installed`` set when the file is missing.
+
+    When *strict* is ``False`` (the default), corrupt or unreadable files
+    also return an empty :class:`ManifestData` for backward compatibility.
+    When *strict* is ``True``, corrupt data raises
+    :class:`~vaultspec_core.core.exceptions.VaultSpecError`.
 
     Args:
         target: Workspace root directory.
+        strict: Raise on corrupt manifest data instead of returning empty.
 
     Returns:
         Populated :class:`ManifestData` instance.
+
+    Raises:
+        VaultSpecError: If *strict* is ``True`` and the manifest exists but
+            contains invalid JSON or is unreadable.
     """
     path = _manifest_path(target)
     if not path.exists():
@@ -70,12 +81,22 @@ def read_manifest_data(target: Path) -> ManifestData:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as e:
+        if strict:
+            raise VaultSpecError(
+                f"Corrupt provider manifest at {path}: {e}",
+                hint="Delete the file and re-run install, or use 'sync --force'.",
+            ) from e
         logger.warning("Failed to read provider manifest: %s", e)
         return ManifestData()
 
     try:
         serial = int(raw.get("serial", 0))
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as e:
+        if strict:
+            raise VaultSpecError(
+                f"Malformed serial in manifest at {path}",
+                hint="Delete the file and re-run install, or use 'sync --force'.",
+            ) from e
         logger.warning("Malformed serial in manifest, defaulting to 0")
         serial = 0
 
@@ -240,7 +261,11 @@ def providers_sharing_dir(
         if cfg is None:
             continue
         for d in (cfg.rules_dir, cfg.skills_dir, cfg.agents_dir):
-            if d is not None and (d == directory or _is_parent(directory, d)):
+            if (
+                d is not None
+                and d.exists()
+                and (d == directory or _is_parent(directory, d))
+            ):
                 sharing.add(tool.value)
                 break
     return sharing

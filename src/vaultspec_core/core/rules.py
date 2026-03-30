@@ -24,17 +24,23 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def collect_rules() -> dict[str, tuple[Path, dict[str, Any], str]]:
+def collect_rules(
+    warnings: list[str] | None = None,
+) -> dict[str, tuple[Path, dict[str, Any], str]]:
     """Collect rule definitions from .vaultspec/rules/rules/.
 
     Includes both built-in rules (``*.builtin.md``) and custom user rules
     (``*.md``).
 
+    Args:
+        warnings: Optional list to append parse-error messages to, so callers
+            can propagate them into :class:`~vaultspec_core.core.types.SyncResult`.
+
     Returns:
         A mapping of filename to a three-tuple of
         ``(source_path, frontmatter_dict, body_text)``.
     """
-    return collect_md_resources(_t.get_context().rules_src_dir)
+    return collect_md_resources(_t.get_context().rules_src_dir, warnings=warnings)
 
 
 def transform_rule(tool: Tool, name: str, _meta: dict[str, Any], body: str) -> str:
@@ -150,11 +156,14 @@ def rules_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
         Accumulated :class:`~vaultspec_core.core.types.SyncResult` across
         all active tool destinations.
     """
-    return sync_to_all_tools(
-        sources=collect_rules(),
+    parse_warnings: list[str] = []
+    result = sync_to_all_tools(
+        sources=collect_rules(warnings=parse_warnings),
         dir_attr="rules_dir",
         transform_fn=transform_rule,
         label="Rules",
         prune=prune,
         dry_run=dry_run,
     )
+    result.warnings.extend(parse_warnings)
+    return result

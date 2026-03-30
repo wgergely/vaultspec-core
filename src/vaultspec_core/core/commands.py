@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import contextvars
 import logging
+import shutil
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -368,22 +369,25 @@ def _ensure_tool_configs(path: Path) -> None:
     # Resolve workspace against the temp dir, then re-initialize with the
     # real target so tool_config paths reference the actual workspace.
     tmp = Path(tempfile.mkdtemp())
-    tmp_fw = tmp / ".vaultspec"
-    tmp_fw.mkdir(parents=True, exist_ok=True)
+    try:
+        tmp_fw = tmp / ".vaultspec"
+        tmp_fw.mkdir(parents=True, exist_ok=True)
 
-    reset_config()
-    layout = resolve_workspace(target_override=tmp)
-    # Replace the temp target with the real path so tool_configs point correctly
-    from vaultspec_core.config.workspace import WorkspaceLayout
+        reset_config()
+        layout = resolve_workspace(target_override=tmp)
+        # Replace the temp target with the real path so tool_configs point correctly
+        from vaultspec_core.config.workspace import WorkspaceLayout
 
-    real_layout = WorkspaceLayout(
-        target_dir=path,
-        vault_dir=path / ".vault",
-        vaultspec_dir=path / ".vaultspec",
-        mode=layout.mode,
-        git=layout.git,
-    )
-    init_paths(real_layout)
+        real_layout = WorkspaceLayout(
+            target_dir=path,
+            vault_dir=path / ".vault",
+            vaultspec_dir=path / ".vaultspec",
+            mode=layout.mode,
+            git=layout.git,
+        )
+        init_paths(real_layout)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def install_run(
@@ -548,8 +552,14 @@ def install_run(
     layout = resolve_workspace(target_override=path)
     init_paths(layout)
 
+    post_errors: list[str] = []
+
     sync_target = provider if provider not in ("all", "core") else "all"
-    sync_provider(sync_target, skip=skip)
+    try:
+        sync_provider(sync_target, skip=skip)
+    except (VaultSpecError, OSError) as exc:
+        logger.warning("Sync failed during install: %s", exc)
+        post_errors.append(f"sync: {exc}")
 
     # Count actual source resources (what the user authored)
     from .agents import collect_agents
@@ -578,7 +588,7 @@ def install_run(
     import datetime
 
     gi_path = path / ".gitignore"
-    mdata = read_manifest_data(path)
+    mdata = read_manifest_data(path, strict=True)
     mdata.gitignore_managed = gi_written or (
         gi_path.exists() and MARKER_BEGIN in gi_path.read_text(encoding="utf-8")
     )
@@ -589,7 +599,7 @@ def install_run(
         mdata.provider_state[name]["installed_at"] = mdata.installed_at
     write_manifest_data(path, mdata)
 
-    return {
+    result: dict[str, Any] = {
         "action": "install",
         "items": created,
         "source_counts": source_counts,
@@ -597,6 +607,9 @@ def install_run(
         "has_mcp": has_mcp,
         "path": path,
     }
+    if post_errors:
+        result["errors"] = post_errors
+    return result
 
 
 def _collect_provider_artifacts(

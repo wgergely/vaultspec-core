@@ -49,16 +49,22 @@ def _sync_supporting_files(
         rel = src_file.relative_to(src_dir)
         dest_file = dest_dir / rel
 
+        try:
+            src_data = src_file.read_bytes()
+        except FileNotFoundError:
+            logger.debug("Source file vanished during sync: %s", src_file)
+            continue
+
         if dest_file.exists():
             try:
-                if dest_file.read_bytes() == src_file.read_bytes():
+                if dest_file.read_bytes() == src_data:
                     continue
             except OSError:
                 logger.debug("Could not compare %s, will overwrite", dest_file)
 
         if not dry_run:
             ensure_dir(dest_file.parent)
-            dest_file.write_bytes(src_file.read_bytes())
+            dest_file.write_bytes(src_data)
 
 
 def sync_files(

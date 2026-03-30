@@ -29,14 +29,20 @@ from .types import SyncResult
 logger = logging.getLogger(__name__)
 
 
-def collect_agents() -> dict[str, tuple[Path, dict[str, Any], str]]:
+def collect_agents(
+    warnings: list[str] | None = None,
+) -> dict[str, tuple[Path, dict[str, Any], str]]:
     """Collect agent definitions from .vaultspec/rules/agents/.
+
+    Args:
+        warnings: Optional list to append parse-error messages to, so callers
+            can propagate them into :class:`~vaultspec_core.core.types.SyncResult`.
 
     Returns:
         A mapping of filename to a three-tuple of
         ``(source_path, frontmatter_dict, body_text)``.
     """
-    return collect_md_resources(_t.get_context().agents_src_dir)
+    return collect_md_resources(_t.get_context().agents_src_dir, warnings=warnings)
 
 
 def transform_agent(_tool: Tool, _name: str, meta: dict[str, Any], body: str) -> str:
@@ -275,7 +281,8 @@ def agents_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
         Accumulated :class:`~vaultspec_core.core.types.SyncResult` across
         all active tool destinations.
     """
-    sources = collect_agents()
+    parse_warnings: list[str] = []
+    sources = collect_agents(warnings=parse_warnings)
     total = SyncResult()
 
     def _merge(result: SyncResult) -> None:
@@ -309,4 +316,5 @@ def agents_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
     if Tool.CODEX in active_configs:
         codex_result = _sync_codex_agents(sources, prune=prune, dry_run=dry_run)
         _merge(codex_result)
+    total.warnings.extend(parse_warnings)
     return total

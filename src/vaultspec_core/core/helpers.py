@@ -92,9 +92,15 @@ def build_file(frontmatter: dict[str, Any], body: str) -> str:
 def ensure_dir(path: Path) -> None:
     """Create *path* and all intermediate parents if they do not already exist.
 
+    Refuses to create directories inside symlink targets to prevent
+    accidental writes through symbolic links.
+
     Args:
         path: Directory path to create.
     """
+    if path.exists() and path.is_symlink():
+        logger.warning("Refusing to create directory inside symlink target: %s", path)
+        return
     path.mkdir(parents=True, exist_ok=True)
 
 
@@ -133,7 +139,7 @@ def atomic_write(path: Path, content: str) -> None:
         path: Destination file path to write.
         content: Text content to write, encoded as UTF-8.
     """
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp = path.with_suffix(path.suffix + f".{os.getpid()}.tmp")
     try:
         tmp.write_text(content, encoding="utf-8")
         try:
@@ -147,8 +153,10 @@ def atomic_write(path: Path, content: str) -> None:
                 path,
                 exc,
             )
-            shutil.copyfile(tmp, path)
-            tmp.unlink(missing_ok=True)
+            try:
+                shutil.copyfile(tmp, path)
+            finally:
+                tmp.unlink(missing_ok=True)
     except Exception as exc:
         logger.error("atomic_write failed for %s: %s", path, exc)
         raise
@@ -171,14 +179,19 @@ def _launch_editor(editor: str, file_path: str) -> None:
         logger.warning("Editor exited with code %d", result.returncode)
 
 
-def collect_md_resources(src_dir: Path) -> dict[str, tuple[Path, dict[str, Any], str]]:
+def collect_md_resources(
+    src_dir: Path,
+    warnings: list[str] | None = None,
+) -> dict[str, tuple[Path, dict[str, Any], str]]:
     """Collect all ``*.md`` resource definitions from *src_dir*.
 
     Reads and parses frontmatter from every Markdown file found directly in
-    *src_dir*, returning a mapping of filename → (path, metadata, body).
+    *src_dir*, returning a mapping of filename -> (path, metadata, body).
 
     Args:
         src_dir: Directory to scan for ``*.md`` files.
+        warnings: Optional list to append parse-error messages to, so callers
+            can propagate them into :class:`~vaultspec_core.core.types.SyncResult`.
 
     Returns:
         Ordered mapping of filename to ``(source_path, frontmatter_dict, body_text)``
@@ -196,6 +209,8 @@ def collect_md_resources(src_dir: Path) -> dict[str, tuple[Path, dict[str, Any],
             sources[f.name] = (f, meta, body)
         except Exception as e:
             logger.error("Failed to read/parse %s: %s", f, e)
+            if warnings is not None:
+                warnings.append(f"Failed to read/parse {f}: {e}")
     return sources
 
 
