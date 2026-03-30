@@ -533,6 +533,7 @@ def cmd_check_body_links(
     _render_and_exit(result, verbose)
 
 
+
 @check_app.command("dangling")
 def cmd_check_dangling(
     fix: Annotated[
