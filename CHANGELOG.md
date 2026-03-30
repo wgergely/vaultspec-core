@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.1.5](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.4...vaultspec-core-v0.1.5) (2026-03-30)
+
+
+### Features
+
+* add --skip mcp flag and MCP repair to sync/upgrade ([31ea1ad](https://github.com/wgergely/vaultspec-core/commit/31ea1ad0edf24a911b641202edd1b0d0f3bc7416)), closes [#17](https://github.com/wgergely/vaultspec-core/issues/17)
+* add check_dangling checker for unresolved wiki-links ([eac965d](https://github.com/wgergely/vaultspec-core/commit/eac965d537b97c1b4ff6d10382b4ef2bb7d61717))
+* add phantom nodes to vault graph for unresolved wiki-links ([4450b52](https://github.com/wgergely/vaultspec-core/commit/4450b5244d3017d3bf50c31095787a805b785cb6))
+* add research, ADRs, and plan for CLI ambiguous states ([#16](https://github.com/wgergely/vaultspec-core/issues/16)) ([d2f4c3c](https://github.com/wgergely/vaultspec-core/commit/d2f4c3c3957a86fba2a998a3eeb5ce36ea45e099))
+* add resolver engine and doctor command (phase 3) ([3549f96](https://github.com/wgergely/vaultspec-core/commit/3549f96ef63bb5dbd71a6b699b03423ab6cdbbcc))
+* add signal enums, manifest v2.0, and gitignore module (phase 1) ([e7335b3](https://github.com/wgergely/vaultspec-core/commit/e7335b3aa10ccd33e4a53b3bbbcf85d5addbbb13))
+* add WorkspaceFactory test condition generator engine ([7ec1a9e](https://github.com/wgergely/vaultspec-core/commit/7ec1a9e5a2afb6b2579260687f45ccece855bf60))
+* CLI ambiguous state detection and resolution engine ([#16](https://github.com/wgergely/vaultspec-core/issues/16)) ([fcce2fa](https://github.com/wgergely/vaultspec-core/commit/fcce2fa11eeec1a272e352a38b0a25ab8f8439fe))
+* implement resolver executor - preflight now executes repair steps ([9337ea5](https://github.com/wgergely/vaultspec-core/commit/9337ea5cdf20c1fc86dcb86ae3788647bbee2ed6))
+* implement signal collectors and diagnose orchestrator (phase 2) ([7345fce](https://github.com/wgergely/vaultspec-core/commit/7345fcef5f2a1fd828c375e493ae4f3db4e9bb39))
+* MCP .mcp.json installation controllable via CLI ([1671912](https://github.com/wgergely/vaultspec-core/commit/1671912a0808c1a3e77819a0b5c1ecc2e4257c47))
+* phantom nodes, dangling-link checker, graph hardening ([#19](https://github.com/wgergely/vaultspec-core/issues/19)) ([6e42663](https://github.com/wgergely/vaultspec-core/commit/6e426630abcf59db7441f893a253dc9816b772fc))
+* wire gitignore, manifest v2.0, and integration tests (phase 4) ([4529145](https://github.com/wgergely/vaultspec-core/commit/452914577a6f19ead90aa77d3feb656a5b41ab4b))
+* wire resolver pre-flight into install/sync/uninstall commands ([a5edfe7](https://github.com/wgergely/vaultspec-core/commit/a5edfe72add398e02e09e93f94b3c3d4e542934d))
+
+
+### Bug Fixes
+
+* address code review findings for phase 1 ([6ae7e8f](https://github.com/wgergely/vaultspec-core/commit/6ae7e8fdd6503497f1b42d7d2e111b21f443f03f))
+* address critical and high audit findings ([bb560b1](https://github.com/wgergely/vaultspec-core/commit/bb560b11de65407f39325b0c4c2a4fc82adc0c02))
+* address medium audit findings and fill test gaps ([105ea84](https://github.com/wgergely/vaultspec-core/commit/105ea843af3edcae671e365361a5330a83456ea5))
+* address phase 3 code review findings ([cb13236](https://github.com/wgergely/vaultspec-core/commit/cb132366a25832c915d66a89d7df6e02bfd0aaba))
+* Phase A data safety - rmtree_robust, mcp.json surgical, uninstall ordering ([f78c666](https://github.com/wgergely/vaultspec-core/commit/f78c66687c662681cf768b5016223d6a24837a57))
+* Phase B error visibility - SyncResult.errors display, OSError catches ([1190d51](https://github.com/wgergely/vaultspec-core/commit/1190d518577361980194dde10f36268c7b5ce736))
+* Phase C flag/logic - upgrade+dry-run precedence, skip core guard, sync isolation ([76d7339](https://github.com/wgergely/vaultspec-core/commit/76d73390e2de00f7de0938b1006ef6a59e827952))
+* remove all mock/patch usage, skips, and suppression comments ([39714a2](https://github.com/wgergely/vaultspec-core/commit/39714a27fec20ef727862604762120983c4e3701))
+* replace pytest.skip with assert in graph collision test ([844a17d](https://github.com/wgergely/vaultspec-core/commit/844a17d672af1f501a7a06e95ad14ad9208c730d))
+* resolve all dangling wiki-links and enable pre-commit hook ([406e6c5](https://github.com/wgergely/vaultspec-core/commit/406e6c568adaba6b82a9e73a8780ae6c622dc4b0))
+* scaffold chicken-and-egg bug, harden dev-repo guard, remove dead tests ([7d6468e](https://github.com/wgergely/vaultspec-core/commit/7d6468e7b46d894a21bd9f7056c0b104709f646c))
+* scaffold chicken-and-egg bug, harden dev-repo guard, remove dead tests ([#19](https://github.com/wgergely/vaultspec-core/issues/19)) ([68b882a](https://github.com/wgergely/vaultspec-core/commit/68b882a3e51a5bdd8e33eca00396ec01ce797c2c))
+
 ## [0.1.4](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.3...vaultspec-core-v0.1.4) (2026-03-23)
 
 
