@@ -74,6 +74,13 @@ def guard_dev_repo(target: Path) -> None:
     """
     override = os.environ.get(_ENV_OVERRIDE, "").strip().lower()
     if override in ("1", "true", "yes"):
+        resolved = target.resolve()
+        if _cached_is_dev_repo(str(resolved)):
+            logger.warning(
+                "Dev-repo guard bypassed via %s for '%s'",
+                _ENV_OVERRIDE,
+                resolved,
+            )
         return
 
     resolved = target.resolve()

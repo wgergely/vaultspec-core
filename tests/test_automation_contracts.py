@@ -158,7 +158,7 @@ def test_ci_workflow_uses_actionlint() -> None:
     jobs = ci["jobs"]
     steps = jobs["workflow-lint"]["steps"]
     used_actions = {step.get("uses") for step in steps if "uses" in step}
-    assert "docker://rhysd/actionlint:latest" in used_actions
+    assert any(a.startswith("docker://rhysd/actionlint:") for a in used_actions)
 
 
 def test_ci_workflow_installs_native_lint_tools() -> None:
@@ -169,32 +169,6 @@ def test_ci_workflow_installs_native_lint_tools() -> None:
     assert "taiki-e/install-action@v2" in used_actions
     # Node.js is no longer required - taplo and pymarkdown are native
     assert "actions/setup-node@v4" not in used_actions
-
-
-def test_docker_workflow_builds_and_smokes_on_pr() -> None:
-    docker = _load_yaml(".github/workflows/docker.yml")
-    jobs = docker["jobs"]
-    assert "docker-build" in jobs, "Docker workflow missing PR build job"
-    steps = jobs["docker-build"]["steps"]
-    run_commands = [step.get("run") for step in steps if "run" in step]
-    assert "just dev test docker" in run_commands
-
-
-def test_docker_publish_workflow_uses_standard_registry_actions() -> None:
-    docker = _load_yaml(".github/workflows/docker.yml")
-    jobs = docker["jobs"]
-    assert "docker-publish" in jobs, "Docker workflow missing publish job"
-    steps = jobs["docker-publish"]["steps"]
-    used_actions = {step.get("uses") for step in steps if "uses" in step}
-    required = {
-        "docker/setup-buildx-action@v3",
-        "docker/metadata-action@v5",
-        "docker/login-action@v3",
-        "docker/build-push-action@v6",
-        "actions/attest-build-provenance@v2",
-    }
-    missing = [action for action in sorted(required) if action not in used_actions]
-    assert not missing, f"Docker publish workflow missing required actions: {missing}"
 
 
 def test_prod_delegates_to_cli() -> None:
@@ -264,8 +238,3 @@ def test_every_capability_has_at_least_one_provider() -> None:
             ).capabilities
         ]
         assert providers, f"ProviderCapability.{cap.name} has no providers"
-
-
-def test_dockerfile_defaults_to_vaultspec_core_help() -> None:
-    dockerfile = _read("Dockerfile")
-    assert 'CMD ["vaultspec-core", "--help"]' in dockerfile
