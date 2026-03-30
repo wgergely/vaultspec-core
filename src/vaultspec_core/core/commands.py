@@ -1087,19 +1087,21 @@ def sync_provider(
             if "mcp" not in skip:
                 _scaffold_mcp_json(ctx.target_dir)
 
-            # Respect gitignore opt-out
+            # Respect gitignore opt-out: check whether the user removed
+            # the managed block BEFORE re-creating it.  If the block is
+            # gone but the manifest still says managed=True, the user
+            # opted out -- honour that by flipping the flag.
             mdata = read_manifest_data(ctx.target_dir)
             if mdata.gitignore_managed:
-                ensure_gitignore_block(ctx.target_dir, DEFAULT_ENTRIES)
-                # Re-check: if markers are absent after ensure, user removed
-                # the block - respect the opt-out.
                 gi_path = ctx.target_dir / ".gitignore"
-                if gi_path.exists():
-                    content = gi_path.read_text(encoding="utf-8")
-                    if MARKER_BEGIN not in content:
-                        mdata = read_manifest_data(ctx.target_dir)
-                        mdata.gitignore_managed = False
-                        write_manifest_data(ctx.target_dir, mdata)
+                block_present = gi_path.exists() and MARKER_BEGIN in gi_path.read_text(
+                    encoding="utf-8"
+                )
+                if block_present:
+                    ensure_gitignore_block(ctx.target_dir, DEFAULT_ENTRIES)
+                else:
+                    mdata.gitignore_managed = False
+                    write_manifest_data(ctx.target_dir, mdata)
 
             # Update last_synced timestamps for installed providers only
             now = datetime.datetime.now(tz=datetime.UTC).isoformat()
