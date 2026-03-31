@@ -295,9 +295,26 @@ def cmd_list(
     apply_target(target)
     from vaultspec_core.console import get_console
     from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.models import DocType
     from vaultspec_core.vaultcore.query import list_documents
 
     console = get_console()
+
+    # Validate doc_type and give helpful suggestions
+    valid_types = {dt.value for dt in DocType} | {"orphaned", "invalid"}
+    if doc_type and doc_type not in valid_types:
+        if doc_type in ("features", "feature"):
+            console.print(
+                f"[yellow]'{doc_type}' is not a document type. "
+                f"Use [bold]vault feature list[/bold] to list features.[/yellow]"
+            )
+            raise typer.Exit(code=1)
+        console.print(
+            f"[red]Unknown document type '{doc_type}'.[/red]\n"
+            f"  Valid types: {', '.join(sorted(valid_types))}"
+        )
+        raise typer.Exit(code=1)
+
     try:
         docs = list_documents(
             _get_ctx().target_dir, doc_type=doc_type, feature=feature, date=date
