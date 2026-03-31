@@ -51,7 +51,10 @@ spec_app.add_typer(rules_app, name="rules")
 
 
 @rules_app.command("list")
-def cmd_rules_list(target: TargetOption = None) -> None:
+def cmd_rules_list(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
     """List all available rules."""
     apply_target(target)
     from rich import box
@@ -60,11 +63,19 @@ def cmd_rules_list(target: TargetOption = None) -> None:
     from vaultspec_core.console import get_console
     from vaultspec_core.core import rules_list
 
+    items = rules_list()
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps(items, indent=2, default=str))
+        raise typer.Exit(0)
+
     table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
     table.add_column("Name", no_wrap=True)
     table.add_column("Source")
 
-    for item in rules_list():
+    for item in items:
         table.add_row(item["name"], item["source"])
 
     get_console().print(table)
@@ -77,6 +88,7 @@ def cmd_rules_add(
         str | None, typer.Option("--content", help="Rule content")
     ] = None,
     force: Annotated[bool, typer.Option("--force", help="Overwrite existing")] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Add a new custom rule."""
@@ -85,14 +97,22 @@ def cmd_rules_add(
     from vaultspec_core.core.exceptions import VaultSpecError
 
     try:
-        rules_add(name=name, content=content, force=force)
+        file_path = rules_add(name=name, content=content, force=force)
     except VaultSpecError as exc:
         _handle_error(exc)
+        return
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps({"path": str(file_path)}, indent=2))
+        raise typer.Exit(0)
 
 
 @rules_app.command("show")
 def cmd_rules_show(
     name: Annotated[str, typer.Argument(help="Rule name")],
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Display a rule's content."""
@@ -105,6 +125,11 @@ def cmd_rules_show(
         content = resource_show(
             name=name, base_dir=get_context().rules_src_dir, label="Rule"
         )
+        if json_output:
+            import json
+
+            typer.echo(json.dumps({"name": name, "content": content}, indent=2))
+            raise typer.Exit(0)
         typer.echo(content)
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
@@ -131,6 +156,7 @@ def cmd_rules_edit(
 def cmd_rules_remove(
     name: Annotated[str, typer.Argument(help="Rule name")],
     force: Annotated[bool, typer.Option("--force", help="Skip confirmation")] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Delete a rule."""
@@ -149,12 +175,20 @@ def cmd_rules_remove(
         )
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
+        return
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps({"removed": name}, indent=2))
+        raise typer.Exit(0)
 
 
 @rules_app.command("rename")
 def cmd_rules_rename(
     old_name: Annotated[str, typer.Argument(help="Current rule name")],
     new_name: Annotated[str, typer.Argument(help="New rule name")],
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Rename an existing rule."""
@@ -164,7 +198,7 @@ def cmd_rules_rename(
     from vaultspec_core.core.types import get_context
 
     try:
-        resource_rename(
+        new_path = resource_rename(
             old_name=old_name,
             new_name=new_name,
             base_dir=get_context().rules_src_dir,
@@ -172,6 +206,18 @@ def cmd_rules_rename(
         )
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
+        return
+
+    if json_output:
+        import json
+
+        typer.echo(
+            json.dumps(
+                {"old_name": old_name, "new_name": new_name, "path": str(new_path)},
+                indent=2,
+            )
+        )
+        raise typer.Exit(0)
 
 
 @rules_app.command("sync")
@@ -181,6 +227,7 @@ def cmd_rules_sync(
         bool,
         typer.Option("--force", help="Prune stale files and overwrite user content"),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Sync rules to tool destinations."""
@@ -190,6 +237,14 @@ def cmd_rules_sync(
     from vaultspec_core.core.sync import format_summary
 
     result = rules_sync(prune=force, dry_run=dry_run)
+
+    if json_output:
+        import dataclasses
+        import json
+
+        typer.echo(json.dumps(dataclasses.asdict(result), indent=2, default=str))
+        raise typer.Exit(0)
+
     console = get_console()
     console.print(f"  [bold]{format_summary('Rules', result)}[/bold]")
     for warning in result.warnings:
@@ -199,6 +254,7 @@ def cmd_rules_sync(
 @rules_app.command("revert")
 def cmd_rules_revert(
     filename: Annotated[str, typer.Argument(help="Rule filename to revert")],
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Revert a rule to its snapshotted original."""
@@ -211,6 +267,11 @@ def cmd_rules_revert(
         filename = f"{filename}.md"
     result = revert_resource(vaultspec_dir, "rules", filename)
     if result.get("reverted"):
+        if json_output:
+            import json
+
+            typer.echo(json.dumps({"reverted": filename}, indent=2))
+            raise typer.Exit(0)
         typer.echo(f"Reverted rule: {filename}")
     else:
         msg = result.get("reason", f"No snapshot found for rule: {filename}")
@@ -230,7 +291,10 @@ spec_app.add_typer(skills_app, name="skills")
 
 
 @skills_app.command("list")
-def cmd_skills_list(target: TargetOption = None) -> None:
+def cmd_skills_list(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
     """List all available skills."""
     apply_target(target)
     from rich import box
@@ -240,6 +304,13 @@ def cmd_skills_list(target: TargetOption = None) -> None:
     from vaultspec_core.core import skills_list
 
     items = skills_list()
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps(items, indent=2, default=str))
+        raise typer.Exit(0)
+
     console = get_console()
     if not items:
         console.print("No managed skills found.")
@@ -265,6 +336,7 @@ def cmd_skills_add(
     template: Annotated[
         str | None, typer.Option("--template", help="Template to use")
     ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Add a new skill."""
@@ -273,14 +345,24 @@ def cmd_skills_add(
     from vaultspec_core.core.exceptions import VaultSpecError
 
     try:
-        skills_add(name=name, description=description, force=force, template=template)
+        file_path = skills_add(
+            name=name, description=description, force=force, template=template
+        )
     except VaultSpecError as exc:
         _handle_error(exc)
+        return
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps({"path": str(file_path)}, indent=2))
+        raise typer.Exit(0)
 
 
 @skills_app.command("show")
 def cmd_skills_show(
     name: Annotated[str, typer.Argument(help="Skill name")],
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Display a skill's content."""
@@ -293,6 +375,11 @@ def cmd_skills_show(
         content = resource_show(
             name=name, base_dir=get_context().skills_src_dir, label="Skill", is_dir=True
         )
+        if json_output:
+            import json
+
+            typer.echo(json.dumps({"name": name, "content": content}, indent=2))
+            raise typer.Exit(0)
         typer.echo(content)
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
@@ -321,6 +408,7 @@ def cmd_skills_edit(
 def cmd_skills_remove(
     name: Annotated[str, typer.Argument(help="Skill name")],
     force: Annotated[bool, typer.Option("--force", help="Skip confirmation")] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Delete a skill."""
@@ -340,12 +428,20 @@ def cmd_skills_remove(
         )
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
+        return
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps({"removed": name}, indent=2))
+        raise typer.Exit(0)
 
 
 @skills_app.command("rename")
 def cmd_skills_rename(
     old_name: Annotated[str, typer.Argument(help="Current skill name")],
     new_name: Annotated[str, typer.Argument(help="New skill name")],
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Rename an existing skill."""
@@ -355,7 +451,7 @@ def cmd_skills_rename(
     from vaultspec_core.core.types import get_context
 
     try:
-        resource_rename(
+        new_path = resource_rename(
             old_name=old_name,
             new_name=new_name,
             base_dir=get_context().skills_src_dir,
@@ -364,6 +460,18 @@ def cmd_skills_rename(
         )
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
+        return
+
+    if json_output:
+        import json
+
+        typer.echo(
+            json.dumps(
+                {"old_name": old_name, "new_name": new_name, "path": str(new_path)},
+                indent=2,
+            )
+        )
+        raise typer.Exit(0)
 
 
 @skills_app.command("sync")
@@ -373,6 +481,7 @@ def cmd_skills_sync(
         bool,
         typer.Option("--force", help="Prune stale files and overwrite user content"),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Sync skills to tool destinations."""
@@ -382,6 +491,14 @@ def cmd_skills_sync(
     from vaultspec_core.core.sync import format_summary
 
     result = skills_sync(prune=force, dry_run=dry_run)
+
+    if json_output:
+        import dataclasses
+        import json
+
+        typer.echo(json.dumps(dataclasses.asdict(result), indent=2, default=str))
+        raise typer.Exit(0)
+
     console = get_console()
     console.print(f"  [bold]{format_summary('Skills', result)}[/bold]")
     for warning in result.warnings:
@@ -391,6 +508,7 @@ def cmd_skills_sync(
 @skills_app.command("revert")
 def cmd_skills_revert(
     filename: Annotated[str, typer.Argument(help="Skill filename to revert")],
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Revert a skill to its snapshotted original."""
@@ -403,6 +521,11 @@ def cmd_skills_revert(
         filename = f"{filename}.md"
     result = revert_resource(vaultspec_dir, "skills", filename)
     if result.get("reverted"):
+        if json_output:
+            import json
+
+            typer.echo(json.dumps({"reverted": filename}, indent=2))
+            raise typer.Exit(0)
         typer.echo(f"Reverted skill: {filename}")
     else:
         msg = result.get("reason", f"No snapshot found for skill: {filename}")
@@ -422,7 +545,10 @@ spec_app.add_typer(agents_app, name="agents")
 
 
 @agents_app.command("list")
-def cmd_agents_list(target: TargetOption = None) -> None:
+def cmd_agents_list(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
     """List all available agents."""
     apply_target(target)
     from rich import box
@@ -432,6 +558,13 @@ def cmd_agents_list(target: TargetOption = None) -> None:
     from vaultspec_core.core import agents_list
 
     items = agents_list()
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps(items, indent=2, default=str))
+        raise typer.Exit(0)
+
     console = get_console()
     if not items:
         console.print("No managed agents found.")
@@ -454,6 +587,7 @@ def cmd_agents_add(
         str, typer.Option("--description", help="Agent description")
     ] = "",
     force: Annotated[bool, typer.Option("--force", help="Overwrite existing")] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Add a new agent definition."""
@@ -462,14 +596,22 @@ def cmd_agents_add(
     from vaultspec_core.core.exceptions import VaultSpecError
 
     try:
-        agents_add(name=name, description=description, force=force)
+        file_path = agents_add(name=name, description=description, force=force)
     except VaultSpecError as exc:
         _handle_error(exc)
+        return
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps({"path": str(file_path)}, indent=2))
+        raise typer.Exit(0)
 
 
 @agents_app.command("show")
 def cmd_agents_show(
     name: Annotated[str, typer.Argument(help="Agent name")],
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Display an agent's content."""
@@ -482,6 +624,11 @@ def cmd_agents_show(
         content = resource_show(
             name=name, base_dir=get_context().agents_src_dir, label="Agent"
         )
+        if json_output:
+            import json
+
+            typer.echo(json.dumps({"name": name, "content": content}, indent=2))
+            raise typer.Exit(0)
         typer.echo(content)
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
@@ -508,6 +655,7 @@ def cmd_agents_edit(
 def cmd_agents_remove(
     name: Annotated[str, typer.Argument(help="Agent name")],
     force: Annotated[bool, typer.Option("--force", help="Skip confirmation")] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Delete an agent definition."""
@@ -526,12 +674,20 @@ def cmd_agents_remove(
         )
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
+        return
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps({"removed": name}, indent=2))
+        raise typer.Exit(0)
 
 
 @agents_app.command("rename")
 def cmd_agents_rename(
     old_name: Annotated[str, typer.Argument(help="Current agent name")],
     new_name: Annotated[str, typer.Argument(help="New agent name")],
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Rename an existing agent definition."""
@@ -541,7 +697,7 @@ def cmd_agents_rename(
     from vaultspec_core.core.types import get_context
 
     try:
-        resource_rename(
+        new_path = resource_rename(
             old_name=old_name,
             new_name=new_name,
             base_dir=get_context().agents_src_dir,
@@ -549,6 +705,18 @@ def cmd_agents_rename(
         )
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc)
+        return
+
+    if json_output:
+        import json
+
+        typer.echo(
+            json.dumps(
+                {"old_name": old_name, "new_name": new_name, "path": str(new_path)},
+                indent=2,
+            )
+        )
+        raise typer.Exit(0)
 
 
 @agents_app.command("sync")
@@ -558,6 +726,7 @@ def cmd_agents_sync(
         bool,
         typer.Option("--force", help="Prune stale files and overwrite user content"),
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Sync agents to tool destinations."""
@@ -567,6 +736,14 @@ def cmd_agents_sync(
     from vaultspec_core.core.sync import format_summary
 
     result = agents_sync(prune=force, dry_run=dry_run)
+
+    if json_output:
+        import dataclasses
+        import json
+
+        typer.echo(json.dumps(dataclasses.asdict(result), indent=2, default=str))
+        raise typer.Exit(0)
+
     console = get_console()
     console.print(f"  [bold]{format_summary('Agents', result)}[/bold]")
     for warning in result.warnings:
@@ -576,6 +753,7 @@ def cmd_agents_sync(
 @agents_app.command("revert")
 def cmd_agents_revert(
     filename: Annotated[str, typer.Argument(help="Agent filename to revert")],
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Revert an agent to its snapshotted original."""
@@ -588,6 +766,11 @@ def cmd_agents_revert(
         filename = f"{filename}.md"
     result = revert_resource(vaultspec_dir, "agents", filename)
     if result.get("reverted"):
+        if json_output:
+            import json
+
+            typer.echo(json.dumps({"reverted": filename}, indent=2))
+            raise typer.Exit(0)
         typer.echo(f"Reverted agent: {filename}")
     else:
         msg = result.get("reason", f"No snapshot found for agent: {filename}")
@@ -607,7 +790,10 @@ spec_app.add_typer(system_app, name="system")
 
 
 @system_app.command("show")
-def cmd_system_show(target: TargetOption = None) -> None:
+def cmd_system_show(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
     """Display system prompt parts and targets."""
     apply_target(target)
     from rich import box
@@ -616,8 +802,15 @@ def cmd_system_show(target: TargetOption = None) -> None:
     from vaultspec_core.console import get_console
     from vaultspec_core.core import system_show
 
-    console = get_console()
     data = system_show()
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps(data, indent=2, default=str))
+        raise typer.Exit(0)
+
+    console = get_console()
 
     if not data["parts"]:
         console.print("[dim]No system parts found in .vaultspec/rules/system/[/dim]")
@@ -655,6 +848,7 @@ def cmd_system_sync(
     force: Annotated[
         bool, typer.Option("--force", help="Overwrite non-managed files")
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Sync system prompts to tool destinations."""
@@ -664,6 +858,14 @@ def cmd_system_sync(
     from vaultspec_core.core.sync import format_summary
 
     result = system_sync(dry_run=dry_run, force=force)
+
+    if json_output:
+        import dataclasses
+        import json
+
+        typer.echo(json.dumps(dataclasses.asdict(result), indent=2, default=str))
+        raise typer.Exit(0)
+
     get_console().print(f"  [bold]{format_summary('System', result)}[/bold]")
 
 
@@ -679,7 +881,10 @@ spec_app.add_typer(hooks_app, name="hooks")
 
 
 @hooks_app.command("list")
-def cmd_hooks_list(target: TargetOption = None) -> None:
+def cmd_hooks_list(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
     """List all defined hooks."""
     apply_target(target)
     from rich import box
@@ -688,8 +893,15 @@ def cmd_hooks_list(target: TargetOption = None) -> None:
     from vaultspec_core.console import get_console
     from vaultspec_core.core.commands import hooks_list_data
 
-    console = get_console()
     data = hooks_list_data()
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps(data, indent=2, default=str))
+        raise typer.Exit(0)
+
+    console = get_console()
     hooks = data["hooks"]
 
     if not hooks:
@@ -724,6 +936,7 @@ def cmd_hooks_run(
     path: Annotated[
         str | None, typer.Option("--path", help="Context path variable")
     ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Trigger hooks for a specific event."""
@@ -737,6 +950,12 @@ def cmd_hooks_run(
     except VaultSpecError as exc:
         _handle_error(exc)
         return
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps(results, indent=2, default=str))
+        raise typer.Exit(0)
 
     console = get_console()
     if not results:

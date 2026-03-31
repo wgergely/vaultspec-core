@@ -76,6 +76,7 @@ def cmd_add(
             help="Additional tags beyond the required directory and feature tags.",
         ),
     ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Create a new .vault/ document from a template.
@@ -184,6 +185,15 @@ def cmd_add(
 
     # Post-creation self-validation
     _validate_created_doc(console, path, _get_ctx().target_dir)
+    if json_output:
+        import json
+
+        typer.echo(
+            json.dumps(
+                {"path": str(path), "type": doc_type, "name": path.stem}, indent=2
+            )
+        )
+        raise typer.Exit(0)
     console.print(f"[green]Created:[/green] {path}")
 
 
@@ -228,6 +238,7 @@ def cmd_stats(
     orphaned: Annotated[
         bool, typer.Option("--orphaned", help="Show only orphaned documents")
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Show vault statistics and metrics."""
@@ -244,6 +255,11 @@ def cmd_stats(
     except OSError as exc:
         console.print(f"[red]Error reading vault: {exc}[/red]")
         raise typer.Exit(code=1) from exc
+    if json_output:
+        import json
+
+        typer.echo(json.dumps(stats, indent=2, default=str))
+        raise typer.Exit(0)
     console.print("[bold]Vault Statistics[/bold]")
     console.print(f"  Total documents: {stats['total_docs']}")
     console.print(f"  Total features:  {stats['total_features']}")
@@ -272,6 +288,7 @@ def cmd_list(
     feature: Annotated[
         str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
     ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """List vault documents, optionally filtered by type."""
@@ -288,6 +305,14 @@ def cmd_list(
     except OSError as exc:
         console.print(f"[red]Error reading vault: {exc}[/red]")
         raise typer.Exit(code=1) from exc
+    if json_output:
+        import dataclasses
+        import json
+
+        typer.echo(
+            json.dumps([dataclasses.asdict(d) for d in docs], indent=2, default=str)
+        )
+        raise typer.Exit(0)
     if not docs:
         console.print("[dim]No documents found.[/dim]")
         return
@@ -462,8 +487,16 @@ def _reject_fix(check_name: str, fix: bool) -> None:
         raise typer.Exit(code=1)
 
 
-def _render_and_exit(result: CheckResult, verbose: bool) -> None:
+def _render_and_exit(
+    result: CheckResult, verbose: bool, json_output: bool = False
+) -> None:
     """Render a CheckResult and exit with appropriate code."""
+    if json_output:
+        import dataclasses
+        import json
+
+        typer.echo(json.dumps(dataclasses.asdict(result), indent=2, default=str))
+        raise typer.Exit(code=1 if result.error_count else 0)
     from vaultspec_core.console import get_console
     from vaultspec_core.vaultcore.checks import render_check_result
 
@@ -484,6 +517,7 @@ def cmd_check_all(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Run all vault health checks."""
@@ -494,6 +528,15 @@ def cmd_check_all(
 
     console = get_console()
     results = run_all_checks(_get_ctx().target_dir, feature=feature, fix=fix)
+
+    if json_output:
+        import dataclasses
+        import json
+
+        typer.echo(
+            json.dumps([dataclasses.asdict(r) for r in results], indent=2, default=str)
+        )
+        raise typer.Exit(0 if all(r.error_count == 0 for r in results) else 1)
 
     console.print("[bold]Vault Check  - All[/bold]")
     for r in results:
@@ -531,6 +574,7 @@ def cmd_check_body_links(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Find wiki-links and markdown path links in document body text."""
@@ -542,7 +586,7 @@ def cmd_check_body_links(
     graph = VaultGraph(_get_ctx().target_dir)
     snapshot = graph.to_snapshot()
     result = check_body_links(_get_ctx().target_dir, snapshot=snapshot, feature=feature)
-    _render_and_exit(result, verbose)
+    _render_and_exit(result, verbose, json_output=json_output)
 
 
 @check_app.command("dangling")
@@ -556,6 +600,7 @@ def cmd_check_dangling(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Find wiki-links in related: frontmatter that resolve to no document."""
@@ -568,7 +613,7 @@ def cmd_check_dangling(
     result = check_dangling(
         _get_ctx().target_dir, graph=graph, feature=feature, fix=fix
     )
-    _render_and_exit(result, verbose)
+    _render_and_exit(result, verbose, json_output=json_output)
 
 
 @check_app.command("orphans")
@@ -582,6 +627,7 @@ def cmd_check_orphans(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Find documents with no incoming wiki-links."""
@@ -593,7 +639,7 @@ def cmd_check_orphans(
 
     graph = VaultGraph(_get_ctx().target_dir)
     result = check_orphans(_get_ctx().target_dir, graph=graph, feature=feature)
-    _render_and_exit(result, verbose)
+    _render_and_exit(result, verbose, json_output=json_output)
 
 
 @check_app.command("frontmatter")
@@ -607,6 +653,7 @@ def cmd_check_frontmatter(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Validate document frontmatter against vault schema."""
@@ -620,7 +667,7 @@ def cmd_check_frontmatter(
     result = check_frontmatter(
         _get_ctx().target_dir, snapshot=snapshot, feature=feature, fix=fix
     )
-    _render_and_exit(result, verbose)
+    _render_and_exit(result, verbose, json_output=json_output)
 
 
 @check_app.command("links")
@@ -634,6 +681,7 @@ def cmd_check_links(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Check wiki-links follow Obsidian convention (no .md extension)."""
@@ -647,7 +695,7 @@ def cmd_check_links(
     result = check_links(
         _get_ctx().target_dir, snapshot=snapshot, feature=feature, fix=fix
     )
-    _render_and_exit(result, verbose)
+    _render_and_exit(result, verbose, json_output=json_output)
 
 
 @check_app.command("features")
@@ -661,6 +709,7 @@ def cmd_check_features(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Check feature tag completeness  - missing doc types."""
@@ -673,7 +722,7 @@ def cmd_check_features(
     graph = VaultGraph(_get_ctx().target_dir)
     snapshot = graph.to_snapshot()
     result = check_features(_get_ctx().target_dir, snapshot=snapshot, feature=feature)
-    _render_and_exit(result, verbose)
+    _render_and_exit(result, verbose, json_output=json_output)
 
 
 @check_app.command("references")
@@ -687,6 +736,7 @@ def cmd_check_references(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Check for missing cross-references within features."""
@@ -699,7 +749,7 @@ def cmd_check_references(
     result = check_references(
         _get_ctx().target_dir, graph=graph, feature=feature, fix=fix
     )
-    _render_and_exit(result, verbose)
+    _render_and_exit(result, verbose, json_output=json_output)
 
 
 @check_app.command("schema")
@@ -713,6 +763,7 @@ def cmd_check_schema(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Enforce schema rules: ADRs must ref research, plans must ref ADRs."""
@@ -723,7 +774,7 @@ def cmd_check_schema(
 
     graph = VaultGraph(_get_ctx().target_dir)
     result = check_schema(_get_ctx().target_dir, graph=graph, feature=feature, fix=fix)
-    _render_and_exit(result, verbose)
+    _render_and_exit(result, verbose, json_output=json_output)
 
 
 @check_app.command("structure")
@@ -734,6 +785,7 @@ def cmd_check_structure(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Check vault directory structure and filename conventions."""
@@ -745,7 +797,7 @@ def cmd_check_structure(
     graph = VaultGraph(_get_ctx().target_dir)
     snapshot = graph.to_snapshot()
     result = check_structure(_get_ctx().target_dir, snapshot=snapshot, fix=fix)
-    _render_and_exit(result, verbose)
+    _render_and_exit(result, verbose, json_output=json_output)
 
 
 # ---- vault feature list ------------------------------------------------------
@@ -760,6 +812,7 @@ def cmd_feature_list(
     type_filter: Annotated[
         str | None, typer.Option("--type", help="Filter by document type")
     ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """List all feature tags in the vault."""
@@ -772,6 +825,11 @@ def cmd_feature_list(
         _get_ctx().target_dir, date=date, doc_type=type_filter, orphaned_only=orphaned
     )
     console = get_console()
+    if json_output:
+        import json
+
+        typer.echo(json.dumps(features, indent=2, default=str))
+        raise typer.Exit(0)
     if not features:
         console.print("[dim]No features found.[/dim]")
         return
@@ -794,6 +852,7 @@ def cmd_feature_index(
         str | None,
         typer.Option("--feature", "-f", help="Generate index for a specific feature"),
     ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Generate or update feature index documents.
@@ -819,13 +878,25 @@ def cmd_feature_index(
         console.print("[dim]No features found in vault.[/dim]")
         return
 
+    generated_paths: list = []
     for feat in features:
         nodes = graph.get_feature_nodes(feat)
         if not nodes:
-            console.print(f"[dim]No documents found for #{feat}.[/dim]")
+            if not json_output:
+                console.print(f"[dim]No documents found for #{feat}.[/dim]")
             continue
         path = generate_feature_index(root_dir, feat, nodes=nodes)
-        console.print(f"[green]Index:[/green] {path}")
+        generated_paths.append(path)
+        if not json_output:
+            console.print(f"[green]Index:[/green] {path}")
+
+    if json_output:
+        import json
+
+        typer.echo(
+            json.dumps({"generated": [str(p) for p in generated_paths]}, indent=2)
+        )
+        raise typer.Exit(0)
 
 
 # ---- vault feature archive ---------------------------------------------------
@@ -834,6 +905,7 @@ def cmd_feature_index(
 @feature_app.command("archive")
 def cmd_feature_archive(
     feature_tag: Annotated[str, typer.Argument(help="Feature tag to archive")],
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Archive all documents for a feature tag."""
@@ -844,6 +916,11 @@ def cmd_feature_archive(
 
     result = archive_feature(_get_ctx().target_dir, feature_tag)
     console = get_console()
+    if json_output:
+        import json
+
+        typer.echo(json.dumps(result, indent=2, default=str))
+        raise typer.Exit(0)
     if result["archived_count"] == 0:
         console.print(f"[dim]No documents found for feature '{feature_tag}'.[/dim]")
     else:

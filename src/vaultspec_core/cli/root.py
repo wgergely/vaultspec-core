@@ -215,6 +215,7 @@ def cmd_install(
             help="Skip a component (core or provider name). Repeatable.",
         ),
     ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Deploy the vaultspec framework to the target directory.
 
@@ -284,6 +285,13 @@ def cmd_install(
     except OSError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from None
+
+    if json_output:
+        import json
+
+        result["path"] = str(result["path"])
+        typer.echo(json.dumps(result, indent=2, default=str))
+        raise typer.Exit(0)
 
     # Render result
     from vaultspec_core.console import get_console
@@ -356,6 +364,7 @@ def cmd_uninstall(
             help="Skip a component (core or provider name). Repeatable.",
         ),
     ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Remove the vaultspec framework from the target directory.
 
@@ -406,6 +415,13 @@ def cmd_uninstall(
     except OSError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from None
+
+    if json_output:
+        import json
+
+        result["path"] = str(result["path"])
+        typer.echo(json.dumps(result, indent=2, default=str))
+        raise typer.Exit(0)
 
     # Render result
     from vaultspec_core.console import get_console
@@ -459,6 +475,7 @@ def cmd_sync(
             help="Skip a component (core or provider name). Repeatable.",
         ),
     ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Sync rules, skills, agents, configs, and system prompts.
 
@@ -513,6 +530,14 @@ def cmd_sync(
     except OSError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from None
+
+    if json_output:
+        import dataclasses
+        import json
+
+        data = [dataclasses.asdict(r) for r in results]
+        typer.echo(json.dumps(data, indent=2, default=str))
+        raise typer.Exit(0)
 
     from vaultspec_core.console import get_console
 
