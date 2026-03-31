@@ -504,7 +504,6 @@ def cmd_sync(
 
     from vaultspec_core.core.commands import sync_provider
     from vaultspec_core.core.exceptions import VaultSpecError
-    from vaultspec_core.core.sync import format_summary
 
     try:
         results = sync_provider(provider, dry_run=dry_run, force=force, skip=set(skip))
@@ -552,10 +551,42 @@ def cmd_sync(
         else:
             console.print("[dim]Sync preview: no changes[/dim]")
     else:
-        # Print sync summaries
-        labels = ["Rules", "Skills", "Agents", "System", "Config"]
-        for label, r in zip(labels, results, strict=True):
-            console.print(f"  [bold]{format_summary(label, r)}[/bold]")
+        from vaultspec_core.core.manifest import installed_tool_configs
+        from vaultspec_core.core.types import SyncResult
+
+        active_names = [cfg.name for cfg in installed_tool_configs().values()]
+
+        # Header
+        provider_list = ", ".join(f"[cyan]{n}[/cyan]" for n in active_names)
+        console.print(
+            f"Syncing [bold]{len(active_names)}[/bold] enabled "
+            f"providers ({provider_list})...\n"
+        )
+
+        # Collect per-tool results across all 5 resource passes
+        resource_labels = ["rules", "skills", "agents", "system", "config"]
+        tool_resources: dict[str, list[tuple[str, SyncResult]]] = {}
+        for label, r in zip(resource_labels, results, strict=True):
+            for tool_name, tool_result in r.per_tool.items():
+                tool_resources.setdefault(tool_name, []).append((label, tool_result))
+
+        # Render one line per provider
+        for tool_name in active_names:
+            entries = tool_resources.get(tool_name, [])
+            parts: list[str] = []
+            for res_label, tr in entries:
+                if tr.added:
+                    parts.append(f"{tr.added} {res_label} added")
+                if tr.updated:
+                    parts.append(f"{tr.updated} {res_label} updated")
+                if tr.pruned:
+                    parts.append(f"{tr.pruned} {res_label} pruned")
+
+            if parts:
+                detail = ", ".join(parts)
+                console.print(f"  [bold]{tool_name:<16}[/bold] {detail}")
+            else:
+                console.print(f"  [dim]{tool_name:<16} all up to date[/dim]")
 
         # Collect and display warnings from all sync passes
         all_warnings = [w for r in results for w in r.warnings]
@@ -584,7 +615,7 @@ def cmd_sync(
         total_skipped = sum(r.skipped for r in results)
         if total_changes == 0 and total_skipped == 0 and not all_warnings:
             console.print(
-                "[bold yellow]Warning:[/bold yellow] Sync produced 0 files. "
+                "\n[bold yellow]Warning:[/bold yellow] Sync produced 0 files. "
                 "The .vaultspec/rules/ source directories may be empty.\n"
                 "  Run [bold]vaultspec-core install . --upgrade[/bold] "
                 "to re-seed builtin content."

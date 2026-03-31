@@ -285,15 +285,6 @@ def agents_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
     sources = collect_agents(warnings=parse_warnings)
     total = SyncResult()
 
-    def _merge(result: SyncResult) -> None:
-        total.added += result.added
-        total.updated += result.updated
-        total.pruned += result.pruned
-        total.skipped += result.skipped
-        total.errors.extend(result.errors)
-        total.warnings.extend(result.warnings)
-        total.items.extend(result.items)
-
     from .manifest import installed_tool_configs
 
     active_configs = installed_tool_configs()
@@ -311,10 +302,12 @@ def agents_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
             dry_run=dry_run,
             label=f"Agents -> {tool_type.value}",
         )
-        _merge(result)
+        total.merge(result)
+        total.per_tool[tool_type.value] = result
 
     if Tool.CODEX in active_configs:
         codex_result = _sync_codex_agents(sources, prune=prune, dry_run=dry_run)
-        _merge(codex_result)
+        total.merge(codex_result)
+        total.per_tool[Tool.CODEX.value] = codex_result
     total.warnings.extend(parse_warnings)
     return total

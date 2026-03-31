@@ -96,6 +96,22 @@ class SyncResult:
     errors: list[str] = field(default_factory=list)
     items: list[tuple[str, str]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    per_tool: dict[str, SyncResult] = field(default_factory=dict)
+
+    def merge(self, other: SyncResult) -> None:
+        """Merge another result's counters and lists into this one.
+
+        Does **not** merge :attr:`per_tool` - each sync pass manages its
+        own per-tool attribution independently.
+        """
+        self.added += other.added
+        self.updated += other.updated
+        self.skipped += other.skipped
+        self.pruned += other.pruned
+        self.errored += other.errored
+        self.errors.extend(other.errors)
+        self.items.extend(other.items)
+        self.warnings.extend(other.warnings)
 
 
 @dataclass(frozen=True)

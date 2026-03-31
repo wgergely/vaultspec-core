@@ -396,20 +396,29 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
     result = SyncResult()
     active_configs = installed_tool_configs()
 
-    def _record(path: Path, action: str) -> None:
+    def _make_action_result(action: str, path: Path) -> SyncResult:
+        """Build a single-file :class:`SyncResult` from a sync action."""
+        r = SyncResult()
         abs_path = str(path).replace("\\", "/")
         if action == "[ADD]":
-            result.added += 1
+            r.added = 1
             if dry_run:
-                result.items.append((abs_path, "[ADD]"))
+                r.items.append((abs_path, "[ADD]"))
         elif action == "[UPDT]":
-            result.updated += 1
+            r.updated = 1
             if dry_run:
-                result.items.append((abs_path, "[UPDATE]"))
+                r.items.append((abs_path, "[UPDATE]"))
+        return r
+
+    # --- Map config_file -> list of tool names sharing it ---
+    config_file_to_tools: dict[Path, list[str]] = {}
+    for _tool_type, cfg in active_configs.items():
+        if cfg.config_file:
+            config_file_to_tools.setdefault(cfg.config_file, []).append(cfg.name)
 
     # --- Markdown root config files ---
     # Aggregate rule refs from all providers sharing the same config_file
-    # to avoid last-writer-wins conflicts (e.g. gemini + antigravity → GEMINI.md).
+    # to avoid last-writer-wins conflicts (e.g. gemini + antigravity -> GEMINI.md).
     config_refs: dict[Path, list[str]] = {}
     for _tool_type, cfg in active_configs.items():
         if not cfg.config_file:
@@ -427,12 +436,12 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
         if not all_refs:
             continue
 
-        # Deduplicate by filename  - when multiple providers contribute
+        # Deduplicate by filename - when multiple providers contribute
         # the same rule file under different directories (e.g.
         # .gemini/rules/X.md and .agents/rules/X.md), keep only one ref.
         # Prefer the shared .agents/ path when it exists.
         seen_refs: list[str] = []
-        seen_basenames: dict[str, int] = {}  # basename → index in seen_refs
+        seen_basenames: dict[str, int] = {}  # basename -> index in seen_refs
         for ref in all_refs:
             basename = PurePosixPath(ref).name
             if basename in seen_basenames:
@@ -462,7 +471,12 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
             force=force,
         )
         logger.info("%s %s", action, cfg.config_file)
-        _record(cfg.config_file, action)
+        action_result = _make_action_result(action, cfg.config_file)
+        result.merge(action_result)
+
+        # Attribute to ALL tools sharing this config_file.
+        for tool_name in config_file_to_tools.get(cfg.config_file, []):
+            result.per_tool.setdefault(tool_name, SyncResult()).merge(action_result)
 
     # --- Secondary rule-reference config files (.gemini/GEMINI.md) ---
     for _tool_type, cfg in active_configs.items():
@@ -478,12 +492,14 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
             force=force,
         )
         logger.info("%s %s", action, cfg.rule_ref_config_file)
-        _record(cfg.rule_ref_config_file, action)
+        action_result = _make_action_result(action, cfg.rule_ref_config_file)
+        result.merge(action_result)
+        result.per_tool.setdefault(cfg.name, SyncResult()).merge(action_result)
 
     # --- Codex native config (TOML) ---
     codex_cfg = active_configs.get(Tool.CODEX)
     codex_native_path = codex_cfg.native_config_file if codex_cfg else None
-    if codex_native_path is not None:
+    if codex_native_path is not None and codex_cfg is not None:
         config_body = _generate_codex_native_config_body()
         if config_body:
             action = _sync_managed_toml(
@@ -494,7 +510,11 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
             )
             if action != "[SKIP]":
                 logger.info("%s %s", action, codex_native_path)
-            _record(codex_native_path, action)
+            action_result = _make_action_result(action, codex_native_path)
+            result.merge(action_result)
+            result.per_tool.setdefault(codex_cfg.name, SyncResult()).merge(
+                action_result
+            )
 
         # NOTE: Codex agents block is managed by agents_sync/_sync_codex_agents,
         # not here, to avoid conflicting writes to the same TOML block.

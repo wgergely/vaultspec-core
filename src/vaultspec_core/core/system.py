@@ -181,78 +181,85 @@ def system_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
     result = SyncResult()
 
     for _tool_type, cfg in installed_tool_configs().items():
+        tool_result = SyncResult()
         system_file = cfg.system_file
         if system_file is not None:
             content = _generate_system_prompt(cfg)
             if content is None:
-                result.skipped += 1
-                continue
-
-            rel = system_file.relative_to(_t.get_context().target_dir)
-
-            if system_file.exists() and not _is_cli_managed(system_file) and not force:
-                logger.warning("    [SKIP] %s - file exists with custom content.", rel)
-                result.warnings.append(
-                    f"Skipped {rel} (user-authored content, use --force to overwrite)"
-                )
-                result.skipped += 1
-                continue
-
-            action = "[SKIP]"
-            if not system_file.exists():
-                action = "[ADD]"
+                tool_result.skipped += 1
             else:
-                try:
-                    if system_file.read_text(encoding="utf-8") != content:
-                        action = "[UPDATE]"
-                except Exception:
-                    action = "[UPDATE]"
+                rel = system_file.relative_to(_t.get_context().target_dir)
 
-            if action != "[SKIP]":
-                abs_path = str(system_file).replace("\\", "/")
-                if dry_run:
-                    result.items.append((abs_path, action))
+                if (
+                    system_file.exists()
+                    and not _is_cli_managed(system_file)
+                    and not force
+                ):
+                    logger.warning(
+                        "    [SKIP] %s - file exists with custom content.", rel
+                    )
+                    tool_result.warnings.append(
+                        f"Skipped {rel} (user-authored content, "
+                        f"use --force to overwrite)"
+                    )
+                    tool_result.skipped += 1
                 else:
-                    ensure_dir(system_file.parent)
-                    atomic_write(system_file, content)
+                    action = "[SKIP]"
+                    if not system_file.exists():
+                        action = "[ADD]"
+                    else:
+                        try:
+                            if system_file.read_text(encoding="utf-8") != content:
+                                action = "[UPDATE]"
+                        except Exception:
+                            action = "[UPDATE]"
 
-                if action == "[ADD]":
-                    result.added += 1
-                else:
-                    result.updated += 1
-            else:
-                result.skipped += 1
+                    if action != "[SKIP]":
+                        abs_path = str(system_file).replace("\\", "/")
+                        if dry_run:
+                            tool_result.items.append((abs_path, action))
+                        else:
+                            ensure_dir(system_file.parent)
+                            atomic_write(system_file, content)
+
+                        if action == "[ADD]":
+                            tool_result.added += 1
+                        else:
+                            tool_result.updated += 1
+                    else:
+                        tool_result.skipped += 1
 
         elif cfg.rules_dir is not None and cfg.emit_system_rule:
             content = _generate_system_rules(cfg)
-            if content is None:
-                continue
+            if content is not None:
+                rule_path = cfg.rules_dir / "vaultspec-system.builtin.md"
 
-            rule_path = cfg.rules_dir / "vaultspec-system.builtin.md"
-
-            action = "[SKIP]"
-            if not rule_path.exists():
-                action = "[ADD]"
-            else:
-                try:
-                    if rule_path.read_text(encoding="utf-8") != content:
+                action = "[SKIP]"
+                if not rule_path.exists():
+                    action = "[ADD]"
+                else:
+                    try:
+                        if rule_path.read_text(encoding="utf-8") != content:
+                            action = "[UPDATE]"
+                    except Exception:
                         action = "[UPDATE]"
-                except Exception:
-                    action = "[UPDATE]"
 
-            if action != "[SKIP]":
-                abs_path = str(rule_path).replace("\\", "/")
-                if dry_run:
-                    result.items.append((abs_path, action))
-                else:
-                    ensure_dir(cfg.rules_dir)
-                    atomic_write(rule_path, content)
+                if action != "[SKIP]":
+                    abs_path = str(rule_path).replace("\\", "/")
+                    if dry_run:
+                        tool_result.items.append((abs_path, action))
+                    else:
+                        ensure_dir(cfg.rules_dir)
+                        atomic_write(rule_path, content)
 
-                if action == "[ADD]":
-                    result.added += 1
+                    if action == "[ADD]":
+                        tool_result.added += 1
+                    else:
+                        tool_result.updated += 1
                 else:
-                    result.updated += 1
-            else:
-                result.skipped += 1
+                    tool_result.skipped += 1
+
+        result.merge(tool_result)
+        result.per_tool[cfg.name] = tool_result
 
     return result

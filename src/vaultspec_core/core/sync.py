@@ -300,37 +300,39 @@ def sync_to_all_tools(
     from .manifest import installed_tool_configs
 
     total = SyncResult()
-    seen_dest_dirs: set[Path] = set()
+
+    # Group tools by resolved destination directory so that shared
+    # directories (e.g. .agents/skills/) are synced once and the
+    # result is attributed to every tool that uses them.
+    dir_to_tools: dict[Path, list[tuple[Any, Any]]] = {}
     for tool_type, cfg in installed_tool_configs().items():
         dest_dir = getattr(cfg, dir_attr)
         if dest_dir is None:
             continue
-        # When multiple providers share a directory (e.g. .agents/skills/),
-        # skip the duplicate sync entirely to avoid inflating skipped counts.
         resolved = dest_dir.resolve()
-        if resolved in seen_dest_dirs:
-            continue
-        seen_dest_dirs.add(resolved)
+        dir_to_tools.setdefault(resolved, []).append((tool_type, cfg))
+
+    for _resolved, tool_list in dir_to_tools.items():
+        first_tool, first_cfg = tool_list[0]
+        dest_dir = getattr(first_cfg, dir_attr)
+
         result = sync_files(
             sources=sources,
             dest_dir=dest_dir,
-            transform_fn=lambda _tool, n, m, b, _tt=tool_type: transform_fn(
+            transform_fn=lambda _tool, n, m, b, _tt=first_tool: transform_fn(
                 _tt, n, m, b
             ),
             dest_path_fn=dest_path_fn,
             prune=prune,
             dry_run=dry_run,
-            label=f"{label} -> {tool_type.value}",
+            label=f"{label} -> {first_tool.value}",
             is_skill=is_skill,
         )
-        total.added += result.added
-        total.updated += result.updated
-        total.pruned += result.pruned
-        total.skipped += result.skipped
-        total.errored += result.errored
-        total.errors.extend(result.errors)
-        total.items.extend(result.items)
-        total.warnings.extend(result.warnings)
+        total.merge(result)
+
+        # Attribute to ALL tools sharing this directory.
+        for tool_type, _cfg in tool_list:
+            total.per_tool[tool_type.value] = result
 
     return total
 
