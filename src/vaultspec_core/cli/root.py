@@ -706,6 +706,12 @@ def cmd_doctor(
     import dataclasses
     import json
 
+    # Initialize workspace context so collectors can read tool configs.
+    try:
+        apply_target(target)
+    except Exception:
+        logger.debug("Could not initialize workspace context", exc_info=True)
+
     from vaultspec_core.core.diagnosis import (
         BuiltinVersionSignal,
         ConfigSignal,
@@ -816,6 +822,26 @@ def cmd_doctor(
         "gitignore",
         f"[{gi_style}]{gi_status}[/{gi_style}]",
         diag.gitignore.value,
+    )
+
+    # MCP row
+    mcp_status, mcp_style = _signal_status(
+        diag.mcp,
+        {
+            ConfigSignal.OK: ("ok", "green"),
+            ConfigSignal.MISSING: ("warn", "yellow"),
+            ConfigSignal.FOREIGN: ("info", "dim"),
+        },
+    )
+    mcp_detail = {
+        ConfigSignal.OK: ".mcp.json present",
+        ConfigSignal.MISSING: ".mcp.json not found",
+        ConfigSignal.FOREIGN: ".mcp.json present (no vaultspec entry)",
+    }.get(diag.mcp, str(diag.mcp))
+    table.add_row(
+        "mcp",
+        f"[{mcp_style}]{mcp_status}[/{mcp_style}]",
+        mcp_detail,
     )
 
     console.print(table)
