@@ -2,46 +2,35 @@
 name: vaultspec-cli
 ---
 
-# vaultspec-core CLI
+# Vaultspec Core CLI
 
-This project is managed by the `vaultspec-core` CLI. Use it to sync
-framework content, manage vault documents, and inspect workspace health.
+Use the `vaultspec-core` CLI to manage and the `.vault/` contents. Use it to sync
+framework content, manage `.vault/` documents, and inspect vault health.
 
-## Running the CLI
+## Usage
 
 If the current virtual environment has `vaultspec-core` installed, run it
-directly:
+directly as `vaultspec-core` or `uv run vaultspec-core` in uv managed environments.
+
+## CLI Commands
+
+Vault healt and management:
 
 ```
-vaultspec-core <command>
+vault add <type> <name> Create a new .vault/ document
+vault list [--type T]   List vault documents
+vault check [checker]   Run vault health checks
+vault stats             Show vault statistics
 ```
 
-Otherwise, use `uv run` to invoke it from the project's managed environment:
+Spec management:
 
 ```
-uv run vaultspec-core <command>
-```
-
-## Commands
-
-```
-vaultspec-core install [provider]      Deploy the framework
-vaultspec-core sync [provider]         Sync rules, skills, agents, configs
-vaultspec-core doctor                  Diagnose workspace health
-vaultspec-core spec rules list         List framework rules
-vaultspec-core spec skills list        List workflow skills
-vaultspec-core spec agents list        List agent definitions
-vaultspec-core spec system show        Show assembled system prompts
-vaultspec-core vault add <type> <name> Create a new .vault/ document
-vaultspec-core vault list [--type T]   List vault documents
-vaultspec-core vault check [checker]   Run vault health checks
-vaultspec-core vault stats             Show vault statistics
-```
-
-## Example
-
-```
-uv run vaultspec-core sync --dry-run
-uv run vaultspec-core vault add research my-feature
-uv run vaultspec-core doctor
+install [provider]      Deploy the framework
+sync [provider]         Sync rules, skills, agents, configs
+doctor                  Diagnose workspace health
+spec rules list         List framework rules
+spec skills list        List workflow skills
+spec agents list        List agent definitions
+spec system show        Show assembled system prompts
 ```
