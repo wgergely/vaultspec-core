@@ -102,3 +102,32 @@ def list_builtins() -> list[str]:
             continue
         paths.append(str(f.relative_to(src)).replace("\\", "/"))
     return paths
+
+
+def check_outdated(target_rules_dir: Path) -> list[str]:
+    """Compare bundled builtins against a deployed ``.vaultspec/rules/`` tree.
+
+    Returns:
+        List of relative paths (forward-slash separated) present in the
+        package but missing or content-different at the target.
+    """
+    src = _builtins_root()
+    outdated: list[str] = []
+    for src_file in sorted(src.rglob("*")):
+        if not src_file.is_file():
+            continue
+        if src_file.name in ("__init__.py", "__pycache__") or "__pycache__" in str(
+            src_file
+        ):
+            continue
+        rel = src_file.relative_to(src)
+        dest = target_rules_dir / rel
+        if not dest.exists():
+            outdated.append(str(rel).replace("\\", "/"))
+            continue
+        try:
+            if src_file.read_bytes() != dest.read_bytes():
+                outdated.append(str(rel).replace("\\", "/"))
+        except OSError:
+            outdated.append(str(rel).replace("\\", "/"))
+    return outdated

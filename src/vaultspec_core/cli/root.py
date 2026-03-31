@@ -588,6 +588,25 @@ def cmd_sync(
             else:
                 console.print(f"  [dim]{tool_name:<16} all up to date[/dim]")
 
+        # Check if bundled builtins are newer than deployed
+        from vaultspec_core.builtins import check_outdated
+
+        vaultspec_rules = sync_target / ".vaultspec" / "rules"
+        outdated = check_outdated(vaultspec_rules) if vaultspec_rules.is_dir() else []
+        if outdated:
+            console.print()
+            console.print(
+                f"[bold yellow]Upgrade available:[/bold yellow] "
+                f"{len(outdated)} builtin(s) in the installed "
+                f"vaultspec-core package are newer than .vaultspec/:"
+            )
+            for path in outdated:
+                console.print(f"  [yellow]•[/yellow] {path}")
+            console.print(
+                "\n  Run [bold]vaultspec-core install --upgrade[/bold] "
+                "to update, then [bold]sync[/bold] again."
+            )
+
         # Collect and display warnings from all sync passes
         all_warnings = [w for r in results for w in r.warnings]
         if all_warnings:
