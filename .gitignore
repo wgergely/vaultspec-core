@@ -31,6 +31,7 @@ MANIFEST
 !/.vaultspec/lib/**
 .vaultspec/lib/**/__pycache__/
 .vaultspec/lib/**/*.pyc
+.vaultspec/providers.json
 
 # Auto-generated temp files
 .vaultspec/.tmp/
@@ -208,4 +209,6 @@ GEMINI.md
 src/vaultspec_core/builtins/*
 !src/vaultspec_core/builtins/__init__.py
 
-
+# >>> vaultspec-managed (do not edit this block) >>>
+.vaultspec/_snapshots/
+# <<< vaultspec-managed <<<

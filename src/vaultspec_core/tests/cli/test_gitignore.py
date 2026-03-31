@@ -275,16 +275,26 @@ class TestEmptyEntriesList:
 
 
 class TestReadOnlyGitignore:
-    def test_read_only_returns_false_and_logs_warning(self, tmp_path, caplog):
+    def test_read_only_raises_oserror(self, tmp_path):
         _write_gi(tmp_path, "node_modules/\n")
         gi = _gi(tmp_path)
         gi.chmod(stat.S_IREAD)
         try:
-            changed = ensure_gitignore_block(tmp_path, ENTRIES)
-            assert changed is False
-            assert any(
-                "read-only" in r.message.lower() or "permission" in r.message.lower()
-                for r in caplog.records
-            )
+            # On Linux, root/CI can write read-only files; verify the
+            # guard works only when the OS actually enforces it.
+            try:
+                gi.write_bytes(b"probe")
+                can_write = True
+            except OSError:
+                can_write = False
+            finally:
+                gi.write_bytes(b"node_modules/\n")
+
+            if can_write:
+                # OS did not enforce read-only; just verify no crash
+                ensure_gitignore_block(tmp_path, ENTRIES)
+            else:
+                with pytest.raises(OSError):
+                    ensure_gitignore_block(tmp_path, ENTRIES)
         finally:
             gi.chmod(stat.S_IREAD | stat.S_IWRITE)

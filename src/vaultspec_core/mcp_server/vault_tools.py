@@ -120,12 +120,14 @@ def register_tools(mcp: FastMCP) -> None:
         # --- Feature listing mode (no filters) ---
         if not feature and not type and not date:
             features = list_feature_details(_get_ctx().target_dir)
+            graph_unavailable = False
             try:
                 graph = VaultGraph(_get_ctx().target_dir)
                 rankings = dict(graph.get_feature_rankings(limit=100))
             except (OSError, ValueError) as exc:
                 logger.warning("Failed to load vault graph rankings: %s", exc)
                 rankings = {}
+                graph_unavailable = True
 
             results = []
             for feat in features[:limit]:
@@ -134,6 +136,8 @@ def register_tools(mcp: FastMCP) -> None:
                     "doc_count": feat["doc_count"],
                     "weight": rankings.get(feat["name"], 0),
                 }
+                if graph_unavailable:
+                    entry["_note"] = "graph ranking unavailable"
                 if json:
                     entry["status"] = _infer_status(set(feat["types"]))
                     entry["types"] = feat["types"]

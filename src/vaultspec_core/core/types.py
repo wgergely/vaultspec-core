@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from .enums import DirName, FileName, ProviderCapability, Resource, Tool
+from .exceptions import VaultSpecError
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,7 @@ class SyncResult:
     updated: int = 0
     skipped: int = 0
     pruned: int = 0
+    errored: int = 0
     errors: list[str] = field(default_factory=list)
     items: list[tuple[str, str]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -167,6 +169,30 @@ def _create_tool_cfg(
             else None
         ),
     )
+
+
+def _validate_tool_containment(
+    root: Path, tool_configs: dict[Tool, ToolConfig]
+) -> None:
+    """Verify every tool directory is a descendant of the workspace root.
+
+    Raises:
+        VaultSpecError: If any configured directory resolves outside *root*.
+    """
+    resolved_root = root.resolve()
+    dir_attrs = ("rules_dir", "skills_dir", "agents_dir")
+    for tool, cfg in tool_configs.items():
+        for attr in dir_attrs:
+            d = getattr(cfg, attr, None)
+            if d is None:
+                continue
+            resolved = d.resolve()
+            if not resolved.is_relative_to(resolved_root):
+                raise VaultSpecError(
+                    f"Provider '{tool.value}' {attr} escapes workspace root: "
+                    f"{resolved}",
+                    hint=f"Check your provider configuration for {tool.value}.",
+                )
 
 
 def init_paths(layout: Any) -> WorkspaceContext:
@@ -282,6 +308,8 @@ def init_paths(layout: Any) -> WorkspaceContext:
             ),
         ),
     }
+
+    _validate_tool_containment(target, tool_configs)
 
     ctx = WorkspaceContext(
         root_dir=target,

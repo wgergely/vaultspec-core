@@ -8,9 +8,12 @@ Uses :mod:`importlib.resources` for package-relative file access.
 
 from __future__ import annotations
 
+import logging
 import shutil
 from importlib import resources
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def _builtins_root() -> Path:
@@ -73,8 +76,12 @@ def seed_builtins(target_rules_dir: Path, *, force: bool = False) -> list[str]:
         if dest.exists() and not force:
             continue
 
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src_file, dest)
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_file, dest)
+        except OSError as exc:
+            logger.warning("Failed to seed %s: %s", rel, exc)
+            continue
         written.append(str(rel).replace("\\", "/"))
 
     return written

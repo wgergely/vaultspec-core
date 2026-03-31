@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import shutil
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -97,15 +99,9 @@ def ensure_gitignore_block(
     lines = content.splitlines()
     begin, end = _find_markers(lines)
 
-    try:
-        if state == "absent":
-            return _remove_block(gi_path, lines, begin, end, eol, bom)
-        return _add_block(gi_path, lines, begin, end, entries, eol, bom)
-    except OSError:
-        logger.warning(
-            "Could not write to %s (permission denied or read-only)", gi_path
-        )
-        return False
+    if state == "absent":
+        return _remove_block(gi_path, lines, begin, end, eol, bom)
+    return _add_block(gi_path, lines, begin, end, entries, eol, bom)
 
 
 def _add_block(
@@ -180,10 +176,26 @@ def _remove_block(
 
 
 def _write(gi_path: Path, content: str, bom: bytes) -> None:
-    """Write *content* to *gi_path*, restoring BOM if originally present.
+    """Write *content* to *gi_path* atomically, restoring BOM if originally present.
 
-    Always writes in binary mode to preserve the caller-chosen line
-    endings.  Using text-mode would double ``\\r`` on Windows when the
-    content already contains ``\\r\\n``.
+    Uses a temporary file and rename to avoid partial writes.  Always
+    writes in binary mode to preserve the caller-chosen line endings.
+    Using text-mode would double ``\\r`` on Windows when the content
+    already contains ``\\r\\n``.
     """
-    gi_path.write_bytes(bom + content.encode("utf-8"))
+    payload = bom + content.encode("utf-8")
+    tmp = gi_path.with_suffix(gi_path.suffix + f".{os.getpid()}.tmp")
+    try:
+        tmp.write_bytes(payload)
+        try:
+            tmp.replace(gi_path)
+        except PermissionError:
+            if os.name != "nt":
+                raise
+            try:
+                shutil.copyfile(tmp, gi_path)
+            finally:
+                tmp.unlink(missing_ok=True)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise

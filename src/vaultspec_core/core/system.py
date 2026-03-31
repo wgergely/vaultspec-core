@@ -21,8 +21,14 @@ from .types import SyncResult, ToolConfig
 logger = logging.getLogger(__name__)
 
 
-def collect_system_parts() -> dict[str, tuple[Path, dict[str, Any], str]]:
+def collect_system_parts(
+    warnings: list[str] | None = None,
+) -> dict[str, tuple[Path, dict[str, Any], str]]:
     """Collect system prompt parts from .vaultspec/rules/system/.
+
+    Args:
+        warnings: Optional list to append parse-error messages to, so callers
+            can propagate them into :class:`~vaultspec_core.core.types.SyncResult`.
 
     Returns:
         A mapping of file stem (e.g. ``"01-core"``) to a three-tuple of
@@ -41,6 +47,8 @@ def collect_system_parts() -> dict[str, tuple[Path, dict[str, Any], str]]:
             sources[f.stem] = (f, meta, body)
         except (OSError, Exception) as e:
             logger.error("Failed to read/parse %s: %s", f, e)
+            if warnings is not None:
+                warnings.append(f"Failed to read/parse {f}: {e}")
             continue
     return sources
 

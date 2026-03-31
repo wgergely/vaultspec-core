@@ -165,7 +165,7 @@ class TestProviderDirRules:
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
         plan = resolve(diag, "uninstall", provider="claude", force=False)
         assert plan.blocked
-        assert any("user content" in c.lower() for c in plan.conflicts)
+        assert any("user-created content" in c.lower() for c in plan.conflicts)
 
     def test_mixed_uninstall_force_removes(self):
         prov = _make_provider(dir_state=ProviderDirSignal.MIXED)

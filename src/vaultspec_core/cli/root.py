@@ -166,10 +166,12 @@ def _run_preflight(
         if exec_result.failed and not dry_run:
             raise typer.Exit(code=1)
 
-    # Show non-preflight steps as informational
+    # Show non-preflight steps as informational (deferred to the main command)
     non_preflight = [s for s in plan.steps if s.action not in PREFLIGHT_ACTIONS]
     for step in non_preflight:
-        console.print(f"  [dim]>[/dim] {step.reason}")
+        console.print(
+            f"  [dim]>[/dim] {step.reason} (detected, will be addressed by {action})"
+        )
 
     if plan.conflicts:
         console.print()
@@ -476,7 +478,9 @@ def cmd_sync(
     if provider == "core":
         typer.echo(
             "Error: 'core' is not a valid sync target. "
-            "The sync source is .vaultspec/ (core) itself.",
+            "The sync source is .vaultspec/ (core) itself.\n"
+            "  Hint: use 'vaultspec-core sync all' to sync all providers, "
+            "or 'vaultspec-core install --upgrade' to update the framework.",
             err=True,
         )
         raise typer.Exit(code=1)
@@ -663,6 +667,13 @@ def cmd_doctor(
     effective = target or Path.cwd()
     effective = effective.resolve()
 
+    if not effective.exists():
+        typer.echo(
+            f"Error: target directory does not exist: {effective}",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
     try:
         diag = diagnose(effective, scope="full")
     except Exception as exc:
@@ -766,7 +777,8 @@ def _signal_status(
     mapping: dict,
 ) -> tuple[str, str]:
     """Map a signal value to a (status_label, style) pair."""
-    return mapping.get(signal, ("unknown", "dim"))
+    val = signal.value if hasattr(signal, "value") else signal
+    return mapping.get(signal, (f"unknown ({val})", "dim"))
 
 
 def _provider_status(prov: ProviderDiagnosis) -> tuple[str, str]:

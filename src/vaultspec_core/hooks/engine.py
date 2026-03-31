@@ -392,4 +392,4 @@ def fire_hooks(event: str, context: dict[str, str] | None = None) -> None:
         hooks = load_hooks(get_context().hooks_dir)
         trigger(hooks, event, context)
     except Exception:
-        logger.debug("Hook trigger failed for %s", event, exc_info=True)
+        logger.warning("Hook trigger failed for %s", event, exc_info=True)

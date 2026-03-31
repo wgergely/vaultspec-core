@@ -236,10 +236,14 @@ def cmd_stats(
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.query import get_stats
 
-    stats = get_stats(
-        _get_ctx().target_dir, feature=feature, doc_type=type_filter, date=date
-    )
     console = get_console()
+    try:
+        stats = get_stats(
+            _get_ctx().target_dir, feature=feature, doc_type=type_filter, date=date
+        )
+    except OSError as exc:
+        console.print(f"[red]Error reading vault: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
     console.print("[bold]Vault Statistics[/bold]")
     console.print(f"  Total documents: {stats['total_docs']}")
     console.print(f"  Total features:  {stats['total_features']}")
@@ -276,10 +280,14 @@ def cmd_list(
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.query import list_documents
 
-    docs = list_documents(
-        _get_ctx().target_dir, doc_type=doc_type, feature=feature, date=date
-    )
     console = get_console()
+    try:
+        docs = list_documents(
+            _get_ctx().target_dir, doc_type=doc_type, feature=feature, date=date
+        )
+    except OSError as exc:
+        console.print(f"[red]Error reading vault: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
     if not docs:
         console.print("[dim]No documents found.[/dim]")
         return
@@ -344,7 +352,11 @@ def cmd_graph(
     from vaultspec_core.graph import VaultGraph
 
     console = get_console()
-    graph = VaultGraph(_get_ctx().target_dir)
+    try:
+        graph = VaultGraph(_get_ctx().target_dir)
+    except OSError as exc:
+        console.print(f"[red]Error reading vault: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
 
     if not graph.nodes:
         console.print("[dim]No vault documents found.[/dim]")
@@ -531,7 +543,6 @@ def cmd_check_body_links(
     snapshot = graph.to_snapshot()
     result = check_body_links(_get_ctx().target_dir, snapshot=snapshot, feature=feature)
     _render_and_exit(result, verbose)
-
 
 
 @check_app.command("dangling")

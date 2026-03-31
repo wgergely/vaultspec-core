@@ -13,6 +13,7 @@ import logging
 import re
 from typing import TYPE_CHECKING
 
+from ...core.helpers import atomic_write
 from ._base import CheckDiagnostic, CheckResult, Severity
 
 if TYPE_CHECKING:
@@ -80,7 +81,15 @@ def _add_related_link(doc_path: Path, link_name: str) -> bool:
         new_yaml = yaml_block + f'\nrelated:\n  - "{link}"'
 
     new_content = f"{leading_ws}---\n{new_yaml}\n---\n{body}"
-    doc_path.write_text(new_content, encoding="utf-8")
+    bak = doc_path.with_suffix(doc_path.suffix + ".bak")
+    bak.write_bytes(doc_path.read_bytes())
+    try:
+        atomic_write(doc_path, new_content)
+    except Exception:
+        if bak.exists():
+            bak.replace(doc_path)
+        raise
+    bak.unlink(missing_ok=True)
     logger.info("Added %s to related field in %s", link, doc_path.name)
     return True
 

@@ -100,7 +100,9 @@ def generate_feature_index(
         f"{document_list}\n"
     )
 
+    from ..core.helpers import atomic_write
+
     docs_dir.mkdir(parents=True, exist_ok=True)
-    index_path.write_text(content, encoding="utf-8")
+    atomic_write(index_path, content)
     logger.info("Generated feature index: %s", index_path)
     return index_path

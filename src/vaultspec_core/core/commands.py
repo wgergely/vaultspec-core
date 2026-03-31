@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import contextvars
 import logging
+import shutil
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -22,7 +23,7 @@ from .exceptions import (
     VaultSpecError,
     WorkspaceNotInitializedError,
 )
-from .helpers import _rmtree_robust, ensure_dir
+from .helpers import _rmtree_robust, atomic_write, ensure_dir
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +157,7 @@ def _scaffold_provider(
     if cfg.config_file:
         if not dry_run and not cfg.config_file.exists():
             ensure_dir(cfg.config_file.parent)
-            cfg.config_file.write_text("", encoding="utf-8")
+            atomic_write(cfg.config_file, "")
         _add(_rel(target, cfg.config_file), "config")
 
     if cfg.rule_ref_config_file:
@@ -166,7 +167,7 @@ def _scaffold_provider(
         if not dry_run:
             ensure_dir(cfg.native_config_file.parent)
             if not cfg.native_config_file.exists():
-                cfg.native_config_file.write_text("", encoding="utf-8")
+                atomic_write(cfg.native_config_file, "")
         _add(_rel(target, cfg.native_config_file), "config")
 
     return created
@@ -368,22 +369,25 @@ def _ensure_tool_configs(path: Path) -> None:
     # Resolve workspace against the temp dir, then re-initialize with the
     # real target so tool_config paths reference the actual workspace.
     tmp = Path(tempfile.mkdtemp())
-    tmp_fw = tmp / ".vaultspec"
-    tmp_fw.mkdir(parents=True, exist_ok=True)
+    try:
+        tmp_fw = tmp / ".vaultspec"
+        tmp_fw.mkdir(parents=True, exist_ok=True)
 
-    reset_config()
-    layout = resolve_workspace(target_override=tmp)
-    # Replace the temp target with the real path so tool_configs point correctly
-    from vaultspec_core.config.workspace import WorkspaceLayout
+        reset_config()
+        layout = resolve_workspace(target_override=tmp)
+        # Replace the temp target with the real path so tool_configs point correctly
+        from vaultspec_core.config.workspace import WorkspaceLayout
 
-    real_layout = WorkspaceLayout(
-        target_dir=path,
-        vault_dir=path / ".vault",
-        vaultspec_dir=path / ".vaultspec",
-        mode=layout.mode,
-        git=layout.git,
-    )
-    init_paths(real_layout)
+        real_layout = WorkspaceLayout(
+            target_dir=path,
+            vault_dir=path / ".vault",
+            vaultspec_dir=path / ".vaultspec",
+            mode=layout.mode,
+            git=layout.git,
+        )
+        init_paths(real_layout)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def install_run(
@@ -548,8 +552,14 @@ def install_run(
     layout = resolve_workspace(target_override=path)
     init_paths(layout)
 
+    post_errors: list[str] = []
+
     sync_target = provider if provider not in ("all", "core") else "all"
-    sync_provider(sync_target, skip=skip)
+    try:
+        sync_provider(sync_target, skip=skip)
+    except (VaultSpecError, OSError) as exc:
+        logger.warning("Sync failed during install: %s", exc)
+        post_errors.append(f"sync: {exc}")
 
     # Count actual source resources (what the user authored)
     from .agents import collect_agents
@@ -578,7 +588,7 @@ def install_run(
     import datetime
 
     gi_path = path / ".gitignore"
-    mdata = read_manifest_data(path)
+    mdata = read_manifest_data(path, strict=True)
     mdata.gitignore_managed = gi_written or (
         gi_path.exists() and MARKER_BEGIN in gi_path.read_text(encoding="utf-8")
     )
@@ -589,7 +599,7 @@ def install_run(
         mdata.provider_state[name]["installed_at"] = mdata.installed_at
     write_manifest_data(path, mdata)
 
-    return {
+    result: dict[str, Any] = {
         "action": "install",
         "items": created,
         "source_counts": source_counts,
@@ -597,6 +607,9 @@ def install_run(
         "has_mcp": has_mcp,
         "path": path,
     }
+    if post_errors:
+        result["errors"] = post_errors
+    return result
 
 
 def _collect_provider_artifacts(
@@ -1074,19 +1087,21 @@ def sync_provider(
             if "mcp" not in skip:
                 _scaffold_mcp_json(ctx.target_dir)
 
-            # Respect gitignore opt-out
+            # Respect gitignore opt-out: check whether the user removed
+            # the managed block BEFORE re-creating it.  If the block is
+            # gone but the manifest still says managed=True, the user
+            # opted out -- honour that by flipping the flag.
             mdata = read_manifest_data(ctx.target_dir)
             if mdata.gitignore_managed:
-                ensure_gitignore_block(ctx.target_dir, DEFAULT_ENTRIES)
-                # Re-check: if markers are absent after ensure, user removed
-                # the block - respect the opt-out.
                 gi_path = ctx.target_dir / ".gitignore"
-                if gi_path.exists():
-                    content = gi_path.read_text(encoding="utf-8")
-                    if MARKER_BEGIN not in content:
-                        mdata = read_manifest_data(ctx.target_dir)
-                        mdata.gitignore_managed = False
-                        write_manifest_data(ctx.target_dir, mdata)
+                block_present = gi_path.exists() and MARKER_BEGIN in gi_path.read_text(
+                    encoding="utf-8"
+                )
+                if block_present:
+                    ensure_gitignore_block(ctx.target_dir, DEFAULT_ENTRIES)
+                else:
+                    mdata.gitignore_managed = False
+                    write_manifest_data(ctx.target_dir, mdata)
 
             # Update last_synced timestamps for installed providers only
             now = datetime.datetime.now(tz=datetime.UTC).isoformat()
@@ -1109,7 +1124,10 @@ def sync_provider(
     if installed and provider not in installed:
         raise ProviderNotInstalledError(
             f"Provider '{provider}' is not installed.",
-            hint=f"Run 'vaultspec-core install . {provider}' first.",
+            hint=(
+                f"Run 'vaultspec-core install "
+                f"--target {ctx.target_dir} {provider}' first."
+            ),
         )
 
     # Per-provider sync: filter tool_configs to only the requested tool.

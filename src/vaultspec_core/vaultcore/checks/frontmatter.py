@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from ...core.helpers import atomic_write
 from ._base import (
     CheckDiagnostic,
     CheckResult,
@@ -132,7 +133,15 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
         lines.append(body)
 
     new_content = leading_whitespace + "\n".join(lines)
-    doc_path.write_text(new_content, encoding="utf-8")
+    bak = doc_path.with_suffix(doc_path.suffix + ".bak")
+    bak.write_bytes(doc_path.read_bytes())
+    try:
+        atomic_write(doc_path, new_content)
+    except Exception:
+        if bak.exists():
+            bak.replace(doc_path)
+        raise
+    bak.unlink(missing_ok=True)
     return "; ".join(fixes_applied)
 
 

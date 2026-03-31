@@ -78,7 +78,8 @@ def collect_framework_presence(target: Path) -> FrameworkSignal:
 
     try:
         raw = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Cannot read manifest %s: %s", manifest_path, exc)
         return FrameworkSignal.CORRUPTED
 
     if "installed" not in raw:
@@ -151,7 +152,8 @@ def collect_provider_dir_state(target: Path, tool_value: str) -> ProviderDirSign
     # Check if directory is empty
     try:
         children = list(provider_dir.iterdir())
-    except OSError:
+    except OSError as exc:
+        logger.warning("Cannot read provider directory %s: %s", provider_dir, exc)
         return ProviderDirSignal.MISSING
 
     if not children:
@@ -178,6 +180,19 @@ def collect_provider_dir_state(target: Path, tool_value: str) -> ProviderDirSign
         # No subdirectories expected - non-empty is complete enough
         return ProviderDirSignal.COMPLETE
 
+    # Build a set of known paths to detect foreign content
+    known_paths: set[Path] = set()
+    for d in expected_dirs:
+        known_paths.add(d)
+
+    # Config files are also known content
+    if cfg.config_file is not None:
+        known_paths.add(cfg.config_file)
+    if cfg.native_config_file is not None:
+        known_paths.add(cfg.native_config_file)
+    if cfg.system_file is not None:
+        known_paths.add(cfg.system_file)
+
     all_present = True
     for d in expected_dirs:
         if not d.is_dir():
@@ -186,6 +201,28 @@ def collect_provider_dir_state(target: Path, tool_value: str) -> ProviderDirSign
         md_files = list(d.glob("*.md"))
         if not md_files:
             all_present = False
+
+    # Check for files in the provider directory that don't match known patterns
+    has_foreign = False
+    for child in children:
+        child_resolved = child.resolve()
+        # Known subdirectory
+        if any(child_resolved == kp.resolve() for kp in known_paths if kp is not None):
+            continue
+        # Known config file at provider level
+        if child.is_file() and any(
+            child_resolved == kp.resolve() for kp in known_paths if kp is not None
+        ):
+            continue
+        # Subdirectories of expected dirs are fine
+        if child.is_dir() and any(child_resolved == d.resolve() for d in expected_dirs):
+            continue
+        # If we reach here, the child is not a known resource
+        has_foreign = True
+        break
+
+    if has_foreign:
+        return ProviderDirSignal.MIXED
 
     if all_present:
         return ProviderDirSignal.COMPLETE
@@ -259,7 +296,8 @@ def collect_config_state(target: Path, tool_value: str) -> ConfigSignal:
 
     try:
         content = config_file.read_text(encoding="utf-8")
-    except OSError:
+    except OSError as exc:
+        logger.warning("Cannot read config %s: %s", config_file, exc)
         return ConfigSignal.MISSING
 
     # Detect both legacy AUTO-GENERATED header and current <vaultspec> tags
@@ -285,7 +323,8 @@ def collect_mcp_config_state(target: Path) -> ConfigSignal:
 
     try:
         raw = json.loads(mcp_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Cannot read MCP config %s: %s", mcp_path, exc)
         return ConfigSignal.PARTIAL_MCP
 
     if not isinstance(raw, dict):
@@ -322,7 +361,8 @@ def collect_gitignore_state(target: Path) -> GitignoreSignal:
 
     try:
         content = gi_path.read_text(encoding="utf-8")
-    except OSError:
+    except OSError as exc:
+        logger.warning("Cannot read .gitignore %s: %s", gi_path, exc)
         return GitignoreSignal.NO_FILE
 
     lines = content.splitlines()

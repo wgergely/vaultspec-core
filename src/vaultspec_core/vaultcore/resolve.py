@@ -15,6 +15,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from vaultspec_core.core.exceptions import VaultSpecError
+
 from .models import DocType
 
 __all__ = ["resolve_related_inputs", "validate_feature_dependencies"]
@@ -25,7 +27,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-class RelatedResolutionError(Exception):
+class RelatedResolutionError(VaultSpecError):
     """One or more user-supplied related paths could not be resolved."""
 
     def __init__(self, failures: list[str]) -> None:

@@ -15,7 +15,13 @@ from typing import TYPE_CHECKING, Any
 from . import types as _t
 from .enums import Tool
 from .exceptions import ResourceExistsError
-from .helpers import _launch_editor, build_file, collect_md_resources, ensure_dir
+from .helpers import (
+    _launch_editor,
+    atomic_write,
+    build_file,
+    collect_md_resources,
+    ensure_dir,
+)
 from .sync import sync_to_all_tools
 
 if TYPE_CHECKING:
@@ -24,17 +30,23 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def collect_rules() -> dict[str, tuple[Path, dict[str, Any], str]]:
+def collect_rules(
+    warnings: list[str] | None = None,
+) -> dict[str, tuple[Path, dict[str, Any], str]]:
     """Collect rule definitions from .vaultspec/rules/rules/.
 
     Includes both built-in rules (``*.builtin.md``) and custom user rules
     (``*.md``).
 
+    Args:
+        warnings: Optional list to append parse-error messages to, so callers
+            can propagate them into :class:`~vaultspec_core.core.types.SyncResult`.
+
     Returns:
         A mapping of filename to a three-tuple of
         ``(source_path, frontmatter_dict, body_text)``.
     """
-    return collect_md_resources(_t.get_context().rules_src_dir)
+    return collect_md_resources(_t.get_context().rules_src_dir, warnings=warnings)
 
 
 def transform_rule(tool: Tool, name: str, _meta: dict[str, Any], body: str) -> str:
@@ -121,7 +133,7 @@ def rules_add(
 
             editor = get_config().editor
             scaffold = f"---\nname: {name}\n---\n\n# Rule content\n"
-            file_path.write_text(scaffold, encoding="utf-8")
+            atomic_write(file_path, scaffold)
             logger.info("Opening editor (%s) for %s...", editor, file_path)
             try:
                 _launch_editor(editor, str(file_path))
@@ -134,7 +146,7 @@ def rules_add(
 
     fm = {"name": name}
     full = build_file(fm, (rule_content or "").lstrip())
-    file_path.write_text(full, encoding="utf-8")
+    atomic_write(file_path, full)
     logger.info("Created custom rule: %s", file_path)
     return file_path
 
@@ -150,11 +162,14 @@ def rules_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
         Accumulated :class:`~vaultspec_core.core.types.SyncResult` across
         all active tool destinations.
     """
-    return sync_to_all_tools(
-        sources=collect_rules(),
+    parse_warnings: list[str] = []
+    result = sync_to_all_tools(
+        sources=collect_rules(warnings=parse_warnings),
         dir_attr="rules_dir",
         transform_fn=transform_rule,
         label="Rules",
         prune=prune,
         dry_run=dry_run,
     )
+    result.warnings.extend(parse_warnings)
+    return result

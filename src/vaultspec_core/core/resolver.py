@@ -215,7 +215,9 @@ def _resolve_framework(
                 )
             return
 
-    logger.warning("Unhandled signal: %s for action %s", signal, action)
+    # All FrameworkSignal values are handled above; this is unreachable
+    # unless a new enum member is added without updating the resolver.
+    logger.warning("Unknown FrameworkSignal member: %s (action=%s)", signal, action)
 
 
 # ---------------------------------------------------------------------------
@@ -301,7 +303,13 @@ def _resolve_manifest_entry(
                 )
             return
 
-    logger.warning("Unhandled signal: %s for action %s", signal, action)
+    if signal == ManifestEntrySignal.ORPHANED and action == "uninstall":
+        # Orphaned on uninstall: directory already missing, manifest entry
+        # will be cleaned up by the uninstall command itself.
+        return
+
+    # All ManifestEntrySignal values are handled above.
+    logger.warning("Unknown ManifestEntrySignal member: %s (action=%s)", signal, action)
 
 
 # ---------------------------------------------------------------------------
@@ -332,9 +340,15 @@ def _resolve_provider_dir(
             )
         else:
             plan.conflicts.append(
-                f"Provider '{tool_name}' directory contains user content. "
-                f"Use --force to remove."
+                f"Provider '{tool_name}' directory contains files not managed "
+                f"by vaultspec (user-created content outside rules/, skills/, "
+                f"agents/ subdirectories). Use --force to remove."
             )
+        return
+
+    if signal == ProviderDirSignal.MIXED and action in ("install", "sync"):
+        # Mixed content during install/sync: the command will sync managed
+        # resources without touching unrecognized files.
         return
 
     is_syncable = signal in (ProviderDirSignal.EMPTY, ProviderDirSignal.PARTIAL)
@@ -348,7 +362,20 @@ def _resolve_provider_dir(
         )
         return
 
-    logger.warning("Unhandled signal: %s for action %s", signal, action)
+    if is_syncable and action == "install":
+        # Empty/partial during install: install will scaffold and sync.
+        return
+
+    if is_syncable and action == "uninstall":
+        # Empty/partial during uninstall: the directory will be removed.
+        return
+
+    if signal == ProviderDirSignal.MIXED and action == "uninstall":
+        # Already handled above (MIXED + uninstall with force check).
+        return
+
+    # All ProviderDirSignal values are handled above.
+    logger.warning("Unknown ProviderDirSignal member: %s (action=%s)", signal, action)
 
 
 # ---------------------------------------------------------------------------
@@ -414,7 +441,10 @@ def _resolve_content(
                 )
 
         else:
-            logger.warning("Unhandled signal: %s for action %s", signal, action)
+            # All ContentSignal values are handled above.
+            logger.warning(
+                "Unknown ContentSignal member: %s (action=%s)", signal, action
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -435,7 +465,8 @@ def _resolve_builtin_version(
 
     if signal == BuiltinVersionSignal.DELETED:
         plan.warnings.append(
-            "Builtin resources have been deleted from .vaultspec/rules/."
+            "Builtin resources have been deleted from .vaultspec/rules/. "
+            "Run 'vaultspec-core install --upgrade' to restore."
         )
         if force and action == "sync":
             plan.steps.append(
@@ -449,7 +480,8 @@ def _resolve_builtin_version(
 
     if signal == BuiltinVersionSignal.NO_SNAPSHOTS:
         plan.warnings.append(
-            "No version baseline for builtins - cannot verify integrity."
+            "No version baseline for builtins - cannot verify integrity. "
+            "Run 'vaultspec-core install --upgrade' to establish baseline."
         )
         return
 
@@ -469,7 +501,20 @@ def _resolve_builtin_version(
             )
         return
 
-    logger.warning("Unhandled signal: %s for action %s", signal, action)
+    if signal == BuiltinVersionSignal.MODIFIED and action in ("install", "uninstall"):
+        # Modified builtins during install: install --upgrade will re-seed.
+        # Modified builtins during uninstall: they'll be removed anyway.
+        return
+
+    if signal == BuiltinVersionSignal.DELETED and action in ("install", "uninstall"):
+        # Deleted during install: install --upgrade will re-seed.
+        # Deleted during uninstall: nothing left to remove.
+        return
+
+    # All BuiltinVersionSignal values are handled above.
+    logger.warning(
+        "Unknown BuiltinVersionSignal member: %s (action=%s)", signal, action
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -518,7 +563,9 @@ def _resolve_config(
             )
         return
 
-    logger.warning("Unhandled signal: %s for action %s", signal, action)
+    # Config resolution only applies to "sync" action; other actions handled
+    # by the main command directly.  All ConfigSignal values covered above.
+    logger.warning("Unknown ConfigSignal member: %s (action=%s)", signal, action)
 
 
 # ---------------------------------------------------------------------------
@@ -569,7 +616,19 @@ def _resolve_gitignore(
         )
         return
 
-    logger.warning("Unhandled signal: %s for action %s", signal, action)
+    if signal == GitignoreSignal.NO_ENTRIES and action in ("sync", "uninstall"):
+        # No managed entries during sync/uninstall: no action needed.
+        # Sync will not add gitignore entries (that's install's job).
+        # Uninstall doesn't need entries that aren't there.
+        return
+
+    if signal == GitignoreSignal.PARTIAL and action == "uninstall":
+        # Partial entries during uninstall: the managed block will be
+        # removed by the uninstall command.
+        return
+
+    # All GitignoreSignal values are handled above.
+    logger.warning("Unknown GitignoreSignal member: %s (action=%s)", signal, action)
 
 
 # ---------------------------------------------------------------------------
@@ -623,7 +682,8 @@ def _resolve_version_warning(
         if manifest_parts > running_parts:
             plan.warnings.append(
                 f"Manifest was written by vaultspec-core {manifest_version}, "
-                f"but running version is {running_version}."
+                f"but running version is {running_version}. "
+                f"Consider upgrading: pip install --upgrade vaultspec-core"
             )
     except Exception:
         logger.debug("Version comparison failed", exc_info=True)

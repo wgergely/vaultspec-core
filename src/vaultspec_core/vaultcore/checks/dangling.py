@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from ...core.helpers import atomic_write
 from ._base import CheckDiagnostic, CheckResult, Severity
 
 if TYPE_CHECKING:
@@ -142,6 +143,15 @@ def _remove_related_entries(path: Path, targets: list[str]) -> int:
         new_lines.append(line)
 
     if removed:
-        path.write_text("\n".join(new_lines), encoding="utf-8")
+        new_content = "\n".join(new_lines)
+        bak = path.with_suffix(path.suffix + ".bak")
+        bak.write_bytes(path.read_bytes())
+        try:
+            atomic_write(path, new_content)
+        except Exception:
+            if bak.exists():
+                bak.replace(path)
+            raise
+        bak.unlink(missing_ok=True)
 
     return removed
