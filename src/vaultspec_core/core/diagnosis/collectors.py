@@ -198,8 +198,11 @@ def collect_provider_dir_state(target: Path, tool_value: str) -> ProviderDirSign
         if not d.is_dir():
             all_present = False
             continue
+        # Rules/agents dirs contain flat .md files; skills dirs contain
+        # subdirectories each holding a SKILL.md.  Accept either layout.
         md_files = list(d.glob("*.md"))
-        if not md_files:
+        skill_files = list(d.glob("*/SKILL.md")) if not md_files else []
+        if not md_files and not skill_files:
             all_present = False
 
     # Check for files in the provider directory that don't match known patterns
