@@ -25,6 +25,7 @@ class DocType(StrEnum):
     ADR = "adr"
     AUDIT = "audit"
     EXEC = "exec"
+    INDEX = "index"
     PLAN = "plan"
     REFERENCE = "reference"
     RESEARCH = "research"
@@ -148,11 +149,15 @@ class VaultConstants:
 
         return get_config().docs_dir
 
-    # Supported directories within .vault/
-    SUPPORTED_DIRECTORIES: ClassVar[set[str]] = {dt.value for dt in DocType}
+    # Supported directories within .vault/ (INDEX lives at root, not a subdir)
+    SUPPORTED_DIRECTORIES: ClassVar[set[str]] = {
+        dt.value for dt in DocType if dt != DocType.INDEX
+    }
 
-    # Supported directory tags
-    SUPPORTED_TAGS: ClassVar[set[str]] = {dt.tag for dt in DocType}
+    # Supported directory tags (INDEX has no directory tag)
+    SUPPORTED_TAGS: ClassVar[set[str]] = {
+        dt.tag for dt in DocType if dt != DocType.INDEX
+    }
 
     @classmethod
     def is_supported_directory(cls, dirname: str) -> bool:

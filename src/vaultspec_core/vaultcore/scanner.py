@@ -105,6 +105,9 @@ def get_doc_type(path: pathlib.Path, root_dir: pathlib.Path) -> DocType | None:
     try:
         rel_path = path.relative_to(docs_dir)
         if len(rel_path.parts) < 2:
+            # Root-level files: check for feature index pattern
+            if path.name.endswith(".index.md"):
+                return DocType.INDEX
             logger.debug("File has fewer than 2 path parts: %s", rel_path)
             return None
         doc_type = DocType(rel_path.parts[0])
