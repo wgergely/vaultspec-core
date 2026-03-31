@@ -297,7 +297,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
             ),
             rule_ref_dir=target / DirName.CODEX.value / Resource.RULES.value,
             system_file=None,
-            emit_system_rule=False,
+            emit_system_rule=True,
             capabilities=frozenset(
                 {
                     _pc.RULES,
