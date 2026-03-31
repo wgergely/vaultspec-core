@@ -288,14 +288,14 @@ def init_paths(layout: Any) -> WorkspaceContext:
         ),
         Tool.CODEX: ToolConfig(
             name=Tool.CODEX.value,
-            rules_dir=None,
+            rules_dir=target / DirName.CODEX.value / Resource.RULES.value,
             skills_dir=shared_agents_root / Resource.SKILLS.value,
             agents_dir=None,
             config_file=target / FileName.AGENTS.value,
             native_config_file=(
                 target / DirName.CODEX.value / FileName.CONFIG_TOML.value
             ),
-            rule_ref_dir=None,
+            rule_ref_dir=target / DirName.CODEX.value / Resource.RULES.value,
             system_file=None,
             emit_system_rule=False,
             capabilities=frozenset(
