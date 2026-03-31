@@ -165,8 +165,12 @@ def render_check_result(
         verbose: When False, suppress INFO-level diagnostics.
         summary_only: When True, show only the one-line summary per check.
     """
-    if result.is_clean:
-        console.print(f"  [green]✓[/green] {result.check_name}: [green]clean[/green]")
+    # When not verbose, INFO-only results are effectively clean.
+    visible_issues = result.error_count + result.warning_count
+    if result.is_clean or (not verbose and not visible_issues):
+        console.print(
+            f"  [green]\u2713[/green] {result.check_name}: [green]clean[/green]"
+        )
         return
 
     errors = result.error_count
