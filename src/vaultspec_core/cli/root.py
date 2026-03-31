@@ -586,7 +586,9 @@ def cmd_sync(
                 detail = ", ".join(parts)
                 console.print(f"  [bold]{tool_name:<16}[/bold] {detail}")
             else:
-                console.print(f"  [dim]{tool_name:<16} all up to date[/dim]")
+                console.print(
+                    f"  [green]\u2713[/green] [dim]{tool_name:<16} up to date[/dim]"
+                )
 
         # Check if bundled builtins are newer than deployed
         from vaultspec_core.builtins import check_outdated
