@@ -66,7 +66,7 @@ def test_project(tmp_path):
     # install_run bootstraps its own context, no need to call init_paths first
     from vaultspec_core.core.commands import install_run
 
-    install_run(path=dest, provider="all", upgrade=False, dry_run=False, force=False)
+    install_run(path=dest, provider="all", upgrade=False, dry_run=False, force=True)
 
     # Re-init after install to pick up the full workspace layout
     layout = resolve_workspace(target_override=dest)

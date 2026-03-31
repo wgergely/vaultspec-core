@@ -149,18 +149,22 @@ class TestSyncSkills:
         skills_dir = test_project / ".claude" / "skills"
         skills_dir.mkdir(parents=True, exist_ok=True)
         # User-placed directory without SKILL.md  - must survive pruning
-        (skills_dir / "fd").mkdir()
-        (skills_dir / "fd" / "README.md").write_text("user tool", encoding="utf-8")
+        user_dir = skills_dir / "my-user-tool"
+        user_dir.mkdir(exist_ok=True)
+        # Remove any stale SKILL.md so this is truly a non-skill directory
+        stale_skill = user_dir / "SKILL.md"
+        if stale_skill.exists():
+            stale_skill.unlink()
+        (user_dir / "README.md").write_text("user tool", encoding="utf-8")
         # Stale synced skill with SKILL.md  - should be pruned
-        (skills_dir / "vaultspec-old").mkdir()
-        (skills_dir / "vaultspec-old" / "SKILL.md").write_text(
-            "stale", encoding="utf-8"
-        )
+        stale_dir = skills_dir / "vaultspec-stale-test"
+        stale_dir.mkdir(exist_ok=True)
+        (stale_dir / "SKILL.md").write_text("stale", encoding="utf-8")
 
         self._make_skill_sources(test_project, ["vaultspec-deploy"])
         skills_sync(prune=True)
-        assert (skills_dir / "fd" / "README.md").exists()
-        assert not (skills_dir / "vaultspec-old" / "SKILL.md").exists()
+        assert (user_dir / "README.md").exists()
+        assert not (stale_dir / "SKILL.md").exists()
 
 
 class TestSyncAgents:
@@ -569,15 +573,28 @@ class TestEndToEndAllDestinations:
         ).exists()
 
         # === Codex destination ===
-        # AGENTS.md is only created when Codex has rule refs (rule_ref_dir=None)
         codex_toml = test_project / ".codex" / "config.toml"
         assert codex_toml.exists()
         toml_content = codex_toml.read_text(encoding="utf-8")
         assert 'model = "gpt-5-codex"' in toml_content
         assert '[agents."vaultspec-worker"]' in toml_content
 
+        # Codex rules are synced to .codex/rules/
+        assert (test_project / ".codex" / "rules").exists()
+        assert (test_project / ".codex" / "rules" / "no-swear.md").exists()
+
+        # AGENTS.md gets rule references from .codex/rules/
+        agents_md = test_project / "AGENTS.md"
+        assert agents_md.exists()
+        agents_content = agents_md.read_text(encoding="utf-8")
+        assert "@.codex/rules/no-swear.md" in agents_content
+
+        # Codex gets system builtin rule (emit_system_rule=True)
+        assert (
+            test_project / ".codex" / "rules" / "vaultspec-system.builtin.md"
+        ).exists()
+
         # Codex must NOT have:
-        assert not (test_project / ".codex" / "rules").exists()
         assert not (test_project / ".codex" / "CODEX.md").exists()
         assert not (test_project / ".codex" / "SYSTEM.md").exists()
 

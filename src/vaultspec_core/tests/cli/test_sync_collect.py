@@ -275,21 +275,25 @@ class TestCodexNegativeCoverage:
         """Codex agent definitions use TOML, not a synced agents_dir."""
         assert _cfg(Tool.CODEX).agents_dir is None
 
-    def test_codex_emit_system_rule_disabled(self, test_project):
-        """Codex must not emit behavioral rules via the system rule fallback."""
-        assert _cfg(Tool.CODEX).emit_system_rule is False
+    def test_codex_emit_system_rule_enabled(self, test_project):
+        """Codex emits behavioral rules via the system rule fallback."""
+        assert _cfg(Tool.CODEX).emit_system_rule is True
 
     def test_system_prompt_returns_none_for_codex(self, test_project):
+        """Codex has no dedicated system_file, so system prompt is None."""
         (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Base system prompt", encoding="utf-8"
         )
         assert _generate_system_prompt(_cfg(Tool.CODEX)) is None
 
-    def test_system_rules_returns_none_for_codex(self, test_project):
+    def test_system_rules_generated_for_codex(self, test_project):
+        """Codex gets system rules via emit_system_rule=True."""
         (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Base system prompt", encoding="utf-8"
         )
-        assert _generate_system_rules(_cfg(Tool.CODEX)) is None
+        result = _generate_system_rules(_cfg(Tool.CODEX))
+        assert result is not None
+        assert "Base system prompt" in result
 
     def test_codex_native_config_returns_none_without_codex_keys(self, test_project):
         """If no codex_* frontmatter keys exist, native config returns None."""
@@ -463,8 +467,8 @@ class TestGenerateSystemRules:
         (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE", encoding="utf-8"
         )
+        # Antigravity has emit_system_rule=False
         assert _generate_system_rules(_cfg(Tool.ANTIGRAVITY)) is None
-        assert _generate_system_rules(_cfg(Tool.CODEX)) is None
 
     def test_returns_none_for_empty_parts(self, test_project):
         shutil.rmtree(test_project / ".vaultspec" / "rules" / "system")
