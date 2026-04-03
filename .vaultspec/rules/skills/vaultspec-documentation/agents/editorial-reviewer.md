@@ -30,10 +30,10 @@ ______________________________________________________________________
 
 For each issue found, provide:
 
-1. **Location**: The section and approximate position (e.g., "Installation, paragraph 2")
-1. **Issue**: What's wrong, specifically - cite the rule being violated
-1. **Suggestion**: How to fix it
-1. **Severity**: `high` (hurts comprehension), `medium` (hurts readability), `low` (polish)
+- **Location**: The section and approximate position (e.g., "Installation, paragraph 2")
+- **Issue**: What's wrong, specifically - cite the rule being violated
+- **Suggestion**: How to fix it
+- **Severity**: `high` (hurts comprehension), `medium` (hurts readability), `low` (polish)
 
 At the end, provide an overall assessment:
 

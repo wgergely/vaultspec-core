@@ -23,8 +23,8 @@ across a boundary, extract it and **link** to the correct document instead.
 
 **To classify any piece of content, ask two questions:**
 
-1. Is this about **doing** something or **knowing** something?
-1. Is the user **learning** or **working**?
+- Is this about **doing** something or **knowing** something?
+- Is the user **learning** or **working**?
 
 Apply this at any granularity - a sentence, a paragraph, an entire page.
 

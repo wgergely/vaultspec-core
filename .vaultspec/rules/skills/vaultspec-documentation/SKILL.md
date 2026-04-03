@@ -55,15 +55,15 @@ location. The wireframe is the document's table of promises.
 
 ### How to build the wireframe
 
-1. Ask the user what they want documented (project, feature, tool, etc.)
-1. Ask who the audience is (new users, developers, operators, etc.)
-1. **Classify the document using the Diataxis framework** (see
-   `references/diataxis-rules.md`): Tutorial, How-to Guide, Reference, or
-   Explanation. For documents that span types (e.g. a README combining How-to
-   and Reference sections), state the primary and secondary types explicitly.
-   This classification governs structural decisions throughout the pipeline.
-1. Draft the wireframe with `<Title>` and `<Section>` tags
-1. Present it to the user for initial feedback before entering refinement
+- Ask the user what they want documented (project, feature, tool, etc.)
+- Ask who the audience is (new users, developers, operators, etc.)
+- **Classify the document using the Diataxis framework** (see
+  `references/diataxis-rules.md`): Tutorial, How-to Guide, Reference, or
+  Explanation. For documents that span types (e.g. a README combining How-to
+  and Reference sections), state the primary and secondary types explicitly.
+  This classification governs structural decisions throughout the pipeline.
+- Draft the wireframe with `<Title>` and `<Section>` tags
+- Present it to the user for initial feedback before entering refinement
 
 Keep tags descriptive but concise. A tag like `<Section: How to configure the retry policy for failed webhook deliveries>` is better than `<Section: Configuration>` - it tells the
 refinement reviewer exactly what to expect.
@@ -83,10 +83,10 @@ they can't, no amount of good writing will save the document.
 
 Spawn a subagent with **no project context**. The subagent must:
 
-1. **Read** `agents/wireframe-agent.md` - the full agent persona and instructions.
-1. **Read** `references/diataxis-rules.md` in full - the documentation framework that
-   grounds all structural evaluation.
-1. **Receive only the wireframe** as input. No project summary, no background, no hints.
+- **Read** `agents/wireframe-agent.md` - the full agent persona and instructions.
+- **Read** `references/diataxis-rules.md` in full - the documentation framework that
+  grounds all structural evaluation.
+- **Receive only the wireframe** as input. No project summary, no background, no hints.
 
 The agent instructions contain the persona, the 8 evaluation questions, the response
 format, and the Diataxis compliance review. Do not override or paraphrase them - use
@@ -142,10 +142,10 @@ that confuse the drafting stage.
 
 For each `<Section>` tag:
 
-1. Spawn a subagent tasked with finding everything relevant to that section
-1. The subagent should explore the codebase, read relevant files, check tests, configs,
-   CLI help output - whatever is needed to populate that section accurately
-1. Collect the subagent's findings as structured context for that section
+- Spawn a subagent tasked with finding everything relevant to that section
+- The subagent should explore the codebase, read relevant files, check tests, configs,
+  CLI help output - whatever is needed to populate that section accurately
+- Collect the subagent's findings as structured context for that section
 
 For each `<Title>` tag: titles typically don't need deep research - they frame the sections
 below them.
@@ -199,15 +199,15 @@ misleading descriptions of behavior.
 Spawn parallel subagents, each responsible for verifying a portion of the document. Each
 reviewer should:
 
-1. Read the section(s) assigned to it
-1. Cross-reference every technical claim against the actual codebase:
-   - Are module names, function names, and class names correct?
-   - Do CLI commands and flags actually exist and work as described?
-   - Are file paths and config keys accurate?
-   - Do code examples actually run?
-   - Are described behaviors true to the implementation?
-1. Report findings as a list of corrections needed, with evidence (file path, line number,
-   actual behavior vs. documented behavior)
+- Read the section(s) assigned to it
+- Cross-reference every technical claim against the actual codebase:
+  - Are module names, function names, and class names correct?
+  - Do CLI commands and flags actually exist and work as described?
+  - Are file paths and config keys accurate?
+  - Do code examples actually run?
+  - Are described behaviors true to the implementation?
+- Report findings as a list of corrections needed, with evidence (file path, line number,
+  actual behavior vs. documented behavior)
 
 Apply all corrections to the document. If a correction changes the meaning of a section
 significantly, flag it - the section may need partial redrafting.
@@ -222,10 +222,10 @@ access, no wireframe, no knowledge of what the project is or does.
 
 The subagent must:
 
-1. **Read** `agents/editorial-reviewer.md` - the full agent instructions.
-1. **Read** `references/prose-style-rules.md` in full - the prose and style rule system
-   that grounds all editorial evaluation. Every finding must cite a specific rule.
-1. **Receive only the document** as input. No codebase, no wireframe, no project context.
+- **Read** `agents/editorial-reviewer.md` - the full agent instructions.
+- **Read** `references/prose-style-rules.md` in full - the prose and style rule system
+  that grounds all editorial evaluation. Every finding must cite a specific rule.
+- **Receive only the document** as input. No codebase, no wireframe, no project context.
 
 The agent returns findings only - issues with location, rule citation, and suggested fix.
 

@@ -29,15 +29,15 @@ Answer each of the following questions. Use the Diataxis framework to inform you
 reasoning - if a section mixes types, drifts across boundaries, or violates the rules
 for its type, that should surface naturally in your answers.
 
-1. Would you understand what this project or feature does?
-1. Would you understand how it does it?
-1. Would you understand how to set it up?
-1. Would you understand where to find more information?
-1. Would you understand where to ask for help?
-1. Are there usage instructions? Easy-to-follow practical tips to help you get started?
-1. If you needed to find more information about referenced terms, can you find an
-   easy-to-access summary?
-1. Would you understand why the project exists and what problem it solves?
+- Would you understand what this project or feature does?
+- Would you understand how it does it?
+- Would you understand how to set it up?
+- Would you understand where to find more information?
+- Would you understand where to ask for help?
+- Are there usage instructions? Easy-to-follow practical tips to help you get started?
+- If you needed to find more information about referenced terms, can you find an
+  easy-to-access summary?
+- Would you understand why the project exists and what problem it solves?
 
 ______________________________________________________________________
 
