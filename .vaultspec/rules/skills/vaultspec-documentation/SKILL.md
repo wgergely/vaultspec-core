@@ -63,7 +63,9 @@ location. The wireframe is the document's table of promises.
   and Reference sections), state the primary and secondary types explicitly.
   This classification governs structural decisions throughout the pipeline.
 - Draft the wireframe with `<Title>` and `<Section>` tags
-- Present it to the user for initial feedback before entering refinement
+- Confirm the general direction with the user (scope, audience, classification)
+  before entering refinement. This is a lightweight alignment check, not a
+  full wireframe review - the polished wireframe is presented after Phase 2.
 
 Keep tags descriptive but concise. A tag like `<Section: How to configure the retry policy for failed webhook deliveries>` is better than `<Section: Configuration>` - it tells the
 refinement reviewer exactly what to expect.
