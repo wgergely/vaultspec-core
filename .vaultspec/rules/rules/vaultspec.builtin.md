@@ -38,6 +38,7 @@ Where appropriate, use the following skills:
 - `vaultspec-code-reference`
 - `vaultspec-write-plan`
 - `vaultspec-execute`
+- `vaultspec-documentation`
 
 ## Documentation Hierarchy
 
