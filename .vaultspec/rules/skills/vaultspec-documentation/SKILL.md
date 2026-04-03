@@ -159,7 +159,7 @@ Each section is drafted by an isolated subagent that receives ONLY:
 
 - The current wireframe tag (just the one it's writing)
 - The gathered context for that tag
-- The editorial guidelines (see `references/editorial-guidelines.md` if available)
+- The editorial guidelines (see `references/prose-style-rules.md`)
 - The document's title and audience (for tone calibration)
 
 The subagent does NOT receive:
