@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.1.6](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.5...vaultspec-core-v0.1.6) (2026-04-03)
+
+
+### Features
+
+* add announce pattern and Diataxis classification mandate ([4c22b78](https://github.com/wgergely/vaultspec-core/commit/4c22b78046248c66e4751d7586660270af6a9125))
+* add vaultspec-cli built-in rule for agent CLI awareness ([44a435b](https://github.com/wgergely/vaultspec-core/commit/44a435b50d57f8c68ae6f2c4b60f4ecd29589d1d))
+* add vaultspec-documentation to builtin skill list ([89e6e7d](https://github.com/wgergely/vaultspec-core/commit/89e6e7d721454cbb5b57d08565503fbc1cf7030b))
+* provider-centric sync output with per-tool result tracking ([b63004b](https://github.com/wgergely/vaultspec-core/commit/b63004b7776a15ad44d12622c6a9a6f31de0aa43))
+* recover vaultspec-documentation skill ([b4a4eba](https://github.com/wgergely/vaultspec-core/commit/b4a4eba3ee1559c0bd4fdc9febd51d24eda7758b))
+* recover vaultspec-documentation skill from conversation history ([bcd3ecc](https://github.com/wgergely/vaultspec-core/commit/bcd3eccf5851bbd6884a9c19df95ab5a8ca03f56)), closes [#26](https://github.com/wgergely/vaultspec-core/issues/26)
+* sync warns when bundled builtins are newer than deployed ([069e6f4](https://github.com/wgergely/vaultspec-core/commit/069e6f4d9db10f8ef5f615abebb13245ff10ecfd))
+* universal --json output across all CLI commands ([726a641](https://github.com/wgergely/vaultspec-core/commit/726a6418caeba5b04ea4ceec9daa6417d133ade9))
+
+
+### Bug Fixes
+
+* audit findings phases 1-4 - data safety, error visibility, logic fixes, exception hardening ([ce4076d](https://github.com/wgergely/vaultspec-core/commit/ce4076dfaeaa602fa5c2b6d3b321af4417a090e3))
+* audit findings phases 6-8 - security, filesystem hardening, UX polish ([d9bd6a1](https://github.com/wgergely/vaultspec-core/commit/d9bd6a1d3efd257bbdfee23fa357b75670a0400d))
+* clarify Phase 1 user check vs Phase 2/3 approval gate ([97cf7eb](https://github.com/wgergely/vaultspec-core/commit/97cf7ebcc487e3df19d7a07ad80af18175299995))
+* classify .vault/ feature index files as INDEX instead of unknown ([faad468](https://github.com/wgergely/vaultspec-core/commit/faad468a102b10777118c39920665ca49aedd328))
+* correct broken reference to editorial-guidelines.md ([8c468a6](https://github.com/wgergely/vaultspec-core/commit/8c468a60b548f334cbb2d3a8c1a003e46e163bdc))
+* doctor misreports config as missing, add MCP row ([a948c14](https://github.com/wgergely/vaultspec-core/commit/a948c14452425969548a4cca6add1b63ae9d9825))
+* enable Codex rules_dir so rules sync and AGENTS.md references work ([65522fa](https://github.com/wgergely/vaultspec-core/commit/65522fa905a5cea3896e8e7b1d0d04fecb53c70c))
+* enable system prompt delivery to Codex via vaultspec-system.builtin.md ([7f0ccf0](https://github.com/wgergely/vaultspec-core/commit/7f0ccf0b3ea049e692ea2812aad71d0f549a0dfa))
+* false "partial" diagnosis for providers with skills directories ([a2ef784](https://github.com/wgergely/vaultspec-core/commit/a2ef784fc96d9cbfe5b49cd22f3472e0858ee880))
+* features check renders empty warning header for INFO-only results ([018e521](https://github.com/wgergely/vaultspec-core/commit/018e521c54d2ca674ddd9afcc5879f969de00e8f))
+* read-only gitignore test handles Linux CI root permissions ([0cd0495](https://github.com/wgergely/vaultspec-core/commit/0cd049555e256027032328b5ba4747bfe81aaa82))
+* resolve all 91 audit findings from cli-ambiguous-states rolling audit ([7345d53](https://github.com/wgergely/vaultspec-core/commit/7345d530a7602c37ddb41c01eb403522e80cb0d9))
+* unblock 113 erroring tests, update tests for Codex rules_dir changes ([05659e2](https://github.com/wgergely/vaultspec-core/commit/05659e2d6e9de6fa1daaf48cfedd9343751fc228))
+* vault list validates doc_type, suggests vault feature list ([fa50639](https://github.com/wgergely/vaultspec-core/commit/fa506390c220ac7c68d0fed9a88dbd19e8911fd2))
+
 ## [0.1.5](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.4...vaultspec-core-v0.1.5) (2026-03-30)
 
 
