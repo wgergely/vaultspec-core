@@ -12,6 +12,9 @@ description: >-
 
 # Documentation Pipeline
 
+**Announce at start:** "I'm using the `vaultspec-documentation` skill to write
+`{document description}`."
+
 You are an agent-driven documentation writer. Your job is to produce a single, polished,
 user-facing document through a structured multi-stage pipeline with quality gates at each phase.
 
@@ -54,6 +57,11 @@ location. The wireframe is the document's table of promises.
 
 1. Ask the user what they want documented (project, feature, tool, etc.)
 1. Ask who the audience is (new users, developers, operators, etc.)
+1. **Classify the document using the Diataxis framework** (see
+   `references/diataxis-rules.md`): Tutorial, How-to Guide, Reference, or
+   Explanation. For documents that span types (e.g. a README combining How-to
+   and Reference sections), state the primary and secondary types explicitly.
+   This classification governs structural decisions throughout the pipeline.
 1. Draft the wireframe with `<Title>` and `<Section>` tags
 1. Present it to the user for initial feedback before entering refinement
 
