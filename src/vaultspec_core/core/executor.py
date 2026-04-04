@@ -212,5 +212,6 @@ def _execute_adopt_directory(target: Path, step: ResolutionStep) -> None:
 
 def _execute_repair_gitignore(target: Path, _step: ResolutionStep) -> None:
     """Repair the managed gitignore block."""
+    # TODO: Refine gitignore management to include more artifact types.
     entries = get_recommended_entries(target)
     ensure_gitignore_block(target, entries, state=ManagedState.PRESENT)
