@@ -233,21 +233,18 @@ def _scaffold_precommit(
     hook_doctor = {
         "id": "vault-doctor",
         "name": "Vault Doctor",
-        "entry": "uv run python -m vaultspec_core vault doctor --severity error",
+        "entry": "uv run python -m vaultspec_core vault check all",
         "language": "system",
         "types": ["markdown"],
-        "pass_filenames": True,
+        "pass_filenames": False,
     }
     hook_doctor_deep = {
         "id": "vault-doctor-deep",
         "name": "Vault Doctor (chain + links)",
-        "entry": (
-            "uv run python -m vaultspec_core vault doctor "
-            "--category chain --category links --severity error"
-        ),
+        "entry": "uv run python -m vaultspec_core doctor",
         "language": "system",
         "types": ["markdown"],
-        "pass_filenames": True,
+        "pass_filenames": False,
     }
 
     if config_file.exists():
