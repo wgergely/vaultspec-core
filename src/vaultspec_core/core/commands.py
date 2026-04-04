@@ -289,14 +289,23 @@ def _scaffold_precommit(
 
         if not dry_run:
             atomic_write(
-                config_file, yaml.dump(data, sort_keys=False, default_flow_style=False)
+                config_file,
+                yaml.dump(
+                    data,
+                    sort_keys=False,
+                    default_flow_style=False,
+                    allow_unicode=True,
+                ),
             )
         return [(".pre-commit-config.yaml", "precommit")]
 
     if not dry_run:
         data = {"repos": [{"repo": "local", "hooks": [hook_doctor, hook_doctor_deep]}]}
         atomic_write(
-            config_file, yaml.dump(data, sort_keys=False, default_flow_style=False)
+            config_file,
+            yaml.dump(
+                data, sort_keys=False, default_flow_style=False, allow_unicode=True
+            ),
         )
     return [(".pre-commit-config.yaml", "precommit")]
 
@@ -888,22 +897,97 @@ def uninstall_run(
 
         # Surgical .mcp.json cleanup: remove only the vaultspec-core key
         mcp_path = path / ".mcp.json"
-        if mcp_path.exists() and not dry_run:
-            try:
-                raw = json.loads(mcp_path.read_text(encoding="utf-8"))
-                if isinstance(raw, dict):
-                    servers = raw.get("mcpServers", {})
-                    if isinstance(servers, dict) and "vaultspec-core" in servers:
-                        del servers["vaultspec-core"]
-                        if servers:
-                            atomic_write(mcp_path, json.dumps(raw, indent=2) + "\n")
-                        else:
-                            mcp_path.unlink()
-                        removed.append((_rel(path, mcp_path), "mcp"))
-            except (json.JSONDecodeError, OSError):
-                pass
-        elif mcp_path.exists() and dry_run:
-            removed.append((_rel(path, mcp_path), "mcp"))
+        if "mcp" not in skip:
+            if mcp_path.exists() and not dry_run:
+                try:
+                    raw = json.loads(mcp_path.read_text(encoding="utf-8"))
+                    if isinstance(raw, dict):
+                        servers = raw.get("mcpServers", {})
+                        if isinstance(servers, dict) and "vaultspec-core" in servers:
+                            del servers["vaultspec-core"]
+                            if servers:
+                                atomic_write(mcp_path, json.dumps(raw, indent=2) + "\n")
+                            else:
+                                mcp_path.unlink()
+                            removed.append((_rel(path, mcp_path), "mcp"))
+                except (json.JSONDecodeError, OSError):
+                    pass
+            elif mcp_path.exists() and dry_run:
+                removed.append((_rel(path, mcp_path), "mcp"))
+
+        # Surgical .pre-commit-config.yaml cleanup: remove vaultspec-core hooks
+        precommit_path = path / ".pre-commit-config.yaml"
+        if "precommit" not in skip:
+            if precommit_path.exists() and not dry_run:
+                try:
+                    import yaml
+
+                    raw = precommit_path.read_text(encoding="utf-8")
+                    data = yaml.safe_load(raw)
+                    if isinstance(data, dict):
+                        repos = data.get("repos", [])
+                        if isinstance(repos, list):
+                            changed = False
+                            new_repos = []
+                            for r in repos:
+                                if isinstance(r, dict) and r.get("repo") == "local":
+                                    hooks = r.get("hooks", [])
+                                    if isinstance(hooks, list):
+                                        new_hooks = [
+                                            h
+                                            for h in hooks
+                                            if isinstance(h, dict)
+                                            and h.get("id")
+                                            not in ("vault-doctor", "vault-doctor-deep")
+                                        ]
+                                        if len(new_hooks) != len(hooks):
+                                            r["hooks"] = new_hooks
+                                            changed = True
+                                        if new_hooks:
+                                            new_repos.append(r)
+                                    else:
+                                        new_repos.append(r)
+                                else:
+                                    new_repos.append(r)
+
+                            if changed:
+                                if new_repos:
+                                    data["repos"] = new_repos
+                                    atomic_write(
+                                        precommit_path,
+                                        yaml.dump(
+                                            data,
+                                            sort_keys=False,
+                                            default_flow_style=False,
+                                            allow_unicode=True,
+                                        ),
+                                    )
+                                else:
+                                    del data["repos"]
+                                    if not data:
+                                        precommit_path.unlink()
+                                    else:
+                                        atomic_write(
+                                            precommit_path,
+                                            yaml.dump(
+                                                data,
+                                                sort_keys=False,
+                                                default_flow_style=False,
+                                                allow_unicode=True,
+                                            ),
+                                        )
+                                removed.append(
+                                    (_rel(path, precommit_path), "precommit")
+                                )
+                except (yaml.YAMLError, OSError):
+                    pass
+            elif precommit_path.exists() and dry_run:
+                try:
+                    raw = precommit_path.read_text(encoding="utf-8")
+                    if "id: vault-doctor" in raw:
+                        removed.append((_rel(path, precommit_path), "precommit"))
+                except OSError:
+                    pass
 
     else:
         # Per-provider uninstall with shared directory protection
