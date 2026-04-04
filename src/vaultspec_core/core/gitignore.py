@@ -7,6 +7,8 @@ import os
 import shutil
 from pathlib import Path
 
+from .enums import ManagedState, Tool
+
 logger = logging.getLogger(__name__)
 
 MARKER_BEGIN = "# >>> vaultspec-managed (do not edit this block) >>>"
@@ -22,26 +24,26 @@ def get_recommended_entries(target: Path) -> list[str]:
     Uses :class:`~vaultspec_core.core.types.WorkspaceContext` and manifest
     data to dynamically discover provider directories and configuration files.
     """
-    entries: set[str] = {".vaultspec/_snapshots/"}
+    entries: set[str] = set()
 
     from .manifest import read_manifest_data
 
     try:
-        mdata = read_manifest_data(target)
-        # Always ignore framework internals if framework exists
-        if (target / ".vaultspec").exists():
+        # Internal state that must ALWAYS be ignored if framework exists
+        if (target / ".vaultspec").is_dir():
+            entries.add(".vaultspec/_snapshots/")
             entries.add(".vaultspec/")
-        if (target / ".vault").exists():
+        if (target / ".vault").is_dir():
             entries.add(".vault/")
+
+        mdata = read_manifest_data(target)
 
         # Global files
         if (target / ".mcp.json").exists():
             entries.add(".mcp.json")
 
-        # Use the canonical artifact collection logic from commands.py
-        # to ensure gitignore is perfectly synced with provider artifacts.
-        from .commands import _collect_provider_artifacts
-        from .enums import Tool
+        # Use the local artifact collection logic to ensure gitignore is
+        # perfectly synced with provider artifacts.
 
         for name in mdata.installed:
             try:
@@ -69,6 +71,47 @@ def get_recommended_entries(target: Path) -> list[str]:
     return sorted(entries)
 
 
+def _collect_provider_artifacts(
+    path: Path, tool: ManagedState | Tool
+) -> tuple[list[Path], list[Path]]:
+    """Return ``(directories, files)`` managed by a single provider.
+
+    Args:
+        path: Workspace root directory.
+        tool: :class:`~vaultspec_core.core.enums.Tool` to inspect.
+
+    Returns:
+        A two-tuple of ``(directory_paths, file_paths)`` owned by *tool*.
+    """
+    from . import types as _t
+    from .enums import DirName, FileName
+
+    if not isinstance(tool, Tool):
+        return [], []
+
+    cfg = _t.get_context().tool_configs.get(tool)
+    dirs: list[Path] = []
+    files: list[Path] = []
+
+    if tool == Tool.CLAUDE:
+        dirs.append(path / DirName.CLAUDE.value)
+        files.append(path / FileName.CLAUDE.value)
+    elif tool == Tool.GEMINI:
+        dirs.append(path / DirName.GEMINI.value)
+        files.append(path / FileName.GEMINI.value)
+    elif tool == Tool.ANTIGRAVITY:
+        dirs.append(path / DirName.ANTIGRAVITY.value)
+        files.append(path / FileName.GEMINI.value)
+    elif tool == Tool.CODEX:
+        dirs.append(path / DirName.CODEX.value)
+        files.append(path / FileName.AGENTS.value)
+
+    if cfg and cfg.native_config_file and cfg.native_config_file.parent not in dirs:
+        dirs.append(cfg.native_config_file.parent)
+
+    return dirs, files
+
+
 def _detect_line_ending(raw: bytes) -> str:
     """Return ``"\\r\\n"`` if CRLF is dominant in *raw*, else ``"\\n"``."""
     crlf = raw.count(b"\r\n")
@@ -81,7 +124,7 @@ def _find_markers(lines: list[str]) -> tuple[list[int], list[int]]:
     begins: list[int] = []
     ends: list[int] = []
     for i, line in enumerate(lines):
-        stripped = line.rstrip()
+        stripped = line.strip()
         if stripped == MARKER_BEGIN:
             begins.append(i)
         elif stripped == MARKER_END:
@@ -106,7 +149,7 @@ def ensure_gitignore_block(
     target: Path,
     entries: list[str],
     *,
-    state: str = "present",
+    state: ManagedState = ManagedState.PRESENT,
 ) -> bool:
     """Add or remove a vaultspec-managed block inside ``.gitignore``.
 
@@ -117,8 +160,7 @@ def ensure_gitignore_block(
     Args:
         target: Workspace root directory containing ``.gitignore``.
         entries: Gitignore patterns to manage inside the block.
-        state: ``"present"`` to ensure the block exists, ``"absent"`` to
-            remove it.
+        state: Desired state (PRESENT or ABSENT).
 
     Returns:
         ``True`` if the file was modified, ``False`` otherwise.
@@ -141,7 +183,7 @@ def ensure_gitignore_block(
     lines = content.splitlines()
     begins, ends = _find_markers(lines)
 
-    if state == "absent":
+    if state == ManagedState.ABSENT:
         return _remove_block(gi_path, lines, begins, ends, eol, bom)
     return _add_block(gi_path, lines, begins, ends, entries, eol, bom)
 

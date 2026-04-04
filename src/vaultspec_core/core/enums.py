@@ -128,3 +128,10 @@ class DirName(StrEnum):
     GEMINI = ".gemini"
     ANTIGRAVITY = ".agents"
     CODEX = ".codex"
+
+
+class ManagedState(StrEnum):
+    """Desired state of a managed workspace artifact."""
+
+    PRESENT = "present"
+    ABSENT = "absent"

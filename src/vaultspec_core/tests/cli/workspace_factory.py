@@ -360,9 +360,10 @@ class WorkspaceFactory:
 
     def remove_gitignore_block(self) -> Self:
         """Remove the vaultspec-managed block entirely."""
+        from vaultspec_core.core.enums import ManagedState
         from vaultspec_core.core.gitignore import ensure_gitignore_block
 
-        ensure_gitignore_block(self.root, [], state="absent")
+        ensure_gitignore_block(self.root, [], state=ManagedState.ABSENT)
         return self
 
     def delete_gitignore(self) -> Self:

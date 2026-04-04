@@ -262,6 +262,7 @@ class TestGitignoreState:
         assert collect_gitignore_state(tmp_path) == GitignoreSignal.COMPLETE
 
     def test_partial(self, tmp_path: Path) -> None:
+        (tmp_path / ".vaultspec").mkdir()
         content = f"{MARKER_BEGIN}\nsome/other/path\n{MARKER_END}\n"
         _write_gitignore(tmp_path, content)
         assert collect_gitignore_state(tmp_path) == GitignoreSignal.PARTIAL
