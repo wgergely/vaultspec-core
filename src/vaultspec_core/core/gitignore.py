@@ -52,13 +52,15 @@ def get_recommended_entries(target: Path) -> list[str]:
                 for d in dirs:
                     try:
                         rel_dir = d.relative_to(target)
-                        entries.add(f"{str(rel_dir).replace('\\', '/')}/")
+                        rel_dir_str = str(rel_dir).replace("\\", "/")
+                        entries.add(f"{rel_dir_str}/")
                     except ValueError:
                         pass
                 for f in files:
                     try:
                         rel_file = f.relative_to(target)
-                        entries.add(str(rel_file).replace("\\", "/"))
+                        rel_file_str = str(rel_file).replace("\\", "/")
+                        entries.add(rel_file_str)
                     except ValueError:
                         pass
             except ValueError:
@@ -213,11 +215,36 @@ def _add_block(
         _write(gi_path, result, bom)
         return True
 
-    # Otherwise, clean up all existing markers and append a fresh block.
-    # Remove markers from end to start to avoid index shifts.
-    to_pop = sorted(begins + ends, reverse=True)
-    for idx in to_pop:
-        lines.pop(idx)
+    # Otherwise, clean up all existing markers and content between them.
+    # Identify and remove all valid pairs (markers + content)
+    # Simple pairing: find ENDs that come after a BEGIN
+    ranges: list[tuple[int, int]] = []
+    stack: list[int] = []
+    marker_indices = sorted(
+        [(i, "B") for i in begins] + [(i, "E") for i in ends], key=lambda x: x[0]
+    )
+    for idx, type in marker_indices:
+        if type == "B":
+            stack.append(idx)
+        elif type == "E" and stack:
+            start = stack.pop()
+            ranges.append((start, idx))
+
+    if ranges:
+        # Remove ranges from end to start to avoid index shifts.
+        for start, end in sorted(ranges, key=lambda x: x[0], reverse=True):
+            lines[start : end + 1] = []
+
+        # If any orphaned markers remain (unpaired), remove them individually.
+        begins_left, ends_left = _find_markers(lines)
+        to_pop = sorted(begins_left + ends_left, reverse=True)
+        for idx in to_pop:
+            lines.pop(idx)
+    else:
+        # No valid pairs? Just strip any markers found.
+        to_pop = sorted(begins + ends, reverse=True)
+        for idx in to_pop:
+            lines.pop(idx)
 
     # Strip trailing blank lines, add separator, append block.
     while lines and lines[-1].strip() == "":
@@ -245,11 +272,33 @@ def _remove_block(
     if len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]:
         lines = lines[: begins[0]] + lines[ends[0] + 1 :]
     else:
-        # For multiple or mismatched markers, just strip all markers.
-        # Removing contents is risky if we can't reliably pair them.
-        to_pop = sorted(begins + ends, reverse=True)
-        for idx in to_pop:
-            lines.pop(idx)
+        # For multiple or mismatched markers, clean up paired blocks first.
+        ranges: list[tuple[int, int]] = []
+        stack: list[int] = []
+        marker_indices = sorted(
+            [(i, "B") for i in begins] + [(i, "E") for i in ends], key=lambda x: x[0]
+        )
+        for idx, type in marker_indices:
+            if type == "B":
+                stack.append(idx)
+            elif type == "E" and stack:
+                start = stack.pop()
+                ranges.append((start, idx))
+
+        if ranges:
+            for start, end in sorted(ranges, key=lambda x: x[0], reverse=True):
+                lines[start : end + 1] = []
+
+            # Clean up any remaining orphaned markers.
+            begins_left, ends_left = _find_markers(lines)
+            to_pop = sorted(begins_left + ends_left, reverse=True)
+            for idx in to_pop:
+                lines.pop(idx)
+        else:
+            # Just strip any markers found.
+            to_pop = sorted(begins + ends, reverse=True)
+            for idx in to_pop:
+                lines.pop(idx)
 
     lines = _collapse_double_blanks(lines)
     result = eol.join(lines) + eol

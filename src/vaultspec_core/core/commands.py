@@ -1021,10 +1021,10 @@ def uninstall_run(
                         continue
                 removed.append((str(f).replace("\\", "/"), f"{tool.value} (config)"))
 
-            # Update manifest once after all tools are removed from disk
-            if not dry_run:
-                for tool in tools:
-                    remove_provider(path, tool.value)
+        # Update manifest once after all tools are removed from disk
+        if not dry_run:
+            for tool in tools:
+                remove_provider(path, tool.value)
 
     # Re-sync gitignore block
     if not dry_run:
