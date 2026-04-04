@@ -66,7 +66,11 @@ try:
             # PyYAML chokes on unquoted colons in values (e.g.
             # ``description: A test: with colons``).  Fall back to
             # the simple key-value splitter which handles them fine.
-            logger.warning("PyYAML parse error, falling back to simple parser: %s", e)
+            logger.warning(
+                "PyYAML parse error on content:\n%s\nfalling back to simple parser: %s",
+                text,
+                e,
+            )
             return _simple_yaml_load(text)
 
     _yaml_load = _yaml_load_impl
@@ -102,6 +106,7 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
     try:
         frontmatter = _yaml_load(match.group(1))
     except Exception as e:
+        logger.error("DEBUG: YAML PARSE ERROR on content:\n%s\n", match.group(1))
         logger.warning("Failed to parse frontmatter: %s", e, exc_info=True)
         frontmatter = {}
     body = match.group(2)

@@ -133,9 +133,9 @@ class TestInitPaths:
         assert _cfg(Tool.CODEX).native_config_file == (
             test_project / ".codex" / "config.toml"
         )
-        assert _cfg(Tool.CODEX).rules_dir is None
+        assert _cfg(Tool.CODEX).rules_dir == (test_project / ".codex" / "rules")
         assert _cfg(Tool.CODEX).skills_dir == (test_project / ".agents" / "skills")
-        assert _cfg(Tool.CODEX).rule_ref_dir is None
+        assert _cfg(Tool.CODEX).rule_ref_dir == (test_project / ".codex" / "rules")
         # Claude config at project root
         assert _cfg(Tool.CLAUDE).config_file == test_project / "CLAUDE.md"
         # Gemini config at project root, skills via .agents/

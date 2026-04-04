@@ -287,12 +287,11 @@ class TestReadOnlyGitignore:
                 can_write = True
             except OSError:
                 can_write = False
-            finally:
-                gi.write_bytes(b"node_modules/\n")
 
             if can_write:
                 # OS did not enforce read-only; just verify no crash
                 ensure_gitignore_block(tmp_path, ENTRIES)
+                gi.write_bytes(b"node_modules/\n")
             else:
                 with pytest.raises(OSError):
                     ensure_gitignore_block(tmp_path, ENTRIES)
