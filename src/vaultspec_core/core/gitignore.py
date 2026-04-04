@@ -197,13 +197,21 @@ def _add_block(
     eol: str,
     bom: bytes,
 ) -> bool:
+    """Add or update the vaultspec-managed block in-place.
+
+    Replaces exactly one valid block in its original position. For multiple
+    or mismatched markers, purges them and appends a fresh block to the end.
+    """
     new_block = [MARKER_BEGIN, *entries, MARKER_END]
 
-    # If we have exactly one block and it matches, do nothing.
+    # If we have exactly one block, update it in-place.
     if len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]:
         replaced = lines[: begins[0]] + new_block + lines[ends[0] + 1 :]
         if replaced == lines:
             return False
+        result = eol.join(replaced) + eol
+        _write(gi_path, result, bom)
+        return True
 
     # Otherwise, clean up all existing markers and append a fresh block.
     # Remove markers from end to start to avoid index shifts.

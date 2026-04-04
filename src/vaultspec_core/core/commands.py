@@ -699,7 +699,8 @@ def install_run(
         try:
             content = gi_path.read_text(encoding="utf-8")
             begins, ends = _find_markers(content.splitlines())
-            block_present = bool(begins and ends)
+            block_present = len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]
+
         except (OSError, UnicodeDecodeError):
             pass
 
@@ -1264,7 +1265,9 @@ def sync_provider(
                     try:
                         content = gi_path.read_text(encoding="utf-8")
                         begins, ends = _find_markers(content.splitlines())
-                        block_present = bool(begins and ends)
+                        block_present = (
+                            len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]
+                        )
                     except (OSError, UnicodeDecodeError):
                         block_present = False
 
