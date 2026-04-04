@@ -621,9 +621,9 @@ def install_run(
 
         # Re-opt-in gitignore management on --upgrade --force
         if force:
-            from .gitignore import DEFAULT_ENTRIES, ensure_gitignore_block
+            from .gitignore import ensure_gitignore_block, get_recommended_entries
 
-            ensure_gitignore_block(path, DEFAULT_ENTRIES, state="present")
+            ensure_gitignore_block(path, get_recommended_entries(path), state="present")
             mdata.gitignore_managed = True
 
         write_manifest_data(path, mdata)
@@ -669,10 +669,15 @@ def install_run(
     has_mcp = (path / ".mcp.json").exists()
 
     # Manage gitignore block
-    from .gitignore import DEFAULT_ENTRIES, MARKER_BEGIN, ensure_gitignore_block
+    from .gitignore import (
+        _find_markers,
+        ensure_gitignore_block,
+        get_recommended_entries,
+    )
     from .manifest import read_manifest_data, write_manifest_data
 
-    gi_written = ensure_gitignore_block(path, DEFAULT_ENTRIES, state="present")
+    recommended = get_recommended_entries(path)
+    gi_written = ensure_gitignore_block(path, recommended, state="present")
     if gi_written:
         logger.info("Added vaultspec managed block to .gitignore")
 
@@ -681,9 +686,18 @@ def install_run(
 
     gi_path = path / ".gitignore"
     mdata = read_manifest_data(path, strict=True)
-    mdata.gitignore_managed = gi_written or (
-        gi_path.exists() and MARKER_BEGIN in gi_path.read_text(encoding="utf-8")
-    )
+
+    # Robust detection: if it's there, it's managed.
+    block_present = False
+    if gi_path.exists():
+        try:
+            content = gi_path.read_text(encoding="utf-8")
+            begin, end = _find_markers(content.splitlines())
+            block_present = begin is not None and end is not None
+        except OSError:
+            pass
+
+    mdata.gitignore_managed = block_present
     mdata.vaultspec_version = _get_package_version()
     mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
     for name in provider_names:
@@ -727,7 +741,7 @@ def _collect_provider_artifacts(
         files.append(path / FileName.CLAUDE.value)
     elif tool == Tool.GEMINI:
         dirs.append(path / DirName.GEMINI.value)
-        # Root GEMINI.md is shared with Antigravity  - handled below
+        files.append(path / FileName.GEMINI.value)
     elif tool == Tool.ANTIGRAVITY:
         dirs.append(path / DirName.ANTIGRAVITY.value)
         files.append(path / FileName.GEMINI.value)
@@ -1031,16 +1045,21 @@ def uninstall_run(
                         continue
                 removed.append((str(f).replace("\\", "/"), f"{tool.value} (config)"))
 
-        # Update manifest
-        if not dry_run:
-            for tool in tools:
-                remove_provider(path, tool.value)
+                if not dry_run:
+                    remove_provider(path, tool.value)
 
-    # Remove gitignore managed block on real uninstall of all providers
-    if not dry_run and effective_provider == "all" and not keep_vault:
-        from .gitignore import ensure_gitignore_block
+        # Re-sync gitignore block for partial removals
+        from .manifest import read_manifest_data
 
-        ensure_gitignore_block(path, [], state="absent")
+        mdata = read_manifest_data(path)
+        if mdata.gitignore_managed:
+            from .gitignore import ensure_gitignore_block, get_recommended_entries
+
+            if mdata.installed:
+                recommended = get_recommended_entries(path)
+                ensure_gitignore_block(path, recommended, state="present")
+            elif not keep_vault:
+                ensure_gitignore_block(path, [], state="absent")
 
     action = "dry_run" if dry_run else "uninstall"
     result: dict[str, Any] = {
@@ -1247,7 +1266,7 @@ def sync_provider(
         if not dry_run:
             import datetime
 
-            from .gitignore import DEFAULT_ENTRIES, MARKER_BEGIN, ensure_gitignore_block
+            from .gitignore import ensure_gitignore_block
             from .manifest import read_manifest_data, write_manifest_data
 
             # Repair MCP entry if missing (unless mcp is skipped)
@@ -1263,11 +1282,19 @@ def sync_provider(
             mdata = read_manifest_data(ctx.target_dir)
             if mdata.gitignore_managed:
                 gi_path = ctx.target_dir / ".gitignore"
-                block_present = gi_path.exists() and MARKER_BEGIN in gi_path.read_text(
-                    encoding="utf-8"
-                )
+                try:
+                    from .gitignore import _find_markers, get_recommended_entries
+
+                    content = gi_path.read_text(encoding="utf-8")
+                    begin, end = _find_markers(content.splitlines())
+                    block_present = begin is not None and end is not None
+                except (OSError, UnicodeDecodeError):
+                    block_present = False
+
                 if block_present:
-                    ensure_gitignore_block(ctx.target_dir, DEFAULT_ENTRIES)
+                    ensure_gitignore_block(
+                        ctx.target_dir, get_recommended_entries(ctx.target_dir)
+                    )
                 else:
                     mdata.gitignore_managed = False
                     write_manifest_data(ctx.target_dir, mdata)

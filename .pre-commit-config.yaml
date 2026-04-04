@@ -1,77 +1,85 @@
 repos:
-  # ── Read-only checks only ───────────────────────────────────────────
-  # Every hook here is a pure gate: it exits non-zero when the code is
-  # not acceptable but NEVER modifies files.  Auto-fixing lives in
-  # `just dev fix` which is safe to run outside the stash cycle.
-  #
-  # Why: pre-commit stashes unstaged changes before running hooks, then
-  # restores them afterward.  If any hook modifies files AND the restore
-  # conflicts, pre-commit rolls back ALL fixes  - even from unrelated
-  # hooks that succeeded.  Keeping hooks read-only avoids this entirely.
-  - repo: local
-    hooks:
-      - id: ruff-check
-        name: Lint Python code (Ruff)
-        entry: uv run --no-sync ruff check
-        language: system
-        types: [python]
-        pass_filenames: true
-
-      - id: ruff-format-check
-        name: Check Python formatting (Ruff)
-        entry: uv run --no-sync ruff format --check
-        language: system
-        types: [python]
-        pass_filenames: true
-
-      - id: taplo-lint
-        name: Lint TOML files (Taplo)
-        entry: taplo lint
-        language: system
-        types: [toml]
-        pass_filenames: true
-
-      - id: ty
-        name: Type-check Python codebase (Ty)
-        entry: uv run --no-sync python -m ty check src/vaultspec_core
-        language: system
-        types: [python]
-        pass_filenames: false
-
-      - id: check-naming
-        name: Verify vault document naming and integrity
-        entry: uv run --no-sync python -c "from vaultspec_core.cli import app; app()" vault check structure
-        language: system
-        types: [markdown]
-        pass_filenames: false
-
-      - id: check-dangling
-        name: Check for dangling wiki-links in vault
-        entry: uv run --no-sync python -c "from vaultspec_core.cli import app; app()" vault check dangling
-        language: system
-        types: [markdown]
-        pass_filenames: false
-
-      - id: check-body-links
-        name: Check for links in vault document body text
-        entry: uv run --no-sync python -c "from vaultspec_core.cli import app; app()" vault check body-links
-        language: system
-        types: [markdown]
-        pass_filenames: false
-
-      - id: mdformat-check
-        name: Check Markdown formatting (mdformat)
-        entry: uv run --no-sync mdformat --check
-        language: system
-        pass_filenames: true
-        types: [markdown]
-        exclude: ^test-project/
-
-      - id: pymarkdown
-        name: Lint Markdown style (pymarkdown)
-        entry: uv run --no-sync pymarkdown --config .pymarkdown.json scan
-        language: system
-        pass_filenames: true
-        types: [markdown]
-        exclude: ^test-project/
-
+- repo: local
+  hooks:
+  - id: ruff-check
+    name: Lint Python code (Ruff)
+    entry: uv run --no-sync ruff check
+    language: system
+    types:
+    - python
+    pass_filenames: true
+  - id: ruff-format-check
+    name: Check Python formatting (Ruff)
+    entry: uv run --no-sync ruff format --check
+    language: system
+    types:
+    - python
+    pass_filenames: true
+  - id: taplo-lint
+    name: Lint TOML files (Taplo)
+    entry: taplo lint
+    language: system
+    types:
+    - toml
+    pass_filenames: true
+  - id: ty
+    name: Type-check Python codebase (Ty)
+    entry: uv run --no-sync python -m ty check src/vaultspec_core
+    language: system
+    types:
+    - python
+    pass_filenames: false
+  - id: check-naming
+    name: Verify vault document naming and integrity
+    entry: uv run --no-sync python -c "from vaultspec_core.cli import app; app()"
+      vault check structure
+    language: system
+    types:
+    - markdown
+    pass_filenames: false
+  - id: check-dangling
+    name: Check for dangling wiki-links in vault
+    entry: uv run --no-sync python -c "from vaultspec_core.cli import app; app()"
+      vault check dangling
+    language: system
+    types:
+    - markdown
+    pass_filenames: false
+  - id: check-body-links
+    name: Check for links in vault document body text
+    entry: uv run --no-sync python -c "from vaultspec_core.cli import app; app()"
+      vault check body-links
+    language: system
+    types:
+    - markdown
+    pass_filenames: false
+  - id: mdformat-check
+    name: Check Markdown formatting (mdformat)
+    entry: uv run --no-sync mdformat --check
+    language: system
+    pass_filenames: true
+    types:
+    - markdown
+    exclude: ^test-project/
+  - id: pymarkdown
+    name: Lint Markdown style (pymarkdown)
+    entry: uv run --no-sync pymarkdown --config .pymarkdown.json scan
+    language: system
+    pass_filenames: true
+    types:
+    - markdown
+    exclude: ^test-project/
+  - id: vault-doctor
+    name: Vault Doctor
+    entry: uv run python -m vaultspec_core vault check all
+    language: system
+    types:
+    - markdown
+    pass_filenames: false
+  - id: vault-doctor-deep
+    name: Vault Doctor (chain + links)
+    entry: uv run python -m vaultspec_core doctor
+    language: system
+    types:
+    - markdown
+    pass_filenames: false

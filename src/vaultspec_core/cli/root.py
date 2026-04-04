@@ -15,6 +15,9 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from .spec_cmd import spec_app
+from .vault_cmd import vault_app
+
 if TYPE_CHECKING:
     from vaultspec_core.core.diagnosis import ProviderDiagnosis, WorkspaceDiagnosis
 
@@ -43,9 +46,6 @@ app = typer.Typer(
 )
 
 # ---- Mount sub-groups -------------------------------------------------------
-
-from .spec_cmd import spec_app  # noqa: E402
-from .vault_cmd import vault_app  # noqa: E402
 
 app.add_typer(vault_app, name="vault")
 app.add_typer(spec_app, name="spec")

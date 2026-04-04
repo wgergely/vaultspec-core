@@ -11,7 +11,62 @@ logger = logging.getLogger(__name__)
 
 MARKER_BEGIN = "# >>> vaultspec-managed (do not edit this block) >>>"
 MARKER_END = "# <<< vaultspec-managed <<<"
+
+# Internal state that must ALWAYS be ignored if gitignore is managed.
 DEFAULT_ENTRIES = [".vaultspec/_snapshots/"]
+
+
+def get_recommended_entries(target: Path) -> list[str]:
+    """Return a list of gitignore entries for all managed paths.
+
+    Uses :class:`~vaultspec_core.core.types.WorkspaceContext` and manifest
+    data to dynamically discover provider directories and configuration files.
+    """
+    entries: set[str] = {".vaultspec/_snapshots/"}
+
+    from .manifest import read_manifest_data
+
+    try:
+        mdata = read_manifest_data(target)
+        # Always ignore framework internals if framework exists
+        if (target / ".vaultspec").exists():
+            entries.add(".vaultspec/")
+        if (target / ".vault").exists():
+            entries.add(".vault/")
+
+        # Global files
+        if (target / ".mcp.json").exists():
+            entries.add(".mcp.json")
+
+        # Use the canonical artifact collection logic from commands.py
+        # to ensure gitignore is perfectly synced with provider artifacts.
+        from .commands import _collect_provider_artifacts
+        from .enums import Tool
+
+        for name in mdata.installed:
+            try:
+                tool = Tool(name)
+                dirs, files = _collect_provider_artifacts(target, tool)
+                for d in dirs:
+                    try:
+                        rel_dir = d.relative_to(target)
+                        entries.add(f"{str(rel_dir).replace('\\', '/')}/")
+                    except ValueError:
+                        pass
+                for f in files:
+                    try:
+                        rel_file = f.relative_to(target)
+                        entries.add(str(rel_file).replace("\\", "/"))
+                    except ValueError:
+                        pass
+            except ValueError:
+                continue
+
+    except Exception:
+        # Fallback for very early bootstrap or corruption
+        pass
+
+    return sorted(entries)
 
 
 def _detect_line_ending(raw: bytes) -> str:
@@ -21,30 +76,17 @@ def _detect_line_ending(raw: bytes) -> str:
     return "\r\n" if crlf > lf else "\n"
 
 
-def _find_markers(lines: list[str]) -> tuple[int | None, int | None]:
-    """Return ``(begin_index, end_index)`` of the managed block markers.
-
-    Returns ``(None, None)`` when markers are duplicated or inverted,
-    treating those cases as corruption (same as orphaned single marker).
-    """
-    begin: int | None = None
-    end: int | None = None
-    begin_count = 0
-    end_count = 0
+def _find_markers(lines: list[str]) -> tuple[list[int], list[int]]:
+    """Return ``(begin_indices, end_indices)`` of the managed block markers."""
+    begins: list[int] = []
+    ends: list[int] = []
     for i, line in enumerate(lines):
         stripped = line.rstrip()
         if stripped == MARKER_BEGIN:
-            begin_count += 1
-            begin = i
+            begins.append(i)
         elif stripped == MARKER_END:
-            end_count += 1
-            end = i
-    # Duplicates or inverted markers are treated as corruption.
-    if begin_count > 1 or end_count > 1:
-        return begin, None  # signal corruption via single-marker path
-    if begin is not None and end is not None and begin > end:
-        return begin, None  # inverted - treat as corruption
-    return begin, end
+            ends.append(i)
+    return begins, ends
 
 
 def _collapse_double_blanks(lines: list[str]) -> list[str]:
@@ -97,47 +139,35 @@ def ensure_gitignore_block(
 
     content = text.decode("utf-8")
     lines = content.splitlines()
-    begin, end = _find_markers(lines)
+    begins, ends = _find_markers(lines)
 
     if state == "absent":
-        return _remove_block(gi_path, lines, begin, end, eol, bom)
-    return _add_block(gi_path, lines, begin, end, entries, eol, bom)
+        return _remove_block(gi_path, lines, begins, ends, eol, bom)
+    return _add_block(gi_path, lines, begins, ends, entries, eol, bom)
 
 
 def _add_block(
     gi_path: Path,
     lines: list[str],
-    begin: int | None,
-    end: int | None,
+    begins: list[int],
+    ends: list[int],
     entries: list[str],
     eol: str,
     bom: bytes,
 ) -> bool:
     new_block = [MARKER_BEGIN, *entries, MARKER_END]
 
-    if begin is not None and end is not None:
-        # Replace existing block.
-        replaced = lines[:begin] + new_block + lines[end + 1 :]
+    # If we have exactly one block and it matches, do nothing.
+    if len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]:
+        replaced = lines[: begins[0]] + new_block + lines[ends[0] + 1 :]
         if replaced == lines:
             return False
-        result = eol.join(replaced) + eol
-        _write(gi_path, result, bom)
-        return True
 
-    if begin is not None:
-        logger.warning(
-            "Removing orphaned gitignore marker at line %d in %s",
-            begin + 1,
-            gi_path,
-        )
-        lines.pop(begin)
-    elif end is not None:
-        logger.warning(
-            "Removing orphaned gitignore marker at line %d in %s",
-            end + 1,
-            gi_path,
-        )
-        lines.pop(end)
+    # Otherwise, clean up all existing markers and append a fresh block.
+    # Remove markers from end to start to avoid index shifts.
+    to_pop = sorted(begins + ends, reverse=True)
+    for idx in to_pop:
+        lines.pop(idx)
 
     # Strip trailing blank lines, add separator, append block.
     while lines and lines[-1].strip() == "":
@@ -153,21 +183,23 @@ def _add_block(
 def _remove_block(
     gi_path: Path,
     lines: list[str],
-    begin: int | None,
-    end: int | None,
+    begins: list[int],
+    ends: list[int],
     eol: str,
     bom: bytes,
 ) -> bool:
-    if begin is None and end is None:
+    if not begins and not ends:
         return False
 
-    if begin is not None and end is not None:
-        lines = lines[:begin] + lines[end + 1 :]
-    elif begin is not None:
-        lines.pop(begin)
+    # If we have exactly one block, remove it and its contents.
+    if len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]:
+        lines = lines[: begins[0]] + lines[ends[0] + 1 :]
     else:
-        assert end is not None
-        lines.pop(end)
+        # For multiple or mismatched markers, just strip all markers.
+        # Removing contents is risky if we can't reliably pair them.
+        to_pop = sorted(begins + ends, reverse=True)
+        for idx in to_pop:
+            lines.pop(idx)
 
     lines = _collapse_double_blanks(lines)
     result = eol.join(lines) + eol
