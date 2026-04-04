@@ -127,9 +127,9 @@ def _inject_related(content: str, related: list[str]) -> str:
             lines.append(f'  - "{link}"')
         new_block = "\n".join(lines)
 
-    # Match the related: field and all its list items
+    # Match the related: field and all its list items or inline empty list
     pattern = re.compile(
-        r"^related:(?:\n[ \t]+- .*)*",
+        r"^related:(?:[ \t]*\[\]|(?:\n[ \t]+- .*)*)",
         re.MULTILINE,
     )
     result = pattern.sub(new_block, content, count=1)
@@ -281,6 +281,7 @@ def get_template_path(
         DocType.RESEARCH: "research.md",
         DocType.REFERENCE: "ref-audit.md",
         DocType.EXEC: "exec-step.md",
+        DocType.INDEX: "index.md",
     }
 
     name = mapping.get(doc_type)

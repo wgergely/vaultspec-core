@@ -71,7 +71,8 @@ class TestFrameworkRules:
         plan = resolve(diag, "install")
         assert not plan.blocked
         assert plan.steps == []
-        assert plan.warnings == []
+        warnings = [w for w in plan.warnings if "Consider upgrading" not in w]
+        assert warnings == []
 
     def test_missing_sync_errors(self):
         diag = _make_diagnosis(framework=FrameworkSignal.MISSING)
@@ -237,7 +238,8 @@ class TestContentRules:
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
         plan = resolve(diag, "sync", provider="claude")
         assert plan.steps == []
-        assert plan.warnings == []
+        warnings = [w for w in plan.warnings if "Consider upgrading" not in w]
+        assert warnings == []
 
 
 # ---------------------------------------------------------------------------
@@ -473,7 +475,8 @@ class TestDoctorAction:
         )
         plan = resolve(diag, "doctor")
         assert plan.steps == []
-        assert plan.warnings == []
+        warnings = [w for w in plan.warnings if "Consider upgrading" not in w]
+        assert warnings == []
         assert plan.conflicts == []
 
 

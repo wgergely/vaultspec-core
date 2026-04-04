@@ -221,6 +221,92 @@ def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[tuple[str
     return [(".mcp.json", "mcp")]
 
 
+def _scaffold_precommit(
+    target: Path, *, dry_run: bool = False
+) -> list[tuple[str, str]]:
+    """Scaffold or merge vaultspec-core hooks into .pre-commit-config.yaml."""
+    import yaml
+
+    from .helpers import atomic_write
+
+    config_file = target / ".pre-commit-config.yaml"
+    hook_doctor = {
+        "id": "vault-doctor",
+        "name": "Vault Doctor",
+        "entry": "uv run python -m vaultspec_core vault check all",
+        "language": "system",
+        "types": ["markdown"],
+        "pass_filenames": False,
+    }
+    hook_doctor_deep = {
+        "id": "vault-doctor-deep",
+        "name": "Vault Doctor (chain + links)",
+        "entry": "uv run python -m vaultspec_core doctor",
+        "language": "system",
+        "types": ["markdown"],
+        "pass_filenames": False,
+    }
+
+    if config_file.exists():
+        try:
+            raw = config_file.read_text(encoding="utf-8")
+            data = yaml.safe_load(raw) or {}
+            if not isinstance(data, dict):
+                return []
+        except (yaml.YAMLError, OSError):
+            return []
+
+        repos = data.setdefault("repos", [])
+        if not isinstance(repos, list):
+            return []
+
+        # Find or create local repo
+        local_repos = [
+            r for r in repos if isinstance(r, dict) and r.get("repo") == "local"
+        ]
+        if local_repos:
+            local_repo = local_repos[0]
+            existing_hooks = local_repo.setdefault("hooks", [])
+            if not isinstance(existing_hooks, list):
+                return []
+
+            existing_ids = {h.get("id") for h in existing_hooks if isinstance(h, dict)}
+            added = False
+            if "vault-doctor" not in existing_ids:
+                existing_hooks.append(hook_doctor)
+                added = True
+            if "vault-doctor-deep" not in existing_ids:
+                existing_hooks.append(hook_doctor_deep)
+                added = True
+
+            if not added:
+                return []
+        else:
+            repos.append({"repo": "local", "hooks": [hook_doctor, hook_doctor_deep]})
+
+        if not dry_run:
+            atomic_write(
+                config_file,
+                yaml.dump(
+                    data,
+                    sort_keys=False,
+                    default_flow_style=False,
+                    allow_unicode=True,
+                ),
+            )
+        return [(".pre-commit-config.yaml", "precommit")]
+
+    if not dry_run:
+        data = {"repos": [{"repo": "local", "hooks": [hook_doctor, hook_doctor_deep]}]}
+        atomic_write(
+            config_file,
+            yaml.dump(
+                data, sort_keys=False, default_flow_style=False, allow_unicode=True
+            ),
+        )
+    return [(".pre-commit-config.yaml", "precommit")]
+
+
 def _validate_provider(provider: str) -> None:
     """Validate that *provider* is a known provider name.
 
@@ -244,7 +330,7 @@ def _validate_skip(skip: set[str] | None) -> set[str]:
         return set()
     # "all" is not a valid skip target  - you'd just not run the command.
     # "mcp" is a valid skip target but is not a provider.
-    allowed = (VALID_PROVIDERS - {"all"}) | {"mcp"}
+    allowed = (VALID_PROVIDERS - {"all"}) | {"mcp", "precommit"}
     bad = skip - allowed
     if bad:
         raise ProviderError(
@@ -323,6 +409,8 @@ def init_run(
 
     if "mcp" not in skip:
         created.extend(_scaffold_mcp_json(target))
+    if "precommit" not in skip:
+        created.extend(_scaffold_precommit(target))
 
     # Write provider manifest
     from .manifest import add_providers
@@ -479,6 +567,8 @@ def install_run(
             manifest.extend(_scaffold_provider(path, tool, dry_run=True))
         if "mcp" not in skip:
             manifest.extend(_scaffold_mcp_json(path, dry_run=True))
+        if "precommit" not in skip:
+            manifest.extend(_scaffold_precommit(path, dry_run=True))
 
         # Deduplicate preserving order (by relative path)
         seen: dict[str, str] = {}
@@ -516,6 +606,8 @@ def install_run(
         # Re-scaffold MCP entry if missing (repair)
         if "mcp" not in skip:
             _scaffold_mcp_json(path)
+        if "precommit" not in skip:
+            _scaffold_precommit(path)
 
         # Update manifest timestamps and version
         import datetime
@@ -802,22 +894,97 @@ def uninstall_run(
 
         # Surgical .mcp.json cleanup: remove only the vaultspec-core key
         mcp_path = path / ".mcp.json"
-        if mcp_path.exists() and not dry_run:
-            try:
-                raw = json.loads(mcp_path.read_text(encoding="utf-8"))
-                if isinstance(raw, dict):
-                    servers = raw.get("mcpServers", {})
-                    if isinstance(servers, dict) and "vaultspec-core" in servers:
-                        del servers["vaultspec-core"]
-                        if servers:
-                            atomic_write(mcp_path, json.dumps(raw, indent=2) + "\n")
-                        else:
-                            mcp_path.unlink()
-                        removed.append((_rel(path, mcp_path), "mcp"))
-            except (json.JSONDecodeError, OSError):
-                pass
-        elif mcp_path.exists() and dry_run:
-            removed.append((_rel(path, mcp_path), "mcp"))
+        if "mcp" not in skip:
+            if mcp_path.exists() and not dry_run:
+                try:
+                    raw = json.loads(mcp_path.read_text(encoding="utf-8"))
+                    if isinstance(raw, dict):
+                        servers = raw.get("mcpServers", {})
+                        if isinstance(servers, dict) and "vaultspec-core" in servers:
+                            del servers["vaultspec-core"]
+                            if servers:
+                                atomic_write(mcp_path, json.dumps(raw, indent=2) + "\n")
+                            else:
+                                mcp_path.unlink()
+                            removed.append((_rel(path, mcp_path), "mcp"))
+                except (json.JSONDecodeError, OSError):
+                    pass
+            elif mcp_path.exists() and dry_run:
+                removed.append((_rel(path, mcp_path), "mcp"))
+
+        # Surgical .pre-commit-config.yaml cleanup: remove vaultspec-core hooks
+        precommit_path = path / ".pre-commit-config.yaml"
+        if "precommit" not in skip:
+            if precommit_path.exists() and not dry_run:
+                try:
+                    import yaml
+
+                    raw = precommit_path.read_text(encoding="utf-8")
+                    data = yaml.safe_load(raw)
+                    if isinstance(data, dict):
+                        repos = data.get("repos", [])
+                        if isinstance(repos, list):
+                            changed = False
+                            new_repos = []
+                            for r in repos:
+                                if isinstance(r, dict) and r.get("repo") == "local":
+                                    hooks = r.get("hooks", [])
+                                    if isinstance(hooks, list):
+                                        new_hooks = [
+                                            h
+                                            for h in hooks
+                                            if isinstance(h, dict)
+                                            and h.get("id")
+                                            not in ("vault-doctor", "vault-doctor-deep")
+                                        ]
+                                        if len(new_hooks) != len(hooks):
+                                            r["hooks"] = new_hooks
+                                            changed = True
+                                        if new_hooks:
+                                            new_repos.append(r)
+                                    else:
+                                        new_repos.append(r)
+                                else:
+                                    new_repos.append(r)
+
+                            if changed:
+                                if new_repos:
+                                    data["repos"] = new_repos
+                                    atomic_write(
+                                        precommit_path,
+                                        yaml.dump(
+                                            data,
+                                            sort_keys=False,
+                                            default_flow_style=False,
+                                            allow_unicode=True,
+                                        ),
+                                    )
+                                else:
+                                    del data["repos"]
+                                    if not data:
+                                        precommit_path.unlink()
+                                    else:
+                                        atomic_write(
+                                            precommit_path,
+                                            yaml.dump(
+                                                data,
+                                                sort_keys=False,
+                                                default_flow_style=False,
+                                                allow_unicode=True,
+                                            ),
+                                        )
+                                removed.append(
+                                    (_rel(path, precommit_path), "precommit")
+                                )
+                except (yaml.YAMLError, OSError):
+                    pass
+            elif precommit_path.exists() and dry_run:
+                try:
+                    raw = precommit_path.read_text(encoding="utf-8")
+                    if "id: vault-doctor" in raw:
+                        removed.append((_rel(path, precommit_path), "precommit"))
+                except OSError:
+                    pass
 
     else:
         # Per-provider uninstall with shared directory protection
@@ -1086,6 +1253,8 @@ def sync_provider(
             # Repair MCP entry if missing (unless mcp is skipped)
             if "mcp" not in skip:
                 _scaffold_mcp_json(ctx.target_dir)
+            if "precommit" not in skip:
+                _scaffold_precommit(ctx.target_dir)
 
             # Respect gitignore opt-out: check whether the user removed
             # the managed block BEFORE re-creating it.  If the block is
