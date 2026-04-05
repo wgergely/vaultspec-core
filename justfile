@@ -5,7 +5,12 @@ image := "ghcr.io/wgergely/vaultspec-core"
 local_image := "vaultspec-core:local"
 
 default:
-  @just --list
+  @echo "Available commands:"
+  @echo "  prod [args...]    Run the vaultspec-core Python CLI (pure 1:1 mirror)"
+  @echo "  dev <target>      Development toolchain (deps, lint, fix, audit, test, build, etc.)"
+  @echo "  ci                Full CI pipeline: lint → audit → vault check → test"
+  @echo ""
+  @echo "Run 'just <command> --help' for more details."
 
 # ===========================================================================
 #  prod  - pure 1:1 mirror of the vaultspec-core Python CLI
