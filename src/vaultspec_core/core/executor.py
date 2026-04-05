@@ -14,6 +14,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .diagnosis.signals import ResolutionAction
+from .enums import DirName, ManagedState, Tool
+from .gitignore import ensure_gitignore_block, get_recommended_entries
+from .manifest import (
+    ManifestData,
+    add_providers,
+    read_manifest_data,
+    write_manifest_data,
+)
 
 if TYPE_CHECKING:
     from .resolver import ResolutionPlan, ResolutionStep
@@ -161,15 +169,10 @@ def _dispatch(target: Path, step: ResolutionStep) -> None:
 
 def _execute_repair_manifest(target: Path, _step: ResolutionStep) -> None:
     """Rebuild the manifest by scanning for provider directories on disk."""
-    from .enums import DirName, Tool
-    from .manifest import read_manifest_data, write_manifest_data
-
     # Read existing data (may be corrupt - fall back to defaults)
     try:
         data = read_manifest_data(target)
     except Exception:
-        from .manifest import ManifestData
-
         data = ManifestData()
 
     _tool_dir_map: dict[Tool, str] = {
@@ -191,7 +194,6 @@ def _execute_repair_manifest(target: Path, _step: ResolutionStep) -> None:
 def _execute_scaffold(target: Path, step: ResolutionStep) -> None:
     """Scaffold directories for a single provider."""
     from .commands import _ensure_tool_configs, _scaffold_provider
-    from .enums import Tool
 
     _ensure_tool_configs(target)
 
@@ -205,13 +207,11 @@ def _execute_scaffold(target: Path, step: ResolutionStep) -> None:
 
 def _execute_adopt_directory(target: Path, step: ResolutionStep) -> None:
     """Register an untracked provider directory in the manifest."""
-    from .manifest import add_providers
-
     add_providers(target, [step.target])
 
 
 def _execute_repair_gitignore(target: Path, _step: ResolutionStep) -> None:
     """Repair the managed gitignore block."""
-    from .gitignore import DEFAULT_ENTRIES, ensure_gitignore_block
-
-    ensure_gitignore_block(target, DEFAULT_ENTRIES, state="present")
+    # TODO: Refine gitignore management to include more artifact types.
+    entries = get_recommended_entries(target)
+    ensure_gitignore_block(target, entries, state=ManagedState.PRESENT)

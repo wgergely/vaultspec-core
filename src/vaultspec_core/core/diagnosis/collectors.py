@@ -356,7 +356,7 @@ def collect_gitignore_state(target: Path) -> GitignoreSignal:
         :class:`~vaultspec_core.core.diagnosis.signals.GitignoreSignal`
         reflecting the observed state.
     """
-    from ..gitignore import DEFAULT_ENTRIES, _find_markers
+    from ..gitignore import _find_markers, get_recommended_entries
 
     gi_path = target / ".gitignore"
     if not gi_path.exists():
@@ -368,20 +368,34 @@ def collect_gitignore_state(target: Path) -> GitignoreSignal:
         logger.warning("Cannot read .gitignore %s: %s", gi_path, exc)
         return GitignoreSignal.NO_FILE
 
-    lines = content.splitlines()
-    begin_idx, end_idx = _find_markers(lines)
+    lines = [line.strip() for line in content.splitlines()]
+    begins, ends = _find_markers(lines)
 
-    if begin_idx is None and end_idx is None:
+    if not begins and not ends:
         return GitignoreSignal.NO_ENTRIES
 
-    if begin_idx is None or end_idx is None or end_idx <= begin_idx:
+    # Any state that isn't exactly one BEGIN before exactly one END is corrupted.
+    if len(begins) != 1 or len(ends) != 1 or begins[0] >= ends[0]:
         return GitignoreSignal.CORRUPTED
 
+    begin_idx = begins[0]
+    end_idx = ends[0]
     block_entries = [
         line.rstrip() for line in lines[begin_idx + 1 : end_idx] if line.strip()
     ]
 
-    if block_entries == DEFAULT_ENTRIES:
+    # Contradictory check: is an entry in the block explicitly unignored elsewhere?
+    # (i.e. starts with "!")
+    unignored = {line[1:].strip() for line in lines if line.startswith("!")}
+    for entry in block_entries:
+        if entry in unignored or entry.rstrip("/") in unignored:
+            return GitignoreSignal.CORRUPTED
+
+    recommended = get_recommended_entries(target)
+
+    # Check if all recommended entries are present in the block.
+    # We allow extra entries (idempotency is handled by ensure_gitignore_block).
+    if all(entry in block_entries for entry in recommended):
         return GitignoreSignal.COMPLETE
 
     return GitignoreSignal.PARTIAL

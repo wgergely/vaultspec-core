@@ -124,9 +124,10 @@ class TestRepairGitignore:
 
     def test_repair_adds_missing_block(self, workspace: Path) -> None:
         """Remove gitignore block, repair, verify block is back."""
+        from vaultspec_core.core.enums import ManagedState
         from vaultspec_core.core.gitignore import ensure_gitignore_block
 
-        ensure_gitignore_block(workspace, [], state="absent")
+        ensure_gitignore_block(workspace, [], state=ManagedState.ABSENT)
         gi = workspace / ".gitignore"
         assert MARKER_BEGIN not in gi.read_text(encoding="utf-8")
 

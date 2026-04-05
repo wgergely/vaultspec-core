@@ -27,6 +27,8 @@ from vaultspec_core.cli._target import (
 
 logger = logging.getLogger(__name__)
 
+# Main app definition must precede sub-app imports to enable them to
+# reference it if needed (and to satisfy Typer's module-level discovery).
 app = typer.Typer(
     help=(
         "vaultspec-core: Workspace runtime for vaultspec-managed projects.\n\n"
@@ -41,15 +43,6 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
-
-# ---- Mount sub-groups -------------------------------------------------------
-
-from .spec_cmd import spec_app  # noqa: E402
-from .vault_cmd import vault_app  # noqa: E402
-
-app.add_typer(vault_app, name="vault")
-app.add_typer(spec_app, name="spec")
-
 
 # ---- Global callback --------------------------------------------------------
 
@@ -969,6 +962,18 @@ def _doctor_exit_code(diag: WorkspaceDiagnosis) -> int:
     return 0
 
 
+def _register_subcommands() -> None:
+    """Mount sub-apps with deferred imports to avoid circular dependencies."""
+    from .spec_cmd import spec_app
+    from .vault_cmd import vault_app
+
+    app.add_typer(vault_app, name="vault")
+    app.add_typer(spec_app, name="spec")
+
+
+_register_subcommands()
+
+
 # ---- Entry point -------------------------------------------------------------
 
 
@@ -978,4 +983,4 @@ def run() -> None:
 
 
 if __name__ == "__main__":
-    app()
+    run()

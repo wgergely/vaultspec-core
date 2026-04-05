@@ -7,11 +7,111 @@ import os
 import shutil
 from pathlib import Path
 
+from .enums import ManagedState, Tool
+
 logger = logging.getLogger(__name__)
 
 MARKER_BEGIN = "# >>> vaultspec-managed (do not edit this block) >>>"
 MARKER_END = "# <<< vaultspec-managed <<<"
+
+# Internal state that must ALWAYS be ignored if gitignore is managed.
 DEFAULT_ENTRIES = [".vaultspec/_snapshots/"]
+
+
+def get_recommended_entries(target: Path) -> list[str]:
+    """Return a list of gitignore entries for all managed paths.
+
+    Uses :class:`~vaultspec_core.core.types.WorkspaceContext` and manifest
+    data to dynamically discover provider directories and configuration files.
+    """
+    entries: set[str] = set()
+
+    from .manifest import read_manifest_data
+
+    try:
+        # Internal state that must ALWAYS be ignored if framework exists
+        if (target / ".vaultspec").is_dir():
+            entries.add(".vaultspec/_snapshots/")
+            entries.add(".vaultspec/")
+        if (target / ".vault").is_dir():
+            entries.add(".vault/")
+
+        mdata = read_manifest_data(target)
+
+        # Global files
+        if (target / ".mcp.json").exists():
+            entries.add(".mcp.json")
+
+        # Use the local artifact collection logic to ensure gitignore is
+        # perfectly synced with provider artifacts.
+
+        for name in mdata.installed:
+            try:
+                tool = Tool(name)
+                dirs, files = _collect_provider_artifacts(target, tool)
+                for d in dirs:
+                    try:
+                        rel_dir = d.relative_to(target)
+                        rel_dir_str = str(rel_dir).replace("\\", "/")
+                        entries.add(f"{rel_dir_str}/")
+                    except ValueError:
+                        pass
+                for f in files:
+                    try:
+                        rel_file = f.relative_to(target)
+                        rel_file_str = str(rel_file).replace("\\", "/")
+                        entries.add(rel_file_str)
+                    except ValueError:
+                        pass
+            except ValueError:
+                continue
+
+    except Exception:
+        # Fallback for very early bootstrap or corruption
+        pass
+
+    return sorted(entries)
+
+
+def _collect_provider_artifacts(
+    path: Path, tool: ManagedState | Tool
+) -> tuple[list[Path], list[Path]]:
+    """Return ``(directories, files)`` managed by a single provider.
+
+    Args:
+        path: Workspace root directory.
+        tool: :class:`~vaultspec_core.core.enums.Tool` to inspect.
+
+    Returns:
+        A two-tuple of ``(directory_paths, file_paths)`` owned by *tool*.
+    """
+    from . import types as _t
+    from .enums import DirName, FileName
+
+    if not isinstance(tool, Tool):
+        return [], []
+
+    cfg = _t.get_context().tool_configs.get(tool)
+    dirs: list[Path] = []
+    files: list[Path] = []
+
+    if tool == Tool.CLAUDE:
+        dirs.append(path / DirName.CLAUDE.value)
+        files.append(path / FileName.CLAUDE.value)
+    elif tool == Tool.GEMINI:
+        dirs.append(path / DirName.GEMINI.value)
+        files.append(path / FileName.GEMINI.value)
+    elif tool == Tool.ANTIGRAVITY:
+        dirs.append(path / DirName.ANTIGRAVITY.value)
+        files.append(path / FileName.GEMINI.value)
+    elif tool == Tool.CODEX:
+        dirs.append(path / DirName.CODEX.value)
+        files.append(path / FileName.AGENTS.value)
+
+    if cfg and cfg.native_config_file and cfg.native_config_file.parent not in dirs:
+        dirs.append(cfg.native_config_file.parent)
+
+    return dirs, files
 
 
 def _detect_line_ending(raw: bytes) -> str:
@@ -21,30 +121,17 @@ def _detect_line_ending(raw: bytes) -> str:
     return "\r\n" if crlf > lf else "\n"
 
 
-def _find_markers(lines: list[str]) -> tuple[int | None, int | None]:
-    """Return ``(begin_index, end_index)`` of the managed block markers.
-
-    Returns ``(None, None)`` when markers are duplicated or inverted,
-    treating those cases as corruption (same as orphaned single marker).
-    """
-    begin: int | None = None
-    end: int | None = None
-    begin_count = 0
-    end_count = 0
+def _find_markers(lines: list[str]) -> tuple[list[int], list[int]]:
+    """Return ``(begin_indices, end_indices)`` of the managed block markers."""
+    begins: list[int] = []
+    ends: list[int] = []
     for i, line in enumerate(lines):
-        stripped = line.rstrip()
+        stripped = line.strip()
         if stripped == MARKER_BEGIN:
-            begin_count += 1
-            begin = i
+            begins.append(i)
         elif stripped == MARKER_END:
-            end_count += 1
-            end = i
-    # Duplicates or inverted markers are treated as corruption.
-    if begin_count > 1 or end_count > 1:
-        return begin, None  # signal corruption via single-marker path
-    if begin is not None and end is not None and begin > end:
-        return begin, None  # inverted - treat as corruption
-    return begin, end
+            ends.append(i)
+    return begins, ends
 
 
 def _collapse_double_blanks(lines: list[str]) -> list[str]:
@@ -64,7 +151,7 @@ def ensure_gitignore_block(
     target: Path,
     entries: list[str],
     *,
-    state: str = "present",
+    state: ManagedState = ManagedState.PRESENT,
 ) -> bool:
     """Add or remove a vaultspec-managed block inside ``.gitignore``.
 
@@ -75,8 +162,7 @@ def ensure_gitignore_block(
     Args:
         target: Workspace root directory containing ``.gitignore``.
         entries: Gitignore patterns to manage inside the block.
-        state: ``"present"`` to ensure the block exists, ``"absent"`` to
-            remove it.
+        state: Desired state (PRESENT or ABSENT).
 
     Returns:
         ``True`` if the file was modified, ``False`` otherwise.
@@ -97,47 +183,68 @@ def ensure_gitignore_block(
 
     content = text.decode("utf-8")
     lines = content.splitlines()
-    begin, end = _find_markers(lines)
+    begins, ends = _find_markers(lines)
 
-    if state == "absent":
-        return _remove_block(gi_path, lines, begin, end, eol, bom)
-    return _add_block(gi_path, lines, begin, end, entries, eol, bom)
+    if state == ManagedState.ABSENT:
+        return _remove_block(gi_path, lines, begins, ends, eol, bom)
+    return _add_block(gi_path, lines, begins, ends, entries, eol, bom)
 
 
 def _add_block(
     gi_path: Path,
     lines: list[str],
-    begin: int | None,
-    end: int | None,
+    begins: list[int],
+    ends: list[int],
     entries: list[str],
     eol: str,
     bom: bytes,
 ) -> bool:
+    """Add or update the vaultspec-managed block in-place.
+
+    Replaces exactly one valid block in its original position. For multiple
+    or mismatched markers, purges them and appends a fresh block to the end.
+    """
     new_block = [MARKER_BEGIN, *entries, MARKER_END]
 
-    if begin is not None and end is not None:
-        # Replace existing block.
-        replaced = lines[:begin] + new_block + lines[end + 1 :]
+    # If we have exactly one block, update it in-place.
+    if len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]:
+        replaced = lines[: begins[0]] + new_block + lines[ends[0] + 1 :]
         if replaced == lines:
             return False
         result = eol.join(replaced) + eol
         _write(gi_path, result, bom)
         return True
 
-    if begin is not None:
-        logger.warning(
-            "Removing orphaned gitignore marker at line %d in %s",
-            begin + 1,
-            gi_path,
-        )
-        lines.pop(begin)
-    elif end is not None:
-        logger.warning(
-            "Removing orphaned gitignore marker at line %d in %s",
-            end + 1,
-            gi_path,
-        )
-        lines.pop(end)
+    # Otherwise, clean up all existing markers and content between them.
+    # Identify and remove all valid pairs (markers + content)
+    # Simple pairing: find ENDs that come after a BEGIN
+    ranges: list[tuple[int, int]] = []
+    stack: list[int] = []
+    marker_indices = sorted(
+        [(i, "B") for i in begins] + [(i, "E") for i in ends], key=lambda x: x[0]
+    )
+    for idx, type in marker_indices:
+        if type == "B":
+            stack.append(idx)
+        elif type == "E" and stack:
+            start = stack.pop()
+            ranges.append((start, idx))
+
+    if ranges:
+        # Remove ranges from end to start to avoid index shifts.
+        for start, end in sorted(ranges, key=lambda x: x[0], reverse=True):
+            lines[start : end + 1] = []
+
+        # If any orphaned markers remain (unpaired), remove them individually.
+        begins_left, ends_left = _find_markers(lines)
+        to_pop = sorted(begins_left + ends_left, reverse=True)
+        for idx in to_pop:
+            lines.pop(idx)
+    else:
+        # No valid pairs? Just strip any markers found.
+        to_pop = sorted(begins + ends, reverse=True)
+        for idx in to_pop:
+            lines.pop(idx)
 
     # Strip trailing blank lines, add separator, append block.
     while lines and lines[-1].strip() == "":
@@ -153,21 +260,45 @@ def _add_block(
 def _remove_block(
     gi_path: Path,
     lines: list[str],
-    begin: int | None,
-    end: int | None,
+    begins: list[int],
+    ends: list[int],
     eol: str,
     bom: bytes,
 ) -> bool:
-    if begin is None and end is None:
+    if not begins and not ends:
         return False
 
-    if begin is not None and end is not None:
-        lines = lines[:begin] + lines[end + 1 :]
-    elif begin is not None:
-        lines.pop(begin)
+    # If we have exactly one block, remove it and its contents.
+    if len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]:
+        lines = lines[: begins[0]] + lines[ends[0] + 1 :]
     else:
-        assert end is not None
-        lines.pop(end)
+        # For multiple or mismatched markers, clean up paired blocks first.
+        ranges: list[tuple[int, int]] = []
+        stack: list[int] = []
+        marker_indices = sorted(
+            [(i, "B") for i in begins] + [(i, "E") for i in ends], key=lambda x: x[0]
+        )
+        for idx, type in marker_indices:
+            if type == "B":
+                stack.append(idx)
+            elif type == "E" and stack:
+                start = stack.pop()
+                ranges.append((start, idx))
+
+        if ranges:
+            for start, end in sorted(ranges, key=lambda x: x[0], reverse=True):
+                lines[start : end + 1] = []
+
+            # Clean up any remaining orphaned markers.
+            begins_left, ends_left = _find_markers(lines)
+            to_pop = sorted(begins_left + ends_left, reverse=True)
+            for idx in to_pop:
+                lines.pop(idx)
+        else:
+            # Just strip any markers found.
+            to_pop = sorted(begins + ends, reverse=True)
+            for idx in to_pop:
+                lines.pop(idx)
 
     lines = _collapse_double_blanks(lines)
     result = eol.join(lines) + eol

@@ -16,14 +16,30 @@ from pathlib import Path
 from typing import Any
 
 from . import types as _t
-from .enums import ProviderCapability, Tool
+from .enums import ManagedState, ProviderCapability, Tool
 from .exceptions import (
     ProviderError,
     ProviderNotInstalledError,
     VaultSpecError,
     WorkspaceNotInitializedError,
 )
+from .gitignore import (
+    _collect_provider_artifacts,
+    _find_markers,
+    ensure_gitignore_block,
+    get_recommended_entries,
+)
 from .helpers import _rmtree_robust, atomic_write, ensure_dir
+from .manifest import (
+    ManifestData,
+    add_providers,
+    providers_sharing_dir,
+    providers_sharing_file,
+    read_manifest,
+    read_manifest_data,
+    remove_provider,
+    write_manifest_data,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -413,8 +429,6 @@ def init_run(
         created.extend(_scaffold_precommit(target))
 
     # Write provider manifest
-    from .manifest import add_providers
-
     provider_names = [t.value for t in tools]
     if provider_names:
         add_providers(target, provider_names)
@@ -612,8 +626,6 @@ def install_run(
         # Update manifest timestamps and version
         import datetime
 
-        from .manifest import read_manifest_data, write_manifest_data
-
         mdata = read_manifest_data(path)
         if not mdata.installed_at:
             mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
@@ -621,9 +633,9 @@ def install_run(
 
         # Re-opt-in gitignore management on --upgrade --force
         if force:
-            from .gitignore import DEFAULT_ENTRIES, ensure_gitignore_block
-
-            ensure_gitignore_block(path, DEFAULT_ENTRIES, state="present")
+            ensure_gitignore_block(
+                path, get_recommended_entries(path), state=ManagedState.PRESENT
+            )
             mdata.gitignore_managed = True
 
         write_manifest_data(path, mdata)
@@ -669,10 +681,9 @@ def install_run(
     has_mcp = (path / ".mcp.json").exists()
 
     # Manage gitignore block
-    from .gitignore import DEFAULT_ENTRIES, MARKER_BEGIN, ensure_gitignore_block
-    from .manifest import read_manifest_data, write_manifest_data
+    recommended = get_recommended_entries(path)
 
-    gi_written = ensure_gitignore_block(path, DEFAULT_ENTRIES, state="present")
+    gi_written = ensure_gitignore_block(path, recommended, state=ManagedState.PRESENT)
     if gi_written:
         logger.info("Added vaultspec managed block to .gitignore")
 
@@ -681,9 +692,19 @@ def install_run(
 
     gi_path = path / ".gitignore"
     mdata = read_manifest_data(path, strict=True)
-    mdata.gitignore_managed = gi_written or (
-        gi_path.exists() and MARKER_BEGIN in gi_path.read_text(encoding="utf-8")
-    )
+
+    # Robust detection: if it's there, it's managed.
+    block_present = False
+    if gi_path.exists():
+        try:
+            content = gi_path.read_text(encoding="utf-8")
+            begins, ends = _find_markers(content.splitlines())
+            block_present = len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]
+
+        except (OSError, UnicodeDecodeError):
+            pass
+
+    mdata.gitignore_managed = block_present
     mdata.vaultspec_version = _get_package_version()
     mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
     for name in provider_names:
@@ -702,43 +723,6 @@ def install_run(
     if post_errors:
         result["errors"] = post_errors
     return result
-
-
-def _collect_provider_artifacts(
-    path: Path, tool: Tool
-) -> tuple[list[Path], list[Path]]:
-    """Return ``(directories, files)`` managed by a single provider.
-
-    Args:
-        path: Workspace root directory.
-        tool: :class:`~vaultspec_core.core.enums.Tool` to inspect.
-
-    Returns:
-        A two-tuple of ``(directory_paths, file_paths)`` owned by *tool*.
-    """
-    from .enums import DirName, FileName
-
-    cfg = _t.get_context().tool_configs.get(tool)
-    dirs: list[Path] = []
-    files: list[Path] = []
-
-    if tool == Tool.CLAUDE:
-        dirs.append(path / DirName.CLAUDE.value)
-        files.append(path / FileName.CLAUDE.value)
-    elif tool == Tool.GEMINI:
-        dirs.append(path / DirName.GEMINI.value)
-        # Root GEMINI.md is shared with Antigravity  - handled below
-    elif tool == Tool.ANTIGRAVITY:
-        dirs.append(path / DirName.ANTIGRAVITY.value)
-        files.append(path / FileName.GEMINI.value)
-    elif tool == Tool.CODEX:
-        dirs.append(path / DirName.CODEX.value)
-        files.append(path / FileName.AGENTS.value)
-
-    if cfg and cfg.native_config_file and cfg.native_config_file.parent not in dirs:
-        dirs.append(cfg.native_config_file.parent)
-
-    return dirs, files
 
 
 def uninstall_run(
@@ -768,7 +752,6 @@ def uninstall_run(
         ProviderError: If *provider* is invalid or *force* not set.
     """
     from .guards import guard_dev_repo
-    from .manifest import providers_sharing_dir, providers_sharing_file, remove_provider
 
     guard_dev_repo(path)
 
@@ -837,6 +820,13 @@ def uninstall_run(
     }
 
     errors: list[str] = []
+
+    # Capture manifest state before potential destruction
+    try:
+        mdata_before = read_manifest_data(path)
+    except Exception:
+        # Fallback if manifest is already gone or corrupted
+        mdata_before = ManifestData()
 
     if effective_provider == "all":
         import json
@@ -1031,16 +1021,25 @@ def uninstall_run(
                         continue
                 removed.append((str(f).replace("\\", "/"), f"{tool.value} (config)"))
 
-        # Update manifest
+        # Update manifest once after all tools are removed from disk
         if not dry_run:
             for tool in tools:
                 remove_provider(path, tool.value)
 
-    # Remove gitignore managed block on real uninstall of all providers
-    if not dry_run and effective_provider == "all" and not keep_vault:
-        from .gitignore import ensure_gitignore_block
+    # Re-sync gitignore block
+    if not dry_run:
+        try:
+            mdata_after = read_manifest_data(path)
+        except Exception:
+            mdata_after = ManifestData()
 
-        ensure_gitignore_block(path, [], state="absent")
+        recommended = get_recommended_entries(path)
+        # If no providers remain and we are not keeping the vault, remove the block.
+        # Otherwise, we sync it if it was managed before.
+        if not mdata_after.installed and not keep_vault:
+            ensure_gitignore_block(path, [], state=ManagedState.ABSENT)
+        elif recommended and mdata_before.gitignore_managed:
+            ensure_gitignore_block(path, recommended, state=ManagedState.PRESENT)
 
     action = "dry_run" if dry_run else "uninstall"
     result: dict[str, Any] = {
@@ -1247,8 +1246,7 @@ def sync_provider(
         if not dry_run:
             import datetime
 
-            from .gitignore import DEFAULT_ENTRIES, MARKER_BEGIN, ensure_gitignore_block
-            from .manifest import read_manifest_data, write_manifest_data
+            from .gitignore import ensure_gitignore_block
 
             # Repair MCP entry if missing (unless mcp is skipped)
             if "mcp" not in skip:
@@ -1263,11 +1261,20 @@ def sync_provider(
             mdata = read_manifest_data(ctx.target_dir)
             if mdata.gitignore_managed:
                 gi_path = ctx.target_dir / ".gitignore"
-                block_present = gi_path.exists() and MARKER_BEGIN in gi_path.read_text(
-                    encoding="utf-8"
-                )
+                if gi_path.exists():
+                    try:
+                        content = gi_path.read_text(encoding="utf-8")
+                        begins, ends = _find_markers(content.splitlines())
+                        block_present = (
+                            len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]
+                        )
+                    except (OSError, UnicodeDecodeError):
+                        block_present = False
+
                 if block_present:
-                    ensure_gitignore_block(ctx.target_dir, DEFAULT_ENTRIES)
+                    ensure_gitignore_block(
+                        ctx.target_dir, get_recommended_entries(ctx.target_dir)
+                    )
                 else:
                     mdata.gitignore_managed = False
                     write_manifest_data(ctx.target_dir, mdata)
@@ -1287,8 +1294,6 @@ def sync_provider(
         return results
 
     # Validate provider is installed
-    from .manifest import read_manifest
-
     installed = read_manifest(ctx.target_dir)
     if installed and provider not in installed:
         raise ProviderNotInstalledError(
@@ -1326,8 +1331,6 @@ def sync_provider(
 
     if not dry_run:
         import datetime
-
-        from .manifest import read_manifest_data, write_manifest_data
 
         now = datetime.datetime.now(tz=datetime.UTC).isoformat()
         mdata = read_manifest_data(ctx.target_dir)
