@@ -274,13 +274,27 @@ class TestReadOnlyGitignore:
         gi = _gi(tmp_path)
         gi.chmod(stat.S_IREAD)
         try:
-            # On Linux, root/CI can write read-only files; verify the
-            # guard works only when the OS actually enforces it.
+            # On Linux, root/CI can write read-only files; also, atomic
+            # replace (rename) can succeed for 0444 files if the directory is
+            # writable. Verify the guard works only when the OS actually
+            # enforces it for the specific mechanism we use.
             try:
-                gi.write_bytes(b"probe")
-                can_write = True
+                probe = tmp_path / "probe.tmp"
+                probe.write_bytes(b"test")
+                try:
+                    probe.replace(gi)
+                    can_write = True
+                except OSError:
+                    can_write = False
+                finally:
+                    probe.unlink(missing_ok=True)
             except OSError:
                 can_write = False
+            finally:
+                # Restore original state if probe replaced it
+                if can_write:
+                    _write_gi(tmp_path, "node_modules/\n")
+                    gi.chmod(stat.S_IREAD)
 
             if can_write:
                 # OS did not enforce read-only; just verify no crash

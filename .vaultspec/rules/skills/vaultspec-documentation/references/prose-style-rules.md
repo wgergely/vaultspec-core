@@ -103,8 +103,8 @@ ______________________________________________________________________
 - **No periods on headings, subheadings, or list items under 3 words.**
 - **Bold for UI elements.** "Click **Settings**." Code font for code, commands,
   filenames, and parameters.
-- **Meaningful link text.** "See the [authentication guide](...)" -
-  not "Click [here](...)."
+- **Meaningful link text.** "See the `[authentication guide](...)`" -
+  not "Click `[here](...)`."
 
 ______________________________________________________________________
 
