@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.7](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.6...vaultspec-core-v0.1.7) (2026-04-05)
+
+
+### Features
+
+* add pre-commit hook management to CLI install and sync ([f51fd0f](https://github.com/wgergely/vaultspec-core/commit/f51fd0f3f57a931d546efa391f9f6e92b3e83c7a)), closes [#29](https://github.com/wgergely/vaultspec-core/issues/29)
+* pre-commit hook management via python CLI ([c2927d4](https://github.com/wgergely/vaultspec-core/commit/c2927d4711d3abf8da52c1c75ce4c464c4cffe17))
+* robust gitignore management and lifecycle integration ([99a554f](https://github.com/wgergely/vaultspec-core/commit/99a554fd24c093ecaf969156324017a09337e281))
+* robust gitignore management and lifecycle integration ([d6077c1](https://github.com/wgergely/vaultspec-core/commit/d6077c1674f32e0c2abb5db07740e250c5f2f8c9))
+
+
+### Bug Fixes
+
+* address code review findings for gitignore management ([317e04a](https://github.com/wgergely/vaultspec-core/commit/317e04a65a008ad414d6ced86cc424621f333cce))
+* address codex and gemini code review findings ([cc8c01c](https://github.com/wgergely/vaultspec-core/commit/cc8c01cebf7ff904101e73f4983fe2165008d13d))
+* address PR review feedback for pre-commit hooks ([83db5c9](https://github.com/wgergely/vaultspec-core/commit/83db5c972b8a8f51cfcfe0affed7e09f4fa54a1a))
+* use valid CLI commands in scaffolded pre-commit hooks ([9e96b41](https://github.com/wgergely/vaultspec-core/commit/9e96b41e01d9d83028ed0b7f51365d66d7589d72))
+
 ## [0.1.6](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.5...vaultspec-core-v0.1.6) (2026-04-03)
 
 
