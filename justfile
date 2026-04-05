@@ -23,7 +23,22 @@ default:
 # ===========================================================================
 
 prod *args='':
-  uv run vaultspec-core {{args}}
+  case "{{args}}" in \
+    "--help"|"-h"|"help") \
+      echo "Usage: just prod [args...]" ; \
+      echo "" ; \
+      echo "Runs the vaultspec-core Python CLI (pure 1:1 mirror)." ; \
+      echo "Examples:" ; \
+      echo "  just prod install . claude --force" ; \
+      echo "  just prod sync claude --dry-run" ; \
+      echo "  just prod vault check all --fix" ; \
+      echo "  just prod vault check all -v" ; \
+      echo "  just prod vault graph --metrics" ; \
+      echo "  just prod vault add adr -f my-feature" ; \
+      echo "  just prod spec rules list" ;; \
+    *) \
+      uv run vaultspec-core {{args}} ;; \
+  esac
 
 # ===========================================================================
 #  dev  - development toolchain (linters, formatters, tests, builds)
@@ -52,7 +67,7 @@ prod *args='':
 #    just dev build docker
 # ===========================================================================
 
-dev target *args='':
+dev target='--help' *args='':
   case "{{target}}" in \
     deps) \
       just _dev-deps {{args}} ;; \
@@ -70,6 +85,18 @@ dev target *args='':
       just _dev-publish {{args}} ;; \
     precommit) \
       just _dev-precommit {{args}} ;; \
+    --help|-h|help) \
+      echo "Usage: just dev <target> [args...]" ; \
+      echo "" ; \
+      echo "Targets:" ; \
+      echo "  deps      dependency management (sync, upgrade, lock)" ; \
+      echo "  lint      read-only static analysis (ruff, ty, taplo, markdownlint, ...)" ; \
+      echo "  fix       auto-fix everything fixable (python, toml, markdown, vault)" ; \
+      echo "  audit     supply-chain / security checks (pip-audit)" ; \
+      echo "  test      pytest, docker smoke" ; \
+      echo "  build     uv build, docker build" ; \
+      echo "  publish   docker push" ; \
+      echo "  precommit pre-commit hook management (install, upgrade, run)" ;; \
     *) \
       echo "unknown dev target: {{target}}" >&2; \
       echo "  targets: deps lint fix audit test build publish precommit" >&2; \
@@ -80,17 +107,24 @@ dev target *args='':
 #  ci  - full pipeline: lint → audit → vault check → test
 # ===========================================================================
 
-ci:
-  just dev lint all && \
-  just dev audit deps && \
-  just prod vault check all && \
-  just dev test all
+ci *args='':
+  case "{{args}}" in \
+    "--help"|"-h"|"help") \
+      echo "Usage: just ci" ; \
+      echo "" ; \
+      echo "Runs the full CI pipeline: lint → audit → vault check → test" ;; \
+    *) \
+      just dev lint all && \
+      just dev audit deps && \
+      just prod vault check all && \
+      just dev test all ;; \
+  esac
 
 # ---------------------------------------------------------------------------
 #  Internal recipes (prefixed with _ to hide from --list)
 # ---------------------------------------------------------------------------
 
-_dev-deps target='sync':
+_dev-deps target='--help':
   case "{{target}}" in \
     sync) \
       uv sync --locked --group dev ;; \
@@ -100,13 +134,21 @@ _dev-deps target='sync':
       uv lock ;; \
     lock-upgrade) \
       uv lock --upgrade ;; \
+    --help|-h|help) \
+      echo "Usage: just dev deps <target>" ; \
+      echo "" ; \
+      echo "Targets:" ; \
+      echo "  sync          Sync dependencies" ; \
+      echo "  upgrade       Upgrade all dependencies" ; \
+      echo "  lock          Lock dependencies" ; \
+      echo "  lock-upgrade  Upgrade and lock dependencies" ;; \
     *) \
       echo "unknown dev deps target: {{target}}" >&2; \
       echo "  targets: sync upgrade lock lock-upgrade" >&2; \
       exit 1 ;; \
   esac
 
-_dev-lint target='all':
+_dev-lint target='--help':
   case "{{target}}" in \
     python) \
       uv run ruff check src tests ;; \
@@ -156,13 +198,24 @@ _dev-lint target='all':
       just _dev-lint toml && \
       just _dev-lint markdown && \
       just _dev-lint workflow ;; \
+    --help|-h|help) \
+      echo "Usage: just dev lint <target>" ; \
+      echo "" ; \
+      echo "Targets:" ; \
+      echo "  python    Run Ruff on Python source" ; \
+      echo "  type      Run Ty (type checker) on Python source" ; \
+      echo "  links     Run Lychee link checker" ; \
+      echo "  toml      Run Taplo TOML linter" ; \
+      echo "  markdown  Run Markdown linting and formatting checks" ; \
+      echo "  workflow  Run Actionlint on GitHub workflows" ; \
+      echo "  all       Run all linters" ;; \
     *) \
       echo "unknown dev lint target: {{target}}" >&2; \
       echo "  targets: python type links toml markdown workflow all" >&2; \
       exit 1 ;; \
   esac
 
-_dev-fix target='all':
+_dev-fix target='--help':
   case "{{target}}" in \
     python) \
       uv run ruff format src tests && \
@@ -188,13 +241,22 @@ _dev-fix target='all':
       just _dev-fix toml && \
       just _dev-fix markdown && \
       just _dev-fix vault ;; \
+    --help|-h|help) \
+      echo "Usage: just dev fix <target>" ; \
+      echo "" ; \
+      echo "Targets:" ; \
+      echo "  python    Auto-fix and format Python source" ; \
+      echo "  toml      Auto-format TOML files" ; \
+      echo "  markdown  Auto-format Markdown files" ; \
+      echo "  vault     Auto-fix vault issues" ; \
+      echo "  all       Run all fixers" ;; \
     *) \
       echo "unknown dev fix target: {{target}}" >&2; \
       echo "  targets: python toml markdown vault all" >&2; \
       exit 1 ;; \
   esac
 
-_dev-audit target:
+_dev-audit target='--help':
   case "{{target}}" in \
     deps) \
       tmp="${TMPDIR:-${TEMP:-/tmp}}/vaultspec-pip-audit-$$.txt"; \
@@ -202,13 +264,18 @@ _dev-audit target:
       uv export --frozen --group dev \
         --no-emit-project --output-file "$tmp"; \
       uv run pip-audit --strict -r "$tmp" ;; \
+    --help|-h|help) \
+      echo "Usage: just dev audit <target>" ; \
+      echo "" ; \
+      echo "Targets:" ; \
+      echo "  deps      Run pip-audit on dependencies" ;; \
     *) \
       echo "unknown dev audit target: {{target}}" >&2; \
       echo "  targets: deps" >&2; \
       exit 1 ;; \
   esac
 
-_dev-test target='all':
+_dev-test target='--help':
   case "{{target}}" in \
     python) \
       uv run pytest src/vaultspec_core \
@@ -220,13 +287,20 @@ _dev-test target='all':
     all) \
       just _dev-test python && \
       just _dev-test docker ;; \
+    --help|-h|help) \
+      echo "Usage: just dev test <target>" ; \
+      echo "" ; \
+      echo "Targets:" ; \
+      echo "  python    Run pytest on Python source" ; \
+      echo "  docker    Run smoke test in Docker" ; \
+      echo "  all       Run all tests" ;; \
     *) \
       echo "unknown dev test target: {{target}}" >&2; \
       echo "  targets: python docker all" >&2; \
       exit 1 ;; \
   esac
 
-_dev-build target:
+_dev-build target='--help':
   case "{{target}}" in \
     python) \
       uv build ;; \
@@ -236,24 +310,37 @@ _dev-build target:
     all) \
       just _dev-build python && \
       just _dev-build docker ;; \
+    --help|-h|help) \
+      echo "Usage: just dev build <target>" ; \
+      echo "" ; \
+      echo "Targets:" ; \
+      echo "  python    Build Python package" ; \
+      echo "  docker    Build Docker image locally" ; \
+      echo "  all       Run all builds" ;; \
     *) \
       echo "unknown dev build target: {{target}}" >&2; \
       echo "  targets: python docker all" >&2; \
       exit 1 ;; \
   esac
 
-_dev-publish target tag:
+_dev-publish target='--help' tag='':
   case "{{target}}" in \
     docker-ghcr) \
+      if [ -z "{{tag}}" ]; then echo "error: missing argument 'tag' for docker-ghcr" >&2; exit 1; fi; \
       docker buildx build --platform linux/amd64 \
         --push -t {{ image }}:{{tag}} . ;; \
+    --help|-h|help) \
+      echo "Usage: just dev publish <target> <tag>" ; \
+      echo "" ; \
+      echo "Targets:" ; \
+      echo "  docker-ghcr   Publish docker image to GHCR" ;; \
     *) \
       echo "unknown dev publish target: {{target}}" >&2; \
       echo "  targets: docker-ghcr" >&2; \
       exit 1 ;; \
   esac
 
-_dev-precommit target='run':
+_dev-precommit target='--help':
   case "{{target}}" in \
     install) \
       uv run prek install ;; \
@@ -261,6 +348,13 @@ _dev-precommit target='run':
       uv run prek auto-update ;; \
     run) \
       uv run prek run --all-files ;; \
+    --help|-h|help) \
+      echo "Usage: just dev precommit <target>" ; \
+      echo "" ; \
+      echo "Targets:" ; \
+      echo "  install   Install pre-commit hooks" ; \
+      echo "  upgrade   Upgrade pre-commit hooks" ; \
+      echo "  run       Run pre-commit hooks on all files" ;; \
     *) \
       echo "unknown dev precommit target: {{target}}" >&2; \
       echo "  targets: install upgrade run" >&2; \
