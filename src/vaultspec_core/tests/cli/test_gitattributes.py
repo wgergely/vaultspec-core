@@ -300,3 +300,87 @@ class TestReadOnlyGitattributes:
                     ensure_gitattributes_block(tmp_path)
         finally:
             ga.chmod(stat.S_IREAD | stat.S_IWRITE)
+
+
+# ---------------------------------------------------------------------------
+# Integration tests: install / sync / uninstall lifecycle
+# ---------------------------------------------------------------------------
+
+
+class TestInstallCreatesGitattributes:
+    def test_install_creates_gitattributes_with_block(self, tmp_path):
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        factory = WorkspaceFactory(tmp_path)
+        factory.install()
+
+        assert factory.gitattributes_has_block()
+        text = (tmp_path / ".gitattributes").read_text(encoding="utf-8")
+        assert "* text=auto eol=lf" in text
+        assert "*.bat text eol=crlf" in text
+
+    def test_install_sets_manifest_flag(self, tmp_path):
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        factory = WorkspaceFactory(tmp_path)
+        factory.install()
+
+        mdata = factory.read_manifest()
+        assert mdata.gitattributes_managed is True
+
+    def test_install_preserves_existing_content(self, tmp_path):
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        (tmp_path / ".gitattributes").write_text("*.jpg binary\n", encoding="utf-8")
+        factory = WorkspaceFactory(tmp_path)
+        factory.install()
+
+        text = (tmp_path / ".gitattributes").read_text(encoding="utf-8")
+        assert "*.jpg binary" in text
+        assert MARKER_BEGIN in text
+
+
+class TestSyncRespectsGitattributesOptOut:
+    def test_sync_repairs_block(self, tmp_path):
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        factory = WorkspaceFactory(tmp_path)
+        factory.install()
+
+        # Corrupt the block entries (replace with stale content)
+        ga = tmp_path / ".gitattributes"
+        text = ga.read_text(encoding="utf-8")
+        text = text.replace("* text=auto eol=lf", "* text=auto")
+        ga.write_text(text, encoding="utf-8")
+
+        factory.sync()
+
+        repaired = ga.read_text(encoding="utf-8")
+        assert "* text=auto eol=lf" in repaired
+
+    def test_sync_honours_opt_out(self, tmp_path):
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        factory = WorkspaceFactory(tmp_path)
+        factory.install()
+        factory.remove_gitattributes_block()
+
+        factory.sync()
+
+        mdata = factory.read_manifest()
+        assert mdata.gitattributes_managed is False
+
+
+class TestUninstallRemovesGitattributes:
+    def test_full_uninstall_removes_block(self, tmp_path):
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        factory = WorkspaceFactory(tmp_path)
+        factory.install()
+        assert factory.gitattributes_has_block()
+
+        factory.uninstall(keep_vault=False)
+
+        ga = tmp_path / ".gitattributes"
+        if ga.exists():
+            assert MARKER_BEGIN not in ga.read_text(encoding="utf-8")

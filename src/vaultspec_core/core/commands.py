@@ -23,12 +23,8 @@ from .exceptions import (
     VaultSpecError,
     WorkspaceNotInitializedError,
 )
-from .gitattributes import (
-    ensure_gitattributes_block,
-)
-from .gitattributes import (
-    has_valid_block as _ga_has_valid_block,
-)
+from .gitattributes import ensure_gitattributes_block
+from .gitattributes import has_valid_block as _ga_has_valid_block
 from .gitignore import (
     _collect_provider_artifacts,
     _find_markers,
@@ -1268,12 +1264,6 @@ def sync_provider(
         if not dry_run:
             import datetime
 
-            from .gitattributes import (
-                ensure_gitattributes_block,
-            )
-            from .gitattributes import (
-                has_valid_block as _ga_has_valid_block_sync,
-            )
             from .gitignore import ensure_gitignore_block
 
             # Repair MCP entry if missing (unless mcp is skipped)
@@ -1315,9 +1305,7 @@ def sync_provider(
                 if ga_path.exists():
                     try:
                         content = ga_path.read_text(encoding="utf-8")
-                        ga_block_present = _ga_has_valid_block_sync(
-                            content.splitlines()
-                        )
+                        ga_block_present = _ga_has_valid_block(content.splitlines())
                     except (OSError, UnicodeDecodeError):
                         pass
 
