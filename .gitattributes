@@ -16,8 +16,8 @@
 *.json    text
 
 # Documentation
-*.md      text
-*.txt     text
+*.md      text eol=lf
+*.txt     text eol=lf
 
 # Data/Config
 *.yml     text
