@@ -44,17 +44,17 @@ def test_justfile_exposes_approved_targets() -> None:
     justfile = _read("justfile")
     # Top-level namespace recipes
     assert "prod *args='':" in justfile
-    assert "dev target *args='':" in justfile
-    assert "ci:" in justfile
+    assert "dev target='--help' *args='':" in justfile
+    assert "ci *args='':" in justfile
     # Internal dev recipes with default targets
-    assert "_dev-deps target='sync':" in justfile
-    assert "_dev-lint target='all':" in justfile
-    assert "_dev-fix target='all':" in justfile
-    assert "_dev-audit target:" in justfile
-    assert "_dev-test target='all':" in justfile
-    assert "_dev-build target:" in justfile
-    assert "_dev-publish target tag:" in justfile
-    assert "_dev-precommit target='run':" in justfile
+    assert "_dev-deps target='--help':" in justfile
+    assert "_dev-lint target='--help':" in justfile
+    assert "_dev-fix target='--help':" in justfile
+    assert "_dev-audit target='--help':" in justfile
+    assert "_dev-test target='--help':" in justfile
+    assert "_dev-build target='--help':" in justfile
+    assert "_dev-publish target='--help' tag='':" in justfile
+    assert "_dev-precommit target='--help':" in justfile
     # Dev dispatch covers all verbs
     for verb in (
         "deps",
@@ -78,33 +78,33 @@ def test_justfile_exposes_approved_targets() -> None:
 
 def test_dependency_audit_uses_lockfile_export_without_root_project() -> None:
     justfile = _read("justfile")
-    # Export and audit commands are split across continuation lines
+    # Export and audit commands use platform-conditional logic
     assert "uv export --frozen --group dev" in justfile
     assert "--no-emit-project --output-file" in justfile
-    assert 'uv run pip-audit --strict -r "$tmp"' in justfile
+    assert "uv run pip-audit --strict -r" in justfile
 
 
 def test_lint_all_runs_every_validation_surface() -> None:
     justfile = _read("justfile")
-    assert "just _dev-lint python" in justfile
-    assert "just _dev-lint type" in justfile
-    assert "just _dev-lint links" in justfile
-    assert "just _dev-lint toml" in justfile
-    assert "just _dev-lint markdown" in justfile
-    assert "just _dev-lint workflow" in justfile
+    assert "just _dev-lint-python" in justfile
+    assert "just _dev-lint-type" in justfile
+    assert "just _dev-lint-links" in justfile
+    assert "just _dev-lint-toml" in justfile
+    assert "just _dev-lint-markdown" in justfile
+    assert "just _dev-lint-workflow" in justfile
 
 
 def test_test_all_runs_python_and_docker() -> None:
     justfile = _read("justfile")
-    assert "just _dev-test python" in justfile
-    assert "just _dev-test docker" in justfile
-    assert "just _dev-build docker" in justfile
-    assert "just _dev-build python" in justfile
+    assert "just _dev-test-python" in justfile
+    assert "just _dev-test-docker" in justfile
+    assert "just _dev-build-docker" in justfile
+    assert "just _dev-build-python" in justfile
 
 
 def test_fix_surface_covers_all_autofixable_targets() -> None:
     justfile = _read("justfile")
-    assert "_dev-fix target='all':" in justfile
+    assert "_dev-fix target='--help':" in justfile
     assert "uv run ruff format src tests" in justfile
     assert "uv run ruff check --fix src tests" in justfile
     assert "taplo fmt" in justfile
@@ -175,7 +175,7 @@ def test_prod_delegates_to_cli() -> None:
     justfile = _read("justfile")
     # prod recipe passes all args through to uv run vaultspec-core
     assert "prod *args='':" in justfile
-    assert "uv run vaultspec-core {{args}}" in justfile
+    assert '"uv run vaultspec-core " + args' in justfile
     # install/uninstall available via prod namespace (documented in comments)
     assert "just prod install" in justfile
     assert "uv run vaultspec-core" in justfile
@@ -218,6 +218,10 @@ def test_provider_capability_consistency() -> None:
         if ProviderCapability.ROOT_CONFIG in caps:
             assert cfg.config_file is not None, (
                 f"{tool.value} declares ROOT_CONFIG but has no config_file"
+            )
+        if ProviderCapability.WORKFLOWS in caps:
+            assert cfg.workflows_dir is not None, (
+                f"{tool.value} declares WORKFLOWS but has no workflows_dir"
             )
 
 

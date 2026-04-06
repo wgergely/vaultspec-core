@@ -335,7 +335,7 @@ def _execute_shell(
     try:
         target_dir = get_context().target_dir
         env["VAULTSPEC_TARGET_DIR"] = str(target_dir)
-        cwd: str | None = str(target_dir)
+        cwd: str | None = str(target_dir) if target_dir.is_dir() else None
     except LookupError:
         cwd = None
 
