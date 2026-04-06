@@ -452,6 +452,8 @@ def collect_content_integrity(
 
     # Files only in destination
     for name in dest_files - source_files:
+        if name.endswith("-system.builtin.md"):
+            continue  # Synthesized by system_sync(), not sourced
         result[name] = ContentSignal.STALE
 
     # Files only in source
