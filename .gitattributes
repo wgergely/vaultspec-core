@@ -9,21 +9,28 @@
 
 # Web files
 *.html    text diff=html
-*.css     text
-*.js      text
-*.ts      text
-*.tsx     text
-*.json    text
+*.css     text eol=lf
+*.js      text eol=lf
+*.ts      text eol=lf
+*.tsx     text eol=lf
+*.json    text eol=lf
 
 # Documentation
 *.md      text eol=lf
 *.txt     text eol=lf
 
 # Data/Config
-*.yml     text
-*.yaml    text
-*.toml    text
-*.xml     text
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.toml    text eol=lf
+*.xml     text eol=lf
+
+# Standard configs & tools
+justfile        text eol=lf
+Dockerfile      text eol=lf
+.gitignore      text eol=lf
+.dockerignore   text eol=lf
+.gitattributes  text eol=lf
 
 # Shell scripts
 *.sh      text eol=lf
