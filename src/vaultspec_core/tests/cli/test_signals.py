@@ -13,6 +13,7 @@ from vaultspec_core.core.diagnosis.signals import (
     ConfigSignal,
     ContentSignal,
     FrameworkSignal,
+    GitattributesSignal,
     GitignoreSignal,
     ManifestEntrySignal,
     ProviderDirSignal,
@@ -55,6 +56,10 @@ pytestmark = [pytest.mark.unit]
             {"NO_FILE", "NO_ENTRIES", "PARTIAL", "COMPLETE", "CORRUPTED"},
         ),
         (
+            GitattributesSignal,
+            {"NO_FILE", "NO_ENTRIES", "PARTIAL", "COMPLETE", "CORRUPTED"},
+        ),
+        (
             ResolutionAction,
             {
                 "SCAFFOLD",
@@ -63,6 +68,7 @@ pytestmark = [pytest.mark.unit]
                 "REPAIR_MANIFEST",
                 "ADOPT_DIRECTORY",
                 "REPAIR_GITIGNORE",
+                "REPAIR_GITATTRIBUTES",
                 "REMOVE",
                 "SKIP",
             },
@@ -120,6 +126,7 @@ class TestWorkspaceDiagnosis:
         assert diag.providers == {}
         assert diag.builtin_version == BuiltinVersionSignal.NO_SNAPSHOTS
         assert diag.gitignore == GitignoreSignal.NO_FILE
+        assert diag.gitattributes == GitattributesSignal.NO_FILE
 
     def test_construction_with_providers(self):
         prov = ProviderDiagnosis(

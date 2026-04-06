@@ -735,6 +735,7 @@ def cmd_doctor(
         ConfigSignal,
         ContentSignal,
         FrameworkSignal,
+        GitattributesSignal,
         GitignoreSignal,
         ManifestEntrySignal,
         diagnose,
@@ -842,6 +843,23 @@ def cmd_doctor(
         diag.gitignore.value,
     )
 
+    # Gitattributes row
+    ga_status, ga_style = _signal_status(
+        diag.gitattributes,
+        {
+            GitattributesSignal.COMPLETE: ("ok", "green"),
+            GitattributesSignal.PARTIAL: ("warn", "yellow"),
+            GitattributesSignal.NO_ENTRIES: ("info", "dim"),
+            GitattributesSignal.NO_FILE: ("info", "dim"),
+            GitattributesSignal.CORRUPTED: ("error", "red"),
+        },
+    )
+    table.add_row(
+        "gitattributes",
+        f"[{ga_style}]{ga_status}[/{ga_style}]",
+        diag.gitattributes.value,
+    )
+
     # MCP row
     mcp_status, mcp_style = _signal_status(
         diag.mcp,
@@ -917,6 +935,7 @@ def _doctor_exit_code(diag: WorkspaceDiagnosis) -> int:
         ConfigSignal,
         ContentSignal,
         FrameworkSignal,
+        GitattributesSignal,
         GitignoreSignal,
         ManifestEntrySignal,
         ProviderDirSignal,
@@ -928,6 +947,8 @@ def _doctor_exit_code(diag: WorkspaceDiagnosis) -> int:
     if diag.framework in (FrameworkSignal.MISSING, FrameworkSignal.CORRUPTED):
         has_error = True
     if diag.gitignore == GitignoreSignal.CORRUPTED:
+        has_error = True
+    if diag.gitattributes == GitattributesSignal.CORRUPTED:
         has_error = True
     if diag.builtin_version == BuiltinVersionSignal.DELETED:
         has_error = True

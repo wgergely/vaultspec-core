@@ -41,6 +41,8 @@ class ManifestData:
             (e.g. ``{"claude": {"synced": "true"}}``).
         gitignore_managed: Whether vaultspec manages ``.gitignore``
             entries.
+        gitattributes_managed: Whether vaultspec manages ``.gitattributes``
+            entries.
     """
 
     version: str = "2.0"
@@ -50,6 +52,7 @@ class ManifestData:
     installed: set[str] = field(default_factory=set)
     provider_state: dict[str, dict[str, str]] = field(default_factory=dict)
     gitignore_managed: bool = False
+    gitattributes_managed: bool = False
 
 
 def _manifest_path(target: Path) -> Path:
@@ -147,6 +150,7 @@ def read_manifest_data(target: Path, *, strict: bool = False) -> ManifestData:
         installed=set(raw.get("installed", [])),
         provider_state=raw.get("provider_state", {}),
         gitignore_managed=bool(raw.get("gitignore_managed", False)),
+        gitattributes_managed=bool(raw.get("gitattributes_managed", False)),
     )
 
 
@@ -173,6 +177,7 @@ def write_manifest_data(target: Path, data: ManifestData) -> None:
         "installed": sorted(data.installed),
         "provider_state": data.provider_state,
         "gitignore_managed": data.gitignore_managed,
+        "gitattributes_managed": data.gitattributes_managed,
     }
     with _manifest_lock(path):
         atomic_write(path, json.dumps(payload, indent=2) + "\n")
