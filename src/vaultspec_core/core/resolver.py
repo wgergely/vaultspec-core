@@ -684,8 +684,8 @@ def _resolve_gitattributes(
     if signal == GitattributesSignal.PARTIAL and action == "uninstall":
         return
 
-    # All GitignoreSignal values are handled above.
-    logger.warning("Unknown GitignoreSignal member: %s (action=%s)", signal, action)
+    # All GitattributesSignal values are handled above.
+    logger.warning("Unknown GitattributesSignal member: %s (action=%s)", signal, action)
 
 
 # ---------------------------------------------------------------------------

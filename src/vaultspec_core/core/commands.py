@@ -24,10 +24,10 @@ from .exceptions import (
     WorkspaceNotInitializedError,
 )
 from .gitattributes import (
-    _find_markers as _find_ga_markers,
+    ensure_gitattributes_block,
 )
 from .gitattributes import (
-    ensure_gitattributes_block,
+    has_valid_block as _ga_has_valid_block,
 )
 from .gitignore import (
     _collect_provider_artifacts,
@@ -720,10 +720,7 @@ def install_run(
     if ga_path.exists():
         try:
             content = ga_path.read_text(encoding="utf-8")
-            begins, ends = _find_ga_markers(content.splitlines())
-            ga_block_present = (
-                len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]
-            )
+            ga_block_present = _ga_has_valid_block(content.splitlines())
         except (OSError, UnicodeDecodeError):
             pass
 
@@ -1272,10 +1269,10 @@ def sync_provider(
             import datetime
 
             from .gitattributes import (
-                _find_markers as _find_ga_markers_sync,
+                ensure_gitattributes_block,
             )
             from .gitattributes import (
-                ensure_gitattributes_block,
+                has_valid_block as _ga_has_valid_block_sync,
             )
             from .gitignore import ensure_gitignore_block
 
@@ -1318,9 +1315,8 @@ def sync_provider(
                 if ga_path.exists():
                     try:
                         content = ga_path.read_text(encoding="utf-8")
-                        begins, ends = _find_ga_markers_sync(content.splitlines())
-                        ga_block_present = (
-                            len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]
+                        ga_block_present = _ga_has_valid_block_sync(
+                            content.splitlines()
                         )
                     except (OSError, UnicodeDecodeError):
                         pass

@@ -472,7 +472,7 @@ def collect_gitattributes_state(target: Path) -> GitattributesSignal:
         :class:`~vaultspec_core.core.diagnosis.signals.GitattributesSignal`
         reflecting the observed state.
     """
-    from ..gitattributes import DEFAULT_ENTRIES, _find_markers
+    from ..gitattributes import DEFAULT_ENTRIES, _find_markers, has_valid_block
 
     ga_path = target / ".gitattributes"
     if not ga_path.exists():
@@ -490,7 +490,7 @@ def collect_gitattributes_state(target: Path) -> GitattributesSignal:
     if not begins and not ends:
         return GitattributesSignal.NO_ENTRIES
 
-    if len(begins) != 1 or len(ends) != 1 or begins[0] >= ends[0]:
+    if not has_valid_block(lines):
         return GitattributesSignal.CORRUPTED
 
     begin_idx = begins[0]

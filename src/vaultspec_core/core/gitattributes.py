@@ -26,6 +26,22 @@ DEFAULT_ENTRIES = [
 ]
 
 
+def has_valid_block(lines: list[str]) -> bool:
+    """Return ``True`` if *lines* contain exactly one well-formed managed block.
+
+    A valid block has exactly one :data:`MARKER_BEGIN` followed by exactly
+    one :data:`MARKER_END`.
+
+    Args:
+        lines: Splitlines of the file content.
+
+    Returns:
+        ``True`` when the block structure is valid.
+    """
+    begins, ends = _find_markers(lines)
+    return len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]
+
+
 def ensure_gitattributes_block(
     target: Path,
     entries: list[str] | None = None,
@@ -113,28 +129,16 @@ def _collapse_double_blanks(lines: list[str]) -> list[str]:
     return result
 
 
-def _add_block(
-    ga_path: Path,
+def _purge_markers(
     lines: list[str],
     begins: list[int],
     ends: list[int],
-    entries: list[str],
-    eol: str,
-    bom: bytes,
-) -> bool:
-    """Add or update the vaultspec-managed block in-place."""
-    new_block = [MARKER_BEGIN, *entries, MARKER_END]
+) -> None:
+    """Remove all managed-block markers and their content from *lines* in-place.
 
-    # If we have exactly one block, update it in-place.
-    if len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]:
-        replaced = lines[: begins[0]] + new_block + lines[ends[0] + 1 :]
-        if replaced == lines:
-            return False
-        result = eol.join(replaced) + eol
-        _write(ga_path, result, bom)
-        return True
-
-    # Otherwise, clean up all existing markers and content between them.
+    Pairs begin/end markers using a stack, removes paired ranges from end
+    to start to avoid index shifts, then removes any orphaned markers.
+    """
     ranges: list[tuple[int, int]] = []
     stack: list[int] = []
     marker_indices = sorted(
@@ -160,10 +164,36 @@ def _add_block(
         for idx in to_pop:
             lines.pop(idx)
 
+
+def _add_block(
+    ga_path: Path,
+    lines: list[str],
+    begins: list[int],
+    ends: list[int],
+    entries: list[str],
+    eol: str,
+    bom: bytes,
+) -> bool:
+    """Add or update the vaultspec-managed block in-place."""
+    new_block = [MARKER_BEGIN, *entries, MARKER_END]
+
+    # If we have exactly one block, update it in-place.
+    if len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]:
+        replaced = lines[: begins[0]] + new_block + lines[ends[0] + 1 :]
+        if replaced == lines:
+            return False
+        result = eol.join(replaced) + eol
+        _write(ga_path, result, bom)
+        return True
+
+    # Otherwise, clean up all existing markers and content between them.
+    _purge_markers(lines, begins, ends)
+
     # Strip trailing blank lines, add separator, append block.
     while lines and lines[-1].strip() == "":
         lines.pop()
-    lines.append("")
+    if lines:
+        lines.append("")
     lines.extend(new_block)
 
     result = eol.join(lines) + eol
@@ -185,31 +215,7 @@ def _remove_block(
     if len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]:
         lines = lines[: begins[0]] + lines[ends[0] + 1 :]
     else:
-        ranges: list[tuple[int, int]] = []
-        stack: list[int] = []
-        marker_indices = sorted(
-            [(i, "B") for i in begins] + [(i, "E") for i in ends],
-            key=lambda x: x[0],
-        )
-        for idx, mtype in marker_indices:
-            if mtype == "B":
-                stack.append(idx)
-            elif mtype == "E" and stack:
-                start = stack.pop()
-                ranges.append((start, idx))
-
-        if ranges:
-            for start, end in sorted(ranges, key=lambda x: x[0], reverse=True):
-                lines[start : end + 1] = []
-
-            begins_left, ends_left = _find_markers(lines)
-            to_pop = sorted(begins_left + ends_left, reverse=True)
-            for idx in to_pop:
-                lines.pop(idx)
-        else:
-            to_pop = sorted(begins + ends, reverse=True)
-            for idx in to_pop:
-                lines.pop(idx)
+        _purge_markers(lines, begins, ends)
 
     lines = _collapse_double_blanks(lines)
     result = eol.join(lines) + eol
