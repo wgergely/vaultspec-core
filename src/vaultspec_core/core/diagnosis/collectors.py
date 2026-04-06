@@ -419,6 +419,7 @@ def collect_content_integrity(
         :class:`~vaultspec_core.core.diagnosis.signals.ContentSignal`.
     """
     from ..enums import Tool
+    from ..system import SYSTEM_BUILTIN_RULE
     from ..types import get_context
 
     tool = Tool(tool_value)
@@ -452,6 +453,8 @@ def collect_content_integrity(
 
     # Files only in destination
     for name in dest_files - source_files:
+        if name == SYSTEM_BUILTIN_RULE:
+            continue  # Synthesized by system_sync(), not sourced
         result[name] = ContentSignal.STALE
 
     # Files only in source

@@ -20,6 +20,10 @@ from .types import SyncResult, ToolConfig
 
 logger = logging.getLogger(__name__)
 
+#: Filename of the synthesized system-rule artifact emitted by
+#: :func:`system_sync` into each provider's rules directory.
+SYSTEM_BUILTIN_RULE = "vaultspec-system.builtin.md"
+
 
 def collect_system_parts(
     warnings: list[str] | None = None,
@@ -232,7 +236,7 @@ def system_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
         elif cfg.rules_dir is not None and cfg.emit_system_rule:
             content = _generate_system_rules(cfg)
             if content is not None:
-                rule_path = cfg.rules_dir / "vaultspec-system.builtin.md"
+                rule_path = cfg.rules_dir / SYSTEM_BUILTIN_RULE
 
                 action = "[SKIP]"
                 if not rule_path.exists():

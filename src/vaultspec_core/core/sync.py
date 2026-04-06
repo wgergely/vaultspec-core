@@ -154,6 +154,8 @@ def sync_files(
             logger.error("    [ERROR] %s: %s", name, e, exc_info=True)
 
     # Detect stale destination items and either prune or warn.
+    from .system import SYSTEM_BUILTIN_RULE
+
     source_names = set(sources.keys())
     if dest_dir.exists():
         items = list(dest_dir.iterdir())
@@ -170,7 +172,7 @@ def sync_files(
                     item.is_file()
                     and item.suffix == ".md"
                     and item.name not in source_names
-                    and not item.name.endswith("-system.builtin.md")
+                    and item.name != SYSTEM_BUILTIN_RULE
                 )
 
             if not is_stale:
