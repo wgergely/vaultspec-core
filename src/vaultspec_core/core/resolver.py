@@ -17,6 +17,7 @@ from .diagnosis.signals import (
     ConfigSignal,
     ContentSignal,
     FrameworkSignal,
+    GitattributesSignal,
     GitignoreSignal,
     ManifestEntrySignal,
     ProviderDirSignal,
@@ -104,6 +105,7 @@ def resolve(
     _resolve_version_warning(plan, diagnosis)
     _resolve_builtin_version(plan, diagnosis.builtin_version, prov_action, force=force)
     _resolve_gitignore(plan, diagnosis.gitignore, prov_action, force=force)
+    _resolve_gitattributes(plan, diagnosis.gitattributes, prov_action, force=force)
 
     # Per-provider rules
     for tool, prov_diag in diagnosis.providers.items():
@@ -625,6 +627,61 @@ def _resolve_gitignore(
     if signal == GitignoreSignal.PARTIAL and action == "uninstall":
         # Partial entries during uninstall: the managed block will be
         # removed by the uninstall command.
+        return
+
+
+# ---------------------------------------------------------------------------
+# Gitattributes rules
+# ---------------------------------------------------------------------------
+
+
+def _resolve_gitattributes(
+    plan: ResolutionPlan,
+    signal: GitattributesSignal,
+    action: str,
+    *,
+    force: bool,
+) -> None:
+    """Apply gitattributes resolution rules."""
+    _ = force  # gitattributes repairs are unconditional
+    if signal in (GitattributesSignal.COMPLETE, GitattributesSignal.NO_FILE):
+        return
+
+    if signal == GitattributesSignal.PARTIAL:
+        if action in ("install", "sync"):
+            plan.steps.append(
+                ResolutionStep(
+                    action=ResolutionAction.REPAIR_GITATTRIBUTES,
+                    target=".gitattributes",
+                    reason="Managed block entries are stale, updating",
+                )
+            )
+        return
+
+    if signal == GitattributesSignal.CORRUPTED:
+        plan.steps.append(
+            ResolutionStep(
+                action=ResolutionAction.REPAIR_GITATTRIBUTES,
+                target=".gitattributes",
+                reason="Gitattributes managed block is corrupted",
+            )
+        )
+        return
+
+    if signal == GitattributesSignal.NO_ENTRIES and action == "install":
+        plan.steps.append(
+            ResolutionStep(
+                action=ResolutionAction.REPAIR_GITATTRIBUTES,
+                target=".gitattributes",
+                reason="Gitattributes has no managed entries",
+            )
+        )
+        return
+
+    if signal == GitattributesSignal.NO_ENTRIES and action in ("sync", "uninstall"):
+        return
+
+    if signal == GitattributesSignal.PARTIAL and action == "uninstall":
         return
 
     # All GitignoreSignal values are handled above.

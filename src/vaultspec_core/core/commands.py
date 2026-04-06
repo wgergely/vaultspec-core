@@ -23,6 +23,12 @@ from .exceptions import (
     VaultSpecError,
     WorkspaceNotInitializedError,
 )
+from .gitattributes import (
+    _find_markers as _find_ga_markers,
+)
+from .gitattributes import (
+    ensure_gitattributes_block,
+)
 from .gitignore import (
     _collect_provider_artifacts,
     _find_markers,
@@ -687,10 +693,16 @@ def install_run(
     if gi_written:
         logger.info("Added vaultspec managed block to .gitignore")
 
+    # Manage gitattributes block
+    ga_written = ensure_gitattributes_block(path, state=ManagedState.PRESENT)
+    if ga_written:
+        logger.info("Added vaultspec managed block to .gitattributes")
+
     # Populate v2.0 manifest fields
     import datetime
 
     gi_path = path / ".gitignore"
+    ga_path = path / ".gitattributes"
     mdata = read_manifest_data(path, strict=True)
 
     # Robust detection: if it's there, it's managed.
@@ -704,7 +716,19 @@ def install_run(
         except (OSError, UnicodeDecodeError):
             pass
 
+    ga_block_present = False
+    if ga_path.exists():
+        try:
+            content = ga_path.read_text(encoding="utf-8")
+            begins, ends = _find_ga_markers(content.splitlines())
+            ga_block_present = (
+                len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]
+            )
+        except (OSError, UnicodeDecodeError):
+            pass
+
     mdata.gitignore_managed = block_present
+    mdata.gitattributes_managed = ga_block_present
     mdata.vaultspec_version = _get_package_version()
     mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
     for name in provider_names:
@@ -1026,7 +1050,7 @@ def uninstall_run(
             for tool in tools:
                 remove_provider(path, tool.value)
 
-    # Re-sync gitignore block
+    # Re-sync gitignore and gitattributes blocks
     if not dry_run:
         try:
             mdata_after = read_manifest_data(path)
@@ -1038,6 +1062,7 @@ def uninstall_run(
         # Otherwise, we sync it if it was managed before.
         if not mdata_after.installed and not keep_vault:
             ensure_gitignore_block(path, [], state=ManagedState.ABSENT)
+            ensure_gitattributes_block(path, state=ManagedState.ABSENT)
         elif recommended and mdata_before.gitignore_managed:
             ensure_gitignore_block(path, recommended, state=ManagedState.PRESENT)
 
@@ -1246,6 +1271,12 @@ def sync_provider(
         if not dry_run:
             import datetime
 
+            from .gitattributes import (
+                _find_markers as _find_ga_markers_sync,
+            )
+            from .gitattributes import (
+                ensure_gitattributes_block,
+            )
             from .gitignore import ensure_gitignore_block
 
             # Repair MCP entry if missing (unless mcp is skipped)
@@ -1277,6 +1308,27 @@ def sync_provider(
                     )
                 else:
                     mdata.gitignore_managed = False
+                    write_manifest_data(ctx.target_dir, mdata)
+
+            # Respect gitattributes opt-out (same pattern as gitignore).
+            mdata = read_manifest_data(ctx.target_dir)
+            if mdata.gitattributes_managed:
+                ga_path = ctx.target_dir / ".gitattributes"
+                ga_block_present = False
+                if ga_path.exists():
+                    try:
+                        content = ga_path.read_text(encoding="utf-8")
+                        begins, ends = _find_ga_markers_sync(content.splitlines())
+                        ga_block_present = (
+                            len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]
+                        )
+                    except (OSError, UnicodeDecodeError):
+                        pass
+
+                if ga_block_present:
+                    ensure_gitattributes_block(ctx.target_dir)
+                else:
+                    mdata.gitattributes_managed = False
                     write_manifest_data(ctx.target_dir, mdata)
 
             # Update last_synced timestamps for installed providers only

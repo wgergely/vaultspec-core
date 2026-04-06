@@ -16,6 +16,7 @@ from .signals import (
     ConfigSignal,
     ContentSignal,
     FrameworkSignal,
+    GitattributesSignal,
     GitignoreSignal,
     ManifestEntrySignal,
     ProviderDirSignal,
@@ -58,6 +59,7 @@ class WorkspaceDiagnosis:
     providers: dict[Tool, ProviderDiagnosis] = field(default_factory=dict)
     builtin_version: BuiltinVersionSignal = BuiltinVersionSignal.NO_SNAPSHOTS
     gitignore: GitignoreSignal = GitignoreSignal.NO_FILE
+    gitattributes: GitattributesSignal = GitattributesSignal.NO_FILE
     mcp: ConfigSignal = ConfigSignal.MISSING
 
 
@@ -86,6 +88,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         collect_config_state,
         collect_content_integrity,
         collect_framework_presence,
+        collect_gitattributes_state,
         collect_gitignore_state,
         collect_manifest_coherence,
         collect_mcp_config_state,
@@ -106,12 +109,23 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         gitignore = GitignoreSignal.NO_FILE
 
     try:
+        gitattributes = collect_gitattributes_state(target)
+    except Exception:
+        logger.warning("Gitattributes state collector failed", exc_info=True)
+        gitattributes = GitattributesSignal.NO_FILE
+
+    try:
         mcp = collect_mcp_config_state(target)
     except Exception:
         logger.warning("MCP config state collector failed", exc_info=True)
         mcp = ConfigSignal.MISSING
 
-    diag = WorkspaceDiagnosis(framework=framework, gitignore=gitignore, mcp=mcp)
+    diag = WorkspaceDiagnosis(
+        framework=framework,
+        gitignore=gitignore,
+        gitattributes=gitattributes,
+        mcp=mcp,
+    )
 
     if framework == FrameworkSignal.MISSING:
         return diag

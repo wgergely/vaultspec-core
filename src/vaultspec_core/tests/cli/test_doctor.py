@@ -45,6 +45,7 @@ class TestDoctorCommand:
         assert "providers" in data
         assert "builtin_version" in data
         assert "gitignore" in data
+        assert "gitattributes" in data
 
     def test_json_exit_code_reflects_corrupted_state(self, tmp_path: Path) -> None:
         factory = WorkspaceFactory(tmp_path)
@@ -78,6 +79,12 @@ class TestDoctorCommand:
         factory.install()
         result = factory.run("doctor")
         assert "gitignore" in result.output.lower()
+
+    def test_output_contains_gitattributes_row(self, tmp_path: Path) -> None:
+        factory = WorkspaceFactory(tmp_path)
+        factory.install()
+        result = factory.run("doctor")
+        assert "gitattributes" in result.output.lower()
 
     def test_deleted_vaultspec_dir_exit_two(self, tmp_path: Path) -> None:
         factory = WorkspaceFactory(tmp_path)

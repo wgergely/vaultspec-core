@@ -16,6 +16,7 @@ from .signals import (
     ConfigSignal,
     ContentSignal,
     FrameworkSignal,
+    GitattributesSignal,
     GitignoreSignal,
     ManifestEntrySignal,
     ProviderDirSignal,
@@ -459,3 +460,46 @@ def collect_content_integrity(
         result[name] = ContentSignal.MISSING
 
     return result
+
+
+def collect_gitattributes_state(target: Path) -> GitattributesSignal:
+    """Assess the state of vaultspec-managed ``.gitattributes`` entries.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        :class:`~vaultspec_core.core.diagnosis.signals.GitattributesSignal`
+        reflecting the observed state.
+    """
+    from ..gitattributes import DEFAULT_ENTRIES, _find_markers
+
+    ga_path = target / ".gitattributes"
+    if not ga_path.exists():
+        return GitattributesSignal.NO_FILE
+
+    try:
+        content = ga_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        logger.warning("Cannot read .gitattributes %s: %s", ga_path, exc)
+        return GitattributesSignal.NO_FILE
+
+    lines = [line.strip() for line in content.splitlines()]
+    begins, ends = _find_markers(lines)
+
+    if not begins and not ends:
+        return GitattributesSignal.NO_ENTRIES
+
+    if len(begins) != 1 or len(ends) != 1 or begins[0] >= ends[0]:
+        return GitattributesSignal.CORRUPTED
+
+    begin_idx = begins[0]
+    end_idx = ends[0]
+    block_entries = [
+        line.rstrip() for line in lines[begin_idx + 1 : end_idx] if line.strip()
+    ]
+
+    if all(entry in block_entries for entry in DEFAULT_ENTRIES):
+        return GitattributesSignal.COMPLETE
+
+    return GitattributesSignal.PARTIAL

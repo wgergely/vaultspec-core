@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 
 from .diagnosis.signals import ResolutionAction
 from .enums import DirName, ManagedState, Tool
+from .gitattributes import ensure_gitattributes_block
 from .gitignore import ensure_gitignore_block, get_recommended_entries
 from .manifest import (
     ManifestData,
@@ -32,6 +33,7 @@ PREFLIGHT_ACTIONS: frozenset[ResolutionAction] = frozenset(
     {
         ResolutionAction.REPAIR_MANIFEST,
         ResolutionAction.REPAIR_GITIGNORE,
+        ResolutionAction.REPAIR_GITATTRIBUTES,
         ResolutionAction.ADOPT_DIRECTORY,
         ResolutionAction.SCAFFOLD,
     }
@@ -149,6 +151,7 @@ def execute_plan(
 _HANDLERS: dict[ResolutionAction, str] = {
     ResolutionAction.REPAIR_MANIFEST: "_execute_repair_manifest",
     ResolutionAction.REPAIR_GITIGNORE: "_execute_repair_gitignore",
+    ResolutionAction.REPAIR_GITATTRIBUTES: "_execute_repair_gitattributes",
     ResolutionAction.SCAFFOLD: "_execute_scaffold",
     ResolutionAction.ADOPT_DIRECTORY: "_execute_adopt_directory",
 }
@@ -215,3 +218,8 @@ def _execute_repair_gitignore(target: Path, _step: ResolutionStep) -> None:
     # TODO: Refine gitignore management to include more artifact types.
     entries = get_recommended_entries(target)
     ensure_gitignore_block(target, entries, state=ManagedState.PRESENT)
+
+
+def _execute_repair_gitattributes(target: Path, _step: ResolutionStep) -> None:
+    """Repair the managed gitattributes block."""
+    ensure_gitattributes_block(target, state=ManagedState.PRESENT)

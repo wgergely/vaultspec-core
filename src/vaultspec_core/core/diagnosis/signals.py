@@ -74,6 +74,16 @@ class GitignoreSignal(StrEnum):
     CORRUPTED = "corrupted"
 
 
+class GitattributesSignal(StrEnum):
+    """Observed state of gitattributes entries for managed paths."""
+
+    NO_FILE = "no_file"
+    NO_ENTRIES = "no_entries"
+    PARTIAL = "partial"
+    COMPLETE = "complete"
+    CORRUPTED = "corrupted"
+
+
 class ResolutionAction(StrEnum):
     """Corrective action that a resolver can apply."""
 
@@ -83,5 +93,6 @@ class ResolutionAction(StrEnum):
     REPAIR_MANIFEST = "repair_manifest"
     ADOPT_DIRECTORY = "adopt_directory"
     REPAIR_GITIGNORE = "repair_gitignore"
+    REPAIR_GITATTRIBUTES = "repair_gitattributes"
     REMOVE = "remove"
     SKIP = "skip"

@@ -130,6 +130,15 @@ class WorkspaceFactory:
             return False
         return MARKER_BEGIN in gi.read_text(encoding="utf-8")
 
+    def gitattributes_has_block(self) -> bool:
+        """Check whether ``.gitattributes`` contains the managed block."""
+        from vaultspec_core.core.gitattributes import MARKER_BEGIN
+
+        ga = self.root / ".gitattributes"
+        if not ga.exists():
+            return False
+        return MARKER_BEGIN in ga.read_text(encoding="utf-8")
+
     def manifest_is_valid_json(self) -> bool:
         """Check whether ``providers.json`` is parseable JSON."""
         try:
@@ -371,6 +380,34 @@ class WorkspaceFactory:
         gi = self.root / ".gitignore"
         if gi.exists():
             gi.unlink()
+        return self
+
+    # ---- Gitattributes conditions ------------------------------------------
+
+    def corrupt_gitattributes_block(self) -> Self:
+        """Remove the end marker, leaving an orphaned begin marker."""
+        from vaultspec_core.core.gitattributes import MARKER_END
+
+        ga = self.root / ".gitattributes"
+        if ga.exists():
+            content = ga.read_text(encoding="utf-8")
+            content = content.replace(MARKER_END, "")
+            ga.write_text(content, encoding="utf-8")
+        return self
+
+    def remove_gitattributes_block(self) -> Self:
+        """Remove the vaultspec-managed block entirely."""
+        from vaultspec_core.core.enums import ManagedState
+        from vaultspec_core.core.gitattributes import ensure_gitattributes_block
+
+        ensure_gitattributes_block(self.root, state=ManagedState.ABSENT)
+        return self
+
+    def delete_gitattributes(self) -> Self:
+        """Delete ``.gitattributes`` entirely."""
+        ga = self.root / ".gitattributes"
+        if ga.exists():
+            ga.unlink()
         return self
 
     # ---- Config file conditions --------------------------------------------
