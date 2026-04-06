@@ -1,5 +1,6 @@
 set positional-arguments := false
-set shell := ["pwsh.exe", "-NoProfile", "-c"]
+set shell := ["pwsh", "-NoProfile", "-c"]
+set windows-shell := ["pwsh.exe", "-NoProfile", "-c"]
 
 image := "ghcr.io/wgergely/vaultspec-core"
 local_image := "vaultspec-core:local"
