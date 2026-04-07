@@ -184,10 +184,6 @@ def collect_provider_dir_state(target: Path, tool_value: str) -> ProviderDirSign
 
     expected_dirs = content_dirs + structural_dirs
 
-    if not expected_dirs:
-        # No subdirectories expected - non-empty is complete enough
-        return ProviderDirSignal.COMPLETE
-
     # Build a set of known paths to detect foreign content
     known_paths: set[Path] = set()
     for d in expected_dirs:
