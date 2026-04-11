@@ -11,6 +11,7 @@ from __future__ import annotations
 import contextvars
 import logging
 import shutil
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -1153,14 +1154,18 @@ def sync_provider(
 
     def _run_all_syncs() -> list[_t.SyncResult]:
         results: list[_t.SyncResult] = []
-        for sync_fn, label in [
+        sync_passes: list[tuple[Callable[[], _t.SyncResult], str]] = [
             (lambda: rules_sync(prune=force, dry_run=dry_run), "rules"),
             (lambda: skills_sync(prune=force, dry_run=dry_run), "skills"),
             (lambda: agents_sync(prune=force, dry_run=dry_run), "agents"),
             (lambda: system_sync(dry_run=dry_run, force=force), "system"),
             (lambda: config_sync(dry_run=dry_run, force=force), "config"),
-            (lambda: _mcp_sync(dry_run=dry_run, force=force), "mcps"),
-        ]:
+        ]
+        if "mcp" not in skip:
+            sync_passes.append(
+                (lambda: _mcp_sync(dry_run=dry_run, force=force), "mcps")
+            )
+        for sync_fn, label in sync_passes:
             try:
                 results.append(sync_fn())
             except Exception as exc:

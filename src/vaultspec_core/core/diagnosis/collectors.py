@@ -345,19 +345,26 @@ def collect_mcp_config_state(target: Path) -> ConfigSignal:
     if not isinstance(servers, dict):
         return ConfigSignal.PARTIAL_MCP
 
-    if "vaultspec-core" not in servers:
-        return ConfigSignal.PARTIAL_MCP
-
-    # Check for registry drift: compare deployed entries against definitions
-    from vaultspec_core.core.mcps import collect_mcp_servers
+    # Check registry drift: compare deployed entries against definitions
+    from ..mcps import collect_mcp_servers
 
     registry = collect_mcp_servers()
     if registry:
+        managed_names = set(registry.keys())
         for name, (_path, expected_config) in registry.items():
             if name not in servers:
                 return ConfigSignal.REGISTRY_DRIFT
             if servers[name] != expected_config:
                 return ConfigSignal.REGISTRY_DRIFT
+
+        has_user_entries = bool(set(servers.keys()) - managed_names)
+        if has_user_entries:
+            return ConfigSignal.USER_MCP
+        return ConfigSignal.OK
+
+    # Fallback when no registry is available (pre-registry workspace)
+    if "vaultspec-core" not in servers:
+        return ConfigSignal.PARTIAL_MCP
 
     if len(servers) > 1:
         return ConfigSignal.USER_MCP

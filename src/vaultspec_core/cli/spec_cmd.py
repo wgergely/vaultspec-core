@@ -2,7 +2,8 @@
 
 Sub-groups: ``spec rules`` (:data:`rules_app`), ``spec skills`` (:data:`skills_app`),
 ``spec agents`` (:data:`agents_app`), ``spec system`` (:data:`system_app`),
-``spec hooks`` (:data:`hooks_app`). Delegates to :mod:`vaultspec_core.core`
+``spec hooks`` (:data:`hooks_app`), ``spec mcps`` (:data:`mcps_app`).
+Delegates to :mod:`vaultspec_core.core`
 CRUD functions via lazy imports to avoid circular-import issues. Mounted onto
 :data:`.root.app` as the ``spec`` sub-group.
 """
