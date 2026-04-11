@@ -165,7 +165,7 @@ class TestListings:
             encoding="utf-8",
         )
         listing = _collect_skill_listing()
-        assert "## Available Skills" in listing
+        assert "## Vaultspec Skills" in listing
         assert "**vaultspec-deploy**" in listing
         assert "Deploy things" in listing
 
@@ -406,7 +406,7 @@ class TestGenerateSystemPrompt:
         )
         content = _generate_system_prompt(_cfg(Tool.GEMINI))
         assert content is not None
-        assert "## Available Skills" in content
+        assert "## Vaultspec Skills" in content
         assert "**vaultspec-deploy**" in content
 
 
