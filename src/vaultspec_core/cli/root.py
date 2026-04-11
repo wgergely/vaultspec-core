@@ -1015,6 +1015,32 @@ def _doctor_exit_code(diag: WorkspaceDiagnosis) -> int:
     return 0
 
 
+@app.command("check-providers", hidden=True)
+def cmd_check_providers() -> None:
+    """Guard against committing provider artifacts.
+
+    Inspects the git staging area for files that should never be
+    committed (provider directories, generated configs, manifests).
+    Used as a pre-commit hook entry point.
+    """
+    from vaultspec_core.core.commands import check_staged_provider_artifacts
+
+    violations = check_staged_provider_artifacts()
+    if violations:
+        typer.echo(
+            "Error: provider artifacts must not be committed:",
+            err=True,
+        )
+        for v in violations:
+            typer.echo(f"  {v}", err=True)
+        typer.echo(
+            "\nRun 'git reset HEAD <file>' to unstage, "
+            "or 'git rm --cached <file>' to untrack.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+
 def _register_subcommands() -> None:
     """Mount sub-apps with deferred imports to avoid circular dependencies."""
     from .spec_cmd import spec_app
