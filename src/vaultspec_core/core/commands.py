@@ -166,11 +166,10 @@ def _scaffold_provider(
             ensure_dir(cfg.agents_dir)
         _add(_rel(target, cfg.agents_dir), "agents")
 
-    if ProviderCapability.WORKFLOWS in caps:
-        wf_dir = target / ".agents" / "workflows"
+    if ProviderCapability.WORKFLOWS in caps and cfg.workflows_dir:
         if not dry_run:
-            ensure_dir(wf_dir)
-        _add(_rel(target, wf_dir), "workflows")
+            ensure_dir(cfg.workflows_dir)
+        _add(_rel(target, cfg.workflows_dir), "workflows")
 
     if cfg.config_file:
         if not dry_run and not cfg.config_file.exists():

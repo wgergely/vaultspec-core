@@ -172,14 +172,18 @@ def collect_provider_dir_state(target: Path, tool_value: str) -> ProviderDirSign
         # Without config we cannot assess completeness beyond non-empty
         return ProviderDirSignal.PARTIAL
 
-    expected_dirs: list[Path] = []
+    # Content directories require markdown files; structural directories
+    # (like workflows) only need to exist.
+    content_dirs: list[Path] = []
     for d in (cfg.rules_dir, cfg.skills_dir, cfg.agents_dir):
         if d is not None:
-            expected_dirs.append(d)
+            content_dirs.append(d)
 
-    if not expected_dirs:
-        # No subdirectories expected - non-empty is complete enough
-        return ProviderDirSignal.COMPLETE
+    structural_dirs: list[Path] = []
+    if cfg.workflows_dir is not None:
+        structural_dirs.append(cfg.workflows_dir)
+
+    expected_dirs = content_dirs + structural_dirs
 
     # Build a set of known paths to detect foreign content
     known_paths: set[Path] = set()
@@ -195,7 +199,7 @@ def collect_provider_dir_state(target: Path, tool_value: str) -> ProviderDirSign
         known_paths.add(cfg.system_file)
 
     all_present = True
-    for d in expected_dirs:
+    for d in content_dirs:
         if not d.is_dir():
             all_present = False
             continue
@@ -204,6 +208,9 @@ def collect_provider_dir_state(target: Path, tool_value: str) -> ProviderDirSign
         md_files = list(d.glob("*.md"))
         skill_files = list(d.glob("*/SKILL.md")) if not md_files else []
         if not md_files and not skill_files:
+            all_present = False
+    for d in structural_dirs:
+        if not d.is_dir():
             all_present = False
 
     # Check for files in the provider directory that don't match known patterns

@@ -54,6 +54,8 @@ class ToolConfig:
             tool does not have a dedicated system file.
         emit_system_rule: Whether shared system content should be materialized
             as a rule file when ``system_file`` is absent.
+        workflows_dir: Directory where workflow definitions live, or ``None``
+            if the tool does not support workflows.
         capabilities: Declared provider capabilities.  Used by install, sync,
             and dry-run to reason about what each provider supports.
     """
@@ -68,6 +70,7 @@ class ToolConfig:
     rule_ref_config_file: Path | None = None
     system_file: Path | None = None
     emit_system_rule: bool = True
+    workflows_dir: Path | None = None
     capabilities: frozenset[ProviderCapability] = frozenset()
 
 
@@ -293,6 +296,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
             rule_ref_dir=shared_agents_root / Resource.RULES.value,
             system_file=None,
             emit_system_rule=False,
+            workflows_dir=shared_agents_root / Resource.WORKFLOWS.value,
             capabilities=frozenset(
                 {
                     _pc.RULES,
