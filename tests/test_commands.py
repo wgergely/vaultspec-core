@@ -14,6 +14,7 @@ from vaultspec_core.core.commands import (
     install_run,
 )
 from vaultspec_core.core.enums import PrecommitHook
+from vaultspec_core.core.manifest import read_manifest_data, write_manifest_data
 
 
 @pytest.mark.unit
@@ -262,3 +263,107 @@ def test_provider_artifact_patterns_catch_known_files() -> None:
         assert not matched, (
             f"Expected {path!r} to NOT match any provider artifact pattern"
         )
+
+
+@pytest.mark.unit
+def test_install_sets_precommit_managed_flag() -> None:
+    """install_run must set precommit_managed=True in the manifest."""
+    tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"install-pc-flag-{uuid4().hex}"
+    try:
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        reset_config()
+
+        install_run(
+            path=tmp_path, provider="all", upgrade=False, dry_run=False, force=False
+        )
+
+        mdata = read_manifest_data(tmp_path)
+        assert mdata.precommit_managed is True
+    finally:
+        reset_config()
+        shutil.rmtree(tmp_path, ignore_errors=True)
+
+
+@pytest.mark.unit
+def test_scaffold_precommit_opt_out_detection() -> None:
+    """Removing canonical hooks from .pre-commit-config.yaml opts out of management."""
+    import yaml
+
+    from vaultspec_core.core.diagnosis.collectors import collect_precommit_state
+    from vaultspec_core.core.diagnosis.signals import PrecommitSignal
+
+    tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"pc-optout-{uuid4().hex}"
+    try:
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        reset_config()
+
+        install_run(
+            path=tmp_path, provider="all", upgrade=False, dry_run=False, force=False
+        )
+
+        mdata = read_manifest_data(tmp_path)
+        assert mdata.precommit_managed is True
+
+        # Remove all canonical hooks from the config (simulating user opt-out)
+        config_path = tmp_path / ".pre-commit-config.yaml"
+        config_path.write_text(
+            yaml.dump({"repos": []}, sort_keys=False), encoding="utf-8"
+        )
+
+        signal = collect_precommit_state(tmp_path)
+        assert signal in (PrecommitSignal.NO_HOOKS, PrecommitSignal.NO_FILE)
+
+        # The sync opt-out detection logic should flip the flag
+        mdata = read_manifest_data(tmp_path)
+        mdata.precommit_managed = signal not in (
+            PrecommitSignal.NO_FILE,
+            PrecommitSignal.NO_HOOKS,
+        )
+        write_manifest_data(tmp_path, mdata)
+
+        mdata = read_manifest_data(tmp_path)
+        assert mdata.precommit_managed is False
+    finally:
+        reset_config()
+        shutil.rmtree(tmp_path, ignore_errors=True)
+
+
+@pytest.mark.unit
+def test_resolver_skips_repair_when_not_managed() -> None:
+    """resolve() must not emit REPAIR_PRECOMMIT when precommit_managed=False."""
+    from vaultspec_core.core.diagnosis.diagnosis import WorkspaceDiagnosis
+    from vaultspec_core.core.diagnosis.signals import (
+        FrameworkSignal,
+        GitattributesSignal,
+        GitignoreSignal,
+        PrecommitSignal,
+        ResolutionAction,
+    )
+    from vaultspec_core.core.resolver import resolve
+
+    tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"pc-resolver-{uuid4().hex}"
+    try:
+        tmp_path.mkdir(parents=True, exist_ok=True)
+
+        # Write a manifest with precommit_managed=False
+        from vaultspec_core.core.manifest import ManifestData
+
+        mdata = ManifestData(precommit_managed=False)
+        write_manifest_data(tmp_path, mdata)
+
+        diag = WorkspaceDiagnosis(
+            framework=FrameworkSignal.PRESENT,
+            gitignore=GitignoreSignal.COMPLETE,
+            gitattributes=GitattributesSignal.COMPLETE,
+            precommit=PrecommitSignal.NO_HOOKS,
+        )
+
+        plan = resolve(diag, "sync", target=tmp_path)
+        repair_steps = [
+            s for s in plan.steps if s.action == ResolutionAction.REPAIR_PRECOMMIT
+        ]
+        assert repair_steps == [], (
+            f"Expected no REPAIR_PRECOMMIT steps but got: {repair_steps}"
+        )
+    finally:
+        shutil.rmtree(tmp_path, ignore_errors=True)

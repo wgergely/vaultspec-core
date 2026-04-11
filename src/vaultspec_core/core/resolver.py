@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .diagnosis.signals import (
@@ -71,6 +72,7 @@ def resolve(
     *,
     force: bool = False,
     dry_run: bool = False,
+    target: Path | None = None,
 ) -> ResolutionPlan:
     """Build a resolution plan from diagnosed workspace state.
 
@@ -86,6 +88,9 @@ def resolve(
         provider: Provider scope - ``"all"`` or a specific provider name.
         force: When ``True``, escalates warnings to corrective steps.
         dry_run: When ``True``, the plan is informational only.
+        target: Workspace root directory. Used to read manifest flags.
+            Falls back to :func:`~vaultspec_core.core.types.get_context`
+            if not provided.
 
     Returns:
         A :class:`ResolutionPlan` with steps, warnings, and conflicts.
@@ -107,7 +112,32 @@ def resolve(
     _resolve_builtin_version(plan, diagnosis.builtin_version, prov_action, force=force)
     _resolve_gitignore(plan, diagnosis.gitignore, prov_action, force=force)
     _resolve_gitattributes(plan, diagnosis.gitattributes, prov_action, force=force)
-    _resolve_precommit(plan, diagnosis.precommit, prov_action, force=force)
+
+    # Determine precommit management state from manifest
+    pc_managed = True
+    if target is None:
+        try:
+            from .types import get_context
+
+            target = get_context().target_dir
+        except LookupError:
+            pass
+    if target is not None:
+        try:
+            from .manifest import read_manifest_data
+
+            _mdata = read_manifest_data(target)
+            pc_managed = _mdata.precommit_managed
+        except Exception:
+            pc_managed = True
+
+    _resolve_precommit(
+        plan,
+        diagnosis.precommit,
+        prov_action,
+        force=force,
+        precommit_managed=pc_managed,
+    )
 
     # Per-provider rules
     for tool, prov_diag in diagnosis.providers.items():
@@ -701,9 +731,12 @@ def _resolve_precommit(
     action: str,
     *,
     force: bool,
+    precommit_managed: bool = True,
 ) -> None:
     """Apply pre-commit hook resolution rules."""
     _ = force  # precommit repairs are unconditional
+    if not precommit_managed:
+        return
     if signal == PrecommitSignal.COMPLETE:
         return
 

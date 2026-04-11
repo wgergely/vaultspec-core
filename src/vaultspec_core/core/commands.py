@@ -381,6 +381,7 @@ def _scaffold_precommit(
                 if old_id in existing_by_id and new_id not in existing_by_id:
                     existing_by_id[old_id]["id"] = new_id
                     existing_by_id[new_id] = existing_by_id.pop(old_id)
+                    logger.info("Migrated pre-commit hook '%s' -> '%s'", old_id, new_id)
                     changed = True
                 elif old_id in existing_by_id:
                     existing_hooks[:] = [
@@ -396,9 +397,14 @@ def _scaffold_precommit(
                     existing = existing_by_id[hook_id]
                     if existing.get("entry") != canonical["entry"]:
                         existing["entry"] = canonical["entry"]
+                        logger.info(
+                            "Updated pre-commit hook '%s' entry to canonical pattern",
+                            hook_id,
+                        )
                         changed = True
                 else:
                     existing_hooks.append(dict(canonical))
+                    logger.info("Added pre-commit hook '%s'", str(canonical["id"]))
                     changed = True
 
             if not changed:
@@ -756,6 +762,15 @@ def install_run(
             )
             mdata.gitignore_managed = True
 
+        from .diagnosis.collectors import collect_precommit_state
+        from .diagnosis.signals import PrecommitSignal
+
+        pc_signal = collect_precommit_state(path)
+        mdata.precommit_managed = pc_signal not in (
+            PrecommitSignal.NO_FILE,
+            PrecommitSignal.NO_HOOKS,
+        )
+
         write_manifest_data(path, mdata)
 
         return {"action": "upgrade", "seeded_count": len(seeded), "path": path}
@@ -838,6 +853,16 @@ def install_run(
 
     mdata.gitignore_managed = block_present
     mdata.gitattributes_managed = ga_block_present
+
+    from .diagnosis.collectors import collect_precommit_state
+    from .diagnosis.signals import PrecommitSignal
+
+    pc_signal = collect_precommit_state(path)
+    mdata.precommit_managed = pc_signal not in (
+        PrecommitSignal.NO_FILE,
+        PrecommitSignal.NO_HOOKS,
+    )
+
     mdata.vaultspec_version = _get_package_version()
     mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
     for name in provider_names:
@@ -1101,6 +1126,10 @@ def uninstall_run(
                                 removed.append(
                                     (_rel(path, precommit_path), "precommit")
                                 )
+                                mdata_u = read_manifest_data(path)
+                                if mdata_u.precommit_managed:
+                                    mdata_u.precommit_managed = False
+                                    write_manifest_data(path, mdata_u)
                 except (yaml.YAMLError, OSError):
                     pass
             elif precommit_path.exists() and dry_run:
@@ -1389,7 +1418,23 @@ def sync_provider(
             if "mcp" not in skip:
                 _scaffold_mcp_json(ctx.target_dir)
             if "precommit" not in skip:
-                _scaffold_precommit(ctx.target_dir)
+                pc_mdata = read_manifest_data(ctx.target_dir)
+                if pc_mdata.precommit_managed:
+                    from .diagnosis.collectors import collect_precommit_state
+                    from .diagnosis.signals import PrecommitSignal
+
+                    pc_signal = collect_precommit_state(ctx.target_dir)
+                    if pc_signal in (
+                        PrecommitSignal.NO_HOOKS,
+                        PrecommitSignal.NO_FILE,
+                    ):
+                        pc_mdata.precommit_managed = False
+                        write_manifest_data(ctx.target_dir, pc_mdata)
+                        logger.info(
+                            "Pre-commit hooks removed by user, disabling management"
+                        )
+                    else:
+                        _scaffold_precommit(ctx.target_dir)
 
             # Respect gitignore opt-out: check whether the user removed
             # the managed block BEFORE re-creating it.  If the block is
