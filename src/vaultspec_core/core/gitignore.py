@@ -34,7 +34,10 @@ def get_recommended_entries(target: Path) -> list[str]:
             entries.add(".vaultspec/_snapshots/")
             entries.add(".vaultspec/")
         if (target / ".vault").is_dir():
-            entries.add(".vault/")
+            entries.add(".vault/.obsidian/")
+            entries.add(".vault/.trash/")
+            entries.add(".vault/data/")
+            entries.add(".vault/logs/")
 
         mdata = read_manifest_data(target)
 
