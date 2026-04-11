@@ -1,118 +1,92 @@
 ---
 name: vaultspec-projectmanager
 description: >-
-  Use this skill to activate a dormant project manager that handles GitHub
-  board management, issue triage, milestone tracking, worktree provisioning,
-  release cycle coordination, and roadmap definition. The project manager
-  contextualises open issues, fetches project metadata, and keeps local and
-  remote project state in sync.
+  Use this skill for GitHub Projects management, issue triage, milestone
+  tracking, worktree provisioning, release cycle coordination, and roadmap
+  queries. Operates outside the vaultspec pipeline as a project
+  coordination layer.
 ---
 
-# Project Manager Skill (vaultspec-projectmanager)
+# Project manager skill (vaultspec-projectmanager)
 
-Activate this skill when the user needs project-level coordination that sits
-outside the research-adr-plan-execute pipeline. The project manager is a
-dormant agent - it stays quiet until explicitly engaged, then provides
-context-aware project management on demand.
+**Announce at start:** "I'm using the `vaultspec-projectmanager` skill to
+provide project management context."
 
-## When to Use
+Activate this skill for project-level coordination that sits outside the
+research-adr-plan-execute pipeline. The project manager activates only when
+invoked and responds to queries within that session.
 
-- Starting a new LLM session and needing project context bootstrapped.
-- Triaging issues, updating milestones, or managing GitHub project boards.
+## When to use
+
+- Bootstrapping project context at session start.
+- Triaging issues, updating milestones, or managing GitHub Projects.
 - Provisioning worktrees for feature branches.
 - Reviewing or defining the release roadmap.
 - Coordinating cross-repo or cross-milestone work.
 - Querying project state - "what's open?", "what's blocking the release?",
   "what should I work on next?"
 
-This skill is NOT part of the vaultspec pipeline (research -> adr -> plan ->
-execute -> review). It operates alongside it as a project coordination layer.
+This skill isn't part of the vaultspec pipeline (research -> adr -> plan ->
+execute -> review). It operates alongside it as a project coordination
+layer. It does not persist artifacts to `.vault/` and has no frontmatter or
+tagging requirements.
 
-**Announce at start:** "I'm using the `vaultspec-projectmanager` skill to
-provide project management context."
+## Required steps
 
-## Required Steps
+1. **Context gathering:** load the `vaultspec-project-coordinator` agent
+   persona. Gather current project state from GitHub (issues, milestones,
+   GitHub Projects, labels) and local state (branches, worktrees, recent
+   commits).
 
-- **Step 1: Context Gathering** - Load the `vaultspec-projectmanager` agent
-  persona. Gather current project state from GitHub (issues, milestones,
-  project boards, labels) and local state (branches, worktrees, recent
-  commits).
+1. **State synthesis:** synthesize the gathered state into an actionable
+   summary. Identify blockers, priorities, and gaps.
 
-- **Step 2: State Synthesis** - Synthesize the gathered state into an
-  actionable summary. Identify blockers, priorities, and gaps. Surface what
-  the user needs to know without overwhelming them.
+1. **Interactive response:** present findings and await user direction. The
+   project coordinator asks clarifying questions rather than assuming
+   intent. All actions require user confirmation.
 
-- **Step 3: Interactive Response** - Present findings and await user
-  direction. The project manager asks clarifying questions rather than
-  assuming intent. All actions require user confirmation.
+## Agent persona
 
-## Agent Persona
-
-Load the `vaultspec-projectmanager` agent persona for all project management
-work. This agent has `read-write` mode for git worktree operations and
-`gh` CLI interactions, but MUST NOT modify application code, `.vaultspec/`,
-or `.vault/` contents.
-
-## Capabilities
-
-### GitHub Board Management
-
-- Read and update GitHub project boards via `gh` CLI.
-- Move items across board columns (e.g., Backlog -> In Progress -> Done).
-- Create, update, close, and triage issues.
-- Manage labels, assignees, and milestones.
-- Query project board state and report status.
-
-### Release Cycle Coordination
-
-- Track milestones and their associated issues.
-- Report on milestone progress and blockers.
-- Identify issues that need triage or re-prioritisation.
-- Surface dependency chains between issues.
-- Propose release schedules based on milestone state.
-
-### Worktree Provisioning
-
-- Create feature branch worktrees via `git worktree add`.
-- Scaffold development environments with `uv` venv setup.
-- Coordinate with `vaultspec-core install` for framework deployment.
-- List and clean up stale worktrees.
-
-### Roadmap Management
-
-- Query and present the current roadmap from GitHub project boards.
-- Propose roadmap updates based on issue state and milestone progress.
-- Track development direction across milestones.
-- All roadmap changes require explicit user approval before execution.
-
-### Context Bootstrapping
-
-- On session start, gather and present a concise project status summary.
-- Surface recent activity, open PRs, failing checks, and unresolved issues.
-- Identify the most relevant work items for the current session.
-
-## Constraints
-
-- **User-driven** - the project manager proposes, the user decides. Never
-  auto-close issues, auto-merge PRs, or make unilateral board changes.
-- **Non-destructive** - never force-push, delete branches without
-  confirmation, or modify `.vaultspec/` or `.vault/` contents.
-- **Transparent** - always explain what `gh` commands will be executed
-  before running them. Surface the exact CLI invocation.
-- **Adaptive** - if the project uses GitHub Projects, work within that
-  structure. If not, adapt to whatever tracking the project uses.
-- **Dormant by default** - the agent does not volunteer unsolicited
-  advice. It activates when the skill is invoked and responds to queries.
+Load the `vaultspec-project-coordinator` agent persona for all project
+management work. This agent has `read-write` mode for git worktree
+operations and `gh` CLI interactions, but must not modify application code,
+`.vaultspec/`, or `.vault/` contents. Detailed capabilities and operational
+behaviours are defined in the agent persona.
 
 ## Workflow
 
-The project manager operates in a query-response loop:
+The project coordinator operates in a query-response loop:
 
-- User asks a question or requests an action.
-- Agent gathers relevant state via `gh` and `git`.
-- Agent presents findings with proposed actions.
-- User approves, modifies, or rejects.
-- Agent executes approved actions and confirms results.
+1. User asks a question or requests an action.
+1. Agent gathers relevant state via `gh` and `git`.
+1. Agent presents findings with proposed actions, showing the exact CLI
+   invocations before execution.
+1. User approves, modifies, or rejects.
+1. Agent executes approved actions and confirms results.
 
-This loop continues until the user dismisses the project manager or
-switches to a pipeline skill (research, adr, plan, execute, review).
+This loop continues until the user dismisses the project coordinator or
+switches to a pipeline skill.
+
+**Example interaction:**
+
+- User: "What's blocking the release?"
+- Agent runs `gh issue list --milestone "0.3.0-alpha" --state open` and
+  `gh api repos/{owner}/{repo}/milestones`
+- Agent presents open issues grouped by blocker status with proposed next
+  actions
+- User approves or redirects
+
+## Constraints
+
+- **User-driven:** the project coordinator proposes, the user decides. Never
+  auto-close issues, auto-merge PRs, or make unilateral board changes.
+- **Non-destructive:** never force-push. Never delete branches without
+  explicit user confirmation. Never modify `.vaultspec/` or `.vault/`
+  contents.
+- **Transparent:** always show the exact `gh` or `git` command before
+  running it. No silent side effects.
+- **Adaptive:** discover the project's management structure before acting.
+  If the project uses GitHub Projects, work within that structure. If not,
+  adapt to whatever tracking the project uses.
+- **Ephemeral:** this skill produces no persisted vault artifacts. All
+  context is gathered and presented within the session.
