@@ -177,6 +177,26 @@ class TestCollectMcpServers:
 
 @pytest.mark.unit
 class TestMcpList:
+    def test_shadowed_definition_shows_custom(self):
+        path, mcps_dir = _make_workspace()
+        try:
+            (mcps_dir / "srv.builtin.json").write_text(
+                json.dumps({"command": "old"}), encoding="utf-8"
+            )
+            (mcps_dir / "srv.json").write_text(
+                json.dumps({"command": "new"}), encoding="utf-8"
+            )
+            _init_context(path)
+            from vaultspec_core.core.mcps import mcp_list
+
+            items = mcp_list()
+            assert len(items) == 1
+            assert items[0]["name"] == "srv"
+            assert "shadows" in items[0]["source"].lower()
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
     def test_lists_with_source_classification(self):
         path, mcps_dir = _make_workspace()
         try:
@@ -238,6 +258,45 @@ class TestMcpAdd:
             result = mcp_add("exists", config={"command": "new"}, force=True)
             content = json.loads(result.read_text(encoding="utf-8"))
             assert content["command"] == "new"
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_rejects_path_traversal(self):
+        path, _mcps_dir = _make_workspace()
+        try:
+            _init_context(path)
+            from vaultspec_core.core.exceptions import VaultSpecError
+            from vaultspec_core.core.mcps import mcp_add
+
+            with pytest.raises(VaultSpecError, match="Invalid"):
+                mcp_add("../evil")
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_rejects_builtin_suffix(self):
+        path, _mcps_dir = _make_workspace()
+        try:
+            _init_context(path)
+            from vaultspec_core.core.exceptions import VaultSpecError
+            from vaultspec_core.core.mcps import mcp_add
+
+            with pytest.raises(VaultSpecError, match="builtin"):
+                mcp_add("fake.builtin")
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_rejects_non_dict_config(self):
+        path, _mcps_dir = _make_workspace()
+        try:
+            _init_context(path)
+            from vaultspec_core.core.exceptions import VaultSpecError
+            from vaultspec_core.core.mcps import mcp_add
+
+            with pytest.raises(VaultSpecError, match="dict"):
+                mcp_add("srv", config=[1, 2, 3])  # type: ignore[arg-type]
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)

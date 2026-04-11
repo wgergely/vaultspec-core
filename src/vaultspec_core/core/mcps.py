@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from . import types as _t
-from .exceptions import ResourceExistsError, ResourceNotFoundError
+from .exceptions import ResourceExistsError, ResourceNotFoundError, VaultSpecError
 from .helpers import atomic_write, ensure_dir
 from .types import SyncResult
 
@@ -96,11 +96,19 @@ def mcp_list() -> list[dict[str, str]]:
     if mcps_dir is None or not mcps_dir.exists():
         return []
 
-    items: list[dict[str, str]] = []
+    items: dict[str, dict[str, str]] = {}
     for f in sorted(mcps_dir.glob("*.json")):
-        source = "Built-in" if f.name.endswith(".builtin.json") else "Custom"
-        items.append({"name": _server_name(f.name), "source": source})
-    return items
+        name = _server_name(f.name)
+        is_builtin = f.name.endswith(".builtin.json")
+        if name in items:
+            if not is_builtin:
+                items[name]["source"] = "Custom (shadows Built-in)"
+        else:
+            items[name] = {
+                "name": name,
+                "source": "Built-in" if is_builtin else "Custom",
+            }
+    return list(items.values())
 
 
 def mcp_add(
@@ -130,6 +138,17 @@ def mcp_add(
         )
     ensure_dir(mcps_dir)
 
+    if "/" in name or "\\" in name or name == "..":
+        raise VaultSpecError(f"Invalid MCP server name: {name}")
+    if name.endswith(".builtin.json") or name.endswith(".builtin"):
+        raise VaultSpecError(
+            "Cannot add a definition with '.builtin' suffix "
+            "(reserved for package-bundled definitions)."
+        )
+
+    if config is not None and not isinstance(config, dict):
+        raise VaultSpecError("MCP configuration must be a JSON object (dict).")
+
     file_name = name if name.endswith(".json") else f"{name}.json"
     file_path = mcps_dir / file_name
 
@@ -147,7 +166,9 @@ def mcp_add(
 def mcp_remove(name: str) -> Path:
     """Delete an MCP server definition.
 
-    Searches for both ``{name}.json`` and ``{name}.builtin.json``.
+    Searches for ``{name}.json`` first (custom), then ``{name}.builtin.json``.
+    This prioritizes removing custom overrides so users can revert to the
+    built-in definition.
 
     Args:
         name: Server name.
@@ -165,7 +186,7 @@ def mcp_remove(name: str) -> Path:
             hint="No MCP definitions directory exists.",
         )
 
-    for suffix in (".builtin.json", ".json"):
+    for suffix in (".json", ".builtin.json"):
         candidate = mcps_dir / f"{name}{suffix}"
         if candidate.exists():
             candidate.unlink()
