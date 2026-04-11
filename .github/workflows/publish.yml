@@ -34,6 +34,13 @@ jobs:
       - name: Install Python
         run: uv python install 3.13
 
+      - name: Verify .vaultspec/rules present
+        run: |
+          if [ ! -d ".vaultspec/rules" ]; then
+            echo "::error::.vaultspec/rules is missing - wheel build will fail"
+            exit 1
+          fi
+
       - name: Build package
         run: uv build
 

@@ -93,6 +93,9 @@ allow-direct-references = true
 [tool.hatch.build.targets.wheel]
 packages = ["src/vaultspec_core"]
 
+[tool.hatch.build.targets.sdist.force-include]
+".vaultspec/rules" = ".vaultspec/rules"
+
 [tool.hatch.build.targets.wheel.force-include]
 ".vaultspec/rules" = "vaultspec_core/builtins"
 
