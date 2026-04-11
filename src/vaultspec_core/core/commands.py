@@ -240,27 +240,72 @@ def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[tuple[str
 
 CANONICAL_ENTRY_PREFIX = "uv run --no-sync vaultspec-core"
 
+# Patterns that must never be committed.  Used by the
+# check-provider-artifacts pre-commit hook.
+PROVIDER_ARTIFACT_PATTERNS: tuple[str, ...] = (
+    ".mcp.json",
+    "providers.lock",
+    "CLAUDE.md",
+    "GEMINI.md",
+    "AGENTS.md",
+    ".claude/",
+    ".gemini/",
+    ".codex/",
+    ".agents/",
+    ".vaultspec/_snapshots/",
+)
+
+
+def check_staged_provider_artifacts() -> list[str]:
+    """Return staged file paths that match provider artifact patterns.
+
+    Runs ``git diff --cached --name-only`` and filters against
+    :data:`PROVIDER_ARTIFACT_PATTERNS`.
+    """
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--name-only"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+
+    staged = result.stdout.strip().splitlines()
+    violations: list[str] = []
+    for path in staged:
+        normalized = path.replace("\\", "/")
+        for pattern in PROVIDER_ARTIFACT_PATTERNS:
+            if pattern.endswith("/"):
+                if normalized.startswith(pattern) or f"/{pattern}" in normalized:
+                    violations.append(path)
+                    break
+            elif normalized == pattern or normalized.endswith(f"/{pattern}"):
+                violations.append(path)
+                break
+    return violations
+
+
 # Hook definitions keyed by PrecommitHook enum.
-_HOOK_DEFS: dict[PrecommitHook, dict[str, str]] = {
-    PrecommitHook.CHECK_NAMING: {
-        "name": "Vault check naming",
-        "entry": f"{CANONICAL_ENTRY_PREFIX} vault check structure",
+# Each value is a dict of pre-commit hook fields (merged with defaults).
+_HOOK_DEFS: dict[PrecommitHook, dict[str, object]] = {
+    PrecommitHook.VAULT_FIX: {
+        "name": "Vault fix",
+        "entry": f"{CANONICAL_ENTRY_PREFIX} vault check all --fix",
+        "types": ["markdown"],
     },
-    PrecommitHook.CHECK_DANGLING: {
-        "name": "Vault check dangling",
-        "entry": f"{CANONICAL_ENTRY_PREFIX} vault check dangling",
-    },
-    PrecommitHook.CHECK_BODY_LINKS: {
-        "name": "Vault check body links",
-        "entry": f"{CANONICAL_ENTRY_PREFIX} vault check body-links",
-    },
-    PrecommitHook.VAULT_CHECK: {
-        "name": "Vault check",
-        "entry": f"{CANONICAL_ENTRY_PREFIX} vault check all",
+    PrecommitHook.CHECK_PROVIDER_ARTIFACTS: {
+        "name": "Check provider artifacts",
+        "entry": f"{CANONICAL_ENTRY_PREFIX} check-providers",
+        "always_run": True,
     },
     PrecommitHook.SPEC_CHECK: {
         "name": "Spec check",
         "entry": f"{CANONICAL_ENTRY_PREFIX} doctor",
+        "types": ["markdown"],
     },
 }
 
@@ -269,7 +314,6 @@ CANONICAL_PRECOMMIT_HOOKS: list[dict[str, object]] = [
         "id": hook.value,
         **meta,
         "language": "system",
-        "types": ["markdown"],
         "pass_filenames": False,
     }
     for hook, meta in _HOOK_DEFS.items()
@@ -278,9 +322,14 @@ CANONICAL_PRECOMMIT_HOOKS: list[dict[str, object]] = [
 CANONICAL_HOOK_IDS: frozenset[str] = frozenset(h.value for h in PrecommitHook)
 
 # Old hook IDs that should be replaced during scaffold/sync.
+# Maps every previously-used ID to its canonical replacement.
 _DEPRECATED_HOOK_IDS: dict[str, str] = {
-    "vault-doctor": PrecommitHook.VAULT_CHECK.value,
+    "vault-doctor": PrecommitHook.VAULT_FIX.value,
     "vault-doctor-deep": PrecommitHook.SPEC_CHECK.value,
+    "check-naming": PrecommitHook.VAULT_FIX.value,
+    "check-dangling": PrecommitHook.VAULT_FIX.value,
+    "check-body-links": PrecommitHook.VAULT_FIX.value,
+    "vault-check": PrecommitHook.VAULT_FIX.value,
 }
 
 

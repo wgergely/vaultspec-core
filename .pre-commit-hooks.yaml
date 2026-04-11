@@ -1,34 +1,95 @@
-- id: check-naming
-  name: Vault check naming
-  entry: uv run --no-sync vaultspec-core vault check structure
+# Consolidated hooks (scaffolded by default)
+#
+# vault-fix: runs all vault checkers with --fix, auto-repairing safe issues
+# (naming, frontmatter, links, dangling, references, schema) and blocking
+# on remaining errors (body-links).
+#
+# spec-check: runs the workspace doctor, diagnosing framework, provider,
+# and tooling health.
+
+- id: vault-fix
+  name: Vault fix
+  entry: uv run --no-sync vaultspec-core vault check all --fix
   language: system
   types: [markdown]
   pass_filenames: false
 
-- id: check-dangling
-  name: Vault check dangling
-  entry: uv run --no-sync vaultspec-core vault check dangling
+- id: check-provider-artifacts
+  name: Check provider artifacts
+  entry: uv run --no-sync vaultspec-core check-providers
   language: system
-  types: [markdown]
-  pass_filenames: false
-
-- id: check-body-links
-  name: Vault check body links
-  entry: uv run --no-sync vaultspec-core vault check body-links
-  language: system
-  types: [markdown]
-  pass_filenames: false
-
-- id: vault-check
-  name: Vault check
-  entry: uv run --no-sync vaultspec-core vault check all
-  language: system
-  types: [markdown]
+  always_run: true
   pass_filenames: false
 
 - id: spec-check
   name: Spec check
   entry: uv run --no-sync vaultspec-core doctor
+  language: system
+  types: [markdown]
+  pass_filenames: false
+
+# Granular hooks for consumer projects that need fine-grained control.
+# Each fix-* hook auto-repairs its domain; check-* hooks validate only.
+
+- id: fix-naming
+  name: Fix vault naming
+  entry: uv run --no-sync vaultspec-core vault check structure --fix
+  language: system
+  types: [markdown]
+  pass_filenames: false
+
+- id: fix-frontmatter
+  name: Fix vault frontmatter
+  entry: uv run --no-sync vaultspec-core vault check frontmatter --fix
+  language: system
+  types: [markdown]
+  pass_filenames: false
+
+- id: fix-links
+  name: Fix vault links
+  entry: uv run --no-sync vaultspec-core vault check links --fix
+  language: system
+  types: [markdown]
+  pass_filenames: false
+
+- id: fix-dangling
+  name: Fix dangling references
+  entry: uv run --no-sync vaultspec-core vault check dangling --fix
+  language: system
+  types: [markdown]
+  pass_filenames: false
+
+- id: fix-references
+  name: Fix missing references
+  entry: uv run --no-sync vaultspec-core vault check references --fix
+  language: system
+  types: [markdown]
+  pass_filenames: false
+
+- id: fix-schema
+  name: Fix schema compliance
+  entry: uv run --no-sync vaultspec-core vault check schema --fix
+  language: system
+  types: [markdown]
+  pass_filenames: false
+
+- id: check-body-links
+  name: Check body links
+  entry: uv run --no-sync vaultspec-core vault check body-links
+  language: system
+  types: [markdown]
+  pass_filenames: false
+
+- id: check-orphans
+  name: Check orphaned documents
+  entry: uv run --no-sync vaultspec-core vault check orphans
+  language: system
+  types: [markdown]
+  pass_filenames: false
+
+- id: check-features
+  name: Check feature completeness
+  entry: uv run --no-sync vaultspec-core vault check features
   language: system
   types: [markdown]
   pass_filenames: false

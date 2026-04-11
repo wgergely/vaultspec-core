@@ -140,12 +140,17 @@ class ManagedState(StrEnum):
 class PrecommitHook(StrEnum):
     """Canonical pre-commit hook IDs managed by vaultspec-core.
 
-    Vault hooks check ``.vault/`` content integrity.
-    Spec hooks check ``.vaultspec/`` framework and workspace health.
+    ``VAULT_FIX`` runs all vault checkers with ``--fix``, auto-repairing
+    safe issues (naming, frontmatter, links, dangling, references, schema)
+    and blocking on remaining errors (body-links).
+
+    ``SPEC_CHECK`` runs the workspace doctor, diagnosing framework,
+    provider, and tooling health.
+
+    ``CHECK_PROVIDER_ARTIFACTS`` prevents provider artifacts and
+    installation manifests from being committed to git.
     """
 
-    CHECK_NAMING = "check-naming"
-    CHECK_DANGLING = "check-dangling"
-    CHECK_BODY_LINKS = "check-body-links"
-    VAULT_CHECK = "vault-check"
+    VAULT_FIX = "vault-fix"
     SPEC_CHECK = "spec-check"
+    CHECK_PROVIDER_ARTIFACTS = "check-provider-artifacts"

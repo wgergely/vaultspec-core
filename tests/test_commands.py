@@ -160,19 +160,15 @@ def test_precommit_collector_detects_states() -> None:
         )
         assert collect_precommit_state(tmp_path) == PrecommitSignal.NO_HOOKS
 
-        # Only 2 of 5 hooks -> INCOMPLETE
+        # Only 1 of 2 canonical hooks -> INCOMPLETE
         partial_config = {
             "repos": [
                 {
                     "repo": "local",
                     "hooks": [
                         {
-                            "id": PrecommitHook.VAULT_CHECK.value,
-                            "entry": (f"{CANONICAL_ENTRY_PREFIX} vault check all"),
-                        },
-                        {
                             "id": PrecommitHook.SPEC_CHECK.value,
-                            "entry": (f"{CANONICAL_ENTRY_PREFIX} doctor"),
+                            "entry": f"{CANONICAL_ENTRY_PREFIX} doctor",
                         },
                     ],
                 }
@@ -183,13 +179,11 @@ def test_precommit_collector_detects_states() -> None:
         )
         assert collect_precommit_state(tmp_path) == PrecommitSignal.INCOMPLETE
 
-        # All 5 hooks but one uses old entry pattern -> NON_CANONICAL
+        # All hooks present but one uses old entry pattern -> NON_CANONICAL
         from vaultspec_core.core.commands import CANONICAL_PRECOMMIT_HOOKS
 
         non_canonical = [dict(h) for h in CANONICAL_PRECOMMIT_HOOKS]
-        non_canonical[0]["entry"] = (
-            "uv run python -m vaultspec_core vault check structure"
-        )
+        non_canonical[0]["entry"] = "uv run python -m vaultspec_core vault check all"
         config_path.write_text(
             yaml.dump(
                 {"repos": [{"repo": "local", "hooks": non_canonical}]},
@@ -199,11 +193,12 @@ def test_precommit_collector_detects_states() -> None:
         )
         assert collect_precommit_state(tmp_path) == PrecommitSignal.NON_CANONICAL
 
-        # All 5 hooks with canonical entries -> COMPLETE
+        # All hooks with canonical entries -> COMPLETE
         canonical = [dict(h) for h in CANONICAL_PRECOMMIT_HOOKS]
         config_path.write_text(
             yaml.dump(
-                {"repos": [{"repo": "local", "hooks": canonical}]}, sort_keys=False
+                {"repos": [{"repo": "local", "hooks": canonical}]},
+                sort_keys=False,
             ),
             encoding="utf-8",
         )
@@ -211,3 +206,59 @@ def test_precommit_collector_detects_states() -> None:
 
     finally:
         shutil.rmtree(tmp_path, ignore_errors=True)
+
+
+@pytest.mark.unit
+def test_provider_artifact_patterns_catch_known_files() -> None:
+    """PROVIDER_ARTIFACT_PATTERNS must match known provider artifact paths."""
+    from vaultspec_core.core.commands import PROVIDER_ARTIFACT_PATTERNS
+
+    # Paths that MUST be caught
+    must_catch = [
+        ".mcp.json",
+        "providers.lock",
+        "CLAUDE.md",
+        "GEMINI.md",
+        "AGENTS.md",
+        ".claude/rules/foo.md",
+        ".gemini/rules/bar.md",
+        ".codex/config.toml",
+        ".agents/workflows/test.md",
+        ".vaultspec/_snapshots/foo.json",
+    ]
+    # Paths that must NOT be caught
+    must_pass = [
+        "src/commands.py",
+        "tests/test_foo.py",
+        ".vault/adr/my-adr.md",
+        ".vaultspec/rules/my-rule.md",
+        "pyproject.toml",
+    ]
+
+    for path in must_catch:
+        normalized = path.replace("\\", "/")
+        matched = False
+        for pattern in PROVIDER_ARTIFACT_PATTERNS:
+            if pattern.endswith("/"):
+                if normalized.startswith(pattern):
+                    matched = True
+                    break
+            elif normalized == pattern or normalized.endswith(f"/{pattern}"):
+                matched = True
+                break
+        assert matched, f"Expected {path!r} to match a provider artifact pattern"
+
+    for path in must_pass:
+        normalized = path.replace("\\", "/")
+        matched = False
+        for pattern in PROVIDER_ARTIFACT_PATTERNS:
+            if pattern.endswith("/"):
+                if normalized.startswith(pattern):
+                    matched = True
+                    break
+            elif normalized == pattern or normalized.endswith(f"/{pattern}"):
+                matched = True
+                break
+        assert not matched, (
+            f"Expected {path!r} to NOT match any provider artifact pattern"
+        )
