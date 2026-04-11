@@ -549,7 +549,7 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
     """
     import yaml
 
-    from ..commands import CANONICAL_ENTRY_PREFIX, CANONICAL_HOOK_IDS
+    from ..commands import CANONICAL_HOOK_ENTRIES, CANONICAL_HOOK_IDS
 
     config_path = target / ".pre-commit-config.yaml"
     if not config_path.exists():
@@ -586,11 +586,13 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
     if found_ids != CANONICAL_HOOK_IDS:
         return PrecommitSignal.INCOMPLETE
 
-    # All hooks present - check entry patterns
+    # All hooks present - check entry patterns match exactly
     for hook in local_hooks:
-        if hook.get("id") in CANONICAL_HOOK_IDS:
+        hook_id = hook.get("id")
+        if hook_id in CANONICAL_HOOK_IDS:
             entry = str(hook.get("entry", ""))
-            if not entry.startswith(CANONICAL_ENTRY_PREFIX):
+            expected = CANONICAL_HOOK_ENTRIES.get(str(hook_id), "")
+            if entry != expected:
                 return PrecommitSignal.NON_CANONICAL
 
     return PrecommitSignal.COMPLETE

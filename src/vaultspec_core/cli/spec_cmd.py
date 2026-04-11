@@ -1450,7 +1450,7 @@ def _doctor_exit_code(
         has_warn = True
     if diag.builtin_version == BuiltinVersionSignal.DELETED:
         has_error = True
-    if diag.builtin_version == BuiltinVersionSignal.MODIFIED:
+    elif diag.builtin_version == BuiltinVersionSignal.MODIFIED:
         has_warn = True
 
     for prov in diag.providers.values():
@@ -1458,13 +1458,12 @@ def _doctor_exit_code(
             continue
         if prov.manifest_entry == ManifestEntrySignal.ORPHANED:
             has_error = True
-        if prov.manifest_entry == ManifestEntrySignal.UNTRACKED:
+        elif prov.manifest_entry == ManifestEntrySignal.UNTRACKED:
             has_warn = True
         if prov.dir_state == ProviderDirSignal.MISSING:
             has_error = True
-        if prov.dir_state == ProviderDirSignal.MIXED:
-            has_warn = True
-        if prov.dir_state in (
+        elif prov.dir_state in (
+            ProviderDirSignal.MIXED,
             ProviderDirSignal.EMPTY,
             ProviderDirSignal.PARTIAL,
         ):
@@ -1475,14 +1474,16 @@ def _doctor_exit_code(
             ConfigSignal.REGISTRY_DRIFT,
         ):
             has_warn = True
-        for s in prov.content.values():
-            if s in (
+        if any(
+            s
+            in (
                 ContentSignal.STALE,
                 ContentSignal.DIVERGED,
-            ):
-                has_warn = True
-            if s == ContentSignal.MISSING:
-                has_warn = True
+                ContentSignal.MISSING,
+            )
+            for s in prov.content.values()
+        ):
+            has_warn = True
 
     if has_error:
         return 2
