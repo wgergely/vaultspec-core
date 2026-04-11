@@ -167,11 +167,14 @@ class VaultConstants:
     def is_supported_directory(cls, dirname: str) -> bool:
         """Return whether *dirname* is a recognized vault subdirectory.
 
+        Checks both document directories (:data:`SUPPORTED_DIRECTORIES`) and
+        non-document auxiliary directories (:data:`AUXILIARY_DIRECTORIES`).
+
         Args:
-            dirname: Bare directory name (e.g. ``"adr"``, ``"exec"``).
+            dirname: Bare directory name (e.g. ``"adr"``, ``"data"``).
 
         Returns:
-            ``True`` if the directory is in ``SUPPORTED_DIRECTORIES``.
+            ``True`` if the directory is recognized.
         """
         return (
             dirname in cls.SUPPORTED_DIRECTORIES or dirname in cls.AUXILIARY_DIRECTORIES
