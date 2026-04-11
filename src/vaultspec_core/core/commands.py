@@ -332,6 +332,11 @@ _DEPRECATED_HOOK_IDS: dict[str, str] = {
     "vault-check": PrecommitHook.VAULT_FIX.value,
 }
 
+# All managed hook IDs (canonical + deprecated) for uninstall filtering.
+_ALL_MANAGED_HOOK_IDS: frozenset[str] = CANONICAL_HOOK_IDS | frozenset(
+    _DEPRECATED_HOOK_IDS
+)
+
 
 def _scaffold_precommit(
     target: Path, *, dry_run: bool = False
@@ -1078,14 +1083,11 @@ def uninstall_run(
                                 if isinstance(r, dict) and r.get("repo") == "local":
                                     hooks = r.get("hooks", [])
                                     if isinstance(hooks, list):
-                                        _all_managed = CANONICAL_HOOK_IDS | frozenset(
-                                            _DEPRECATED_HOOK_IDS
-                                        )
                                         new_hooks = [
                                             h
                                             for h in hooks
                                             if isinstance(h, dict)
-                                            and h.get("id") not in _all_managed
+                                            and h.get("id") not in _ALL_MANAGED_HOOK_IDS
                                         ]
                                         if len(new_hooks) != len(hooks):
                                             r["hooks"] = new_hooks
@@ -1135,8 +1137,7 @@ def uninstall_run(
             elif precommit_path.exists() and dry_run:
                 try:
                     raw = precommit_path.read_text(encoding="utf-8")
-                    _all_ids = CANONICAL_HOOK_IDS | frozenset(_DEPRECATED_HOOK_IDS)
-                    if any(f"id: {hid}" in raw for hid in _all_ids):
+                    if any(f"id: {hid}" in raw for hid in _ALL_MANAGED_HOOK_IDS):
                         removed.append((_rel(path, precommit_path), "precommit"))
                 except OSError:
                     pass
