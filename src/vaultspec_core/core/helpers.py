@@ -50,7 +50,15 @@ def advisory_lock(path: Path) -> Iterator[None]:
             created next to it and used as the lock target.
     """
     lock_path = path.with_suffix(path.suffix + ".lock")
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Only create the lock file's parent if it already exists.  Creating
+    # it unconditionally would cause side-effects (e.g. directory creation
+    # during dry-run operations where the target doesn't exist yet).
+    # When the parent doesn't exist, no concurrent writer can race on
+    # this file, so it is safe to skip locking entirely.
+    if not lock_path.parent.exists():
+        yield
+        return
 
     resolved_key = str(lock_path.resolve())
     tlock = _get_thread_lock(resolved_key)
