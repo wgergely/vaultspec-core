@@ -13,6 +13,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -23,15 +24,26 @@ import yaml
 logger = logging.getLogger(__name__)
 
 
+_thread_locks: dict[str, threading.Lock] = {}
+_thread_locks_guard = threading.Lock()
+
+
+def _get_thread_lock(key: str) -> threading.Lock:
+    """Return a per-path threading lock, creating one if needed."""
+    with _thread_locks_guard:
+        if key not in _thread_locks:
+            _thread_locks[key] = threading.Lock()
+        return _thread_locks[key]
+
+
 @contextmanager
 def advisory_lock(path: Path) -> Iterator[None]:
     """Advisory file lock for serializing concurrent read-modify-write cycles.
 
-    Uses ``fcntl.flock`` on Unix and ``msvcrt.locking`` on Windows.
-    The lock is cooperative - it only serializes concurrent CLI processes
-    that also acquire the same lock.  If the lock cannot be obtained the
-    operation proceeds unlocked so a single stuck process cannot block
-    all other invocations.
+    Serializes threads within the same process via a per-path
+    :class:`threading.Lock`, then serializes across processes via an
+    OS-level file lock (``fcntl.flock`` on Unix, ``msvcrt.locking``
+    on Windows).  Both layers block until acquired.
 
     Args:
         path: The file being protected.  A sibling ``.lock`` file is
@@ -40,31 +52,32 @@ def advisory_lock(path: Path) -> Iterator[None]:
     lock_path = path.with_suffix(path.suffix + ".lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
 
-    fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR)
+    resolved_key = str(lock_path.resolve())
+    tlock = _get_thread_lock(resolved_key)
+    tlock.acquire()
     try:
-        if sys.platform == "win32":
-            import msvcrt
+        fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR)
+        try:
+            if sys.platform == "win32":
+                import msvcrt
 
-            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-            try:
-                yield
-            finally:
-                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-        else:
-            import fcntl
+                msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+                try:
+                    yield
+                finally:
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
 
-            fcntl.flock(fd, fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(fd, fcntl.LOCK_UN)
-    except OSError:
-        logger.debug(
-            "Could not acquire advisory lock on %s, proceeding without lock", path
-        )
-        yield
+                fcntl.flock(fd, fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
     finally:
-        os.close(fd)
+        tlock.release()
 
 
 def _yaml_load(text: str) -> dict[str, Any]:

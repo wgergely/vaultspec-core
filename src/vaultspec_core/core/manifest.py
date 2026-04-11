@@ -134,6 +134,13 @@ def write_manifest_data(target: Path, data: ManifestData) -> None:
     :attr:`ManifestData.version` to the current :data:`MANIFEST_VERSION`
     before writing.
 
+    .. note::
+
+       This function does **not** acquire a lock.  Callers that perform a
+       read-modify-write cycle must wrap the entire cycle in
+       :func:`_manifest_lock` to prevent concurrent writers from
+       overwriting each other's changes.
+
     Args:
         target: Workspace root directory.
         data: :class:`ManifestData` instance to persist.
@@ -153,8 +160,7 @@ def write_manifest_data(target: Path, data: ManifestData) -> None:
         "gitattributes_managed": data.gitattributes_managed,
         "precommit_managed": data.precommit_managed,
     }
-    with _manifest_lock(path):
-        atomic_write(path, json.dumps(payload, indent=2) + "\n")
+    atomic_write(path, json.dumps(payload, indent=2) + "\n")
 
 
 def read_manifest(target: Path) -> set[str]:
@@ -183,9 +189,10 @@ def write_manifest(target: Path, providers: set[str]) -> None:
         target: Workspace root directory.
         providers: Set of provider name strings to record as installed.
     """
-    data = read_manifest_data(target)
-    data.installed = set(providers)
-    write_manifest_data(target, data)
+    with _manifest_lock(_manifest_path(target)):
+        data = read_manifest_data(target)
+        data.installed = set(providers)
+        write_manifest_data(target, data)
 
 
 def add_providers(target: Path, names: list[str]) -> set[str]:
@@ -201,10 +208,11 @@ def add_providers(target: Path, names: list[str]) -> set[str]:
     Returns:
         Updated set of all installed provider names.
     """
-    data = read_manifest_data(target)
-    data.installed.update(names)
-    write_manifest_data(target, data)
-    return data.installed
+    with _manifest_lock(_manifest_path(target)):
+        data = read_manifest_data(target)
+        data.installed.update(names)
+        write_manifest_data(target, data)
+        return data.installed
 
 
 def remove_provider(target: Path, name: str) -> set[str]:
@@ -220,11 +228,12 @@ def remove_provider(target: Path, name: str) -> set[str]:
     Returns:
         Updated set of remaining installed provider names.
     """
-    data = read_manifest_data(target)
-    data.installed.discard(name)
-    data.provider_state.pop(name, None)
-    write_manifest_data(target, data)
-    return data.installed
+    with _manifest_lock(_manifest_path(target)):
+        data = read_manifest_data(target)
+        data.installed.discard(name)
+        data.provider_state.pop(name, None)
+        write_manifest_data(target, data)
+        return data.installed
 
 
 def providers_sharing_file(
