@@ -13,6 +13,7 @@ from vaultspec_core.core.gitignore import (
     MARKER_END,
     _find_markers,
     ensure_gitignore_block,
+    get_recommended_entries,
 )
 
 if TYPE_CHECKING:
@@ -305,3 +306,27 @@ class TestReadOnlyGitignore:
                     ensure_gitignore_block(tmp_path, ENTRIES)
         finally:
             gi.chmod(stat.S_IREAD | stat.S_IWRITE)
+
+
+class TestRecommendedEntries:
+    """Verify .vault/ is not blanket-ignored; only generated subdirs are."""
+
+    def test_vault_dir_not_blanket_ignored(self, tmp_path):
+        (tmp_path / ".vaultspec").mkdir()
+        (tmp_path / ".vault").mkdir()
+        entries = get_recommended_entries(tmp_path)
+        assert ".vault/" not in entries
+
+    def test_vault_generated_subdirs_ignored(self, tmp_path):
+        (tmp_path / ".vaultspec").mkdir()
+        (tmp_path / ".vault").mkdir()
+        entries = get_recommended_entries(tmp_path)
+        assert ".vault/.obsidian/" in entries
+        assert ".vault/.trash/" in entries
+        assert ".vault/data/" in entries
+        assert ".vault/logs/" in entries
+
+    def test_vaultspec_snapshots_always_ignored(self, tmp_path):
+        (tmp_path / ".vaultspec").mkdir()
+        entries = get_recommended_entries(tmp_path)
+        assert ".vaultspec/_snapshots/" in entries
