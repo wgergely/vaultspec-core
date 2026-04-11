@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.1.9](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.8...vaultspec-core-v0.1.9) (2026-04-11)
+
+
+### Features
+
+* vaultspec-projectmanager skill + agent ([#63](https://github.com/wgergely/vaultspec-core/issues/63)) ([dcc0a4f](https://github.com/wgergely/vaultspec-core/commit/dcc0a4fb981ad00282f363df56999d6ccce59e6d))
+
+
+### Bug Fixes
+
+* add 'mcps' to resource_labels in sync all ([b537234](https://github.com/wgergely/vaultspec-core/commit/b537234c724d44495de8bff19c9b8207cc010f47))
+* address Gemini review - blocking Windows lock, RMW scope, deadlock safety ([4aa5081](https://github.com/wgergely/vaultspec-core/commit/4aa5081aa5cd3c138f15f0f9eb96b4e1f56c807c))
+* advisory file locking for .mcp.json and scaffold operations ([04bb71a](https://github.com/wgergely/vaultspec-core/commit/04bb71a6707597c8013ce451a807b928b000249f))
+* advisory file locking for scaffold read-modify-write operations ([c777977](https://github.com/wgergely/vaultspec-core/commit/c7779777a5fbb66f714e843d63221f1653edd482)), closes [#49](https://github.com/wgergely/vaultspec-core/issues/49)
+* allow .vault/data/ in vault check structure ([#59](https://github.com/wgergely/vaultspec-core/issues/59)) ([5647150](https://github.com/wgergely/vaultspec-core/commit/56471500e0b0bdf55b53edc420254626539af24a))
+* include .vaultspec/rules in sdist so PyPI publish succeeds ([#62](https://github.com/wgergely/vaultspec-core/issues/62)) ([de9a3a7](https://github.com/wgergely/vaultspec-core/commit/de9a3a736424c46f4bdba2a21916b830208f0041)), closes [#60](https://github.com/wgergely/vaultspec-core/issues/60)
+* refine .gitignore to preserve .vault/ tracked content ([0bdfdff](https://github.com/wgergely/vaultspec-core/commit/0bdfdff1e6cf2d9cf00bc9ab116a3bdd516ae1b5))
+* skip advisory lock when parent directory does not exist ([a1faf8e](https://github.com/wgergely/vaultspec-core/commit/a1faf8ec4162832113b7322dde5b7f9e00dd0602))
+
 ## [0.1.8](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.7...vaultspec-core-v0.1.8) (2026-04-11)
 
 
