@@ -358,7 +358,9 @@ def test_resolver_skips_repair_when_not_managed() -> None:
             precommit=PrecommitSignal.NO_HOOKS,
         )
 
-        plan = resolve(diag, "sync", target=tmp_path)
+        from vaultspec_core.core.enums import CliAction
+
+        plan = resolve(diag, CliAction.SYNC, target=tmp_path)
         repair_steps = [
             s for s in plan.steps if s.action == ResolutionAction.REPAIR_PRECOMMIT
         ]

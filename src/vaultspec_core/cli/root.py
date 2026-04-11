@@ -24,6 +24,7 @@ from vaultspec_core.cli._target import (
     apply_target,
     apply_target_install,
 )
+from vaultspec_core.core.enums import CliAction
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +257,7 @@ def cmd_install(
 
     _run_preflight(
         path,
-        action="upgrade" if upgrade else "install",
+        action=CliAction.UPGRADE if upgrade else CliAction.INSTALL,
         provider=provider,
         force=force,
         dry_run=dry_run,
@@ -386,7 +387,7 @@ def cmd_uninstall(
 
     _run_preflight(
         path,
-        action="uninstall",
+        action=CliAction.UNINSTALL,
         provider=provider,
         force=force,
         dry_run=dry_run,
@@ -505,7 +506,7 @@ def cmd_sync(
 
     _run_preflight(
         sync_target,
-        action="sync",
+        action=CliAction.SYNC,
         provider=provider,
         force=force,
         dry_run=dry_run,

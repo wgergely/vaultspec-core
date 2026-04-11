@@ -18,7 +18,7 @@ from vaultspec_core.core.diagnosis.signals import (
     ProviderDirSignal,
     ResolutionAction,
 )
-from vaultspec_core.core.enums import Tool
+from vaultspec_core.core.enums import CliAction, Tool
 from vaultspec_core.core.resolver import ResolutionPlan, resolve
 
 pytestmark = [pytest.mark.unit]
@@ -68,7 +68,7 @@ class TestFrameworkRules:
 
     def test_missing_install_proceeds(self):
         diag = _make_diagnosis(framework=FrameworkSignal.MISSING)
-        plan = resolve(diag, "install")
+        plan = resolve(diag, CliAction.INSTALL)
         assert not plan.blocked
         assert plan.steps == []
         warnings = [w for w in plan.warnings if "Consider upgrading" not in w]
@@ -76,32 +76,32 @@ class TestFrameworkRules:
 
     def test_missing_sync_errors(self):
         diag = _make_diagnosis(framework=FrameworkSignal.MISSING)
-        plan = resolve(diag, "sync")
+        plan = resolve(diag, CliAction.SYNC)
         assert plan.blocked
         assert any("not installed" in c.lower() for c in plan.conflicts)
 
     def test_missing_uninstall_warns(self):
         diag = _make_diagnosis(framework=FrameworkSignal.MISSING)
-        plan = resolve(diag, "uninstall")
+        plan = resolve(diag, CliAction.UNINSTALL)
         assert not plan.blocked
         assert any("nothing to remove" in w.lower() for w in plan.warnings)
 
     def test_corrupted_install_no_force_conflicts(self):
         diag = _make_diagnosis(framework=FrameworkSignal.CORRUPTED)
-        plan = resolve(diag, "install", force=False)
+        plan = resolve(diag, CliAction.INSTALL, force=False)
         assert plan.blocked
         assert any("corrupted" in c.lower() for c in plan.conflicts)
 
     def test_corrupted_install_force_repairs(self):
         diag = _make_diagnosis(framework=FrameworkSignal.CORRUPTED)
-        plan = resolve(diag, "install", force=True)
+        plan = resolve(diag, CliAction.INSTALL, force=True)
         assert not plan.blocked
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.REPAIR_MANIFEST in actions
 
     def test_corrupted_sync_always_repairs(self):
         diag = _make_diagnosis(framework=FrameworkSignal.CORRUPTED)
-        plan = resolve(diag, "sync", force=False)
+        plan = resolve(diag, CliAction.SYNC, force=False)
         assert not plan.blocked
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.REPAIR_MANIFEST in actions
@@ -119,7 +119,7 @@ class TestManifestEntryRules:
     def test_orphaned_sync_scaffolds_then_syncs(self):
         prov = _make_provider(manifest_entry=ManifestEntrySignal.ORPHANED)
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "sync", provider="claude")
+        plan = resolve(diag, CliAction.SYNC, provider="claude")
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.SCAFFOLD in actions
         assert ResolutionAction.SYNC in actions
@@ -131,14 +131,14 @@ class TestManifestEntryRules:
     def test_untracked_install_adopts(self):
         prov = _make_provider(manifest_entry=ManifestEntrySignal.UNTRACKED)
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "install", provider="claude")
+        plan = resolve(diag, CliAction.INSTALL, provider="claude")
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.ADOPT_DIRECTORY in actions
 
     def test_untracked_sync_no_force_warns(self):
         prov = _make_provider(manifest_entry=ManifestEntrySignal.UNTRACKED)
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "sync", provider="claude", force=False)
+        plan = resolve(diag, CliAction.SYNC, provider="claude", force=False)
         assert plan.steps == [] or all(
             s.action != ResolutionAction.ADOPT_DIRECTORY for s in plan.steps
         )
@@ -147,7 +147,7 @@ class TestManifestEntryRules:
     def test_untracked_sync_force_adopts_then_syncs(self):
         prov = _make_provider(manifest_entry=ManifestEntrySignal.UNTRACKED)
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "sync", provider="claude", force=True)
+        plan = resolve(diag, CliAction.SYNC, provider="claude", force=True)
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.ADOPT_DIRECTORY in actions
         assert ResolutionAction.SYNC in actions
@@ -164,14 +164,14 @@ class TestProviderDirRules:
     def test_mixed_uninstall_no_force_conflicts(self):
         prov = _make_provider(dir_state=ProviderDirSignal.MIXED)
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "uninstall", provider="claude", force=False)
+        plan = resolve(diag, CliAction.UNINSTALL, provider="claude", force=False)
         assert plan.blocked
         assert any("user-created content" in c.lower() for c in plan.conflicts)
 
     def test_mixed_uninstall_force_removes(self):
         prov = _make_provider(dir_state=ProviderDirSignal.MIXED)
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "uninstall", provider="claude", force=True)
+        plan = resolve(diag, CliAction.UNINSTALL, provider="claude", force=True)
         assert not plan.blocked
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.REMOVE in actions
@@ -179,14 +179,14 @@ class TestProviderDirRules:
     def test_empty_sync_syncs(self):
         prov = _make_provider(dir_state=ProviderDirSignal.EMPTY)
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "sync", provider="claude")
+        plan = resolve(diag, CliAction.SYNC, provider="claude")
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.SYNC in actions
 
     def test_partial_sync_syncs(self):
         prov = _make_provider(dir_state=ProviderDirSignal.PARTIAL)
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "sync", provider="claude")
+        plan = resolve(diag, CliAction.SYNC, provider="claude")
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.SYNC in actions
 
@@ -202,41 +202,41 @@ class TestContentRules:
     def test_stale_sync_no_force_warns(self):
         prov = _make_provider(content={"old.md": ContentSignal.STALE})
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "sync", provider="claude", force=False)
+        plan = resolve(diag, CliAction.SYNC, provider="claude", force=False)
         assert any("stale" in w.lower() for w in plan.warnings)
         assert all(s.action != ResolutionAction.PRUNE for s in plan.steps)
 
     def test_stale_sync_force_prunes(self):
         prov = _make_provider(content={"old.md": ContentSignal.STALE})
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "sync", provider="claude", force=True)
+        plan = resolve(diag, CliAction.SYNC, provider="claude", force=True)
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.PRUNE in actions
 
     def test_missing_sync_syncs(self):
         prov = _make_provider(content={"new.md": ContentSignal.MISSING})
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "sync", provider="claude")
+        plan = resolve(diag, CliAction.SYNC, provider="claude")
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.SYNC in actions
 
     def test_diverged_sync_no_force_warns(self):
         prov = _make_provider(content={"rule.md": ContentSignal.DIVERGED})
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "sync", provider="claude", force=False)
+        plan = resolve(diag, CliAction.SYNC, provider="claude", force=False)
         assert any("diverged" in w.lower() for w in plan.warnings)
 
     def test_diverged_sync_force_overwrites(self):
         prov = _make_provider(content={"rule.md": ContentSignal.DIVERGED})
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "sync", provider="claude", force=True)
+        plan = resolve(diag, CliAction.SYNC, provider="claude", force=True)
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.SYNC in actions
 
     def test_clean_content_no_steps(self):
         prov = _make_provider(content={"ok.md": ContentSignal.CLEAN})
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "sync", provider="claude")
+        plan = resolve(diag, CliAction.SYNC, provider="claude")
         assert plan.steps == []
         warnings = [w for w in plan.warnings if "Consider upgrading" not in w]
         assert warnings == []
@@ -252,12 +252,12 @@ class TestBuiltinVersionRules:
 
     def test_modified_sync_no_force_warns(self):
         diag = _make_diagnosis(builtin_version=BuiltinVersionSignal.MODIFIED)
-        plan = resolve(diag, "sync", force=False)
+        plan = resolve(diag, CliAction.SYNC, force=False)
         assert any("modified" in w.lower() for w in plan.warnings)
 
     def test_modified_sync_force_reseeds(self):
         diag = _make_diagnosis(builtin_version=BuiltinVersionSignal.MODIFIED)
-        plan = resolve(diag, "sync", force=True)
+        plan = resolve(diag, CliAction.SYNC, force=True)
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.SYNC in actions
         assert any("re-seed" in s.reason.lower() for s in plan.steps)
@@ -283,20 +283,20 @@ class TestConfigRules:
     def test_missing_sync_syncs(self):
         prov = _make_provider(config=ConfigSignal.MISSING)
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "sync", provider="claude")
+        plan = resolve(diag, CliAction.SYNC, provider="claude")
         targets = [s.target for s in plan.steps]
         assert any("config" in t for t in targets)
 
     def test_foreign_sync_no_force_warns(self):
         prov = _make_provider(config=ConfigSignal.FOREIGN)
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "sync", provider="claude", force=False)
+        plan = resolve(diag, CliAction.SYNC, provider="claude", force=False)
         assert any("user-authored" in w.lower() for w in plan.warnings)
 
     def test_foreign_sync_force_overwrites(self):
         prov = _make_provider(config=ConfigSignal.FOREIGN)
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "sync", provider="claude", force=True)
+        plan = resolve(diag, CliAction.SYNC, provider="claude", force=True)
         targets = [s.target for s in plan.steps]
         assert any("config" in t for t in targets)
 
@@ -311,7 +311,7 @@ class TestGitignoreRules:
 
     def test_no_entries_install_repairs(self):
         diag = _make_diagnosis(gitignore=GitignoreSignal.NO_ENTRIES)
-        plan = resolve(diag, "install")
+        plan = resolve(diag, CliAction.INSTALL)
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.REPAIR_GITIGNORE in actions
 
@@ -327,7 +327,7 @@ class TestGitignoreRules:
 
     def test_complete_no_action(self):
         diag = _make_diagnosis(gitignore=GitignoreSignal.COMPLETE)
-        plan = resolve(diag, "install")
+        plan = resolve(diag, CliAction.INSTALL)
         gitignore_steps = [
             s for s in plan.steps if s.action == ResolutionAction.REPAIR_GITIGNORE
         ]
@@ -352,7 +352,7 @@ class TestProviderFiltering:
             ),
         }
         diag = _make_diagnosis(providers=providers)
-        plan = resolve(diag, "sync", provider="all")
+        plan = resolve(diag, CliAction.SYNC, provider="all")
         targets = [s.target for s in plan.steps]
         assert any("claude" in t for t in targets)
         assert any("gemini" in t for t in targets)
@@ -367,7 +367,7 @@ class TestProviderFiltering:
             ),
         }
         diag = _make_diagnosis(providers=providers)
-        plan = resolve(diag, "sync", provider="claude")
+        plan = resolve(diag, CliAction.SYNC, provider="claude")
         targets = [s.target for s in plan.steps]
         assert any("claude" in t for t in targets)
         assert not any("gemini" in t for t in targets)
@@ -402,13 +402,13 @@ class TestResolutionPlan:
 class TestCorruptedUninstall:
     def test_corrupted_uninstall_no_force_conflicts(self):
         diag = _make_diagnosis(framework=FrameworkSignal.CORRUPTED)
-        plan = resolve(diag, "uninstall", force=False)
+        plan = resolve(diag, CliAction.UNINSTALL, force=False)
         assert plan.blocked
         assert any("corrupted" in c.lower() for c in plan.conflicts)
 
     def test_corrupted_uninstall_force_repairs(self):
         diag = _make_diagnosis(framework=FrameworkSignal.CORRUPTED)
-        plan = resolve(diag, "uninstall", force=True)
+        plan = resolve(diag, CliAction.UNINSTALL, force=True)
         assert not plan.blocked
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.REPAIR_MANIFEST in actions
@@ -422,13 +422,13 @@ class TestCorruptedUninstall:
 class TestBuiltinDeleted:
     def test_deleted_no_force_warns(self):
         diag = _make_diagnosis(builtin_version=BuiltinVersionSignal.DELETED)
-        plan = resolve(diag, "sync", force=False)
+        plan = resolve(diag, CliAction.SYNC, force=False)
         assert any("deleted" in w.lower() for w in plan.warnings)
         assert all(s.target != "builtins" for s in plan.steps)
 
     def test_deleted_force_sync_reseeds(self):
         diag = _make_diagnosis(builtin_version=BuiltinVersionSignal.DELETED)
-        plan = resolve(diag, "sync", force=True)
+        plan = resolve(diag, CliAction.SYNC, force=True)
         assert any("deleted" in w.lower() for w in plan.warnings)
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.SYNC in actions
@@ -444,14 +444,14 @@ class TestUpgradeAction:
     def test_upgrade_missing_framework_proceeds(self):
         """Upgrade uses install semantics for framework: MISSING should proceed."""
         diag = _make_diagnosis(framework=FrameworkSignal.MISSING)
-        plan = resolve(diag, "upgrade")
+        plan = resolve(diag, CliAction.UPGRADE)
         assert not plan.blocked
 
     def test_upgrade_partial_provider_syncs(self):
         """Upgrade uses sync semantics for providers: PARTIAL should produce SYNC."""
         prov = _make_provider(dir_state=ProviderDirSignal.PARTIAL)
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "upgrade", provider="claude")
+        plan = resolve(diag, CliAction.UPGRADE, provider="claude")
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.SYNC in actions
 
@@ -473,7 +473,7 @@ class TestDoctorAction:
             gitignore=GitignoreSignal.CORRUPTED,
             providers={Tool.CLAUDE: prov},
         )
-        plan = resolve(diag, "doctor")
+        plan = resolve(diag, CliAction.DOCTOR)
         assert plan.steps == []
         warnings = [w for w in plan.warnings if "Consider upgrading" not in w]
         assert warnings == []
@@ -489,7 +489,7 @@ class TestOrphanedInstall:
     def test_orphaned_install_scaffolds(self):
         prov = _make_provider(manifest_entry=ManifestEntrySignal.ORPHANED)
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "install", provider="claude")
+        plan = resolve(diag, CliAction.INSTALL, provider="claude")
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.SCAFFOLD in actions
 
@@ -503,14 +503,14 @@ class TestUntrackedUninstall:
     def test_untracked_uninstall_no_force_conflicts(self):
         prov = _make_provider(manifest_entry=ManifestEntrySignal.UNTRACKED)
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "uninstall", provider="claude", force=False)
+        plan = resolve(diag, CliAction.UNINSTALL, provider="claude", force=False)
         assert plan.blocked
         assert any("untracked" in c.lower() for c in plan.conflicts)
 
     def test_untracked_uninstall_force_removes(self):
         prov = _make_provider(manifest_entry=ManifestEntrySignal.UNTRACKED)
         diag = _make_diagnosis(providers={Tool.CLAUDE: prov})
-        plan = resolve(diag, "uninstall", provider="claude", force=True)
+        plan = resolve(diag, CliAction.UNINSTALL, provider="claude", force=True)
         assert not plan.blocked
         actions = [s.action for s in plan.steps]
         assert ResolutionAction.REMOVE in actions

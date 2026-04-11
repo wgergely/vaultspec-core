@@ -20,7 +20,7 @@ from vaultspec_core.core.diagnosis.signals import (
     ProviderDirSignal,
     ResolutionAction,
 )
-from vaultspec_core.core.enums import PrecommitHook, Tool
+from vaultspec_core.core.enums import CliAction, PrecommitHook, Tool
 
 pytestmark = [pytest.mark.unit]
 
@@ -76,6 +76,16 @@ pytestmark = [pytest.mark.unit]
                 "VAULT_FIX",
                 "CHECK_PROVIDER_ARTIFACTS",
                 "SPEC_CHECK",
+            },
+        ),
+        (
+            CliAction,
+            {
+                "INSTALL",
+                "UPGRADE",
+                "SYNC",
+                "UNINSTALL",
+                "DOCTOR",
             },
         ),
         (

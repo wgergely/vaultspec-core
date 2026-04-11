@@ -138,6 +138,16 @@ class ManagedState(StrEnum):
     ABSENT = "absent"
 
 
+class CliAction(StrEnum):
+    """CLI action passed to the resolver and preflight engine."""
+
+    INSTALL = "install"
+    UPGRADE = "upgrade"
+    SYNC = "sync"
+    UNINSTALL = "uninstall"
+    DOCTOR = "doctor"
+
+
 class PrecommitHook(StrEnum):
     """Canonical pre-commit hook IDs managed by vaultspec-core.
 
