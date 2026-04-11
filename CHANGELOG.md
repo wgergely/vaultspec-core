@@ -1,5 +1,54 @@
 # Changelog
 
+## [0.1.8](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.7...vaultspec-core-v0.1.8) (2026-04-11)
+
+
+### Features
+
+* add check-providers CLI command and doctor precommit row ([0505953](https://github.com/wgergely/vaultspec-core/commit/05059536b1d9f571376c3f02c49238cebf43f4f7)), closes [#47](https://github.com/wgergely/vaultspec-core/issues/47)
+* add MCP server registry with install/sync/uninstall lifecycle ([73eb7a3](https://github.com/wgergely/vaultspec-core/commit/73eb7a31bc3fbc90de2c07c8716a7390d9d9c05a)), closes [#43](https://github.com/wgergely/vaultspec-core/issues/43)
+* add precommit_managed manifest flag and opt-out mechanism ([fc6b385](https://github.com/wgergely/vaultspec-core/commit/fc6b38551e64947aa33ceeb65f9f1715feed6ba1))
+* **gitattributes:** scaffold .gitattributes in install/sync/doctor ([389114c](https://github.com/wgergely/vaultspec-core/commit/389114c72d5ba05873845bee692e292b08e9f851))
+* **gitattributes:** scaffold and manage .gitattributes via install/sync/doctor ([46d212a](https://github.com/wgergely/vaultspec-core/commit/46d212a5d6f982d23bd5a90a6bd43a42145b720f)), closes [#35](https://github.com/wgergely/vaultspec-core/issues/35)
+* MCP server registry — built-in MCP definitions with install/sync/uninstall lifecycle ([02df71a](https://github.com/wgergely/vaultspec-core/commit/02df71a92c516638377e99789b8eb02427c8dbe6))
+* standardize CLI force/warning/dry-run across all facades ([8ea2f62](https://github.com/wgergely/vaultspec-core/commit/8ea2f62a7a982e7969dc39545d1909119208de76))
+* standardize pre-commit hook scaffolding across consumer projects ([4c616d4](https://github.com/wgergely/vaultspec-core/commit/4c616d4a2239fabcf3d4c52ba846fecccba7da6b))
+* standardize pre-commit hook scaffolding across consumer projects ([ec8bcb4](https://github.com/wgergely/vaultspec-core/commit/ec8bcb4c5f22e8a85156bb4d0e08c800457e4283)), closes [#36](https://github.com/wgergely/vaultspec-core/issues/36)
+
+
+### Bug Fixes
+
+* address code review - foreign content check and cwd fallback warning ([04bd46a](https://github.com/wgergely/vaultspec-core/commit/04bd46a596e0cf4bbc4ee8db15bb3fdc75a599d9))
+* address code review findings for doctor namespace move ([2785754](https://github.com/wgergely/vaultspec-core/commit/278575414bb378b92de043aed61477f1e7bca737))
+* address code review findings for MCP registry ([64ae9ae](https://github.com/wgergely/vaultspec-core/commit/64ae9aedeef360aa353b5bda42fcc069432db8d6))
+* address code review findings from external review ([3be56a4](https://github.com/wgergely/vaultspec-core/commit/3be56a4a6676ef82ccb85afc95260b7ec7a44ed0))
+* address code review findings from external review ([d3cb7d1](https://github.com/wgergely/vaultspec-core/commit/d3cb7d1c94b3394e003c01d1e374333290253a90))
+* construct default help menu manually to avoid shell PATH issues ([c9fdb5a](https://github.com/wgergely/vaultspec-core/commit/c9fdb5a4feed3b81d7368d1ee8fb2332c97b9996))
+* docstring corrections and missing ADR2 test coverage ([bac4302](https://github.com/wgergely/vaultspec-core/commit/bac43027c22515bab88d1696a76aaff4dbe1bed0))
+* **doctor:** exclude synthesized builtin files from stale detection ([a6d315a](https://github.com/wgergely/vaultspec-core/commit/a6d315a53cd54a54975421b7feb27b71306cd68b))
+* **doctor:** exclude synthesized builtin files from stale detection ([4edb6e1](https://github.com/wgergely/vaultspec-core/commit/4edb6e1ca747795ef1f1ffe8b843cf9babef6876)), closes [#34](https://github.com/wgergely/vaultspec-core/issues/34)
+* ecosystem CI health - doctor/sync, hooks, contract tests ([c753ce9](https://github.com/wgergely/vaultspec-core/commit/c753ce97ccfee90059c0bf7b8bfe2e8415aa8a32))
+* exclude .vault/ from managed gitignore block ([a5f8a53](https://github.com/wgergely/vaultspec-core/commit/a5f8a53e6b27fc851498289b1c229e51e9e69fb5))
+* exclude .vault/ from managed gitignore block ([f292532](https://github.com/wgergely/vaultspec-core/commit/f29253220fe9df1d316458f53b1aa0ceda314f3e)), closes [#50](https://github.com/wgergely/vaultspec-core/issues/50)
+* **gitattributes:** remove redundant scoped imports, add integration tests ([78f27e6](https://github.com/wgergely/vaultspec-core/commit/78f27e6a2d4f2ea4b0f2f579356903b866367e84))
+* **git:** enforce eol=lf for markdown files to fix mdformat errors on Windows ([10ebd58](https://github.com/wgergely/vaultspec-core/commit/10ebd58a6e25a7856a0dc9af59433a08abb88f9c))
+* harden MCP name validation across add and remove paths ([669292e](https://github.com/wgergely/vaultspec-core/commit/669292ebd0cf65dc832a677cec9c44ebb12bb8c7))
+* include mcps label in sync output when MCP pass is active ([4df0208](https://github.com/wgergely/vaultspec-core/commit/4df02080d7a037ddc5f0ded026cfd95c96554c8b))
+* input validation, shadowing, and remove priority in MCP registry ([e052d15](https://github.com/wgergely/vaultspec-core/commit/e052d158178df7726d7d3e858cc7dfb465555b44))
+* **justfile:** convert all recipes to powershell syntax to fix pathing and comply with project instructions ([6c505ea](https://github.com/wgergely/vaultspec-core/commit/6c505ea95260d0f73e55237a25d9a45d59fc9614))
+* **justfile:** use official cross-platform shell configuration for pwsh ([21dcd81](https://github.com/wgergely/vaultspec-core/commit/21dcd81dee04ae70db5fed64f408df073a5ee06f))
+* rename generated '## Available Skills' header to '## Vaultspec Skills' ([9fc84e6](https://github.com/wgergely/vaultspec-core/commit/9fc84e600cfa08f269067081351792ef303af2e2))
+* rename generated '## Rules' header to '## Vaultspec Rules' ([c7f08d6](https://github.com/wgergely/vaultspec-core/commit/c7f08d64c6737a4e3fdf521e86b243bcf33adc3b))
+* rename generated '## Rules' header to '## Vaultspec Rules' ([2a5e349](https://github.com/wgergely/vaultspec-core/commit/2a5e349858195a53537bc8893b556f5f5b25881a)), closes [#44](https://github.com/wgergely/vaultspec-core/issues/44)
+* resolve doctor/sync false positives, stale contract tests, and hook engine cwd crash ([850d219](https://github.com/wgergely/vaultspec-core/commit/850d21998955d14b4a85da48c8bacb5715495e05)), closes [#37](https://github.com/wgergely/vaultspec-core/issues/37)
+* run MCP uninstall before directory removal in uninstall_run ([188c2c7](https://github.com/wgergely/vaultspec-core/commit/188c2c790633ceafe79edfb54378cf98dcb6f149))
+* update ConfigSignal enum member test for REGISTRY_DRIFT ([e92fc77](https://github.com/wgergely/vaultspec-core/commit/e92fc773d333e62548cad608a09dd1e7b365564d))
+
+
+### Performance
+
+* hoist managed hook ID set to module-level constant ([c787c78](https://github.com/wgergely/vaultspec-core/commit/c787c78f0823e59b84a8f5692e289eacc6397cda))
+
 ## [0.1.7](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.6...vaultspec-core-v0.1.7) (2026-04-05)
 
 
