@@ -46,14 +46,14 @@ repos:
     - markdown
     exclude: ^test-project/
   - id: vault-fix
-    name: Vault Doctor
+    name: Vault Doctor (Fix)
     entry: uv run --no-sync vaultspec-core vault check all --fix
     language: system
     types:
     - markdown
     pass_filenames: false
   - id: spec-check
-    name: Vault Doctor (chain + links)
+    name: Vault Doctor (Check)
     entry: uv run --no-sync vaultspec-core doctor
     language: system
     types:
