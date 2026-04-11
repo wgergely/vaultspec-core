@@ -215,7 +215,10 @@ src/vaultspec_core/builtins/*
 .codex/
 .gemini/
 .mcp.json
-.vault/
+.vault/.obsidian/
+.vault/.trash/
+.vault/data/
+.vault/logs/
 .vaultspec/
 .vaultspec/_snapshots/
 AGENTS.md
