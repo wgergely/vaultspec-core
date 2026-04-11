@@ -825,6 +825,16 @@ def uninstall_run(
             path / "AGENTS.md",
         ]
 
+        # Surgical .mcp.json cleanup BEFORE directory removal so the
+        # registry in .vaultspec/rules/mcps/ is still readable.
+        mcp_path = path / ".mcp.json"
+        if "mcp" not in skip:
+            from .mcps import mcp_uninstall
+
+            uninstalled = mcp_uninstall(path, dry_run=dry_run)
+            if uninstalled:
+                removed.append((_rel(path, mcp_path), "mcp"))
+
         for d in managed_dirs:
             owners = _dir_owners.get(d.name, [])
             if owners and any(o in skip for o in owners):
@@ -855,15 +865,6 @@ def uninstall_run(
                         continue
                 label = file_labels.get(f.name, "")
                 removed.append((str(f).replace("\\", "/"), label))
-
-        # Surgical .mcp.json cleanup: remove registry-managed entries
-        mcp_path = path / ".mcp.json"
-        if "mcp" not in skip:
-            from .mcps import mcp_uninstall
-
-            uninstalled = mcp_uninstall(path, dry_run=dry_run)
-            if uninstalled:
-                removed.append((_rel(path, mcp_path), "mcp"))
 
         # Surgical .pre-commit-config.yaml cleanup: remove vaultspec-core hooks
         precommit_path = path / ".pre-commit-config.yaml"
