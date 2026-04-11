@@ -1,0 +1,4 @@
+{
+  "command": "uv",
+  "args": ["run", "python", "-m", "vaultspec_core.mcp_server.app"]
+}

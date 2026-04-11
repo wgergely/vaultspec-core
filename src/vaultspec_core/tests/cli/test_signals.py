@@ -49,7 +49,7 @@ pytestmark = [pytest.mark.unit]
         ),
         (
             ConfigSignal,
-            {"OK", "MISSING", "FOREIGN", "PARTIAL_MCP", "USER_MCP"},
+            {"OK", "MISSING", "FOREIGN", "PARTIAL_MCP", "USER_MCP", "REGISTRY_DRIFT"},
         ),
         (
             GitignoreSignal,

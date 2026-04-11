@@ -536,7 +536,12 @@ def _resolve_config(
     if action != "sync":
         return
 
-    if signal in (ConfigSignal.OK, ConfigSignal.PARTIAL_MCP, ConfigSignal.USER_MCP):
+    if signal in (
+        ConfigSignal.OK,
+        ConfigSignal.PARTIAL_MCP,
+        ConfigSignal.USER_MCP,
+        ConfigSignal.REGISTRY_DRIFT,
+    ):
         return
 
     if signal == ConfigSignal.MISSING:
