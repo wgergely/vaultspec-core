@@ -135,3 +135,17 @@ class ManagedState(StrEnum):
 
     PRESENT = "present"
     ABSENT = "absent"
+
+
+class PrecommitHook(StrEnum):
+    """Canonical pre-commit hook IDs managed by vaultspec-core.
+
+    Vault hooks check ``.vault/`` content integrity.
+    Spec hooks check ``.vaultspec/`` framework and workspace health.
+    """
+
+    CHECK_NAMING = "check-naming"
+    CHECK_DANGLING = "check-dangling"
+    CHECK_BODY_LINKS = "check-body-links"
+    VAULT_CHECK = "vault-check"
+    SPEC_CHECK = "spec-check"

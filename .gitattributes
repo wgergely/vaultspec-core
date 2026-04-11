@@ -60,3 +60,9 @@ Dockerfile      text eol=lf
 *.so      binary
 *.dll     binary
 *.exe     binary
+
+# >>> vaultspec-managed (do not edit this block) >>>
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+# <<< vaultspec-managed <<<

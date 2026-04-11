@@ -19,6 +19,7 @@ from .signals import (
     GitattributesSignal,
     GitignoreSignal,
     ManifestEntrySignal,
+    PrecommitSignal,
     ProviderDirSignal,
 )
 
@@ -513,3 +514,65 @@ def collect_gitattributes_state(target: Path) -> GitattributesSignal:
         return GitattributesSignal.COMPLETE
 
     return GitattributesSignal.PARTIAL
+
+
+def collect_precommit_state(target: Path) -> PrecommitSignal:
+    """Assess the state of vaultspec-core hooks in ``.pre-commit-config.yaml``.
+
+    Checks that all canonical hooks are present and use the canonical
+    entry pattern (``uv run --no-sync python -m vaultspec_core ...``).
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        :class:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal`
+        reflecting the observed state.
+    """
+    import yaml
+
+    from ..commands import CANONICAL_ENTRY_PREFIX, CANONICAL_HOOK_IDS
+
+    config_path = target / ".pre-commit-config.yaml"
+    if not config_path.exists():
+        return PrecommitSignal.NO_FILE
+
+    try:
+        data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    except (yaml.YAMLError, OSError) as exc:
+        logger.warning("Cannot read .pre-commit-config.yaml %s: %s", config_path, exc)
+        return PrecommitSignal.NO_FILE
+
+    if not isinstance(data, dict):
+        return PrecommitSignal.NO_HOOKS
+
+    repos = data.get("repos", [])
+    if not isinstance(repos, list):
+        return PrecommitSignal.NO_HOOKS
+
+    # Collect all hooks from local repos
+    local_hooks: list[dict[str, object]] = []
+    for repo in repos:
+        if isinstance(repo, dict) and repo.get("repo") == "local":
+            hooks = repo.get("hooks", [])
+            if isinstance(hooks, list):
+                local_hooks.extend(h for h in hooks if isinstance(h, dict))
+
+    found_ids = {
+        str(h.get("id")) for h in local_hooks if h.get("id") in CANONICAL_HOOK_IDS
+    }
+
+    if not found_ids:
+        return PrecommitSignal.NO_HOOKS
+
+    if found_ids != CANONICAL_HOOK_IDS:
+        return PrecommitSignal.INCOMPLETE
+
+    # All hooks present - check entry patterns
+    for hook in local_hooks:
+        if hook.get("id") in CANONICAL_HOOK_IDS:
+            entry = str(hook.get("entry", ""))
+            if not entry.startswith(CANONICAL_ENTRY_PREFIX):
+                return PrecommitSignal.NON_CANONICAL
+
+    return PrecommitSignal.COMPLETE

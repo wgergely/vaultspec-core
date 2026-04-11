@@ -20,6 +20,7 @@ from .diagnosis.signals import (
     GitattributesSignal,
     GitignoreSignal,
     ManifestEntrySignal,
+    PrecommitSignal,
     ProviderDirSignal,
     ResolutionAction,
 )
@@ -106,6 +107,7 @@ def resolve(
     _resolve_builtin_version(plan, diagnosis.builtin_version, prov_action, force=force)
     _resolve_gitignore(plan, diagnosis.gitignore, prov_action, force=force)
     _resolve_gitattributes(plan, diagnosis.gitattributes, prov_action, force=force)
+    _resolve_precommit(plan, diagnosis.precommit, prov_action, force=force)
 
     # Per-provider rules
     for tool, prov_diag in diagnosis.providers.items():
@@ -686,6 +688,66 @@ def _resolve_gitattributes(
 
     # All GitattributesSignal values are handled above.
     logger.warning("Unknown GitattributesSignal member: %s (action=%s)", signal, action)
+
+
+# ---------------------------------------------------------------------------
+# Pre-commit hooks
+# ---------------------------------------------------------------------------
+
+
+def _resolve_precommit(
+    plan: ResolutionPlan,
+    signal: PrecommitSignal,
+    action: str,
+    *,
+    force: bool,
+) -> None:
+    """Apply pre-commit hook resolution rules."""
+    _ = force  # precommit repairs are unconditional
+    if signal == PrecommitSignal.COMPLETE:
+        return
+
+    if signal == PrecommitSignal.NO_FILE:
+        # install scaffolds precommit itself; no repair step needed
+        return
+
+    if signal == PrecommitSignal.NO_HOOKS:
+        if action in ("install", "sync"):
+            plan.steps.append(
+                ResolutionStep(
+                    action=ResolutionAction.REPAIR_PRECOMMIT,
+                    target=".pre-commit-config.yaml",
+                    reason="No vaultspec-core hooks found in pre-commit config",
+                )
+            )
+        return
+
+    if signal == PrecommitSignal.INCOMPLETE:
+        if action in ("install", "sync"):
+            plan.steps.append(
+                ResolutionStep(
+                    action=ResolutionAction.REPAIR_PRECOMMIT,
+                    target=".pre-commit-config.yaml",
+                    reason="Missing canonical hooks in pre-commit config",
+                )
+            )
+        return
+
+    if signal == PrecommitSignal.NON_CANONICAL:
+        if action in ("install", "sync"):
+            plan.steps.append(
+                ResolutionStep(
+                    action=ResolutionAction.REPAIR_PRECOMMIT,
+                    target=".pre-commit-config.yaml",
+                    reason=(
+                        "Hook entries use non-canonical pattern; "
+                        "should use 'uv run --no-sync vaultspec-core'"
+                    ),
+                )
+            )
+        return
+
+    logger.warning("Unknown PrecommitSignal member: %s (action=%s)", signal, action)
 
 
 # ---------------------------------------------------------------------------

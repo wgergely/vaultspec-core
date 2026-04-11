@@ -8,7 +8,12 @@ import pytest
 
 from tests.constants import PROJECT_ROOT
 from vaultspec_core.config import reset_config
-from vaultspec_core.core.commands import install_run
+from vaultspec_core.core.commands import (
+    CANONICAL_ENTRY_PREFIX,
+    CANONICAL_HOOK_IDS,
+    install_run,
+)
+from vaultspec_core.core.enums import PrecommitHook
 
 
 @pytest.mark.unit
@@ -39,7 +44,8 @@ def test_init_run_scaffolds_antigravity_workspace_layout() -> None:
 
 
 @pytest.mark.unit
-def test_install_run_scaffolds_precommit_config() -> None:
+def test_install_run_scaffolds_full_canonical_precommit_hooks() -> None:
+    """install_run must produce all 5 canonical hooks with --no-sync entries."""
     import yaml
 
     tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"install-precommit-{uuid4().hex}"
@@ -47,7 +53,6 @@ def test_install_run_scaffolds_precommit_config() -> None:
         tmp_path.mkdir(parents=True, exist_ok=True)
         reset_config()
 
-        # install_run bootstraps its own context
         install_run(
             path=tmp_path, provider="all", upgrade=False, dry_run=False, force=False
         )
@@ -65,9 +70,144 @@ def test_install_run_scaffolds_precommit_config() -> None:
         hooks = local_repo.get("hooks", [])
         hook_ids = {h.get("id") for h in hooks}
 
-        assert "vault-doctor" in hook_ids
-        assert "vault-doctor-deep" in hook_ids
+        assert hook_ids == CANONICAL_HOOK_IDS
+
+        for hook in hooks:
+            if hook["id"] in CANONICAL_HOOK_IDS:
+                assert hook["entry"].startswith(CANONICAL_ENTRY_PREFIX), (
+                    f"Hook {hook['id']} uses non-canonical entry: {hook['entry']}"
+                )
 
     finally:
         reset_config()
+        shutil.rmtree(tmp_path, ignore_errors=True)
+
+
+@pytest.mark.unit
+def test_scaffold_precommit_repairs_non_canonical_entries() -> None:
+    """Re-running scaffold must fix hooks that use old entry patterns."""
+    import yaml
+
+    from vaultspec_core.core.commands import (
+        _DEPRECATED_HOOK_IDS,
+        _scaffold_precommit,
+    )
+
+    # Pick the first deprecated ID to simulate an old config
+    old_id = next(iter(_DEPRECATED_HOOK_IDS))
+
+    tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"precommit-repair-{uuid4().hex}"
+    try:
+        tmp_path.mkdir(parents=True, exist_ok=True)
+
+        old_config = {
+            "repos": [
+                {
+                    "repo": "local",
+                    "hooks": [
+                        {
+                            "id": old_id,
+                            "name": "Old hook",
+                            "entry": "uv run python -m vaultspec_core vault check all",
+                            "language": "system",
+                            "types": ["markdown"],
+                            "pass_filenames": False,
+                        },
+                    ],
+                }
+            ]
+        }
+        config_path = tmp_path / ".pre-commit-config.yaml"
+        config_path.write_text(yaml.dump(old_config, sort_keys=False), encoding="utf-8")
+
+        _scaffold_precommit(tmp_path)
+
+        config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        hooks = config["repos"][0]["hooks"]
+        hook_ids = {h["id"] for h in hooks}
+
+        assert hook_ids == CANONICAL_HOOK_IDS
+
+        for hook in hooks:
+            assert hook["entry"].startswith(CANONICAL_ENTRY_PREFIX), (
+                f"Hook {hook['id']} still uses non-canonical entry: {hook['entry']}"
+            )
+
+    finally:
+        shutil.rmtree(tmp_path, ignore_errors=True)
+
+
+@pytest.mark.unit
+def test_precommit_collector_detects_states() -> None:
+    """collect_precommit_state reports correct signals for various configs."""
+    import yaml
+
+    from vaultspec_core.core.diagnosis.collectors import collect_precommit_state
+    from vaultspec_core.core.diagnosis.signals import PrecommitSignal
+
+    tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"precommit-diag-{uuid4().hex}"
+    try:
+        tmp_path.mkdir(parents=True, exist_ok=True)
+
+        # No file -> NO_FILE
+        assert collect_precommit_state(tmp_path) == PrecommitSignal.NO_FILE
+
+        config_path = tmp_path / ".pre-commit-config.yaml"
+
+        # Empty repos -> NO_HOOKS
+        config_path.write_text(
+            yaml.dump({"repos": []}, sort_keys=False), encoding="utf-8"
+        )
+        assert collect_precommit_state(tmp_path) == PrecommitSignal.NO_HOOKS
+
+        # Only 2 of 5 hooks -> INCOMPLETE
+        partial_config = {
+            "repos": [
+                {
+                    "repo": "local",
+                    "hooks": [
+                        {
+                            "id": PrecommitHook.VAULT_CHECK.value,
+                            "entry": (f"{CANONICAL_ENTRY_PREFIX} vault check all"),
+                        },
+                        {
+                            "id": PrecommitHook.SPEC_CHECK.value,
+                            "entry": (f"{CANONICAL_ENTRY_PREFIX} doctor"),
+                        },
+                    ],
+                }
+            ]
+        }
+        config_path.write_text(
+            yaml.dump(partial_config, sort_keys=False), encoding="utf-8"
+        )
+        assert collect_precommit_state(tmp_path) == PrecommitSignal.INCOMPLETE
+
+        # All 5 hooks but one uses old entry pattern -> NON_CANONICAL
+        from vaultspec_core.core.commands import CANONICAL_PRECOMMIT_HOOKS
+
+        non_canonical = [dict(h) for h in CANONICAL_PRECOMMIT_HOOKS]
+        non_canonical[0]["entry"] = (
+            "uv run python -m vaultspec_core vault check structure"
+        )
+        config_path.write_text(
+            yaml.dump(
+                {"repos": [{"repo": "local", "hooks": non_canonical}]},
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+        assert collect_precommit_state(tmp_path) == PrecommitSignal.NON_CANONICAL
+
+        # All 5 hooks with canonical entries -> COMPLETE
+        canonical = [dict(h) for h in CANONICAL_PRECOMMIT_HOOKS]
+        config_path.write_text(
+            yaml.dump(
+                {"repos": [{"repo": "local", "hooks": canonical}]}, sort_keys=False
+            ),
+            encoding="utf-8",
+        )
+        assert collect_precommit_state(tmp_path) == PrecommitSignal.COMPLETE
+
+    finally:
         shutil.rmtree(tmp_path, ignore_errors=True)

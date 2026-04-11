@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from . import types as _t
-from .enums import ManagedState, ProviderCapability, Tool
+from .enums import ManagedState, PrecommitHook, ProviderCapability, Tool
 from .exceptions import (
     ProviderError,
     ProviderNotInstalledError,
@@ -238,31 +238,66 @@ def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[tuple[str
     return [(".mcp.json", "mcp")]
 
 
+CANONICAL_ENTRY_PREFIX = "uv run --no-sync vaultspec-core"
+
+# Hook definitions keyed by PrecommitHook enum.
+_HOOK_DEFS: dict[PrecommitHook, dict[str, str]] = {
+    PrecommitHook.CHECK_NAMING: {
+        "name": "Vault check naming",
+        "entry": f"{CANONICAL_ENTRY_PREFIX} vault check structure",
+    },
+    PrecommitHook.CHECK_DANGLING: {
+        "name": "Vault check dangling",
+        "entry": f"{CANONICAL_ENTRY_PREFIX} vault check dangling",
+    },
+    PrecommitHook.CHECK_BODY_LINKS: {
+        "name": "Vault check body links",
+        "entry": f"{CANONICAL_ENTRY_PREFIX} vault check body-links",
+    },
+    PrecommitHook.VAULT_CHECK: {
+        "name": "Vault check",
+        "entry": f"{CANONICAL_ENTRY_PREFIX} vault check all",
+    },
+    PrecommitHook.SPEC_CHECK: {
+        "name": "Spec check",
+        "entry": f"{CANONICAL_ENTRY_PREFIX} doctor",
+    },
+}
+
+CANONICAL_PRECOMMIT_HOOKS: list[dict[str, object]] = [
+    {
+        "id": hook.value,
+        **meta,
+        "language": "system",
+        "types": ["markdown"],
+        "pass_filenames": False,
+    }
+    for hook, meta in _HOOK_DEFS.items()
+]
+
+CANONICAL_HOOK_IDS: frozenset[str] = frozenset(h.value for h in PrecommitHook)
+
+# Old hook IDs that should be replaced during scaffold/sync.
+_DEPRECATED_HOOK_IDS: dict[str, str] = {
+    "vault-doctor": PrecommitHook.VAULT_CHECK.value,
+    "vault-doctor-deep": PrecommitHook.SPEC_CHECK.value,
+}
+
+
 def _scaffold_precommit(
     target: Path, *, dry_run: bool = False
 ) -> list[tuple[str, str]]:
-    """Scaffold or merge vaultspec-core hooks into .pre-commit-config.yaml."""
+    """Scaffold or merge vaultspec-core hooks into .pre-commit-config.yaml.
+
+    Ensures the full canonical hook set is present with canonical entry
+    patterns.  Existing hooks with matching IDs are updated to the
+    canonical entry; missing hooks are appended.
+    """
     import yaml
 
     from .helpers import atomic_write
 
     config_file = target / ".pre-commit-config.yaml"
-    hook_doctor = {
-        "id": "vault-doctor",
-        "name": "Vault Doctor",
-        "entry": "uv run python -m vaultspec_core vault check all",
-        "language": "system",
-        "types": ["markdown"],
-        "pass_filenames": False,
-    }
-    hook_doctor_deep = {
-        "id": "vault-doctor-deep",
-        "name": "Vault Doctor (chain + links)",
-        "entry": "uv run python -m vaultspec_core doctor",
-        "language": "system",
-        "types": ["markdown"],
-        "pass_filenames": False,
-    }
 
     if config_file.exists():
         try:
@@ -287,19 +322,45 @@ def _scaffold_precommit(
             if not isinstance(existing_hooks, list):
                 return []
 
-            existing_ids = {h.get("id") for h in existing_hooks if isinstance(h, dict)}
-            added = False
-            if "vault-doctor" not in existing_ids:
-                existing_hooks.append(hook_doctor)
-                added = True
-            if "vault-doctor-deep" not in existing_ids:
-                existing_hooks.append(hook_doctor_deep)
-                added = True
+            existing_by_id = {
+                h.get("id"): h for h in existing_hooks if isinstance(h, dict)
+            }
 
-            if not added:
+            # Migrate deprecated hook IDs to their canonical replacements
+            changed = False
+            for old_id, new_id in _DEPRECATED_HOOK_IDS.items():
+                if old_id in existing_by_id and new_id not in existing_by_id:
+                    existing_by_id[old_id]["id"] = new_id
+                    existing_by_id[new_id] = existing_by_id.pop(old_id)
+                    changed = True
+                elif old_id in existing_by_id:
+                    existing_hooks[:] = [
+                        h
+                        for h in existing_hooks
+                        if not (isinstance(h, dict) and h.get("id") == old_id)
+                    ]
+                    del existing_by_id[old_id]
+                    changed = True
+            for canonical in CANONICAL_PRECOMMIT_HOOKS:
+                hook_id = str(canonical["id"])
+                if hook_id in existing_by_id:
+                    existing = existing_by_id[hook_id]
+                    if existing.get("entry") != canonical["entry"]:
+                        existing["entry"] = canonical["entry"]
+                        changed = True
+                else:
+                    existing_hooks.append(dict(canonical))
+                    changed = True
+
+            if not changed:
                 return []
         else:
-            repos.append({"repo": "local", "hooks": [hook_doctor, hook_doctor_deep]})
+            repos.append(
+                {
+                    "repo": "local",
+                    "hooks": [dict(h) for h in CANONICAL_PRECOMMIT_HOOKS],
+                }
+            )
 
         if not dry_run:
             atomic_write(
@@ -314,7 +375,14 @@ def _scaffold_precommit(
         return [(".pre-commit-config.yaml", "precommit")]
 
     if not dry_run:
-        data = {"repos": [{"repo": "local", "hooks": [hook_doctor, hook_doctor_deep]}]}
+        data = {
+            "repos": [
+                {
+                    "repo": "local",
+                    "hooks": [dict(h) for h in CANONICAL_PRECOMMIT_HOOKS],
+                }
+            ]
+        }
         atomic_write(
             config_file,
             yaml.dump(
@@ -936,12 +1004,14 @@ def uninstall_run(
                                 if isinstance(r, dict) and r.get("repo") == "local":
                                     hooks = r.get("hooks", [])
                                     if isinstance(hooks, list):
+                                        _all_managed = CANONICAL_HOOK_IDS | frozenset(
+                                            _DEPRECATED_HOOK_IDS
+                                        )
                                         new_hooks = [
                                             h
                                             for h in hooks
                                             if isinstance(h, dict)
-                                            and h.get("id")
-                                            not in ("vault-doctor", "vault-doctor-deep")
+                                            and h.get("id") not in _all_managed
                                         ]
                                         if len(new_hooks) != len(hooks):
                                             r["hooks"] = new_hooks
@@ -987,7 +1057,8 @@ def uninstall_run(
             elif precommit_path.exists() and dry_run:
                 try:
                     raw = precommit_path.read_text(encoding="utf-8")
-                    if "id: vault-doctor" in raw:
+                    _all_ids = CANONICAL_HOOK_IDS | frozenset(_DEPRECATED_HOOK_IDS)
+                    if any(f"id: {hid}" in raw for hid in _all_ids):
                         removed.append((_rel(path, precommit_path), "precommit"))
                 except OSError:
                     pass

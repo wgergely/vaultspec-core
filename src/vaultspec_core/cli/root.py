@@ -738,6 +738,7 @@ def cmd_doctor(
         GitattributesSignal,
         GitignoreSignal,
         ManifestEntrySignal,
+        PrecommitSignal,
         diagnose,
     )
 
@@ -880,6 +881,30 @@ def cmd_doctor(
         mcp_detail,
     )
 
+    # Pre-commit row
+    pc_status, pc_style = _signal_status(
+        diag.precommit,
+        {
+            PrecommitSignal.COMPLETE: ("ok", "green"),
+            PrecommitSignal.INCOMPLETE: ("warn", "yellow"),
+            PrecommitSignal.NON_CANONICAL: ("warn", "yellow"),
+            PrecommitSignal.NO_HOOKS: ("warn", "yellow"),
+            PrecommitSignal.NO_FILE: ("info", "dim"),
+        },
+    )
+    pc_detail = {
+        PrecommitSignal.COMPLETE: "all hooks present",
+        PrecommitSignal.INCOMPLETE: "missing canonical hooks",
+        PrecommitSignal.NON_CANONICAL: "non-canonical entry pattern",
+        PrecommitSignal.NO_HOOKS: "no vaultspec hooks found",
+        PrecommitSignal.NO_FILE: "no .pre-commit-config.yaml",
+    }.get(diag.precommit, str(diag.precommit))
+    table.add_row(
+        "precommit",
+        f"[{pc_style}]{pc_status}[/{pc_style}]",
+        pc_detail,
+    )
+
     console.print(table)
 
     exit_code = _doctor_exit_code(diag)
@@ -938,6 +963,7 @@ def _doctor_exit_code(diag: WorkspaceDiagnosis) -> int:
         GitattributesSignal,
         GitignoreSignal,
         ManifestEntrySignal,
+        PrecommitSignal,
         ProviderDirSignal,
     )
 
@@ -950,6 +976,12 @@ def _doctor_exit_code(diag: WorkspaceDiagnosis) -> int:
         has_error = True
     if diag.gitattributes == GitattributesSignal.CORRUPTED:
         has_error = True
+    if diag.precommit in (
+        PrecommitSignal.INCOMPLETE,
+        PrecommitSignal.NON_CANONICAL,
+        PrecommitSignal.NO_HOOKS,
+    ):
+        has_warn = True
     if diag.builtin_version == BuiltinVersionSignal.DELETED:
         has_error = True
     if diag.builtin_version == BuiltinVersionSignal.MODIFIED:

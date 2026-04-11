@@ -19,6 +19,7 @@ from .signals import (
     GitattributesSignal,
     GitignoreSignal,
     ManifestEntrySignal,
+    PrecommitSignal,
     ProviderDirSignal,
 )
 
@@ -61,6 +62,7 @@ class WorkspaceDiagnosis:
     gitignore: GitignoreSignal = GitignoreSignal.NO_FILE
     gitattributes: GitattributesSignal = GitattributesSignal.NO_FILE
     mcp: ConfigSignal = ConfigSignal.MISSING
+    precommit: PrecommitSignal = PrecommitSignal.NO_FILE
 
 
 def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
@@ -92,6 +94,7 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         collect_gitignore_state,
         collect_manifest_coherence,
         collect_mcp_config_state,
+        collect_precommit_state,
         collect_provider_dir_state,
     )
 
@@ -120,11 +123,18 @@ def diagnose(target: Path, *, scope: str = "full") -> WorkspaceDiagnosis:
         logger.warning("MCP config state collector failed", exc_info=True)
         mcp = ConfigSignal.MISSING
 
+    try:
+        precommit = collect_precommit_state(target)
+    except Exception:
+        logger.warning("Precommit state collector failed", exc_info=True)
+        precommit = PrecommitSignal.NO_FILE
+
     diag = WorkspaceDiagnosis(
         framework=framework,
         gitignore=gitignore,
         gitattributes=gitattributes,
         mcp=mcp,
+        precommit=precommit,
     )
 
     if framework == FrameworkSignal.MISSING:

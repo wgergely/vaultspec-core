@@ -17,6 +17,7 @@ from .signals import (
     GitattributesSignal,
     GitignoreSignal,
     ManifestEntrySignal,
+    PrecommitSignal,
     ProviderDirSignal,
     ResolutionAction,
 )
@@ -29,6 +30,7 @@ __all__ = [
     "GitattributesSignal",
     "GitignoreSignal",
     "ManifestEntrySignal",
+    "PrecommitSignal",
     "ProviderDiagnosis",
     "ProviderDirSignal",
     "ResolutionAction",

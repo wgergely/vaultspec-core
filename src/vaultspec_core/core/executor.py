@@ -34,6 +34,7 @@ PREFLIGHT_ACTIONS: frozenset[ResolutionAction] = frozenset(
         ResolutionAction.REPAIR_MANIFEST,
         ResolutionAction.REPAIR_GITIGNORE,
         ResolutionAction.REPAIR_GITATTRIBUTES,
+        ResolutionAction.REPAIR_PRECOMMIT,
         ResolutionAction.ADOPT_DIRECTORY,
         ResolutionAction.SCAFFOLD,
     }
@@ -152,6 +153,7 @@ _HANDLERS: dict[ResolutionAction, str] = {
     ResolutionAction.REPAIR_MANIFEST: "_execute_repair_manifest",
     ResolutionAction.REPAIR_GITIGNORE: "_execute_repair_gitignore",
     ResolutionAction.REPAIR_GITATTRIBUTES: "_execute_repair_gitattributes",
+    ResolutionAction.REPAIR_PRECOMMIT: "_execute_repair_precommit",
     ResolutionAction.SCAFFOLD: "_execute_scaffold",
     ResolutionAction.ADOPT_DIRECTORY: "_execute_adopt_directory",
 }
@@ -223,3 +225,10 @@ def _execute_repair_gitignore(target: Path, _step: ResolutionStep) -> None:
 def _execute_repair_gitattributes(target: Path, _step: ResolutionStep) -> None:
     """Repair the managed gitattributes block."""
     ensure_gitattributes_block(target, state=ManagedState.PRESENT)
+
+
+def _execute_repair_precommit(target: Path, _step: ResolutionStep) -> None:
+    """Scaffold or repair canonical pre-commit hooks."""
+    from .commands import _scaffold_precommit
+
+    _scaffold_precommit(target)

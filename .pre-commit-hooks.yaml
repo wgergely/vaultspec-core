@@ -1,0 +1,34 @@
+- id: check-naming
+  name: Vault check naming
+  entry: uv run --no-sync vaultspec-core vault check structure
+  language: system
+  types: [markdown]
+  pass_filenames: false
+
+- id: check-dangling
+  name: Vault check dangling
+  entry: uv run --no-sync vaultspec-core vault check dangling
+  language: system
+  types: [markdown]
+  pass_filenames: false
+
+- id: check-body-links
+  name: Vault check body links
+  entry: uv run --no-sync vaultspec-core vault check body-links
+  language: system
+  types: [markdown]
+  pass_filenames: false
+
+- id: vault-check
+  name: Vault check
+  entry: uv run --no-sync vaultspec-core vault check all
+  language: system
+  types: [markdown]
+  pass_filenames: false
+
+- id: spec-check
+  name: Spec check
+  entry: uv run --no-sync vaultspec-core doctor
+  language: system
+  types: [markdown]
+  pass_filenames: false
