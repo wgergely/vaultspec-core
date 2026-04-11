@@ -15,6 +15,7 @@ import logging
 import re
 from typing import TYPE_CHECKING
 
+from ..core.exceptions import ResourceExistsError
 from .models import DocType
 
 __all__ = ["get_template_path", "hydrate_template"]
@@ -181,6 +182,8 @@ def create_vault_doc(
     related: list[str] | None = None,
     extra_tags: list[str] | None = None,
     content_root: pathlib.Path | None = None,
+    force: bool = False,
+    dry_run: bool = False,
 ) -> pathlib.Path:
     """Scaffold a new vault document from the appropriate template.
 
@@ -194,13 +197,16 @@ def create_vault_doc(
             ``related:`` frontmatter field.
         extra_tags: Additional ``#tag`` strings to append to ``tags:``.
         content_root: Explicit content root for template lookup.
+        force: If ``True``, overwrite an existing document.
+        dry_run: If ``True``, return the target path without writing.
 
     Returns:
-        Path to the newly created document.
+        Path to the newly created (or would-be-created) document.
 
     Raises:
         FileNotFoundError: If no template exists for the given ``doc_type``.
-        FileExistsError: If the target file already exists.
+        ResourceExistsError: If the target file already exists and
+            *force* is ``False``.
     """
     from ..config import get_config
 
@@ -227,22 +233,30 @@ def create_vault_doc(
     target_dir = root_dir / get_config().docs_dir / doc_type.value
     target_path = target_dir / filename
 
-    if target_path.exists():
-        raise FileExistsError(f"File already exists at {target_path}")
+    if not force:
+        if target_path.exists():
+            raise ResourceExistsError(
+                f"File already exists at {target_path}",
+                hint="Use --force to overwrite",
+            )
 
-    # Guard against stem collisions  - a file with the same stem in a
-    # different type directory would cause silent overwrites in the
-    # graph (nodes are keyed by stem).
-    stem = target_path.stem
-    docs_dir = root_dir / get_config().docs_dir
-    if docs_dir.exists():
-        for existing in docs_dir.rglob("*.md"):
-            if existing.stem == stem and existing != target_path:
-                raise FileExistsError(
-                    f"A file with stem '{stem}' already exists at "
-                    f"{existing.relative_to(root_dir)}. "
-                    f"Choose a different name to avoid graph key collisions."
-                )
+        # Guard against stem collisions  - a file with the same stem in a
+        # different type directory would cause silent overwrites in the
+        # graph (nodes are keyed by stem).
+        stem = target_path.stem
+        docs_dir = root_dir / get_config().docs_dir
+        if docs_dir.exists():
+            for existing in docs_dir.rglob("*.md"):
+                if existing.stem == stem and existing != target_path:
+                    raise ResourceExistsError(
+                        f"A file with stem '{stem}' already exists at "
+                        f"{existing.relative_to(root_dir)}. "
+                        f"Choose a different name to avoid graph key collisions.",
+                        hint="Use --force to overwrite",
+                    )
+
+    if dry_run:
+        return target_path
 
     from ..core.helpers import atomic_write
 

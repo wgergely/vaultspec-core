@@ -219,6 +219,7 @@ def agents_add(
     description: str = "",
     force: bool = False,
     *,
+    dry_run: bool = False,
     interactive: bool | None = None,
 ) -> Path:
     """Scaffold a new agent definition.
@@ -227,10 +228,11 @@ def agents_add(
         name: Agent name.
         description: Short description.
         force: Whether to overwrite existing.
+        dry_run: If ``True``, return the target path without writing.
         interactive: Override TTY detection.  ``None`` means auto-detect.
 
     Returns:
-        Path to the created agent file.
+        Path to the created (or would-be-created) agent file.
 
     Raises:
         ResourceExistsError: If the agent exists and *force* is ``False``.
@@ -243,8 +245,12 @@ def agents_add(
 
     if file_path.exists() and not force:
         raise ResourceExistsError(
-            f"Agent '{file_name}' exists. Use --force to overwrite."
+            f"Agent '{file_name}' exists.",
+            hint="Use --force to overwrite, or --dry-run to preview",
         )
+
+    if dry_run:
+        return file_path
 
     fm = {"name": name, "description": description}
     body = "# Instructions\n\nAdd agent instructions here.\n"

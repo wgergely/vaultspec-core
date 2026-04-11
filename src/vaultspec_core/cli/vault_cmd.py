@@ -21,6 +21,22 @@ if TYPE_CHECKING:
     from vaultspec_core.graph.api import VaultGraph
     from vaultspec_core.vaultcore.checks._base import CheckResult
 
+
+def _handle_error(exc: Exception) -> None:
+    """Convert a domain or OS exception to a CLI error exit."""
+    from vaultspec_core.core.exceptions import VaultSpecError
+
+    if isinstance(exc, VaultSpecError):
+        typer.echo(f"Error: {exc}", err=True)
+        if exc.hint:
+            typer.echo(f"  Hint: {exc.hint}", err=True)
+        raise typer.Exit(code=1) from exc
+    if isinstance(exc, OSError):
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    raise exc
+
+
 vault_app = typer.Typer(
     help="Create, query, and audit records in the .vault/ project history.",
     no_args_is_help=True,
@@ -76,6 +92,12 @@ def cmd_add(
             help="Additional tags beyond the required directory and feature tags.",
         ),
     ] = None,
+    force: Annotated[
+        bool, typer.Option("--force", help="Overwrite existing document")
+    ] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview without writing")
+    ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
@@ -175,13 +197,33 @@ def cmd_add(
             title=title,
             related=resolved_related,
             extra_tags=extra_tags,
+            force=force,
+            dry_run=dry_run,
         )
     except FileNotFoundError as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(code=1) from None
-    except FileExistsError as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(code=1) from None
+        _handle_error(exc)
+        return
+    except Exception as exc:
+        _handle_error(exc)
+        return
+
+    if dry_run:
+        console.print(f"[dim]Would create:[/dim] {path}")
+        if json_output:
+            import json
+
+            typer.echo(
+                json.dumps(
+                    {
+                        "path": str(path),
+                        "type": doc_type,
+                        "name": path.stem,
+                        "dry_run": True,
+                    },
+                    indent=2,
+                )
+            )
+        raise typer.Exit(0)
 
     # Post-creation self-validation
     _validate_created_doc(console, path, _get_ctx().target_dir)
@@ -526,7 +568,7 @@ def _render_and_exit(
 @check_app.command("all")
 def cmd_check_all(
     fix: Annotated[
-        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+        bool, typer.Option("--fix", help="Apply safe auto-corrections to vault content")
     ] = False,
     feature: Annotated[
         str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
@@ -609,7 +651,7 @@ def cmd_check_body_links(
 @check_app.command("dangling")
 def cmd_check_dangling(
     fix: Annotated[
-        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+        bool, typer.Option("--fix", help="Apply safe auto-corrections to vault content")
     ] = False,
     feature: Annotated[
         str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
@@ -636,7 +678,7 @@ def cmd_check_dangling(
 @check_app.command("orphans")
 def cmd_check_orphans(
     fix: Annotated[
-        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+        bool, typer.Option("--fix", help="Apply safe auto-corrections to vault content")
     ] = False,
     feature: Annotated[
         str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
@@ -662,7 +704,7 @@ def cmd_check_orphans(
 @check_app.command("frontmatter")
 def cmd_check_frontmatter(
     fix: Annotated[
-        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+        bool, typer.Option("--fix", help="Apply safe auto-corrections to vault content")
     ] = False,
     feature: Annotated[
         str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
@@ -690,7 +732,7 @@ def cmd_check_frontmatter(
 @check_app.command("links")
 def cmd_check_links(
     fix: Annotated[
-        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+        bool, typer.Option("--fix", help="Apply safe auto-corrections to vault content")
     ] = False,
     feature: Annotated[
         str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
@@ -718,7 +760,7 @@ def cmd_check_links(
 @check_app.command("features")
 def cmd_check_features(
     fix: Annotated[
-        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+        bool, typer.Option("--fix", help="Apply safe auto-corrections to vault content")
     ] = False,
     feature: Annotated[
         str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
@@ -745,7 +787,7 @@ def cmd_check_features(
 @check_app.command("references")
 def cmd_check_references(
     fix: Annotated[
-        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+        bool, typer.Option("--fix", help="Apply safe auto-corrections to vault content")
     ] = False,
     feature: Annotated[
         str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
@@ -772,7 +814,7 @@ def cmd_check_references(
 @check_app.command("schema")
 def cmd_check_schema(
     fix: Annotated[
-        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+        bool, typer.Option("--fix", help="Apply safe auto-corrections to vault content")
     ] = False,
     feature: Annotated[
         str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
@@ -797,7 +839,7 @@ def cmd_check_schema(
 @check_app.command("structure")
 def cmd_check_structure(
     fix: Annotated[
-        bool, typer.Option("--fix", help="Apply auto-fixes where possible")
+        bool, typer.Option("--fix", help="Apply safe auto-corrections to vault content")
     ] = False,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")

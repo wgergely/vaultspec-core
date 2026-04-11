@@ -93,6 +93,7 @@ def rules_add(
     content: str | None = None,
     force: bool = False,
     *,
+    dry_run: bool = False,
     interactive: bool | None = None,
 ) -> Path:
     """Scaffold a new custom rule file.
@@ -103,11 +104,12 @@ def rules_add(
             ``True``, opens the configured editor.  When ``None`` and
             *interactive* is ``False``, reads from stdin.
         force: Whether to overwrite an existing rule.
+        dry_run: If ``True``, return the target path without writing.
         interactive: Override TTY detection.  ``None`` means auto-detect via
             ``sys.stdin.isatty()``.
 
     Returns:
-        Path to the created rule file.
+        Path to the created (or would-be-created) rule file.
 
     Raises:
         ResourceExistsError: If the rule exists and *force* is ``False``.
@@ -120,8 +122,12 @@ def rules_add(
 
     if file_path.exists() and not force:
         raise ResourceExistsError(
-            f"Rule '{file_name}' exists. Use --force to overwrite."
+            f"Rule '{file_name}' exists.",
+            hint="Use --force to overwrite, or --dry-run to preview",
         )
+
+    if dry_run:
+        return file_path
 
     rule_content = content
 

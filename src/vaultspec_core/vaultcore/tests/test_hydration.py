@@ -4,6 +4,7 @@ import logging
 
 import pytest
 
+from vaultspec_core.core.exceptions import ResourceExistsError
 from vaultspec_core.vaultcore import hydrate_template
 from vaultspec_core.vaultcore.hydration import create_vault_doc
 from vaultspec_core.vaultcore.models import DocType
@@ -72,8 +73,8 @@ class TestCreateVaultDocStemCollision:
         return tmp_path
 
     def test_exact_path_collision_rejected(self, vault_project):
-        """Re-creating the same file raises FileExistsError."""
-        with pytest.raises(FileExistsError, match="already exists"):
+        """Re-creating the same file raises ResourceExistsError."""
+        with pytest.raises(ResourceExistsError, match="already exists"):
             create_vault_doc(
                 vault_project,
                 DocType.ADR,
@@ -100,7 +101,7 @@ class TestCreateVaultDocStemCollision:
         )
 
         # Now create an ADR that generates stem "2026-03-20-collide-adr"
-        with pytest.raises(FileExistsError, match=r"stem.*already exists"):
+        with pytest.raises(ResourceExistsError, match=r"stem.*already exists"):
             create_vault_doc(
                 vault_project,
                 DocType.ADR,
