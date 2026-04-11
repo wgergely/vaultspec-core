@@ -64,7 +64,7 @@ def _collect_skill_listing() -> str:
         return ""
 
     lines = [
-        "## Available Skills",
+        "## Vaultspec Skills",
         "",
     ]
     for name, meta_tuple in skills.items():

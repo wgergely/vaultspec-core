@@ -29,30 +29,6 @@ repos:
     types:
     - python
     pass_filenames: false
-  - id: check-naming
-    name: Verify vault document naming and integrity
-    entry: uv run --no-sync python -c "from vaultspec_core.cli import app; app()"
-      vault check structure
-    language: system
-    types:
-    - markdown
-    pass_filenames: false
-  - id: check-dangling
-    name: Check for dangling wiki-links in vault
-    entry: uv run --no-sync python -c "from vaultspec_core.cli import app; app()"
-      vault check dangling
-    language: system
-    types:
-    - markdown
-    pass_filenames: false
-  - id: check-body-links
-    name: Check for links in vault document body text
-    entry: uv run --no-sync python -c "from vaultspec_core.cli import app; app()"
-      vault check body-links
-    language: system
-    types:
-    - markdown
-    pass_filenames: false
   - id: mdformat-check
     name: Check Markdown formatting (mdformat)
     entry: uv run --no-sync mdformat --check
@@ -69,17 +45,23 @@ repos:
     types:
     - markdown
     exclude: ^test-project/
-  - id: vault-doctor
-    name: Vault Doctor
-    entry: uv run --no-sync python -m vaultspec_core vault check all
+  - id: vault-fix
+    name: Vault Doctor (Fix)
+    entry: uv run --no-sync vaultspec-core vault check all --fix
     language: system
     types:
     - markdown
     pass_filenames: false
-  - id: vault-doctor-deep
-    name: Vault Doctor (chain + links)
-    entry: uv run --no-sync python -m vaultspec_core doctor
+  - id: spec-check
+    name: Vault Doctor (Check)
+    entry: uv run --no-sync vaultspec-core doctor
     language: system
     types:
     - markdown
+    pass_filenames: false
+  - id: check-provider-artifacts
+    name: Check provider artifacts
+    entry: uv run --no-sync vaultspec-core check-providers
+    always_run: true
+    language: system
     pass_filenames: false

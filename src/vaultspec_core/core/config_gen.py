@@ -20,6 +20,9 @@ from .types import SyncResult, ToolConfig
 
 logger = logging.getLogger(__name__)
 
+_RULES_HEADER = "## Vaultspec Rules"
+_RULES_PREAMBLE = "You MUST respect these rules at all times:"
+
 
 def _is_cli_managed(path_or_content: str | Path) -> bool:
     """Return ``True`` if a file or string contains a vaultspec managed block.
@@ -192,9 +195,9 @@ def _generate_config_body(cfg: ToolConfig) -> str | None:
 
     refs = _collect_rule_refs(cfg)
     if refs:
-        body_parts.append("## Rules")
+        body_parts.append(_RULES_HEADER)
         body_parts.append("")
-        body_parts.append("You MUST respect these rules at all times:")
+        body_parts.append(_RULES_PREAMBLE)
         body_parts.append("")
         for ref in refs:
             body_parts.append(f"@{ref}")
@@ -215,9 +218,9 @@ def _generate_rule_ref_body(cfg: ToolConfig) -> str | None:
         return None
 
     body_parts = [
-        "## Rules",
+        _RULES_HEADER,
         "",
-        "You MUST respect these rules at all times:",
+        _RULES_PREAMBLE,
         "",
     ]
     for ref in refs:
@@ -454,9 +457,9 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
             seen_refs.append(ref)
 
         body_parts = [
-            "## Rules",
+            _RULES_HEADER,
             "",
-            "You MUST respect these rules at all times:",
+            _RULES_PREAMBLE,
             "",
         ]
         for ref in seen_refs:

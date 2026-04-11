@@ -584,6 +584,8 @@ def cmd_sync(
 
         # Collect per-tool results across all 5 resource passes
         resource_labels = ["rules", "skills", "agents", "system", "config"]
+        if "mcp" not in skip:
+            resource_labels.append("mcps")
         tool_resources: dict[str, list[tuple[str, SyncResult]]] = {}
         for label, r in zip(resource_labels, results, strict=True):
             for tool_name, tool_result in r.per_tool.items():
