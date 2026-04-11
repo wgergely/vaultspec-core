@@ -16,7 +16,7 @@ from typing import Any
 
 from . import types as _t
 from .exceptions import ResourceExistsError, ResourceNotFoundError, VaultSpecError
-from .helpers import atomic_write, ensure_dir
+from .helpers import advisory_lock, atomic_write, ensure_dir
 from .types import SyncResult
 
 logger = logging.getLogger(__name__)
@@ -242,45 +242,46 @@ def mcp_sync(
 
     mcp_json = target_dir / ".mcp.json"
 
-    # Read existing config
-    existing: dict[str, Any] = {}
-    if mcp_json.exists():
-        try:
-            raw = json.loads(mcp_json.read_text(encoding="utf-8"))
-            if isinstance(raw, dict):
-                existing = raw
-        except (json.JSONDecodeError, OSError) as exc:
-            result.warnings.append(f"Cannot parse existing .mcp.json: {exc}")
+    with advisory_lock(mcp_json):
+        # Read existing config
+        existing: dict[str, Any] = {}
+        if mcp_json.exists():
+            try:
+                raw = json.loads(mcp_json.read_text(encoding="utf-8"))
+                if isinstance(raw, dict):
+                    existing = raw
+            except (json.JSONDecodeError, OSError) as exc:
+                result.warnings.append(f"Cannot parse existing .mcp.json: {exc}")
 
-    servers = existing.setdefault("mcpServers", {})
-    if not isinstance(servers, dict):
-        servers = {}
-        existing["mcpServers"] = servers
+        servers = existing.setdefault("mcpServers", {})
+        if not isinstance(servers, dict):
+            servers = {}
+            existing["mcpServers"] = servers
 
-    changed = False
-    for name, (_path, config) in sources.items():
-        if name not in servers:
-            servers[name] = config
-            result.added += 1
-            result.items.append((name, "added"))
-            changed = True
-        elif servers[name] == config:
-            result.skipped += 1
-        else:
-            if force:
+        changed = False
+        for name, (_path, config) in sources.items():
+            if name not in servers:
                 servers[name] = config
-                result.updated += 1
-                result.items.append((name, "updated"))
+                result.added += 1
+                result.items.append((name, "added"))
                 changed = True
-            else:
+            elif servers[name] == config:
                 result.skipped += 1
-                result.warnings.append(
-                    f"MCP server '{name}' differs from definition "
-                    f"(use --force to overwrite)"
-                )
+            else:
+                if force:
+                    servers[name] = config
+                    result.updated += 1
+                    result.items.append((name, "updated"))
+                    changed = True
+                else:
+                    result.skipped += 1
+                    result.warnings.append(
+                        f"MCP server '{name}' differs from definition "
+                        f"(use --force to overwrite)"
+                    )
 
-    if changed and not dry_run:
-        atomic_write(mcp_json, json.dumps(existing, indent=2) + "\n")
+        if changed and not dry_run:
+            atomic_write(mcp_json, json.dumps(existing, indent=2) + "\n")
 
     return result
 
@@ -310,29 +311,30 @@ def mcp_uninstall(target_dir: Path, *, dry_run: bool = False) -> list[str]:
     if not mcp_json.exists():
         return []
 
-    try:
-        raw = json.loads(mcp_json.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return []
+    with advisory_lock(mcp_json):
+        try:
+            raw = json.loads(mcp_json.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return []
 
-    if not isinstance(raw, dict):
-        return []
+        if not isinstance(raw, dict):
+            return []
 
-    servers = raw.get("mcpServers", {})
-    if not isinstance(servers, dict):
-        return []
+        servers = raw.get("mcpServers", {})
+        if not isinstance(servers, dict):
+            return []
 
-    removed: list[str] = []
-    for name in managed_names:
-        if name in servers:
-            removed.append(name)
-            if not dry_run:
-                del servers[name]
+        removed: list[str] = []
+        for name in managed_names:
+            if name in servers:
+                removed.append(name)
+                if not dry_run:
+                    del servers[name]
 
-    if not dry_run and removed:
-        if servers:
-            atomic_write(mcp_json, json.dumps(raw, indent=2) + "\n")
-        else:
-            mcp_json.unlink()
+        if not dry_run and removed:
+            if servers:
+                atomic_write(mcp_json, json.dumps(raw, indent=2) + "\n")
+            else:
+                mcp_json.unlink()
 
     return removed

@@ -13,13 +13,79 @@ import shutil
 import stat
 import subprocess
 import sys
-from collections.abc import Callable
+import threading
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 logger = logging.getLogger(__name__)
+
+
+_thread_locks: dict[str, threading.Lock] = {}
+_thread_locks_guard = threading.Lock()
+
+
+def _get_thread_lock(key: str) -> threading.Lock:
+    """Return a per-path threading lock, creating one if needed."""
+    with _thread_locks_guard:
+        if key not in _thread_locks:
+            _thread_locks[key] = threading.Lock()
+        return _thread_locks[key]
+
+
+@contextmanager
+def advisory_lock(path: Path) -> Iterator[None]:
+    """Advisory file lock for serializing concurrent read-modify-write cycles.
+
+    Serializes threads within the same process via a per-path
+    :class:`threading.Lock`, then serializes across processes via an
+    OS-level file lock (``fcntl.flock`` on Unix, ``msvcrt.locking``
+    on Windows).  Both layers block until acquired.
+
+    Args:
+        path: The file being protected.  A sibling ``.lock`` file is
+            created next to it and used as the lock target.
+    """
+    lock_path = path.with_suffix(path.suffix + ".lock")
+
+    # Only create the lock file's parent if it already exists.  Creating
+    # it unconditionally would cause side-effects (e.g. directory creation
+    # during dry-run operations where the target doesn't exist yet).
+    # When the parent doesn't exist, no concurrent writer can race on
+    # this file, so it is safe to skip locking entirely.
+    if not lock_path.parent.exists():
+        yield
+        return
+
+    resolved_key = str(lock_path.resolve())
+    tlock = _get_thread_lock(resolved_key)
+    tlock.acquire()
+    try:
+        fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR)
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+
+                msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+                try:
+                    yield
+                finally:
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(fd, fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+    finally:
+        tlock.release()
 
 
 def _yaml_load(text: str) -> dict[str, Any]:

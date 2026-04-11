@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 
 from .enums import ManagedState, Tool
+from .helpers import advisory_lock
 
 logger = logging.getLogger(__name__)
 
@@ -174,23 +175,24 @@ def ensure_gitignore_block(
     if not gi_path.exists():
         return False
 
-    raw = gi_path.read_bytes()
-    eol = _detect_line_ending(raw)
+    with advisory_lock(gi_path):
+        raw = gi_path.read_bytes()
+        eol = _detect_line_ending(raw)
 
-    # Preserve BOM if present.
-    bom = b""
-    text = raw
-    if raw.startswith(b"\xef\xbb\xbf"):
-        bom = b"\xef\xbb\xbf"
-        text = raw[3:]
+        # Preserve BOM if present.
+        bom = b""
+        text = raw
+        if raw.startswith(b"\xef\xbb\xbf"):
+            bom = b"\xef\xbb\xbf"
+            text = raw[3:]
 
-    content = text.decode("utf-8")
-    lines = content.splitlines()
-    begins, ends = _find_markers(lines)
+        content = text.decode("utf-8")
+        lines = content.splitlines()
+        begins, ends = _find_markers(lines)
 
-    if state == ManagedState.ABSENT:
-        return _remove_block(gi_path, lines, begins, ends, eol, bom)
-    return _add_block(gi_path, lines, begins, ends, entries, eol, bom)
+        if state == ManagedState.ABSENT:
+            return _remove_block(gi_path, lines, begins, ends, eol, bom)
+        return _add_block(gi_path, lines, begins, ends, entries, eol, bom)
 
 
 def _add_block(

@@ -32,7 +32,7 @@ from .gitignore import (
     ensure_gitignore_block,
     get_recommended_entries,
 )
-from .helpers import _rmtree_robust, atomic_write, ensure_dir
+from .helpers import _rmtree_robust, advisory_lock, atomic_write, ensure_dir
 from .manifest import (
     ManifestData,
     add_providers,
@@ -314,76 +314,100 @@ def _scaffold_precommit(
 
     config_file = target / ".pre-commit-config.yaml"
 
-    if config_file.exists():
-        try:
-            raw = config_file.read_text(encoding="utf-8")
-            data = yaml.safe_load(raw) or {}
-            if not isinstance(data, dict):
-                return []
-        except (yaml.YAMLError, OSError):
-            return []
-
-        repos = data.setdefault("repos", [])
-        if not isinstance(repos, list):
-            return []
-
-        # Find or create local repo
-        local_repos = [
-            r for r in repos if isinstance(r, dict) and r.get("repo") == "local"
-        ]
-        if local_repos:
-            local_repo = local_repos[0]
-            existing_hooks = local_repo.setdefault("hooks", [])
-            if not isinstance(existing_hooks, list):
+    with advisory_lock(config_file):
+        if config_file.exists():
+            try:
+                raw = config_file.read_text(encoding="utf-8")
+                data = yaml.safe_load(raw) or {}
+                if not isinstance(data, dict):
+                    return []
+            except (yaml.YAMLError, OSError):
                 return []
 
-            existing_by_id = {
-                h.get("id"): h for h in existing_hooks if isinstance(h, dict)
-            }
+            repos = data.setdefault("repos", [])
+            if not isinstance(repos, list):
+                return []
 
-            # Migrate deprecated hook IDs to their canonical replacements
-            changed = False
-            for old_id, new_id in _DEPRECATED_HOOK_IDS.items():
-                if old_id in existing_by_id and new_id not in existing_by_id:
-                    existing_by_id[old_id]["id"] = new_id
-                    existing_by_id[new_id] = existing_by_id.pop(old_id)
-                    logger.info("Migrated pre-commit hook '%s' -> '%s'", old_id, new_id)
-                    changed = True
-                elif old_id in existing_by_id:
-                    existing_hooks[:] = [
-                        h
-                        for h in existing_hooks
-                        if not (isinstance(h, dict) and h.get("id") == old_id)
-                    ]
-                    del existing_by_id[old_id]
-                    changed = True
-            for canonical in CANONICAL_PRECOMMIT_HOOKS:
-                hook_id = str(canonical["id"])
-                if hook_id in existing_by_id:
-                    existing = existing_by_id[hook_id]
-                    if existing.get("entry") != canonical["entry"]:
-                        existing["entry"] = canonical["entry"]
+            # Find or create local repo
+            local_repos = [
+                r for r in repos if isinstance(r, dict) and r.get("repo") == "local"
+            ]
+            if local_repos:
+                local_repo = local_repos[0]
+                existing_hooks = local_repo.setdefault("hooks", [])
+                if not isinstance(existing_hooks, list):
+                    return []
+
+                existing_by_id = {
+                    h.get("id"): h for h in existing_hooks if isinstance(h, dict)
+                }
+
+                # Migrate deprecated hook IDs to their canonical replacements
+                changed = False
+                for old_id, new_id in _DEPRECATED_HOOK_IDS.items():
+                    if old_id in existing_by_id and new_id not in existing_by_id:
+                        existing_by_id[old_id]["id"] = new_id
+                        existing_by_id[new_id] = existing_by_id.pop(old_id)
                         logger.info(
-                            "Updated pre-commit hook '%s' entry to canonical pattern",
-                            hook_id,
+                            "Migrated pre-commit hook '%s' -> '%s'", old_id, new_id
                         )
                         changed = True
-                else:
-                    existing_hooks.append(dict(canonical))
-                    logger.info("Added pre-commit hook '%s'", str(canonical["id"]))
-                    changed = True
+                    elif old_id in existing_by_id:
+                        existing_hooks[:] = [
+                            h
+                            for h in existing_hooks
+                            if not (isinstance(h, dict) and h.get("id") == old_id)
+                        ]
+                        del existing_by_id[old_id]
+                        changed = True
+                for canonical in CANONICAL_PRECOMMIT_HOOKS:
+                    hook_id = str(canonical["id"])
+                    if hook_id in existing_by_id:
+                        existing = existing_by_id[hook_id]
+                        if existing.get("entry") != canonical["entry"]:
+                            existing["entry"] = canonical["entry"]
+                            logger.info(
+                                "Updated pre-commit hook '%s' entry"
+                                " to canonical pattern",
+                                hook_id,
+                            )
+                            changed = True
+                    else:
+                        existing_hooks.append(dict(canonical))
+                        logger.info("Added pre-commit hook '%s'", str(canonical["id"]))
+                        changed = True
 
-            if not changed:
-                return []
-        else:
-            repos.append(
-                {
-                    "repo": "local",
-                    "hooks": [dict(h) for h in CANONICAL_PRECOMMIT_HOOKS],
-                }
-            )
+                if not changed:
+                    return []
+            else:
+                repos.append(
+                    {
+                        "repo": "local",
+                        "hooks": [dict(h) for h in CANONICAL_PRECOMMIT_HOOKS],
+                    }
+                )
+
+            if not dry_run:
+                atomic_write(
+                    config_file,
+                    yaml.dump(
+                        data,
+                        sort_keys=False,
+                        default_flow_style=False,
+                        allow_unicode=True,
+                    ),
+                )
+            return [(".pre-commit-config.yaml", "precommit")]
 
         if not dry_run:
+            data = {
+                "repos": [
+                    {
+                        "repo": "local",
+                        "hooks": [dict(h) for h in CANONICAL_PRECOMMIT_HOOKS],
+                    }
+                ]
+            }
             atomic_write(
                 config_file,
                 yaml.dump(
@@ -394,23 +418,6 @@ def _scaffold_precommit(
                 ),
             )
         return [(".pre-commit-config.yaml", "precommit")]
-
-    if not dry_run:
-        data = {
-            "repos": [
-                {
-                    "repo": "local",
-                    "hooks": [dict(h) for h in CANONICAL_PRECOMMIT_HOOKS],
-                }
-            ]
-        }
-        atomic_write(
-            config_file,
-            yaml.dump(
-                data, sort_keys=False, default_flow_style=False, allow_unicode=True
-            ),
-        )
-    return [(".pre-commit-config.yaml", "precommit")]
 
 
 def _validate_provider(provider: str) -> None:

@@ -9,17 +9,13 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import sys
-from collections.abc import Iterator
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from .enums import Tool
 from .exceptions import VaultSpecError
-from .helpers import atomic_write
+from .helpers import advisory_lock, atomic_write
 
 logger = logging.getLogger(__name__)
 
@@ -62,39 +58,12 @@ def _manifest_path(target: Path) -> Path:
     return target / ".vaultspec" / MANIFEST_FILENAME
 
 
-@contextmanager
-def _manifest_lock(path: Path) -> Iterator[None]:
+def _manifest_lock(path: Path):
     """Advisory file lock around manifest read-modify-write.
 
-    Uses ``fcntl.flock`` on Unix and ``msvcrt.locking`` on Windows.
-    The lock is cooperative - it only serializes concurrent CLI processes.
+    Delegates to :func:`~vaultspec_core.core.helpers.advisory_lock`.
     """
-    lock_path = path.with_suffix(".lock")
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-
-    fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR)
-    try:
-        if sys.platform == "win32":
-            import msvcrt
-
-            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-            try:
-                yield
-            finally:
-                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-        else:
-            import fcntl
-
-            fcntl.flock(fd, fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(fd, fcntl.LOCK_UN)
-    except OSError:
-        logger.debug("Could not acquire manifest lock, proceeding without lock")
-        yield
-    finally:
-        os.close(fd)
+    return advisory_lock(path)
 
 
 def read_manifest_data(target: Path, *, strict: bool = False) -> ManifestData:
@@ -165,6 +134,13 @@ def write_manifest_data(target: Path, data: ManifestData) -> None:
     :attr:`ManifestData.version` to the current :data:`MANIFEST_VERSION`
     before writing.
 
+    .. note::
+
+       This function does **not** acquire a lock.  Callers that perform a
+       read-modify-write cycle must wrap the entire cycle in
+       :func:`_manifest_lock` to prevent concurrent writers from
+       overwriting each other's changes.
+
     Args:
         target: Workspace root directory.
         data: :class:`ManifestData` instance to persist.
@@ -184,8 +160,7 @@ def write_manifest_data(target: Path, data: ManifestData) -> None:
         "gitattributes_managed": data.gitattributes_managed,
         "precommit_managed": data.precommit_managed,
     }
-    with _manifest_lock(path):
-        atomic_write(path, json.dumps(payload, indent=2) + "\n")
+    atomic_write(path, json.dumps(payload, indent=2) + "\n")
 
 
 def read_manifest(target: Path) -> set[str]:
@@ -214,9 +189,10 @@ def write_manifest(target: Path, providers: set[str]) -> None:
         target: Workspace root directory.
         providers: Set of provider name strings to record as installed.
     """
-    data = read_manifest_data(target)
-    data.installed = set(providers)
-    write_manifest_data(target, data)
+    with _manifest_lock(_manifest_path(target)):
+        data = read_manifest_data(target)
+        data.installed = set(providers)
+        write_manifest_data(target, data)
 
 
 def add_providers(target: Path, names: list[str]) -> set[str]:
@@ -232,10 +208,11 @@ def add_providers(target: Path, names: list[str]) -> set[str]:
     Returns:
         Updated set of all installed provider names.
     """
-    data = read_manifest_data(target)
-    data.installed.update(names)
-    write_manifest_data(target, data)
-    return data.installed
+    with _manifest_lock(_manifest_path(target)):
+        data = read_manifest_data(target)
+        data.installed.update(names)
+        write_manifest_data(target, data)
+        return data.installed
 
 
 def remove_provider(target: Path, name: str) -> set[str]:
@@ -251,11 +228,12 @@ def remove_provider(target: Path, name: str) -> set[str]:
     Returns:
         Updated set of remaining installed provider names.
     """
-    data = read_manifest_data(target)
-    data.installed.discard(name)
-    data.provider_state.pop(name, None)
-    write_manifest_data(target, data)
-    return data.installed
+    with _manifest_lock(_manifest_path(target)):
+        data = read_manifest_data(target)
+        data.installed.discard(name)
+        data.provider_state.pop(name, None)
+        write_manifest_data(target, data)
+        return data.installed
 
 
 def providers_sharing_file(
