@@ -192,7 +192,7 @@ def _generate_config_body(cfg: ToolConfig) -> str | None:
 
     refs = _collect_rule_refs(cfg)
     if refs:
-        body_parts.append("## Rules")
+        body_parts.append("## Vaultspec Rules")
         body_parts.append("")
         body_parts.append("You MUST respect these rules at all times:")
         body_parts.append("")
@@ -215,7 +215,7 @@ def _generate_rule_ref_body(cfg: ToolConfig) -> str | None:
         return None
 
     body_parts = [
-        "## Rules",
+        "## Vaultspec Rules",
         "",
         "You MUST respect these rules at all times:",
         "",
@@ -454,7 +454,7 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
             seen_refs.append(ref)
 
         body_parts = [
-            "## Rules",
+            "## Vaultspec Rules",
             "",
             "You MUST respect these rules at all times:",
             "",
