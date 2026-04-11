@@ -5,6 +5,7 @@ tags:
 date: '2026-03-15'
 related:
   - '[[2026-03-16-managed-content-blocks-adr]]'
+  - '[[2026-03-15-claude-code-provider-research]]'
 ---
 
 <!-- DO NOT add 'Related:', 'tags:', 'date:', or other frontmatter fields

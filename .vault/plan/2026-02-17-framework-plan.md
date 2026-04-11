@@ -6,6 +6,7 @@ date: '2026-02-17'
 related:
   - '[[2026-02-17-bootstrap-prompt-adr]]'
   - '[[2026-02-16-environment-variable-adr]]'
+  - '[[2026-02-16-env-var-research]]'
 ---
 
 # Framework Infrastructure Plan

@@ -154,6 +154,10 @@ class VaultConstants:
         dt.value for dt in DocType if dt != DocType.INDEX
     }
 
+    # Non-document directories that are legitimate .vault/ content
+    # (e.g. data stores, log output) but not document types.
+    AUXILIARY_DIRECTORIES: ClassVar[set[str]] = {"data", "logs"}
+
     # Supported directory tags (INDEX has no directory tag)
     SUPPORTED_TAGS: ClassVar[set[str]] = {
         dt.tag for dt in DocType if dt != DocType.INDEX
@@ -163,13 +167,18 @@ class VaultConstants:
     def is_supported_directory(cls, dirname: str) -> bool:
         """Return whether *dirname* is a recognized vault subdirectory.
 
+        Checks both document directories (:data:`SUPPORTED_DIRECTORIES`) and
+        non-document auxiliary directories (:data:`AUXILIARY_DIRECTORIES`).
+
         Args:
-            dirname: Bare directory name (e.g. ``"adr"``, ``"exec"``).
+            dirname: Bare directory name (e.g. ``"adr"``, ``"data"``).
 
         Returns:
-            ``True`` if the directory is in ``SUPPORTED_DIRECTORIES``.
+            ``True`` if the directory is recognized.
         """
-        return dirname in cls.SUPPORTED_DIRECTORIES
+        return (
+            dirname in cls.SUPPORTED_DIRECTORIES or dirname in cls.AUXILIARY_DIRECTORIES
+        )
 
     @classmethod
     def get_tag_for_directory(cls, dirname: str) -> str | None:

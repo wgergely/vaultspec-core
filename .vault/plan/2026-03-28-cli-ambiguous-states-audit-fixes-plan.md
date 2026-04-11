@@ -7,6 +7,7 @@ related:
   - '[[2026-03-27-cli-ambiguous-states-audit]]'
   - '[[2026-03-27-cli-ambiguous-states-resolver-adr]]'
   - '[[2026-03-27-cli-ambiguous-states-plan]]'
+  - '[[2026-03-27-cli-ambiguous-states-prior-art-research]]'
 ---
 
 # `cli-ambiguous-states` audit fix plan
