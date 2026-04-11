@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .diagnosis.signals import (
@@ -20,9 +21,11 @@ from .diagnosis.signals import (
     GitattributesSignal,
     GitignoreSignal,
     ManifestEntrySignal,
+    PrecommitSignal,
     ProviderDirSignal,
     ResolutionAction,
 )
+from .enums import CliAction
 
 logger = logging.getLogger(__name__)
 
@@ -65,11 +68,12 @@ class ResolutionPlan:
 
 def resolve(
     diagnosis: WorkspaceDiagnosis,
-    action: str,
+    action: CliAction | str,
     provider: str = "all",
     *,
     force: bool = False,
     dry_run: bool = False,
+    target: Path | None = None,
 ) -> ResolutionPlan:
     """Build a resolution plan from diagnosed workspace state.
 
@@ -85,27 +89,55 @@ def resolve(
         provider: Provider scope - ``"all"`` or a specific provider name.
         force: When ``True``, escalates warnings to corrective steps.
         dry_run: When ``True``, the plan is informational only.
+        target: Workspace root directory. Used to read manifest flags.
+            Falls back to :func:`~vaultspec_core.core.types.get_context`
+            if not provided.
 
     Returns:
         A :class:`ResolutionPlan` with steps, warnings, and conflicts.
     """
     _ = dry_run  # reserved for executor phase
+    action = CliAction(action)
     plan = ResolutionPlan()
 
-    # Doctor only diagnoses; it never resolves.
-    if action == "doctor":
+    if action == CliAction.DOCTOR:
         return plan
 
-    # Upgrade = install semantics for framework rules, then sync for the rest.
-    # Resolve framework rules with "install", everything else with "sync".
-    fw_action = "install" if action == "upgrade" else action
-    prov_action = "sync" if action == "upgrade" else action
+    # Upgrade = install semantics for framework, sync for providers.
+    fw_action = CliAction.INSTALL if action == CliAction.UPGRADE else action
+    prov_action = CliAction.SYNC if action == CliAction.UPGRADE else action
 
     _resolve_framework(plan, diagnosis.framework, fw_action, force=force)
     _resolve_version_warning(plan, diagnosis)
     _resolve_builtin_version(plan, diagnosis.builtin_version, prov_action, force=force)
     _resolve_gitignore(plan, diagnosis.gitignore, prov_action, force=force)
     _resolve_gitattributes(plan, diagnosis.gitattributes, prov_action, force=force)
+
+    # Determine precommit management state from manifest
+    pc_managed = True
+    if target is None:
+        try:
+            from .types import get_context
+
+            target = get_context().target_dir
+        except LookupError:
+            pass
+    if target is not None:
+        try:
+            from .manifest import read_manifest_data
+
+            _mdata = read_manifest_data(target)
+            pc_managed = _mdata.precommit_managed
+        except Exception:
+            pc_managed = True
+
+    _resolve_precommit(
+        plan,
+        diagnosis.precommit,
+        prov_action,
+        force=force,
+        precommit_managed=pc_managed,
+    )
 
     # Per-provider rules
     for tool, prov_diag in diagnosis.providers.items():
@@ -152,7 +184,7 @@ def resolve(
 def _resolve_framework(
     plan: ResolutionPlan,
     signal: FrameworkSignal,
-    action: str,
+    action: CliAction,
     *,
     force: bool,
 ) -> None:
@@ -161,20 +193,20 @@ def _resolve_framework(
         return
 
     if signal == FrameworkSignal.MISSING:
-        if action == "install":
+        if action == CliAction.INSTALL:
             # Proceed normally - install will scaffold
             return
-        if action == "sync":
+        if action == CliAction.SYNC:
             plan.conflicts.append(
                 "Framework not installed. Run 'vaultspec-core install' first."
             )
             return
-        if action == "uninstall":
+        if action == CliAction.UNINSTALL:
             plan.warnings.append("Nothing to remove - framework is not installed.")
             return
 
     if signal == FrameworkSignal.CORRUPTED:
-        if action == "install":
+        if action == CliAction.INSTALL:
             if force:
                 plan.steps.append(
                     ResolutionStep(
@@ -186,7 +218,7 @@ def _resolve_framework(
             else:
                 plan.conflicts.append("Manifest is corrupted. Use --force to repair.")
             return
-        if action == "sync":
+        if action == CliAction.SYNC:
             plan.steps.append(
                 ResolutionStep(
                     action=ResolutionAction.REPAIR_MANIFEST,
@@ -202,7 +234,7 @@ def _resolve_framework(
                 )
             )
             return
-        if action == "uninstall":
+        if action == CliAction.UNINSTALL:
             if force:
                 plan.steps.append(
                     ResolutionStep(
@@ -231,7 +263,7 @@ def _resolve_manifest_entry(
     plan: ResolutionPlan,
     signal: ManifestEntrySignal,
     tool_name: str,
-    action: str,
+    action: CliAction,
     *,
     force: bool,
 ) -> None:
@@ -239,7 +271,10 @@ def _resolve_manifest_entry(
     if signal in (ManifestEntrySignal.COHERENT, ManifestEntrySignal.NOT_INSTALLED):
         return
 
-    if signal == ManifestEntrySignal.ORPHANED and action in ("install", "sync"):
+    if signal == ManifestEntrySignal.ORPHANED and action in (
+        CliAction.INSTALL,
+        CliAction.SYNC,
+    ):
         plan.steps.append(
             ResolutionStep(
                 action=ResolutionAction.SCAFFOLD,
@@ -247,7 +282,7 @@ def _resolve_manifest_entry(
                 reason=f"Provider '{tool_name}' in manifest but directory missing",
             )
         )
-        if action == "sync":
+        if action == CliAction.SYNC:
             plan.steps.append(
                 ResolutionStep(
                     action=ResolutionAction.SYNC,
@@ -258,7 +293,7 @@ def _resolve_manifest_entry(
         return
 
     if signal == ManifestEntrySignal.UNTRACKED:
-        if action == "install":
+        if action == CliAction.INSTALL:
             plan.steps.append(
                 ResolutionStep(
                     action=ResolutionAction.ADOPT_DIRECTORY,
@@ -267,7 +302,7 @@ def _resolve_manifest_entry(
                 )
             )
             return
-        if action == "sync":
+        if action == CliAction.SYNC:
             if force:
                 plan.steps.append(
                     ResolutionStep(
@@ -289,7 +324,7 @@ def _resolve_manifest_entry(
                     f"Use --force to adopt and sync."
                 )
             return
-        if action == "uninstall":
+        if action == CliAction.UNINSTALL:
             if force:
                 plan.steps.append(
                     ResolutionStep(
@@ -305,7 +340,7 @@ def _resolve_manifest_entry(
                 )
             return
 
-    if signal == ManifestEntrySignal.ORPHANED and action == "uninstall":
+    if signal == ManifestEntrySignal.ORPHANED and action == CliAction.UNINSTALL:
         # Orphaned on uninstall: directory already missing, manifest entry
         # will be cleaned up by the uninstall command itself.
         return
@@ -323,7 +358,7 @@ def _resolve_provider_dir(
     plan: ResolutionPlan,
     signal: ProviderDirSignal,
     tool_name: str,
-    action: str,
+    action: CliAction,
     *,
     force: bool,
 ) -> None:
@@ -331,7 +366,7 @@ def _resolve_provider_dir(
     if signal in (ProviderDirSignal.COMPLETE, ProviderDirSignal.MISSING):
         return
 
-    if signal == ProviderDirSignal.MIXED and action == "uninstall":
+    if signal == ProviderDirSignal.MIXED and action == CliAction.UNINSTALL:
         if force:
             plan.steps.append(
                 ResolutionStep(
@@ -348,13 +383,16 @@ def _resolve_provider_dir(
             )
         return
 
-    if signal == ProviderDirSignal.MIXED and action in ("install", "sync"):
+    if signal == ProviderDirSignal.MIXED and action in (
+        CliAction.INSTALL,
+        CliAction.SYNC,
+    ):
         # Mixed content during install/sync: the command will sync managed
         # resources without touching unrecognized files.
         return
 
     is_syncable = signal in (ProviderDirSignal.EMPTY, ProviderDirSignal.PARTIAL)
-    if is_syncable and action == "sync":
+    if is_syncable and action == CliAction.SYNC:
         plan.steps.append(
             ResolutionStep(
                 action=ResolutionAction.SYNC,
@@ -364,15 +402,15 @@ def _resolve_provider_dir(
         )
         return
 
-    if is_syncable and action == "install":
+    if is_syncable and action == CliAction.INSTALL:
         # Empty/partial during install: install will scaffold and sync.
         return
 
-    if is_syncable and action == "uninstall":
+    if is_syncable and action == CliAction.UNINSTALL:
         # Empty/partial during uninstall: the directory will be removed.
         return
 
-    if signal == ProviderDirSignal.MIXED and action == "uninstall":
+    if signal == ProviderDirSignal.MIXED and action == CliAction.UNINSTALL:
         # Already handled above (MIXED + uninstall with force check).
         return
 
@@ -389,12 +427,12 @@ def _resolve_content(
     plan: ResolutionPlan,
     content: dict[str, ContentSignal],
     tool_name: str,
-    action: str,
+    action: CliAction,
     *,
     force: bool,
 ) -> None:
     """Apply per-resource content resolution rules for a single provider."""
-    if action != "sync":
+    if action != CliAction.SYNC:
         return
 
     for resource, signal in content.items():
@@ -457,7 +495,7 @@ def _resolve_content(
 def _resolve_builtin_version(
     plan: ResolutionPlan,
     signal: BuiltinVersionSignal,
-    action: str,
+    action: CliAction,
     *,
     force: bool,
 ) -> None:
@@ -470,7 +508,7 @@ def _resolve_builtin_version(
             "Builtin resources have been deleted from .vaultspec/rules/. "
             "Run 'vaultspec-core install --upgrade' to restore."
         )
-        if force and action == "sync":
+        if force and action == CliAction.SYNC:
             plan.steps.append(
                 ResolutionStep(
                     action=ResolutionAction.SYNC,
@@ -487,7 +525,7 @@ def _resolve_builtin_version(
         )
         return
 
-    if signal == BuiltinVersionSignal.MODIFIED and action == "sync":
+    if signal == BuiltinVersionSignal.MODIFIED and action == CliAction.SYNC:
         if force:
             plan.steps.append(
                 ResolutionStep(
@@ -503,12 +541,18 @@ def _resolve_builtin_version(
             )
         return
 
-    if signal == BuiltinVersionSignal.MODIFIED and action in ("install", "uninstall"):
+    if signal == BuiltinVersionSignal.MODIFIED and action in (
+        CliAction.INSTALL,
+        CliAction.UNINSTALL,
+    ):
         # Modified builtins during install: install --upgrade will re-seed.
         # Modified builtins during uninstall: they'll be removed anyway.
         return
 
-    if signal == BuiltinVersionSignal.DELETED and action in ("install", "uninstall"):
+    if signal == BuiltinVersionSignal.DELETED and action in (
+        CliAction.INSTALL,
+        CliAction.UNINSTALL,
+    ):
         # Deleted during install: install --upgrade will re-seed.
         # Deleted during uninstall: nothing left to remove.
         return
@@ -528,12 +572,12 @@ def _resolve_config(
     plan: ResolutionPlan,
     signal: ConfigSignal,
     tool_name: str,
-    action: str,
+    action: CliAction,
     *,
     force: bool,
 ) -> None:
     """Apply config resolution rules for a single provider."""
-    if action != "sync":
+    if action != CliAction.SYNC:
         return
 
     if signal in (
@@ -583,7 +627,7 @@ def _resolve_config(
 def _resolve_gitignore(
     plan: ResolutionPlan,
     signal: GitignoreSignal,
-    action: str,
+    action: CliAction,
     *,
     force: bool,
 ) -> None:
@@ -593,7 +637,7 @@ def _resolve_gitignore(
         return
 
     if signal == GitignoreSignal.PARTIAL:
-        if action in ("install", "sync"):
+        if action in (CliAction.INSTALL, CliAction.SYNC):
             plan.steps.append(
                 ResolutionStep(
                     action=ResolutionAction.REPAIR_GITIGNORE,
@@ -613,7 +657,7 @@ def _resolve_gitignore(
         )
         return
 
-    if signal == GitignoreSignal.NO_ENTRIES and action == "install":
+    if signal == GitignoreSignal.NO_ENTRIES and action == CliAction.INSTALL:
         plan.steps.append(
             ResolutionStep(
                 action=ResolutionAction.REPAIR_GITIGNORE,
@@ -623,13 +667,16 @@ def _resolve_gitignore(
         )
         return
 
-    if signal == GitignoreSignal.NO_ENTRIES and action in ("sync", "uninstall"):
+    if signal == GitignoreSignal.NO_ENTRIES and action in (
+        CliAction.SYNC,
+        CliAction.UNINSTALL,
+    ):
         # No managed entries during sync/uninstall: no action needed.
         # Sync will not add gitignore entries (that's install's job).
         # Uninstall doesn't need entries that aren't there.
         return
 
-    if signal == GitignoreSignal.PARTIAL and action == "uninstall":
+    if signal == GitignoreSignal.PARTIAL and action == CliAction.UNINSTALL:
         # Partial entries during uninstall: the managed block will be
         # removed by the uninstall command.
         return
@@ -643,7 +690,7 @@ def _resolve_gitignore(
 def _resolve_gitattributes(
     plan: ResolutionPlan,
     signal: GitattributesSignal,
-    action: str,
+    action: CliAction,
     *,
     force: bool,
 ) -> None:
@@ -653,7 +700,7 @@ def _resolve_gitattributes(
         return
 
     if signal == GitattributesSignal.PARTIAL:
-        if action in ("install", "sync"):
+        if action in (CliAction.INSTALL, CliAction.SYNC):
             plan.steps.append(
                 ResolutionStep(
                     action=ResolutionAction.REPAIR_GITATTRIBUTES,
@@ -673,7 +720,7 @@ def _resolve_gitattributes(
         )
         return
 
-    if signal == GitattributesSignal.NO_ENTRIES and action == "install":
+    if signal == GitattributesSignal.NO_ENTRIES and action == CliAction.INSTALL:
         plan.steps.append(
             ResolutionStep(
                 action=ResolutionAction.REPAIR_GITATTRIBUTES,
@@ -683,14 +730,87 @@ def _resolve_gitattributes(
         )
         return
 
-    if signal == GitattributesSignal.NO_ENTRIES and action in ("sync", "uninstall"):
+    if signal == GitattributesSignal.NO_ENTRIES and action in (
+        CliAction.SYNC,
+        CliAction.UNINSTALL,
+    ):
         return
 
-    if signal == GitattributesSignal.PARTIAL and action == "uninstall":
+    if signal == GitattributesSignal.PARTIAL and action == CliAction.UNINSTALL:
         return
 
     # All GitattributesSignal values are handled above.
     logger.warning("Unknown GitattributesSignal member: %s (action=%s)", signal, action)
+
+
+# ---------------------------------------------------------------------------
+# Pre-commit hooks
+# ---------------------------------------------------------------------------
+
+
+def _resolve_precommit(
+    plan: ResolutionPlan,
+    signal: PrecommitSignal,
+    action: CliAction,
+    *,
+    force: bool,
+    precommit_managed: bool = True,
+) -> None:
+    """Apply pre-commit hook resolution rules."""
+    _ = force  # precommit repairs are unconditional
+    if not precommit_managed:
+        return
+    if signal == PrecommitSignal.COMPLETE:
+        return
+
+    if signal == PrecommitSignal.NO_FILE:
+        if precommit_managed and action == CliAction.SYNC:
+            plan.steps.append(
+                ResolutionStep(
+                    action=ResolutionAction.REPAIR_PRECOMMIT,
+                    target=".pre-commit-config.yaml",
+                    reason="Pre-commit config missing but management is enabled",
+                )
+            )
+        return
+
+    if signal == PrecommitSignal.NO_HOOKS:
+        if action in (CliAction.INSTALL, CliAction.SYNC):
+            plan.steps.append(
+                ResolutionStep(
+                    action=ResolutionAction.REPAIR_PRECOMMIT,
+                    target=".pre-commit-config.yaml",
+                    reason="No vaultspec-core hooks found in pre-commit config",
+                )
+            )
+        return
+
+    if signal == PrecommitSignal.INCOMPLETE:
+        if action in (CliAction.INSTALL, CliAction.SYNC):
+            plan.steps.append(
+                ResolutionStep(
+                    action=ResolutionAction.REPAIR_PRECOMMIT,
+                    target=".pre-commit-config.yaml",
+                    reason="Missing canonical hooks in pre-commit config",
+                )
+            )
+        return
+
+    if signal == PrecommitSignal.NON_CANONICAL:
+        if action in (CliAction.INSTALL, CliAction.SYNC):
+            plan.steps.append(
+                ResolutionStep(
+                    action=ResolutionAction.REPAIR_PRECOMMIT,
+                    target=".pre-commit-config.yaml",
+                    reason=(
+                        "Hook entries use non-canonical pattern; "
+                        "should use 'uv run --no-sync vaultspec-core'"
+                    ),
+                )
+            )
+        return
+
+    logger.warning("Unknown PrecommitSignal member: %s (action=%s)", signal, action)
 
 
 # ---------------------------------------------------------------------------

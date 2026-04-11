@@ -121,6 +121,7 @@ def skills_add(
     force: bool = False,
     template: str | None = None,
     *,
+    dry_run: bool = False,
     interactive: bool | None = None,
 ) -> Path:
     """Scaffold a new skill directory with a SKILL.md.
@@ -130,10 +131,11 @@ def skills_add(
         description: Optional skill description.
         force: Whether to overwrite an existing skill.
         template: Optional template name to pre-populate.
+        dry_run: If ``True``, return the target path without writing.
         interactive: Override TTY detection.  ``None`` means auto-detect.
 
     Returns:
-        Path to the created SKILL.md file.
+        Path to the created (or would-be-created) SKILL.md file.
 
     Raises:
         ResourceExistsError: If the skill exists and *force* is ``False``.
@@ -148,8 +150,12 @@ def skills_add(
 
     if skill_dir.exists() and not force:
         raise ResourceExistsError(
-            f"Skill '{skill_name}' exists. Use --force to overwrite."
+            f"Skill '{skill_name}' exists.",
+            hint="Use --force to overwrite, or --dry-run to preview",
         )
+
+    if dry_run:
+        return file_path
 
     ensure_dir(skill_dir)
 

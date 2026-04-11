@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from . import types as _t
-from .enums import ManagedState, ProviderCapability, Tool
+from .enums import ManagedState, PrecommitHook, ProviderCapability, Tool
 from .exceptions import (
     ProviderError,
     ProviderNotInstalledError,
@@ -191,31 +191,123 @@ def _scaffold_provider(
     return created
 
 
+CANONICAL_ENTRY_PREFIX = "uv run --no-sync vaultspec-core"
+
+# Patterns that must never be committed.  Used by the
+# check-provider-artifacts pre-commit hook.
+PROVIDER_ARTIFACT_PATTERNS: tuple[str, ...] = (
+    ".mcp.json",
+    "providers.lock",
+    "CLAUDE.md",
+    "GEMINI.md",
+    "AGENTS.md",
+    ".claude/",
+    ".gemini/",
+    ".codex/",
+    ".agents/",
+    ".vaultspec/_snapshots/",
+)
+
+
+def check_staged_provider_artifacts() -> list[str]:
+    """Return staged file paths that match provider artifact patterns.
+
+    Runs ``git diff --cached --name-only`` and filters against
+    :data:`PROVIDER_ARTIFACT_PATTERNS`.
+    """
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--name-only"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+
+    staged = result.stdout.strip().splitlines()
+    violations: list[str] = []
+    for path in staged:
+        normalized = path.replace("\\", "/")
+        parts = normalized.split("/")
+        for pattern in PROVIDER_ARTIFACT_PATTERNS:
+            if pattern.endswith("/"):
+                # Directory pattern: match any path segment exactly
+                dirname = pattern.rstrip("/")
+                if any(seg == dirname for seg in parts):
+                    violations.append(path)
+                    break
+            elif normalized == pattern or parts[-1] == pattern:
+                violations.append(path)
+                break
+    return violations
+
+
+# Hook definitions keyed by PrecommitHook enum.
+# Each value is a dict of pre-commit hook fields (merged with defaults).
+_HOOK_DEFS: dict[PrecommitHook, dict[str, object]] = {
+    PrecommitHook.VAULT_FIX: {
+        "name": "Vault fix",
+        "entry": f"{CANONICAL_ENTRY_PREFIX} vault check all --fix",
+        "types": ["markdown"],
+    },
+    PrecommitHook.CHECK_PROVIDER_ARTIFACTS: {
+        "name": "Check provider artifacts",
+        "entry": f"{CANONICAL_ENTRY_PREFIX} check-providers",
+        "always_run": True,
+    },
+    PrecommitHook.SPEC_CHECK: {
+        "name": "Spec check",
+        "entry": f"{CANONICAL_ENTRY_PREFIX} doctor",
+        "types": ["markdown"],
+    },
+}
+
+CANONICAL_PRECOMMIT_HOOKS: list[dict[str, object]] = [
+    {
+        "id": hook.value,
+        **meta,
+        "language": "system",
+        "pass_filenames": False,
+    }
+    for hook, meta in _HOOK_DEFS.items()
+]
+
+CANONICAL_HOOK_IDS: frozenset[str] = frozenset(h.value for h in PrecommitHook)
+
+# Old hook IDs that should be replaced during scaffold/sync.
+# Maps every previously-used ID to its canonical replacement.
+_DEPRECATED_HOOK_IDS: dict[str, str] = {
+    "vault-doctor": PrecommitHook.VAULT_FIX.value,
+    "vault-doctor-deep": PrecommitHook.SPEC_CHECK.value,
+    "check-naming": PrecommitHook.VAULT_FIX.value,
+    "check-dangling": PrecommitHook.VAULT_FIX.value,
+    "check-body-links": PrecommitHook.VAULT_FIX.value,
+    "vault-check": PrecommitHook.VAULT_FIX.value,
+}
+
+# All managed hook IDs (canonical + deprecated) for uninstall filtering.
+_ALL_MANAGED_HOOK_IDS: frozenset[str] = CANONICAL_HOOK_IDS | frozenset(
+    _DEPRECATED_HOOK_IDS
+)
+
+
 def _scaffold_precommit(
     target: Path, *, dry_run: bool = False
 ) -> list[tuple[str, str]]:
-    """Scaffold or merge vaultspec-core hooks into .pre-commit-config.yaml."""
+    """Scaffold or merge vaultspec-core hooks into .pre-commit-config.yaml.
+
+    Ensures the full canonical hook set is present with canonical entry
+    patterns.  Existing hooks with matching IDs are updated to the
+    canonical entry; missing hooks are appended.
+    """
     import yaml
 
     from .helpers import atomic_write
 
     config_file = target / ".pre-commit-config.yaml"
-    hook_doctor = {
-        "id": "vault-doctor",
-        "name": "Vault Doctor",
-        "entry": "uv run python -m vaultspec_core vault check all",
-        "language": "system",
-        "types": ["markdown"],
-        "pass_filenames": False,
-    }
-    hook_doctor_deep = {
-        "id": "vault-doctor-deep",
-        "name": "Vault Doctor (chain + links)",
-        "entry": "uv run python -m vaultspec_core doctor",
-        "language": "system",
-        "types": ["markdown"],
-        "pass_filenames": False,
-    }
 
     if config_file.exists():
         try:
@@ -240,19 +332,51 @@ def _scaffold_precommit(
             if not isinstance(existing_hooks, list):
                 return []
 
-            existing_ids = {h.get("id") for h in existing_hooks if isinstance(h, dict)}
-            added = False
-            if "vault-doctor" not in existing_ids:
-                existing_hooks.append(hook_doctor)
-                added = True
-            if "vault-doctor-deep" not in existing_ids:
-                existing_hooks.append(hook_doctor_deep)
-                added = True
+            existing_by_id = {
+                h.get("id"): h for h in existing_hooks if isinstance(h, dict)
+            }
 
-            if not added:
+            # Migrate deprecated hook IDs to their canonical replacements
+            changed = False
+            for old_id, new_id in _DEPRECATED_HOOK_IDS.items():
+                if old_id in existing_by_id and new_id not in existing_by_id:
+                    existing_by_id[old_id]["id"] = new_id
+                    existing_by_id[new_id] = existing_by_id.pop(old_id)
+                    logger.info("Migrated pre-commit hook '%s' -> '%s'", old_id, new_id)
+                    changed = True
+                elif old_id in existing_by_id:
+                    existing_hooks[:] = [
+                        h
+                        for h in existing_hooks
+                        if not (isinstance(h, dict) and h.get("id") == old_id)
+                    ]
+                    del existing_by_id[old_id]
+                    changed = True
+            for canonical in CANONICAL_PRECOMMIT_HOOKS:
+                hook_id = str(canonical["id"])
+                if hook_id in existing_by_id:
+                    existing = existing_by_id[hook_id]
+                    if existing.get("entry") != canonical["entry"]:
+                        existing["entry"] = canonical["entry"]
+                        logger.info(
+                            "Updated pre-commit hook '%s' entry to canonical pattern",
+                            hook_id,
+                        )
+                        changed = True
+                else:
+                    existing_hooks.append(dict(canonical))
+                    logger.info("Added pre-commit hook '%s'", str(canonical["id"]))
+                    changed = True
+
+            if not changed:
                 return []
         else:
-            repos.append({"repo": "local", "hooks": [hook_doctor, hook_doctor_deep]})
+            repos.append(
+                {
+                    "repo": "local",
+                    "hooks": [dict(h) for h in CANONICAL_PRECOMMIT_HOOKS],
+                }
+            )
 
         if not dry_run:
             atomic_write(
@@ -267,7 +391,14 @@ def _scaffold_precommit(
         return [(".pre-commit-config.yaml", "precommit")]
 
     if not dry_run:
-        data = {"repos": [{"repo": "local", "hooks": [hook_doctor, hook_doctor_deep]}]}
+        data = {
+            "repos": [
+                {
+                    "repo": "local",
+                    "hooks": [dict(h) for h in CANONICAL_PRECOMMIT_HOOKS],
+                }
+            ]
+        }
         atomic_write(
             config_file,
             yaml.dump(
@@ -597,6 +728,15 @@ def install_run(
             )
             mdata.gitignore_managed = True
 
+        from .diagnosis.collectors import collect_precommit_state
+        from .diagnosis.signals import PrecommitSignal
+
+        pc_signal = collect_precommit_state(path)
+        mdata.precommit_managed = pc_signal not in (
+            PrecommitSignal.NO_FILE,
+            PrecommitSignal.NO_HOOKS,
+        )
+
         write_manifest_data(path, mdata)
 
         return {"action": "upgrade", "seeded_count": len(seeded), "path": path}
@@ -681,6 +821,16 @@ def install_run(
 
     mdata.gitignore_managed = block_present
     mdata.gitattributes_managed = ga_block_present
+
+    from .diagnosis.collectors import collect_precommit_state
+    from .diagnosis.signals import PrecommitSignal
+
+    pc_signal = collect_precommit_state(path)
+    mdata.precommit_managed = pc_signal not in (
+        PrecommitSignal.NO_FILE,
+        PrecommitSignal.NO_HOOKS,
+    )
+
     mdata.vaultspec_version = _get_package_version()
     mdata.installed_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
     for name in provider_names:
@@ -888,8 +1038,7 @@ def uninstall_run(
                                             h
                                             for h in hooks
                                             if isinstance(h, dict)
-                                            and h.get("id")
-                                            not in ("vault-doctor", "vault-doctor-deep")
+                                            and h.get("id") not in _ALL_MANAGED_HOOK_IDS
                                         ]
                                         if len(new_hooks) != len(hooks):
                                             r["hooks"] = new_hooks
@@ -930,12 +1079,16 @@ def uninstall_run(
                                 removed.append(
                                     (_rel(path, precommit_path), "precommit")
                                 )
+                                mdata_u = read_manifest_data(path)
+                                if mdata_u.precommit_managed:
+                                    mdata_u.precommit_managed = False
+                                    write_manifest_data(path, mdata_u)
                 except (yaml.YAMLError, OSError):
                     pass
             elif precommit_path.exists() and dry_run:
                 try:
                     raw = precommit_path.read_text(encoding="utf-8")
-                    if "id: vault-doctor" in raw:
+                    if any(f"id: {hid}" in raw for hid in _ALL_MANAGED_HOOK_IDS):
                         removed.append((_rel(path, precommit_path), "precommit"))
                 except OSError:
                     pass
@@ -1220,7 +1373,23 @@ def sync_provider(
             from .gitignore import ensure_gitignore_block
 
             if "precommit" not in skip:
-                _scaffold_precommit(ctx.target_dir)
+                pc_mdata = read_manifest_data(ctx.target_dir)
+                if pc_mdata.precommit_managed:
+                    from .diagnosis.collectors import collect_precommit_state
+                    from .diagnosis.signals import PrecommitSignal
+
+                    pc_signal = collect_precommit_state(ctx.target_dir)
+                    if pc_signal in (
+                        PrecommitSignal.NO_HOOKS,
+                        PrecommitSignal.NO_FILE,
+                    ):
+                        pc_mdata.precommit_managed = False
+                        write_manifest_data(ctx.target_dir, pc_mdata)
+                        logger.info(
+                            "Pre-commit hooks removed by user, disabling management"
+                        )
+                    else:
+                        _scaffold_precommit(ctx.target_dir)
 
             # Respect gitignore opt-out: check whether the user removed
             # the managed block BEFORE re-creating it.  If the block is

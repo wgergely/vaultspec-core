@@ -85,6 +85,16 @@ class GitattributesSignal(StrEnum):
     CORRUPTED = "corrupted"
 
 
+class PrecommitSignal(StrEnum):
+    """Observed state of pre-commit hooks for vaultspec-core."""
+
+    NO_FILE = "no_file"
+    NO_HOOKS = "no_hooks"
+    INCOMPLETE = "incomplete"
+    NON_CANONICAL = "non_canonical"
+    COMPLETE = "complete"
+
+
 class ResolutionAction(StrEnum):
     """Corrective action that a resolver can apply."""
 
@@ -95,5 +105,6 @@ class ResolutionAction(StrEnum):
     ADOPT_DIRECTORY = "adopt_directory"
     REPAIR_GITIGNORE = "repair_gitignore"
     REPAIR_GITATTRIBUTES = "repair_gitattributes"
+    REPAIR_PRECOMMIT = "repair_precommit"
     REMOVE = "remove"
     SKIP = "skip"

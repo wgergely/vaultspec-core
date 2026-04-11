@@ -24,6 +24,7 @@ from vaultspec_core.cli._target import (
     apply_target,
     apply_target_install,
 )
+from vaultspec_core.core.enums import CliAction
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +257,7 @@ def cmd_install(
 
     _run_preflight(
         path,
-        action="upgrade" if upgrade else "install",
+        action=CliAction.UPGRADE if upgrade else CliAction.INSTALL,
         provider=provider,
         force=force,
         dry_run=dry_run,
@@ -386,7 +387,7 @@ def cmd_uninstall(
 
     _run_preflight(
         path,
-        action="uninstall",
+        action=CliAction.UNINSTALL,
         provider=provider,
         force=force,
         dry_run=dry_run,
@@ -505,7 +506,7 @@ def cmd_sync(
 
     _run_preflight(
         sync_target,
-        action="sync",
+        action=CliAction.SYNC,
         provider=provider,
         force=force,
         dry_run=dry_run,
@@ -738,6 +739,7 @@ def cmd_doctor(
         GitattributesSignal,
         GitignoreSignal,
         ManifestEntrySignal,
+        PrecommitSignal,
         diagnose,
     )
 
@@ -882,6 +884,30 @@ def cmd_doctor(
         mcp_detail,
     )
 
+    # Pre-commit row
+    pc_status, pc_style = _signal_status(
+        diag.precommit,
+        {
+            PrecommitSignal.COMPLETE: ("ok", "green"),
+            PrecommitSignal.INCOMPLETE: ("warn", "yellow"),
+            PrecommitSignal.NON_CANONICAL: ("warn", "yellow"),
+            PrecommitSignal.NO_HOOKS: ("warn", "yellow"),
+            PrecommitSignal.NO_FILE: ("info", "dim"),
+        },
+    )
+    pc_detail = {
+        PrecommitSignal.COMPLETE: "all hooks present",
+        PrecommitSignal.INCOMPLETE: "missing canonical hooks",
+        PrecommitSignal.NON_CANONICAL: "non-canonical entry pattern",
+        PrecommitSignal.NO_HOOKS: "no vaultspec hooks found",
+        PrecommitSignal.NO_FILE: "no .pre-commit-config.yaml",
+    }.get(diag.precommit, str(diag.precommit))
+    table.add_row(
+        "precommit",
+        f"[{pc_style}]{pc_status}[/{pc_style}]",
+        pc_detail,
+    )
+
     console.print(table)
 
     exit_code = _doctor_exit_code(diag)
@@ -940,6 +966,7 @@ def _doctor_exit_code(diag: WorkspaceDiagnosis) -> int:
         GitattributesSignal,
         GitignoreSignal,
         ManifestEntrySignal,
+        PrecommitSignal,
         ProviderDirSignal,
     )
 
@@ -952,6 +979,12 @@ def _doctor_exit_code(diag: WorkspaceDiagnosis) -> int:
         has_error = True
     if diag.gitattributes == GitattributesSignal.CORRUPTED:
         has_error = True
+    if diag.precommit in (
+        PrecommitSignal.INCOMPLETE,
+        PrecommitSignal.NON_CANONICAL,
+        PrecommitSignal.NO_HOOKS,
+    ):
+        has_warn = True
     if diag.builtin_version == BuiltinVersionSignal.DELETED:
         has_error = True
     if diag.builtin_version == BuiltinVersionSignal.MODIFIED:
@@ -987,6 +1020,32 @@ def _doctor_exit_code(diag: WorkspaceDiagnosis) -> int:
     if has_warn:
         return 1
     return 0
+
+
+@app.command("check-providers", hidden=True)
+def cmd_check_providers() -> None:
+    """Guard against committing provider artifacts.
+
+    Inspects the git staging area for files that should never be
+    committed (provider directories, generated configs, manifests).
+    Used as a pre-commit hook entry point.
+    """
+    from vaultspec_core.core.commands import check_staged_provider_artifacts
+
+    violations = check_staged_provider_artifacts()
+    if violations:
+        typer.echo(
+            "Error: provider artifacts must not be committed:",
+            err=True,
+        )
+        for v in violations:
+            typer.echo(f"  {v}", err=True)
+        typer.echo(
+            "\nRun 'git reset HEAD <file>' to unstage, "
+            "or 'git rm --cached <file>' to untrack.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
 
 
 def _register_subcommands() -> None:

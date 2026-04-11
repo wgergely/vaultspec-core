@@ -16,10 +16,11 @@ from vaultspec_core.core.diagnosis.signals import (
     GitattributesSignal,
     GitignoreSignal,
     ManifestEntrySignal,
+    PrecommitSignal,
     ProviderDirSignal,
     ResolutionAction,
 )
-from vaultspec_core.core.enums import Tool
+from vaultspec_core.core.enums import CliAction, PrecommitHook, Tool
 
 pytestmark = [pytest.mark.unit]
 
@@ -60,6 +61,34 @@ pytestmark = [pytest.mark.unit]
             {"NO_FILE", "NO_ENTRIES", "PARTIAL", "COMPLETE", "CORRUPTED"},
         ),
         (
+            PrecommitSignal,
+            {
+                "NO_FILE",
+                "NO_HOOKS",
+                "INCOMPLETE",
+                "NON_CANONICAL",
+                "COMPLETE",
+            },
+        ),
+        (
+            PrecommitHook,
+            {
+                "VAULT_FIX",
+                "CHECK_PROVIDER_ARTIFACTS",
+                "SPEC_CHECK",
+            },
+        ),
+        (
+            CliAction,
+            {
+                "INSTALL",
+                "UPGRADE",
+                "SYNC",
+                "UNINSTALL",
+                "DOCTOR",
+            },
+        ),
+        (
             ResolutionAction,
             {
                 "SCAFFOLD",
@@ -69,6 +98,7 @@ pytestmark = [pytest.mark.unit]
                 "ADOPT_DIRECTORY",
                 "REPAIR_GITIGNORE",
                 "REPAIR_GITATTRIBUTES",
+                "REPAIR_PRECOMMIT",
                 "REMOVE",
                 "SKIP",
             },

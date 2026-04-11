@@ -13,6 +13,7 @@ from typing import Annotated
 
 import typer
 
+from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
 
 logger = logging.getLogger(__name__)
@@ -23,21 +24,6 @@ spec_app = typer.Typer(
     ),
     no_args_is_help=True,
 )
-
-
-def _handle_error(exc: Exception) -> None:
-    """Convert a domain or OS exception to a CLI error exit."""
-    from vaultspec_core.core.exceptions import VaultSpecError
-
-    if isinstance(exc, VaultSpecError):
-        typer.echo(f"Error: {exc}", err=True)
-        if exc.hint:
-            typer.echo(f"  Hint: {exc.hint}", err=True)
-        raise typer.Exit(code=1) from exc
-    if isinstance(exc, OSError):
-        typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
-    raise exc
 
 
 # =============================================================================
@@ -89,6 +75,9 @@ def cmd_rules_add(
         str | None, typer.Option("--content", help="Rule content")
     ] = None,
     force: Annotated[bool, typer.Option("--force", help="Overwrite existing")] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview without writing")
+    ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
@@ -98,7 +87,7 @@ def cmd_rules_add(
     from vaultspec_core.core.exceptions import VaultSpecError
 
     try:
-        file_path = rules_add(name=name, content=content, force=force)
+        file_path = rules_add(name=name, content=content, force=force, dry_run=dry_run)
     except VaultSpecError as exc:
         _handle_error(exc)
         return
@@ -156,7 +145,15 @@ def cmd_rules_edit(
 @rules_app.command("remove")
 def cmd_rules_remove(
     name: Annotated[str, typer.Argument(help="Rule name")],
-    force: Annotated[bool, typer.Option("--force", help="Skip confirmation")] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--yes",
+            "-y",
+            "--force",
+            help="Confirm removal without prompting",
+        ),
+    ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
@@ -334,6 +331,9 @@ def cmd_skills_add(
         str, typer.Option("--description", help="Skill description")
     ] = "",
     force: Annotated[bool, typer.Option("--force", help="Overwrite existing")] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview without writing")
+    ] = False,
     template: Annotated[
         str | None, typer.Option("--template", help="Template to use")
     ] = None,
@@ -347,7 +347,11 @@ def cmd_skills_add(
 
     try:
         file_path = skills_add(
-            name=name, description=description, force=force, template=template
+            name=name,
+            description=description,
+            force=force,
+            template=template,
+            dry_run=dry_run,
         )
     except VaultSpecError as exc:
         _handle_error(exc)
@@ -408,7 +412,15 @@ def cmd_skills_edit(
 @skills_app.command("remove")
 def cmd_skills_remove(
     name: Annotated[str, typer.Argument(help="Skill name")],
-    force: Annotated[bool, typer.Option("--force", help="Skip confirmation")] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--yes",
+            "-y",
+            "--force",
+            help="Confirm removal without prompting",
+        ),
+    ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
@@ -588,6 +600,9 @@ def cmd_agents_add(
         str, typer.Option("--description", help="Agent description")
     ] = "",
     force: Annotated[bool, typer.Option("--force", help="Overwrite existing")] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview without writing")
+    ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
@@ -597,7 +612,9 @@ def cmd_agents_add(
     from vaultspec_core.core.exceptions import VaultSpecError
 
     try:
-        file_path = agents_add(name=name, description=description, force=force)
+        file_path = agents_add(
+            name=name, description=description, force=force, dry_run=dry_run
+        )
     except VaultSpecError as exc:
         _handle_error(exc)
         return
@@ -655,7 +672,15 @@ def cmd_agents_edit(
 @agents_app.command("remove")
 def cmd_agents_remove(
     name: Annotated[str, typer.Argument(help="Agent name")],
-    force: Annotated[bool, typer.Option("--force", help="Skip confirmation")] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--yes",
+            "-y",
+            "--force",
+            help="Confirm removal without prompting",
+        ),
+    ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
