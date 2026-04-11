@@ -520,7 +520,7 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
     """Assess the state of vaultspec-core hooks in ``.pre-commit-config.yaml``.
 
     Checks that all canonical hooks are present and use the canonical
-    entry pattern (``uv run --no-sync python -m vaultspec_core ...``).
+    entry pattern (``uv run --no-sync vaultspec-core ...``).
 
     Args:
         target: Workspace root directory.

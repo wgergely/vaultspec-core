@@ -46,7 +46,7 @@ def test_init_run_scaffolds_antigravity_workspace_layout() -> None:
 
 @pytest.mark.unit
 def test_install_run_scaffolds_full_canonical_precommit_hooks() -> None:
-    """install_run must produce all 5 canonical hooks with --no-sync entries."""
+    """install_run must produce all canonical hooks with --no-sync entries."""
     import yaml
 
     tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"install-precommit-{uuid4().hex}"
@@ -366,4 +366,129 @@ def test_resolver_skips_repair_when_not_managed() -> None:
             f"Expected no REPAIR_PRECOMMIT steps but got: {repair_steps}"
         )
     finally:
+        shutil.rmtree(tmp_path, ignore_errors=True)
+
+
+@pytest.mark.unit
+def test_vault_add_force_overwrites_existing() -> None:
+    """vault add --force must overwrite an existing document."""
+    from vaultspec_core.core.exceptions import ResourceExistsError
+    from vaultspec_core.vaultcore.hydration import create_vault_doc
+    from vaultspec_core.vaultcore.models import DocType
+
+    tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"vault-add-force-{uuid4().hex}"
+    try:
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        reset_config()
+
+        install_run(
+            path=tmp_path,
+            provider="all",
+            upgrade=False,
+            dry_run=False,
+            force=False,
+        )
+
+        path1 = create_vault_doc(tmp_path, DocType.ADR, "test-feat", "2026-04-11")
+        assert path1.exists()
+
+        with pytest.raises(ResourceExistsError, match="already exists"):
+            create_vault_doc(tmp_path, DocType.ADR, "test-feat", "2026-04-11")
+
+        path2 = create_vault_doc(
+            tmp_path, DocType.ADR, "test-feat", "2026-04-11", force=True
+        )
+        assert path2 == path1
+        assert path2.exists()
+    finally:
+        reset_config()
+        shutil.rmtree(tmp_path, ignore_errors=True)
+
+
+@pytest.mark.unit
+def test_vault_add_dry_run_no_write() -> None:
+    """vault add --dry-run must return path without creating file."""
+    from vaultspec_core.vaultcore.hydration import create_vault_doc
+    from vaultspec_core.vaultcore.models import DocType
+
+    tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"vault-add-dry-{uuid4().hex}"
+    try:
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        reset_config()
+
+        install_run(
+            path=tmp_path,
+            provider="all",
+            upgrade=False,
+            dry_run=False,
+            force=False,
+        )
+
+        path = create_vault_doc(
+            tmp_path,
+            DocType.RESEARCH,
+            "dry-test",
+            "2026-04-11",
+            dry_run=True,
+        )
+        assert not path.exists()
+        assert path.name == "2026-04-11-dry-test-research.md"
+    finally:
+        reset_config()
+        shutil.rmtree(tmp_path, ignore_errors=True)
+
+
+@pytest.mark.unit
+def test_resource_exists_error_includes_hint() -> None:
+    """ResourceExistsError from create_vault_doc must include a hint."""
+    from vaultspec_core.core.exceptions import ResourceExistsError
+    from vaultspec_core.vaultcore.hydration import create_vault_doc
+    from vaultspec_core.vaultcore.models import DocType
+
+    tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"hint-test-{uuid4().hex}"
+    try:
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        reset_config()
+
+        install_run(
+            path=tmp_path,
+            provider="all",
+            upgrade=False,
+            dry_run=False,
+            force=False,
+        )
+
+        create_vault_doc(tmp_path, DocType.ADR, "hint-feat", "2026-04-11")
+
+        with pytest.raises(ResourceExistsError) as exc_info:
+            create_vault_doc(tmp_path, DocType.ADR, "hint-feat", "2026-04-11")
+        assert exc_info.value.hint
+        assert "--force" in exc_info.value.hint
+    finally:
+        reset_config()
+        shutil.rmtree(tmp_path, ignore_errors=True)
+
+
+@pytest.mark.unit
+def test_spec_add_dry_run_no_write() -> None:
+    """spec rules_add with dry_run must not write the file."""
+    from vaultspec_core.core.rules import rules_add
+
+    tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"spec-dry-{uuid4().hex}"
+    try:
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        reset_config()
+
+        install_run(
+            path=tmp_path,
+            provider="all",
+            upgrade=False,
+            dry_run=False,
+            force=False,
+        )
+
+        path = rules_add("dry-test-rule", dry_run=True)
+        assert not path.exists()
+    finally:
+        reset_config()
         shutil.rmtree(tmp_path, ignore_errors=True)
