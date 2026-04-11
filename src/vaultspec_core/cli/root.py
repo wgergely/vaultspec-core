@@ -868,12 +868,14 @@ def cmd_doctor(
             ConfigSignal.OK: ("ok", "green"),
             ConfigSignal.MISSING: ("warn", "yellow"),
             ConfigSignal.FOREIGN: ("info", "dim"),
+            ConfigSignal.REGISTRY_DRIFT: ("warn", "yellow"),
         },
     )
     mcp_detail = {
         ConfigSignal.OK: ".mcp.json present",
         ConfigSignal.MISSING: ".mcp.json not found",
         ConfigSignal.FOREIGN: ".mcp.json present (no vaultspec entry)",
+        ConfigSignal.REGISTRY_DRIFT: ".mcp.json entries differ from registry",
     }.get(diag.mcp, str(diag.mcp))
     table.add_row(
         "mcp",
@@ -1000,7 +1002,11 @@ def _doctor_exit_code(diag: WorkspaceDiagnosis) -> int:
             has_warn = True
         if prov.dir_state in (ProviderDirSignal.EMPTY, ProviderDirSignal.PARTIAL):
             has_warn = True
-        if prov.config in (ConfigSignal.MISSING, ConfigSignal.FOREIGN):
+        if prov.config in (
+            ConfigSignal.MISSING,
+            ConfigSignal.FOREIGN,
+            ConfigSignal.REGISTRY_DRIFT,
+        ):
             has_warn = True
         for s in prov.content.values():
             if s in (ContentSignal.STALE, ContentSignal.DIVERGED):

@@ -106,6 +106,7 @@ class Resource(StrEnum):
     TEMPLATES = "templates"
     HOOKS = "hooks"
     WORKFLOWS = "workflows"
+    MCPS = "mcps"
 
 
 class FileName(StrEnum):
