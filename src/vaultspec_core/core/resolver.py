@@ -746,7 +746,14 @@ def _resolve_precommit(
         return
 
     if signal == PrecommitSignal.NO_FILE:
-        # install scaffolds precommit itself; no repair step needed
+        if precommit_managed and action == "sync":
+            plan.steps.append(
+                ResolutionStep(
+                    action=ResolutionAction.REPAIR_PRECOMMIT,
+                    target=".pre-commit-config.yaml",
+                    reason="Pre-commit config missing but management is enabled",
+                )
+            )
         return
 
     if signal == PrecommitSignal.NO_HOOKS:

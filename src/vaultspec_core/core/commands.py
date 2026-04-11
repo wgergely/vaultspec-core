@@ -231,12 +231,15 @@ def check_staged_provider_artifacts() -> list[str]:
     violations: list[str] = []
     for path in staged:
         normalized = path.replace("\\", "/")
+        parts = normalized.split("/")
         for pattern in PROVIDER_ARTIFACT_PATTERNS:
             if pattern.endswith("/"):
-                if normalized.startswith(pattern) or f"/{pattern}" in normalized:
+                # Directory pattern: match any path segment exactly
+                dirname = pattern.rstrip("/")
+                if any(seg == dirname for seg in parts):
                     violations.append(path)
                     break
-            elif normalized == pattern or normalized.endswith(f"/{pattern}"):
+            elif normalized == pattern or parts[-1] == pattern:
                 violations.append(path)
                 break
     return violations

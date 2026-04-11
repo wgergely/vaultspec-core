@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
 
 if TYPE_CHECKING:
@@ -20,21 +21,6 @@ if TYPE_CHECKING:
 
     from vaultspec_core.graph.api import VaultGraph
     from vaultspec_core.vaultcore.checks._base import CheckResult
-
-
-def _handle_error(exc: Exception) -> None:
-    """Convert a domain or OS exception to a CLI error exit."""
-    from vaultspec_core.core.exceptions import VaultSpecError
-
-    if isinstance(exc, VaultSpecError):
-        typer.echo(f"Error: {exc}", err=True)
-        if exc.hint:
-            typer.echo(f"  Hint: {exc.hint}", err=True)
-        raise typer.Exit(code=1) from exc
-    if isinstance(exc, OSError):
-        typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
-    raise exc
 
 
 vault_app = typer.Typer(
