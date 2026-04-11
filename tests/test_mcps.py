@@ -271,6 +271,23 @@ class TestMcpAdd:
 
             with pytest.raises(VaultSpecError, match="Invalid"):
                 mcp_add("../evil")
+            with pytest.raises(VaultSpecError, match="Invalid"):
+                mcp_add("foo/../bar")
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_rejects_empty_name(self):
+        path, _mcps_dir = _make_workspace()
+        try:
+            _init_context(path)
+            from vaultspec_core.core.exceptions import VaultSpecError
+            from vaultspec_core.core.mcps import mcp_add
+
+            with pytest.raises(VaultSpecError, match="empty"):
+                mcp_add("")
+            with pytest.raises(VaultSpecError, match="empty"):
+                mcp_add("   ")
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)
@@ -329,6 +346,32 @@ class TestMcpRemove:
 
             mcp_remove("removable")
             assert not target_file.exists()
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_rejects_traversal_in_remove(self):
+        path, _mcps_dir = _make_workspace()
+        try:
+            _init_context(path)
+            from vaultspec_core.core.exceptions import VaultSpecError
+            from vaultspec_core.core.mcps import mcp_remove
+
+            with pytest.raises(VaultSpecError, match="Invalid"):
+                mcp_remove("../escape")
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_rejects_empty_name_in_remove(self):
+        path, _mcps_dir = _make_workspace()
+        try:
+            _init_context(path)
+            from vaultspec_core.core.exceptions import VaultSpecError
+            from vaultspec_core.core.mcps import mcp_remove
+
+            with pytest.raises(VaultSpecError, match="empty"):
+                mcp_remove("")
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)

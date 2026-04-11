@@ -40,6 +40,22 @@ def _server_name(filename: str) -> str:
     return filename
 
 
+def _validate_server_name(name: str) -> None:
+    """Raise :class:`VaultSpecError` if *name* is unsafe for use as a filename.
+
+    Guards against path traversal, empty names, reserved suffixes, and
+    OS-unsafe characters.
+    """
+    if not name or not name.strip():
+        raise VaultSpecError("MCP server name must not be empty.")
+    if "/" in name or "\\" in name or ".." in name:
+        raise VaultSpecError(f"Invalid MCP server name: {name}")
+    if name.endswith(".builtin.json") or name.endswith(".builtin"):
+        raise VaultSpecError(
+            "Cannot use '.builtin' suffix (reserved for package-bundled definitions)."
+        )
+
+
 def _get_mcps_src_dir() -> Path | None:
     """Return the MCP source directory from the active context, or ``None``."""
     try:
@@ -77,6 +93,8 @@ def collect_mcp_servers(
                     warnings.append(msg)
                 continue
             name = _server_name(f.name)
+            if not name:
+                continue
             sources[name] = (f, raw)
         except (json.JSONDecodeError, OSError) as e:
             msg = f"Failed to read/parse MCP definition {f}: {e}"
@@ -99,6 +117,8 @@ def mcp_list() -> list[dict[str, str]]:
     items: dict[str, dict[str, str]] = {}
     for f in sorted(mcps_dir.glob("*.json")):
         name = _server_name(f.name)
+        if not name:
+            continue
         is_builtin = f.name.endswith(".builtin.json")
         if name in items:
             if not is_builtin:
@@ -138,13 +158,7 @@ def mcp_add(
         )
     ensure_dir(mcps_dir)
 
-    if "/" in name or "\\" in name or name == "..":
-        raise VaultSpecError(f"Invalid MCP server name: {name}")
-    if name.endswith(".builtin.json") or name.endswith(".builtin"):
-        raise VaultSpecError(
-            "Cannot add a definition with '.builtin' suffix "
-            "(reserved for package-bundled definitions)."
-        )
+    _validate_server_name(name)
 
     if config is not None and not isinstance(config, dict):
         raise VaultSpecError("MCP configuration must be a JSON object (dict).")
@@ -179,6 +193,8 @@ def mcp_remove(name: str) -> Path:
     Raises:
         ResourceNotFoundError: If no definition file matches *name*.
     """
+    _validate_server_name(name)
+
     mcps_dir = _get_mcps_src_dir()
     if mcps_dir is None or not mcps_dir.exists():
         raise ResourceNotFoundError(
