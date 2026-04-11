@@ -11,7 +11,9 @@ description: >-
 **Announce at start:** "I'm using the `vaultspec-projectmanager` skill to
 provide project management context."
 
-Handles project-level coordination outside the vaultspec pipeline.
+Handles project-level coordination outside the vaultspec pipeline. This
+skill manages project state (issues, boards, milestones, worktrees) but
+never modifies application code, tests, or documentation.
 User-triggered only - never activates automatically.
 
 ## Prerequisites
