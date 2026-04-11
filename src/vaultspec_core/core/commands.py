@@ -260,7 +260,7 @@ _HOOK_DEFS: dict[PrecommitHook, dict[str, object]] = {
     },
     PrecommitHook.SPEC_CHECK: {
         "name": "Spec check",
-        "entry": f"{CANONICAL_ENTRY_PREFIX} doctor",
+        "entry": f"{CANONICAL_ENTRY_PREFIX} spec doctor",
         "types": ["markdown"],
     },
 }
@@ -276,6 +276,11 @@ CANONICAL_PRECOMMIT_HOOKS: list[dict[str, object]] = [
 ]
 
 CANONICAL_HOOK_IDS: frozenset[str] = frozenset(h.value for h in PrecommitHook)
+
+# Maps each canonical hook ID to its expected entry command.
+CANONICAL_HOOK_ENTRIES: dict[str, str] = {
+    hook.value: str(meta["entry"]) for hook, meta in _HOOK_DEFS.items()
+}
 
 # Old hook IDs that should be replaced during scaffold/sync.
 # Maps every previously-used ID to its canonical replacement.

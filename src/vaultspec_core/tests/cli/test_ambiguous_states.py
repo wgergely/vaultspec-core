@@ -203,7 +203,10 @@ class TestDoctorDegradedWorkspaces:
     def test_clean_workspace_doctor_no_errors(
         self, installed_workspace: Path, runner: CliRunner
     ):
-        result = runner.invoke(app, ["doctor", "--target", str(installed_workspace)])
+        result = runner.invoke(
+            app,
+            ["spec", "doctor", "--target", str(installed_workspace)],
+        )
         # Clean workspace should not have hard errors (exit code 2)
         # Exit code 1 (warnings) is acceptable for test workspaces
         assert result.exit_code in (0, 1)
@@ -212,7 +215,10 @@ class TestDoctorDegradedWorkspaces:
         self, installed_workspace: Path, runner: CliRunner
     ):
         _make_degraded(installed_workspace, "corrupted_manifest")
-        result = runner.invoke(app, ["doctor", "--target", str(installed_workspace)])
+        result = runner.invoke(
+            app,
+            ["spec", "doctor", "--target", str(installed_workspace)],
+        )
         # Corrupted manifest should be reported as an issue
         assert result.exit_code != 0 or "corrupt" in result.output.lower()
 
@@ -220,7 +226,10 @@ class TestDoctorDegradedWorkspaces:
         self, installed_workspace: Path, runner: CliRunner
     ):
         _make_degraded(installed_workspace, "orphaned_manifest")
-        result = runner.invoke(app, ["doctor", "--target", str(installed_workspace)])
+        result = runner.invoke(
+            app,
+            ["spec", "doctor", "--target", str(installed_workspace)],
+        )
         output = result.output.lower()
         # Should report the orphaned provider
         assert (
@@ -234,6 +243,9 @@ class TestDoctorDegradedWorkspaces:
         self, installed_workspace: Path, runner: CliRunner
     ):
         _make_degraded(installed_workspace, "untracked_dir")
-        result = runner.invoke(app, ["doctor", "--target", str(installed_workspace)])
+        result = runner.invoke(
+            app,
+            ["spec", "doctor", "--target", str(installed_workspace)],
+        )
         output = result.output.lower()
         assert result.exit_code != 0 or "untracked" in output or "warn" in output

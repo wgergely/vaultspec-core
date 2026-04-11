@@ -135,7 +135,10 @@ class TestFullLifecycleRecovery:
         assert result.exit_code == 0
 
         # 2. Doctor: should be healthy
-        result = runner.invoke(app, ["doctor", "--target", str(tmp_path)])
+        result = runner.invoke(
+            app,
+            ["spec", "doctor", "--target", str(tmp_path)],
+        )
         assert result.exit_code in (0, 1)  # 0 or 1 (warnings ok)
 
         # 3. Corrupt manifest
@@ -143,7 +146,10 @@ class TestFullLifecycleRecovery:
         manifest.write_text("BROKEN", encoding="utf-8")
 
         # 4. Doctor: should detect corruption
-        result = runner.invoke(app, ["doctor", "--target", str(tmp_path)])
+        result = runner.invoke(
+            app,
+            ["spec", "doctor", "--target", str(tmp_path)],
+        )
         assert result.exit_code == 2  # error
 
         # 5. Sync --force: should repair and sync
@@ -157,7 +163,10 @@ class TestFullLifecycleRecovery:
         assert len(raw["installed"]) > 0
 
         # 7. Doctor again: should be healthier
-        result = runner.invoke(app, ["doctor", "--target", str(tmp_path)])
+        result = runner.invoke(
+            app,
+            ["spec", "doctor", "--target", str(tmp_path)],
+        )
         assert result.exit_code in (0, 1)
 
 
