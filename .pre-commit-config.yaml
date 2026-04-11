@@ -54,7 +54,7 @@ repos:
     pass_filenames: false
   - id: spec-check
     name: Vault Doctor (Check)
-    entry: uv run --no-sync vaultspec-core vault check all
+    entry: uv run --no-sync vaultspec-core spec doctor
     language: system
     types:
     - markdown
