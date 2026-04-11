@@ -358,7 +358,7 @@ class TestDoctorJsonSchema:
         factory = WorkspaceFactory(tmp_path)
         factory.install()
 
-        result = factory.run("doctor", "--json")
+        result = factory.run("spec", "doctor", "--json")
         data = json.loads(result.output)
 
         # Top-level keys
@@ -386,7 +386,7 @@ class TestDoctorV1Manifest:
         v1_data = {"installed": ["claude", "gemini", "antigravity", "codex"]}
         manifest_path.write_text(json.dumps(v1_data, indent=2), encoding="utf-8")
 
-        result = factory.run("doctor")
+        result = factory.run("spec", "doctor")
         # Should not crash -- should handle gracefully
         assert result.exit_code in (0, 1, 2)
 
@@ -398,7 +398,7 @@ class TestDoctorV1Manifest:
         v1_data = {"installed": ["claude"]}
         manifest_path.write_text(json.dumps(v1_data, indent=2), encoding="utf-8")
 
-        result = factory.run("doctor", "--json")
+        result = factory.run("spec", "doctor", "--json")
         # Should produce valid JSON despite v1 manifest
         json_start = result.output.index("{")
         data = json.loads(result.output[json_start:])

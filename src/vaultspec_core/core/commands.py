@@ -260,7 +260,7 @@ _HOOK_DEFS: dict[PrecommitHook, dict[str, object]] = {
     },
     PrecommitHook.SPEC_CHECK: {
         "name": "Spec check",
-        "entry": f"{CANONICAL_ENTRY_PREFIX} doctor",
+        "entry": f"{CANONICAL_ENTRY_PREFIX} spec doctor",
         "types": ["markdown"],
     },
 }

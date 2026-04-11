@@ -23,7 +23,7 @@
 
 - id: spec-check
   name: Spec check
-  entry: uv run --no-sync vaultspec-core doctor
+  entry: uv run --no-sync vaultspec-core spec doctor
   language: system
   types: [markdown]
   pass_filenames: false
