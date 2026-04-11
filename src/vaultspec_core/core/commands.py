@@ -190,54 +190,6 @@ def _scaffold_provider(
     return created
 
 
-def _scaffold_mcp_json(target: Path, *, dry_run: bool = False) -> list[tuple[str, str]]:
-    """Scaffold or merge ``vaultspec-core`` into ``.mcp.json``.
-
-    If ``.mcp.json`` already exists the function merges the ``vaultspec-core``
-    server entry into the existing ``mcpServers`` dict, preserving user entries.
-    When the entry already exists the file is left untouched.
-
-    Args:
-        target: Workspace root directory.
-        dry_run: When ``True``, returns the manifest without writing anything.
-
-    Returns:
-        List with a single ``(".mcp.json", "mcp")`` tuple when a write
-        occurred (or would occur), otherwise empty.
-    """
-    import json
-
-    from .helpers import atomic_write
-
-    mcp_json = target / ".mcp.json"
-    server_entry = {
-        "command": "uv",
-        "args": ["run", "python", "-m", "vaultspec_core.mcp_server.app"],
-    }
-
-    if mcp_json.exists():
-        try:
-            raw = json.loads(mcp_json.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return []
-        if not isinstance(raw, dict):
-            return []
-        servers = raw.setdefault("mcpServers", {})
-        if not isinstance(servers, dict):
-            return []
-        if "vaultspec-core" in servers:
-            return []
-        servers["vaultspec-core"] = server_entry
-        if not dry_run:
-            atomic_write(mcp_json, json.dumps(raw, indent=2) + "\n")
-        return [(".mcp.json", "mcp")]
-
-    if not dry_run:
-        mcp_config = {"mcpServers": {"vaultspec-core": server_entry}}
-        atomic_write(mcp_json, json.dumps(mcp_config, indent=2) + "\n")
-    return [(".mcp.json", "mcp")]
-
-
 def _scaffold_precommit(
     target: Path, *, dry_run: bool = False
 ) -> list[tuple[str, str]]:
@@ -425,7 +377,11 @@ def init_run(
         created.extend(_scaffold_provider(target, tool))
 
     if "mcp" not in skip:
-        created.extend(_scaffold_mcp_json(target))
+        from .mcps import mcp_sync
+
+        mcp_result = mcp_sync()
+        if mcp_result.items:
+            created.append((".mcp.json", "mcp"))
     if "precommit" not in skip:
         created.extend(_scaffold_precommit(target))
 
@@ -581,7 +537,11 @@ def install_run(
         for tool in tools:
             manifest.extend(_scaffold_provider(path, tool, dry_run=True))
         if "mcp" not in skip:
-            manifest.extend(_scaffold_mcp_json(path, dry_run=True))
+            from .mcps import mcp_sync
+
+            mcp_result = mcp_sync(dry_run=True)
+            if mcp_result.items:
+                manifest.append((".mcp.json", "mcp"))
         if "precommit" not in skip:
             manifest.extend(_scaffold_precommit(path, dry_run=True))
 
@@ -618,9 +578,6 @@ def install_run(
         sync_target = provider if provider not in ("all", "core") else "all"
         sync_provider(sync_target, force=True, skip=skip)
 
-        # Re-scaffold MCP entry if missing (repair)
-        if "mcp" not in skip:
-            _scaffold_mcp_json(path)
         if "precommit" not in skip:
             _scaffold_precommit(path)
 
@@ -668,6 +625,7 @@ def install_run(
 
     # Count actual source resources (what the user authored)
     from .agents import collect_agents
+    from .mcps import collect_mcp_servers
     from .rules import collect_rules
     from .skills import collect_skills
 
@@ -675,6 +633,7 @@ def install_run(
         "rules": len(collect_rules()),
         "skills": len(collect_skills()),
         "agents": len(collect_agents()),
+        "mcps": len(collect_mcp_servers()),
     }
 
     tools = _filter_tools(_PROVIDER_TO_TOOLS.get(provider, []), skip)
@@ -845,8 +804,6 @@ def uninstall_run(
         mdata_before = ManifestData()
 
     if effective_provider == "all":
-        import json
-
         from .helpers import atomic_write
 
         # Remove everything (respecting skip).
@@ -898,24 +855,13 @@ def uninstall_run(
                 label = file_labels.get(f.name, "")
                 removed.append((str(f).replace("\\", "/"), label))
 
-        # Surgical .mcp.json cleanup: remove only the vaultspec-core key
+        # Surgical .mcp.json cleanup: remove registry-managed entries
         mcp_path = path / ".mcp.json"
         if "mcp" not in skip:
-            if mcp_path.exists() and not dry_run:
-                try:
-                    raw = json.loads(mcp_path.read_text(encoding="utf-8"))
-                    if isinstance(raw, dict):
-                        servers = raw.get("mcpServers", {})
-                        if isinstance(servers, dict) and "vaultspec-core" in servers:
-                            del servers["vaultspec-core"]
-                            if servers:
-                                atomic_write(mcp_path, json.dumps(raw, indent=2) + "\n")
-                            else:
-                                mcp_path.unlink()
-                            removed.append((_rel(path, mcp_path), "mcp"))
-                except (json.JSONDecodeError, OSError):
-                    pass
-            elif mcp_path.exists() and dry_run:
+            from .mcps import mcp_uninstall
+
+            uninstalled = mcp_uninstall(path, dry_run=dry_run)
+            if uninstalled:
                 removed.append((_rel(path, mcp_path), "mcp"))
 
         # Surgical .pre-commit-config.yaml cleanup: remove vaultspec-core hooks
@@ -1197,6 +1143,7 @@ def sync_provider(
     from .agents import agents_sync
     from .config_gen import config_sync
     from .guards import guard_dev_repo
+    from .mcps import mcp_sync as _mcp_sync
     from .rules import rules_sync
     from .skills import skills_sync
     from .system import system_sync
@@ -1212,6 +1159,7 @@ def sync_provider(
             (lambda: agents_sync(prune=force, dry_run=dry_run), "agents"),
             (lambda: system_sync(dry_run=dry_run, force=force), "system"),
             (lambda: config_sync(dry_run=dry_run, force=force), "config"),
+            (lambda: _mcp_sync(dry_run=dry_run, force=force), "mcps"),
         ]:
             try:
                 results.append(sync_fn())
@@ -1265,9 +1213,6 @@ def sync_provider(
 
             from .gitignore import ensure_gitignore_block
 
-            # Repair MCP entry if missing (unless mcp is skipped)
-            if "mcp" not in skip:
-                _scaffold_mcp_json(ctx.target_dir)
             if "precommit" not in skip:
                 _scaffold_precommit(ctx.target_dir)
 

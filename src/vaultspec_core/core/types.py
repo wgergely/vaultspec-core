@@ -141,6 +141,7 @@ class WorkspaceContext:
     system_src_dir: Path
     templates_dir: Path
     hooks_dir: Path
+    mcps_src_dir: Path | None = None
     tool_configs: dict[Tool, ToolConfig] = field(default_factory=dict)
 
 
@@ -242,6 +243,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
     system_src_dir = vaultspec / Resource.RULES.value / Resource.SYSTEM.value
     templates_dir = vaultspec / Resource.RULES.value / Resource.TEMPLATES.value
     hooks_dir = vaultspec / Resource.RULES.value / Resource.HOOKS.value
+    mcps_src_dir = vaultspec / Resource.RULES.value / Resource.MCPS.value
     shared_agents_root = target / DirName.ANTIGRAVITY.value
 
     gemini_dir = target / cfg.gemini_dir
@@ -340,6 +342,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
         system_src_dir=system_src_dir,
         templates_dir=templates_dir,
         hooks_dir=hooks_dir,
+        mcps_src_dir=mcps_src_dir,
         tool_configs=tool_configs,
     )
     _workspace_ctx.set(ctx)

@@ -26,6 +26,11 @@ from .exceptions import WorkspaceNotInitializedError as WorkspaceNotInitializedE
 from .helpers import atomic_write as atomic_write
 from .helpers import build_file as build_file
 from .helpers import ensure_dir as ensure_dir
+from .mcps import collect_mcp_servers as collect_mcp_servers
+from .mcps import mcp_add as mcp_add
+from .mcps import mcp_list as mcp_list
+from .mcps import mcp_remove as mcp_remove
+from .mcps import mcp_sync as mcp_sync
 from .resources import resource_edit as resource_edit
 from .resources import resource_remove as resource_remove
 from .resources import resource_rename as resource_rename

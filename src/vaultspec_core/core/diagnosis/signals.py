@@ -62,6 +62,7 @@ class ConfigSignal(StrEnum):
     FOREIGN = "foreign"
     PARTIAL_MCP = "partial_mcp"
     USER_MCP = "user_mcp"
+    REGISTRY_DRIFT = "registry_drift"
 
 
 class GitignoreSignal(StrEnum):

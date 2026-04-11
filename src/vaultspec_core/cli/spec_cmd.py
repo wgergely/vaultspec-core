@@ -973,3 +973,147 @@ def cmd_hooks_run(
                 console.print(f"    {line}")
         if r["error"]:
             console.print(f"    [red]error:[/red] {r['error']}")
+
+
+# =============================================================================
+# MCPs
+# =============================================================================
+
+mcps_app = typer.Typer(
+    help="Manage MCP server definitions and synced .mcp.json entries.",
+    no_args_is_help=True,
+)
+spec_app.add_typer(mcps_app, name="mcps")
+
+
+@mcps_app.command("list")
+def cmd_mcps_list(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """List all registered MCP server definitions."""
+    apply_target(target)
+    from rich import box
+    from rich.table import Table
+
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core import mcp_list
+
+    items = mcp_list()
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps(items, indent=2, default=str))
+        raise typer.Exit(0)
+
+    console = get_console()
+    if not items:
+        console.print("No MCP server definitions found.")
+        return
+
+    table = Table(box=box.SIMPLE_HEAD, highlight=False, show_edge=False)
+    table.add_column("Name", no_wrap=True)
+    table.add_column("Source")
+
+    for item in items:
+        table.add_row(item["name"], item["source"])
+
+    console.print(table)
+
+
+@mcps_app.command("add")
+def cmd_mcps_add(
+    name: Annotated[str, typer.Option("--name", help="MCP server name")],
+    config: Annotated[
+        str | None, typer.Option("--config", help="Server config as JSON string")
+    ] = None,
+    force: Annotated[bool, typer.Option("--force", help="Overwrite existing")] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Add a new custom MCP server definition."""
+    apply_target(target)
+    import json as json_mod
+
+    from vaultspec_core.core import mcp_add
+    from vaultspec_core.core.exceptions import VaultSpecError
+
+    parsed_config = None
+    if config is not None:
+        try:
+            parsed_config = json_mod.loads(config)
+        except json_mod.JSONDecodeError as exc:
+            typer.echo(f"Error: Invalid JSON config: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+
+    try:
+        file_path = mcp_add(name=name, config=parsed_config, force=force)
+    except VaultSpecError as exc:
+        _handle_error(exc)
+        return
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps({"path": str(file_path)}, indent=2))
+        raise typer.Exit(0)
+
+
+@mcps_app.command("remove")
+def cmd_mcps_remove(
+    name: Annotated[str, typer.Argument(help="MCP server name")],
+    force: Annotated[bool, typer.Option("--force", help="Skip confirmation")] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Remove an MCP server definition."""
+    apply_target(target)
+    from vaultspec_core.core import mcp_remove
+    from vaultspec_core.core.exceptions import VaultSpecError
+
+    if not force and not typer.confirm(f"Remove MCP definition '{name}'?"):
+        raise typer.Abort()
+
+    try:
+        mcp_remove(name=name)
+    except VaultSpecError as exc:
+        _handle_error(exc)
+        return
+
+    if json_output:
+        import json
+
+        typer.echo(json.dumps({"removed": name}, indent=2))
+        raise typer.Exit(0)
+
+
+@mcps_app.command("sync")
+def cmd_mcps_sync(
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes")] = False,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Overwrite modified entries"),
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Sync MCP definitions to .mcp.json."""
+    apply_target(target)
+    from vaultspec_core.console import get_console
+    from vaultspec_core.core import mcp_sync
+    from vaultspec_core.core.sync import format_summary
+
+    result = mcp_sync(force=force, dry_run=dry_run)
+
+    if json_output:
+        import dataclasses
+        import json
+
+        typer.echo(json.dumps(dataclasses.asdict(result), indent=2, default=str))
+        raise typer.Exit(0)
+
+    console = get_console()
+    console.print(f"  [bold]{format_summary('MCPs', result)}[/bold]")
+    for warning in result.warnings:
+        console.print(f"  [yellow]•[/yellow] {warning}")
