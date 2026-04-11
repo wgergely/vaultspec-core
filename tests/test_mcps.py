@@ -174,6 +174,49 @@ class TestCollectMcpServers:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)
 
+    def test_custom_shadows_builtin_in_collect(self):
+        """When both foo.builtin.json and foo.json exist, custom config wins."""
+        path, mcps_dir = _make_workspace()
+        try:
+            (mcps_dir / "srv.builtin.json").write_text(
+                json.dumps({"command": "old-builtin"}), encoding="utf-8"
+            )
+            (mcps_dir / "srv.json").write_text(
+                json.dumps({"command": "new-custom"}), encoding="utf-8"
+            )
+            _init_context(path)
+            from vaultspec_core.core.mcps import collect_mcp_servers
+
+            result = collect_mcp_servers()
+            assert len(result) == 1
+            assert result["srv"][1]["command"] == "new-custom"
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_empty_stem_filenames_skipped(self):
+        """Files named '.json' or '.builtin.json' (no server name) are ignored."""
+        path, mcps_dir = _make_workspace()
+        try:
+            (mcps_dir / ".json").write_text(
+                json.dumps({"command": "bad"}), encoding="utf-8"
+            )
+            (mcps_dir / ".builtin.json").write_text(
+                json.dumps({"command": "also-bad"}), encoding="utf-8"
+            )
+            (mcps_dir / "valid.json").write_text(
+                json.dumps({"command": "good"}), encoding="utf-8"
+            )
+            _init_context(path)
+            from vaultspec_core.core.mcps import collect_mcp_servers
+
+            result = collect_mcp_servers()
+            assert len(result) == 1
+            assert "valid" in result
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
 
 @pytest.mark.unit
 class TestMcpList:
@@ -230,6 +273,19 @@ class TestMcpAdd:
             assert result.exists()
             content = json.loads(result.read_text(encoding="utf-8"))
             assert content["command"] == "test"
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_created_file_stays_within_mcps_dir(self):
+        """Security invariant: the written file must be inside mcps_dir."""
+        path, mcps_dir = _make_workspace()
+        try:
+            _init_context(path)
+            from vaultspec_core.core.mcps import mcp_add
+
+            result = mcp_add("legit-server", config={"command": "test"})
+            assert result.resolve().is_relative_to(mcps_dir.resolve())
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)
@@ -346,6 +402,39 @@ class TestMcpRemove:
 
             mcp_remove("removable")
             assert not target_file.exists()
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_custom_removed_before_builtin(self):
+        """When both exist, custom .json is removed first (revert semantics)."""
+        path, mcps_dir = _make_workspace()
+        try:
+            builtin = mcps_dir / "srv.builtin.json"
+            custom = mcps_dir / "srv.json"
+            builtin.write_text(json.dumps({"command": "old"}), encoding="utf-8")
+            custom.write_text(json.dumps({"command": "new"}), encoding="utf-8")
+            _init_context(path)
+            from vaultspec_core.core.mcps import mcp_remove
+
+            mcp_remove("srv")
+            assert not custom.exists(), "Custom .json should be removed first"
+            assert builtin.exists(), "Builtin should survive first removal"
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_removed_file_was_within_mcps_dir(self):
+        """Security invariant: only files inside mcps_dir can be removed."""
+        path, mcps_dir = _make_workspace()
+        try:
+            target = mcps_dir / "safe.json"
+            target.write_text("{}", encoding="utf-8")
+            _init_context(path)
+            from vaultspec_core.core.mcps import mcp_remove
+
+            result = mcp_remove("safe")
+            assert result.resolve().is_relative_to(mcps_dir.resolve())
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)
@@ -567,6 +656,60 @@ class TestMcpUninstall:
 
             removed = mcp_uninstall(path)
             assert "vaultspec-core" in removed
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+
+@pytest.mark.unit
+class TestUninstallRemovesCustomMcps:
+    def test_full_uninstall_removes_custom_mcp_entries(self):
+        """Regression: uninstall must read registry BEFORE deleting .vaultspec/.
+
+        If .vaultspec/ is deleted first, collect_mcp_servers() returns empty
+        and only the hardcoded 'vaultspec-core' fallback is cleaned up,
+        leaving custom entries behind.
+        """
+        path = PROJECT_ROOT / ".pytest-tmp" / f"mcps-uninstall-full-{uuid4().hex}"
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            reset_config()
+
+            from vaultspec_core.core.commands import install_run
+
+            install_run(
+                path=path, provider="all", upgrade=False, dry_run=False, force=False
+            )
+
+            # Add a custom MCP definition post-install
+            mcps_dir = path / ".vaultspec" / "rules" / "mcps"
+            (mcps_dir / "custom-rag.json").write_text(
+                json.dumps({"command": "uv", "args": ["run", "rag-server"]}),
+                encoding="utf-8",
+            )
+
+            # Sync so the custom entry lands in .mcp.json
+            from vaultspec_core.core.mcps import mcp_sync
+
+            mcp_sync(force=True)
+
+            mcp_before = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+            assert "custom-rag" in mcp_before["mcpServers"]
+            assert "vaultspec-core" in mcp_before["mcpServers"]
+
+            # Full uninstall
+            from vaultspec_core.core.commands import uninstall_run
+
+            uninstall_run(path, provider="all", force=True)
+
+            # Both managed entries should be gone
+            if (path / ".mcp.json").exists():
+                mcp_after = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+                servers = mcp_after.get("mcpServers", {})
+                assert "custom-rag" not in servers, (
+                    "Custom MCP entry survived uninstall"
+                )
+                assert "vaultspec-core" not in servers
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)
