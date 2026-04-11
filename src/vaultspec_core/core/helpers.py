@@ -13,13 +13,58 @@ import shutil
 import stat
 import subprocess
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def advisory_lock(path: Path) -> Iterator[None]:
+    """Advisory file lock for serializing concurrent read-modify-write cycles.
+
+    Uses ``fcntl.flock`` on Unix and ``msvcrt.locking`` on Windows.
+    The lock is cooperative - it only serializes concurrent CLI processes
+    that also acquire the same lock.  If the lock cannot be obtained the
+    operation proceeds unlocked so a single stuck process cannot block
+    all other invocations.
+
+    Args:
+        path: The file being protected.  A sibling ``.lock`` file is
+            created next to it and used as the lock target.
+    """
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR)
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            try:
+                yield
+            finally:
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+    except OSError:
+        logger.debug(
+            "Could not acquire advisory lock on %s, proceeding without lock", path
+        )
+        yield
+    finally:
+        os.close(fd)
 
 
 def _yaml_load(text: str) -> dict[str, Any]:
