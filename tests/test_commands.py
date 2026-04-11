@@ -12,6 +12,7 @@ from vaultspec_core.core.commands import (
     CANONICAL_ENTRY_PREFIX,
     CANONICAL_HOOK_IDS,
     install_run,
+    sync_provider,
 )
 from vaultspec_core.core.enums import PrecommitHook
 from vaultspec_core.core.manifest import read_manifest_data, write_manifest_data
@@ -491,6 +492,37 @@ def test_spec_add_dry_run_no_write() -> None:
 
         path = rules_add("dry-test-rule", dry_run=True)
         assert not path.exists()
+    finally:
+        reset_config()
+        shutil.rmtree(tmp_path, ignore_errors=True)
+
+
+@pytest.mark.unit
+def test_sync_all_result_count_matches_resource_labels() -> None:
+    """sync_provider('all') must return one SyncResult per resource label.
+
+    Regression test for #54: the CLI display zips resource_labels with
+    sync results using strict=True, so the counts must match exactly.
+    """
+    tmp_path = PROJECT_ROOT / ".pytest-tmp" / f"sync-labels-{uuid4().hex}"
+    try:
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        reset_config()
+
+        install_run(
+            path=tmp_path, provider="all", upgrade=False, dry_run=False, force=False
+        )
+
+        results = sync_provider("all")
+
+        # The CLI display code builds this exact label list and zips it
+        # with results using strict=True - a mismatch causes ValueError
+        resource_labels = ["rules", "skills", "agents", "system", "config", "mcps"]
+        assert len(results) == len(resource_labels), (
+            f"sync_provider('all') returned {len(results)} results "
+            f"but resource_labels has {len(resource_labels)} entries; "
+            f"zip(..., strict=True) would crash"
+        )
     finally:
         reset_config()
         shutil.rmtree(tmp_path, ignore_errors=True)
