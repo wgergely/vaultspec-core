@@ -14,7 +14,7 @@ from typing import Any, Protocol
 
 from . import types as _t
 from .config_gen import _toml_quote
-from .enums import Tool
+from .enums import GeminiBuiltinTool, Tool
 from .exceptions import ResourceExistsError
 from .helpers import (
     _launch_editor,
@@ -33,15 +33,20 @@ logger = logging.getLogger(__name__)
 # .vaultspec/rules/agents/*.md to Gemini CLI's first-party tool identifiers.
 # Source agents are authored against Claude names; the Gemini renderer maps
 # at sync time so the source files stay single-authored.
-_CLAUDE_TO_GEMINI_TOOLS: dict[str, str] = {
-    "Read": "read_file",
-    "Write": "write_file",
-    "Edit": "edit",
-    "Glob": "glob",
-    "Grep": "grep",
-    "Bash": "shell",
-    "WebFetch": "web_fetch",
-    "WebSearch": "web_search",
+# Mapping from the Claude tool vocabulary used in
+# `.vaultspec/rules/agents/*.md` to canonical Gemini built-in tool
+# identifiers (`GeminiBuiltinTool` enum members). The enum values are
+# pinned to upstream gemini-cli constants by a live drift test in
+# `tests/cli/test_agents_render.py::TestUpstreamGeminiToolPin`.
+_CLAUDE_TO_GEMINI_TOOLS: dict[str, GeminiBuiltinTool] = {
+    "Read": GeminiBuiltinTool.READ_FILE,
+    "Write": GeminiBuiltinTool.WRITE_FILE,
+    "Edit": GeminiBuiltinTool.REPLACE,
+    "Glob": GeminiBuiltinTool.GLOB,
+    "Grep": GeminiBuiltinTool.GREP_SEARCH,
+    "Bash": GeminiBuiltinTool.RUN_SHELL_COMMAND,
+    "WebFetch": GeminiBuiltinTool.WEB_FETCH,
+    "WebSearch": GeminiBuiltinTool.GOOGLE_WEB_SEARCH,
 }
 
 
@@ -135,7 +140,7 @@ def _render_gemini_agent(
             if warnings is not None:
                 warnings.append(msg)
             continue
-        mapped.append(gemini_name)
+        mapped.append(gemini_name.value)
     if mapped:
         fm["tools"] = mapped
 
