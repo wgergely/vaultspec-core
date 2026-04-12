@@ -64,6 +64,30 @@ def _get_mcps_src_dir() -> Path | None:
         return None
 
 
+def _existing_source_server_names() -> set[str]:
+    """Return server names whose source file physically exists on disk.
+
+    Unlike :func:`collect_mcp_servers`, this never opens or parses the
+    JSON files — a definition that exists but currently fails to parse
+    (e.g. transient typo) is still reported as present. This is the
+    correct signal for the prune step in :func:`mcp_sync`: a server
+    must only be considered for orphan removal when its source file
+    is *definitively absent*, not when parsing happened to fail this
+    run. Otherwise a single typo in a managed definition would
+    silently delete the corresponding ``.mcp.json`` entry on the next
+    ``sync --force``, which is destructive and hard to recover from.
+    """
+    mcps_dir = _get_mcps_src_dir()
+    if mcps_dir is None or not mcps_dir.exists():
+        return set()
+    names: set[str] = set()
+    for f in mcps_dir.glob("*.json"):
+        name = _server_name(f.name)
+        if name:
+            names.add(name)
+    return names
+
+
 def collect_mcp_servers(
     warnings: list[str] | None = None,
 ) -> dict[str, tuple[Path, dict[str, Any]]]:
@@ -289,6 +313,15 @@ def mcp_sync(
             # entries. After this sync the sidecar is written and
             # future syncs use strict ownership.
             managed = set(servers.keys()) & set(sources.keys())
+            if managed:
+                msg = (
+                    f"Legacy .mcp.json migration: taking ownership of "
+                    f"{len(managed)} pre-existing entries that match "
+                    f"current sources ({sorted(managed)}). Future syncs "
+                    f"will use strict ownership tracking."
+                )
+                logger.warning(msg)
+                result.warnings.append(msg)
 
         changed = False
         for name, (_path, config) in sources.items():
@@ -324,9 +357,19 @@ def mcp_sync(
                     f"Rename one to resolve."
                 )
 
-        source_names = set(sources.keys())
         if prune:
-            for name in sorted(managed - source_names):
+            # Critical: prune is gated on the source file being
+            # *physically absent* from disk, not merely missing from
+            # the parsed sources dict. ``collect_mcp_servers`` omits
+            # files that exist but failed JSON parsing or read; if we
+            # treated those as deletions, a transient typo would
+            # silently destroy the corresponding ``.mcp.json`` entry
+            # under ``sync --force``. ``_existing_source_server_names``
+            # walks the directory without opening files, so a parse
+            # failure leaves the entry intact until the source is
+            # fixed (or the file is genuinely deleted).
+            on_disk = _existing_source_server_names()
+            for name in sorted(managed - on_disk):
                 if name in servers:
                     servers.pop(name)
                     result.pruned += 1

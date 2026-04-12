@@ -838,6 +838,42 @@ class TestMcpSyncPrune:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)
 
+    def test_legacy_migration_emits_explicit_warning(self):
+        """Security: legacy migration silently transferring ownership
+        of pre-existing entries is auditable. The first sync against
+        a workspace without ``_vaultspecManaged`` MUST surface a
+        warning naming every entry it took ownership of, so an
+        operator can spot unexpected migrations (e.g. an attacker
+        having dropped a ``foo.json`` source file matching a user
+        entry name).
+        """
+        path, mcps_dir = _make_workspace()
+        try:
+            existing = {
+                "mcpServers": {
+                    "alpha": {"command": "old-a"},
+                    "beta": {"command": "old-b"},
+                }
+            }
+            (path / ".mcp.json").write_text(json.dumps(existing), encoding="utf-8")
+            (mcps_dir / "alpha.builtin.json").write_text(
+                json.dumps({"command": "new-a"}), encoding="utf-8"
+            )
+            (mcps_dir / "beta.builtin.json").write_text(
+                json.dumps({"command": "new-b"}), encoding="utf-8"
+            )
+
+            _init_context(path)
+            from vaultspec_core.core.mcps import mcp_sync
+
+            result = mcp_sync()
+            assert any(
+                "Legacy" in w and "alpha" in w and "beta" in w for w in result.warnings
+            ), f"expected legacy-migration warning, got: {result.warnings}"
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
     def test_legacy_migration_treats_pre_existing_as_managed(self):
         """Workspaces created before ownership tracking shipped have
         no `_vaultspecManaged` sidecar. The migration heuristic treats
@@ -888,6 +924,59 @@ class TestMcpSyncPrune:
             mcp_sync()
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert data["_vaultspecManaged"] == ["alpha", "beta"]
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_prune_skips_entries_whose_source_failed_to_parse(self):
+        """Critical regression: a managed source file that exists but
+        currently fails JSON parsing must NOT be treated as deleted by
+        the prune loop. Otherwise a single typo + ``sync --force``
+        would silently destroy the corresponding ``.mcp.json`` entry,
+        which is destructive and very hard to recover from.
+
+        The fix: prune is gated on physical absence of the source
+        file, not on whether it parsed successfully this run.
+        """
+        path, mcps_dir = _make_workspace()
+        try:
+            (mcps_dir / "fragile.builtin.json").write_text(
+                json.dumps({"command": "uv", "args": ["run", "fragile"]}),
+                encoding="utf-8",
+            )
+            _init_context(path)
+            from vaultspec_core.core.mcps import mcp_sync
+
+            # First sync: install — entry takes ownership.
+            mcp_sync()
+            data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+            assert "fragile" in data["mcpServers"]
+            assert "fragile" in data["_vaultspecManaged"]
+
+            # Corrupt the source: file still exists but is invalid JSON.
+            (mcps_dir / "fragile.builtin.json").write_text(
+                "{not valid json", encoding="utf-8"
+            )
+
+            # Sync with prune=True. The entry MUST survive because the
+            # source file is still present on disk — only the parser
+            # is failing. A parse warning should be reported.
+            result = mcp_sync(prune=True)
+            assert result.pruned == 0, (
+                "Entry was destructively pruned despite source file "
+                "being present (parse failure should not trigger prune)"
+            )
+            assert any("fragile" in w for w in result.warnings)
+
+            data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+            assert "fragile" in data["mcpServers"]
+            assert "fragile" in data["_vaultspecManaged"]
+
+            # Now genuinely delete the source — prune SHOULD remove it.
+            (mcps_dir / "fragile.builtin.json").unlink()
+            result = mcp_sync(prune=True)
+            assert result.pruned == 1
+            assert not (path / ".mcp.json").exists()
         finally:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)
