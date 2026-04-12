@@ -64,6 +64,30 @@ def _get_mcps_src_dir() -> Path | None:
         return None
 
 
+def _existing_source_server_names() -> set[str]:
+    """Return server names whose source file physically exists on disk.
+
+    Unlike :func:`collect_mcp_servers`, this never opens or parses the
+    JSON files — a definition that exists but currently fails to parse
+    (e.g. transient typo) is still reported as present. This is the
+    correct signal for the prune step in :func:`mcp_sync`: a server
+    must only be considered for orphan removal when its source file
+    is *definitively absent*, not when parsing happened to fail this
+    run. Otherwise a single typo in a managed definition would
+    silently delete the corresponding ``.mcp.json`` entry on the next
+    ``sync --force``, which is destructive and hard to recover from.
+    """
+    mcps_dir = _get_mcps_src_dir()
+    if mcps_dir is None or not mcps_dir.exists():
+        return set()
+    names: set[str] = set()
+    for f in mcps_dir.glob("*.json"):
+        name = _server_name(f.name)
+        if name:
+            names.add(name)
+    return names
+
+
 def collect_mcp_servers(
     warnings: list[str] | None = None,
 ) -> dict[str, tuple[Path, dict[str, Any]]]:
@@ -212,19 +236,35 @@ def mcp_remove(name: str) -> Path:
     raise ResourceNotFoundError(f"MCP definition '{name}' not found.")
 
 
+_MANAGED_KEY = "_vaultspecManaged"
+
+
 def mcp_sync(
     dry_run: bool = False,
     force: bool = False,
+    prune: bool = False,
 ) -> SyncResult:
     """Sync MCP server definitions into ``.mcp.json``.
 
     Collects all definitions from the MCP source directory, merges them
-    into the workspace ``.mcp.json`` file.  User-added entries (not
-    matching any definition file) are always preserved.
+    into the workspace ``.mcp.json`` file, and (when ``prune`` is set)
+    removes managed entries whose source files have been deleted.
+
+    Ownership tracking is persisted in ``.mcp.json`` itself under the
+    reserved top-level key ``_vaultspecManaged`` (a sorted list of
+    server names that vaultspec created via this function). Entries
+    that pre-existed without being added by ``mcp_sync`` never enter
+    the managed set, so user-added servers are always preserved —
+    even if they happen to share a name with a current source. This
+    mirrors the content-marker ownership pattern used by
+    ``sync_files`` for rule/agent/skill files.
 
     Args:
         dry_run: If ``True``, compute changes without writing.
         force: Overwrite entries that differ from their definitions.
+        prune: If ``True``, remove managed entries whose source files
+            have been deleted. Mirrors the ``prune`` behavior of
+            ``rules_sync``/``agents_sync``/``skills_sync``.
 
     Returns:
         :class:`~vaultspec_core.core.types.SyncResult` with sync statistics.
@@ -258,17 +298,45 @@ def mcp_sync(
             servers = {}
             existing["mcpServers"] = servers
 
+        if _MANAGED_KEY in existing:
+            raw_managed = existing.get(_MANAGED_KEY, [])
+            if isinstance(raw_managed, list):
+                managed: set[str] = {str(n) for n in raw_managed if isinstance(n, str)}
+            else:
+                managed = set()
+        else:
+            # Legacy migration: workspaces created before ownership
+            # tracking shipped have no sidecar key. Treat any
+            # pre-existing entry whose name matches a current source
+            # as managed — this preserves the legacy "differs, use
+            # --force" warning behaviour for already-installed
+            # entries. After this sync the sidecar is written and
+            # future syncs use strict ownership.
+            managed = set(servers.keys()) & set(sources.keys())
+            if managed:
+                msg = (
+                    f"Legacy .mcp.json migration: taking ownership of "
+                    f"{len(managed)} pre-existing entries that match "
+                    f"current sources ({sorted(managed)}). Future syncs "
+                    f"will use strict ownership tracking."
+                )
+                logger.warning(msg)
+                result.warnings.append(msg)
+
         changed = False
         for name, (_path, config) in sources.items():
             if name not in servers:
+                # New entry — vaultspec creates it and takes ownership.
                 servers[name] = config
+                managed.add(name)
                 result.added += 1
                 result.items.append((name, "added"))
                 changed = True
-            elif servers[name] == config:
-                result.skipped += 1
-            else:
-                if force:
+            elif name in managed:
+                # Previously managed by vaultspec — sync content.
+                if servers[name] == config:
+                    result.skipped += 1
+                elif force:
                     servers[name] = config
                     result.updated += 1
                     result.items.append((name, "updated"))
@@ -279,9 +347,68 @@ def mcp_sync(
                         f"MCP server '{name}' differs from definition "
                         f"(use --force to overwrite)"
                     )
+            else:
+                # User-added entry that shares a name with a current
+                # source. Preserve it; never take ownership implicitly.
+                result.skipped += 1
+                result.warnings.append(
+                    f"MCP server '{name}' is user-managed and shares "
+                    f"its name with a vaultspec source; skipping. "
+                    f"Rename one to resolve."
+                )
+
+        if prune:
+            # Critical: prune is gated on the source file being
+            # *physically absent* from disk, not merely missing from
+            # the parsed sources dict. ``collect_mcp_servers`` omits
+            # files that exist but failed JSON parsing or read; if we
+            # treated those as deletions, a transient typo would
+            # silently destroy the corresponding ``.mcp.json`` entry
+            # under ``sync --force``. ``_existing_source_server_names``
+            # walks the directory without opening files, so a parse
+            # failure leaves the entry intact until the source is
+            # fixed (or the file is genuinely deleted).
+            on_disk = _existing_source_server_names()
+            for name in sorted(managed - on_disk):
+                if name in servers:
+                    servers.pop(name)
+                    result.pruned += 1
+                    result.items.append((name, "[DELETE]"))
+                    changed = True
+                managed.discard(name)
+
+        # Reconcile managed set with what is actually in ``servers``
+        # (defensive cleanup against external mutations).
+        managed &= set(servers.keys())
+
+        # Persist managed set; remove the key entirely when empty so
+        # we never write a dangling sidecar.
+        prior_managed = existing.get(_MANAGED_KEY)
+        new_managed_value = sorted(managed) if managed else None
+        if new_managed_value is None:
+            if _MANAGED_KEY in existing:
+                del existing[_MANAGED_KEY]
+                changed = True
+        else:
+            if prior_managed != new_managed_value:
+                existing[_MANAGED_KEY] = new_managed_value
+                changed = True
 
         if changed and not dry_run:
-            atomic_write(mcp_json, json.dumps(existing, indent=2) + "\n")
+            # If pruning emptied the file entirely AND no other
+            # user-defined top-level keys remain, remove the file
+            # instead of leaving an orphan ``{"mcpServers": {}}``
+            # artefact. ``mcpServers`` is guaranteed to exist via
+            # ``setdefault`` above and ``_MANAGED_KEY`` is explicitly
+            # removed when the managed set is empty, so a single
+            # remaining key means the file holds nothing but the empty
+            # ``mcpServers`` dict. Anything else (custom user keys
+            # like ``inputs``) keeps the file alive.
+            if not servers and len(existing) == 1:
+                if mcp_json.exists():
+                    mcp_json.unlink()
+            else:
+                atomic_write(mcp_json, json.dumps(existing, indent=2) + "\n")
 
     return result
 

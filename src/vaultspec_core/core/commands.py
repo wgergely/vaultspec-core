@@ -1329,7 +1329,10 @@ def sync_provider(
         ]
         if "mcp" not in skip:
             sync_passes.append(
-                (lambda: _mcp_sync(dry_run=dry_run, force=force), "mcps")
+                (
+                    lambda: _mcp_sync(dry_run=dry_run, force=force, prune=force),
+                    "mcps",
+                )
             )
         for sync_fn, label in sync_passes:
             try:
