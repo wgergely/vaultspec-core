@@ -546,6 +546,45 @@ def test_unknown_pathology_raises(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Additional: input validation
+# ---------------------------------------------------------------------------
+
+
+def test_empty_feature_names_raises(tmp_path: Path) -> None:
+    """feature_names=[] raises ValueError instead of crashing with ZeroDivisionError."""
+    with pytest.raises(ValueError, match="feature_names must be a non-empty list"):
+        build_synthetic_vault(tmp_path, n_docs=6, seed=42, feature_names=[])
+
+
+def test_zero_n_docs_raises(tmp_path: Path) -> None:
+    """n_docs=0 raises ValueError."""
+    with pytest.raises(ValueError, match="n_docs must be >= 1"):
+        build_synthetic_vault(tmp_path, n_docs=0, seed=42)
+
+
+def test_negative_n_docs_raises(tmp_path: Path) -> None:
+    """Negative n_docs raises ValueError."""
+    with pytest.raises(ValueError, match="n_docs must be >= 1"):
+        build_synthetic_vault(tmp_path, n_docs=-5, seed=42)
+
+
+# ---------------------------------------------------------------------------
+# Additional: n_docs is honored exactly
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("n_docs", [1, 3, 6, 7, 12, 13, 24, 25, 96])
+def test_n_docs_honored_exactly(tmp_path: Path, n_docs: int) -> None:
+    """The well-formed corpus contains exactly n_docs documents."""
+    root = tmp_path / "vault"
+    root.mkdir()
+    manifest = build_synthetic_vault(root, n_docs=n_docs, seed=42)
+    assert len(manifest.docs) == n_docs, (
+        f"Requested {n_docs} docs but generator produced {len(manifest.docs)}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Additional: stem_collision detail schema
 # ---------------------------------------------------------------------------
 

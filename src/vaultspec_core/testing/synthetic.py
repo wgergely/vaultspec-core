@@ -772,6 +772,14 @@ def build_synthetic_vault(
         keywords, the graph edge list, and populated ``pathologies``,
         ``pathology_details``, and ``named_docs`` fields.
     """
+    if n_docs < 1:
+        raise ValueError(f"n_docs must be >= 1, got {n_docs}")
+    if feature_names is not None and len(feature_names) == 0:
+        raise ValueError(
+            "feature_names must be a non-empty list when provided; "
+            "pass None to use the default FEATURES list."
+        )
+
     rng = random.Random(seed)
     vault_dir = root / ".vault"
     docs: list[GeneratedDoc] = []
@@ -787,10 +795,16 @@ def build_synthetic_vault(
     # Also create .vaultspec so workspace resolution works.
     (root / ".vaultspec").mkdir(parents=True, exist_ok=True)
 
-    per_type = max(1, n_docs // len(DOC_TYPES))
+    # Honor `n_docs` exactly: distribute as evenly as possible across the
+    # six doc types via base + remainder.  The first `remainder` types get
+    # one extra doc.  When `n_docs < len(DOC_TYPES)` only the first `n_docs`
+    # types receive any documents (per_type_base == 0).
+    per_type_base = n_docs // len(DOC_TYPES)
+    remainder = n_docs % len(DOC_TYPES)
     doc_index = 0
 
-    for dt in DOC_TYPES:
+    for type_idx, dt in enumerate(DOC_TYPES):
+        per_type = per_type_base + (1 if type_idx < remainder else 0)
         for _i in range(per_type):
             feature = active_features[doc_index % len(active_features)]
             needle = _needle_for(dt, doc_index)
