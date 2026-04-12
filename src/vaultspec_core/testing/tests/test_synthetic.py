@@ -370,14 +370,14 @@ def test_named_docs_participate_in_graph(tmp_path: Path) -> None:
         "research_key": "2026-02-05-editor-demo-research",
     }
     # Try multiple seeds to ensure at least one produces edges for named docs.
-    # With graph_density=0.3 and 24 docs, probability of no edges for a single
-    # doc over 10 seeds is astronomically small.
+    # With edge_probability=0.3 and 24 docs, probability of no edges for a
+    # single doc over 100 seeds is astronomically small.
     any_edge_found = False
     for seed in range(100):
         root = tmp_path / f"vault-{seed}"
         root.mkdir()
         manifest = build_synthetic_vault(
-            root, n_docs=24, seed=seed, named_docs=stems, graph_density=0.3
+            root, n_docs=24, seed=seed, named_docs=stems, edge_probability=0.3
         )
         named_ids = {d.doc_id for d in manifest.named_docs.values()}
         for from_id, to_id in manifest.graph_edges:
@@ -514,21 +514,21 @@ def test_multi_project_different_seeds(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Additional: graph_density default is non-zero
+# Additional: edge_probability default is non-zero
 # ---------------------------------------------------------------------------
 
 
-def test_default_graph_density_produces_edges(tmp_path: Path) -> None:
-    """Default graph_density=0.3 produces at least one edge with n_docs=24."""
+def test_default_edge_probability_produces_edges(tmp_path: Path) -> None:
+    """Default edge_probability=0.3 produces at least one edge with n_docs=24."""
     manifest = build_synthetic_vault(tmp_path, n_docs=24, seed=42)
     assert len(manifest.graph_edges) > 0, (
-        "Default graph_density=0.3 produced no edges for 24 docs"
+        "Default edge_probability=0.3 produced no edges for 24 docs"
     )
 
 
-def test_zero_graph_density_produces_no_edges(tmp_path: Path) -> None:
-    """Explicit graph_density=0.0 produces no edges."""
-    manifest = build_synthetic_vault(tmp_path, n_docs=12, seed=42, graph_density=0.0)
+def test_zero_edge_probability_produces_no_edges(tmp_path: Path) -> None:
+    """Explicit edge_probability=0.0 produces no edges."""
+    manifest = build_synthetic_vault(tmp_path, n_docs=12, seed=42, edge_probability=0.0)
     assert len(manifest.graph_edges) == 0
 
 

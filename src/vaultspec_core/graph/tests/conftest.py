@@ -44,7 +44,7 @@ def graph_manifest(tmp_path_factory) -> CorpusManifest:
             "editor_demo_research": "2026-02-05-editor-demo-research",
         },
         pathologies=["cycle", "orphan", "stem_collision", "phantom_only_links"],
-        graph_density=0.3,
+        edge_probability=0.3,
     )
 
 

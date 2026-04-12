@@ -1,19 +1,24 @@
 """Synthetic vault corpus generator for deterministic testing.
 
 Generates ``.vault/`` directories with predictable content, unique needle
-keywords per document, and configurable graph density.  Each document is
-parseable by ``vaultspec_core.vaultcore.parse_vault_metadata`` and
+keywords per document, and a configurable wiki-link graph.  Each document
+is parseable by ``vaultspec_core.vaultcore.parse_vault_metadata`` and
 ``prepare_document``.
 
-The ``graph_density`` parameter defaults to ``0.3`` (non-zero). Tests that
-assert on graph connectivity (e.g. ``number_of_edges() > 0``) rely on this
-default; callers that need a fully disconnected corpus must pass
-``graph_density=0.0`` explicitly.
+The ``edge_probability`` parameter defaults to ``0.3`` (non-zero) and
+controls the probability that each generated document receives one
+outgoing wiki-link to a random other document.  It is *not* a graph
+density in the formal sense (it caps each node at one outgoing edge);
+the name reflects the per-node coin flip the generator actually performs.
+Tests that assert on graph connectivity (e.g. ``number_of_edges() > 0``)
+rely on this default; callers that need a fully disconnected corpus must
+pass ``edge_probability=0.0`` explicitly.
 """
 
 from __future__ import annotations
 
 import random
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -217,25 +222,33 @@ def _apply_dangling(
     exec_docs = [d for d in docs if d.doc_type == "exec"]
     targets = exec_docs[:1] if exec_docs else docs[:1]
 
+    # Match the empty-related block in either the canonical inline form
+    # ``related: []`` or the legacy block-style ``related:\n  []`` so the
+    # injection is robust to either rendering. The pattern is anchored to a
+    # leading newline so it cannot accidentally match inside body text.
+    empty_related_re = re.compile(r"\nrelated:[ \t]*(?:\[\]|\n[ \t]*\[\])\n")
+
     for doc in targets:
         broken_stem = "nonexistent-dangling-target-xyzzy"
-        # Rewrite the file with the extra dangling link.
         text = doc.path.read_text(encoding="utf-8")
-        # Insert the broken wiki-link into related: - replace the closing ---
-        # by adding a new related entry before it.
-        if "related: []" in text:
-            text = text.replace(
-                "related: []",
-                f'related:\n  - "[[{broken_stem}]]"',
-            )
-        else:
-            # Append to existing related list
-            text = text.replace(
+        replacement = f'\nrelated:\n  - "[[{broken_stem}]]"\n'
+        new_text, n_subs = empty_related_re.subn(replacement, text, count=1)
+        if n_subs == 0:
+            # Existing non-empty related list: append the new entry inside
+            # the YAML block by inserting before the closing ``---``.
+            new_text = text.replace(
                 "\n---\n",
                 f'\n  - "[[{broken_stem}]]"\n---\n',
                 1,
             )
-        doc.path.write_text(text, encoding="utf-8")
+        doc.path.write_text(new_text, encoding="utf-8")
+
+        # Keep the in-memory manifest consistent with what landed on disk:
+        # the doc now has one more related stem than its original
+        # ``related_ids`` recorded.
+        target_doc_id = f"{doc.doc_type}/{broken_stem}"
+        doc.related_ids.append(target_doc_id)
+        manifest.graph_edges.append((doc.doc_id, target_doc_id))
 
         affected.append(doc)
         details.append({"target_stem": broken_stem, "source_path": doc.path})
@@ -264,6 +277,8 @@ def _apply_dangling(
         affected.append(summary_doc)
         details.append({"target_stem": broken_stem2, "source_path": summary_path})
         docs.append(summary_doc)
+        manifest.needles[summary_doc.needle] = summary_doc.doc_id
+        manifest.graph_edges.append((summary_doc.doc_id, f"exec/{broken_stem2}"))
 
     manifest.pathologies["dangling"] = affected
     manifest.pathology_details["dangling"] = details
@@ -292,6 +307,7 @@ def _apply_orphan(
         path=path,
     )
     docs.append(doc)
+    manifest.needles[doc.needle] = doc.doc_id
     manifest.pathologies["orphan"] = [doc]
     manifest.pathology_details["orphan"] = [{"stem": stem}]
 
@@ -318,6 +334,7 @@ def _apply_missing_frontmatter(
         path=path,
     )
     docs.append(doc)
+    manifest.needles[doc.needle] = doc.doc_id
     manifest.pathologies["missing_frontmatter"] = [doc]
     manifest.pathology_details["missing_frontmatter"] = [{"stem": stem}]
 
@@ -334,7 +351,7 @@ def _apply_wrong_directory_tag(
     # Tag says #plan but file is in adr/ directory.
     fm = (
         '---\ntags:\n  - "#plan"\n  - "#wrong-dir-feature"\n'
-        "date: 2026-01-01\nrelated:\n  []\n---\n"
+        "date: 2026-01-01\nrelated: []\n---\n"
     )
     body = "# wrong directory tag\n\nThis document has a mismatched directory tag.\n"
     path.write_text(fm + "\n" + body, encoding="utf-8")
@@ -347,6 +364,7 @@ def _apply_wrong_directory_tag(
         path=path,
     )
     docs.append(doc)
+    manifest.needles[doc.needle] = doc.doc_id
     manifest.pathologies["wrong_directory_tag"] = [doc]
     manifest.pathology_details["wrong_directory_tag"] = [
         {"stem": stem, "directory": "adr", "tag": "plan"}
@@ -379,6 +397,7 @@ def _apply_stale_index(
         path=path,
     )
     docs.append(doc)
+    manifest.needles[doc.needle] = doc.doc_id
     manifest.pathologies["stale_index"] = [doc]
     manifest.pathology_details["stale_index"] = [
         {"stem": stem, "claimed_count": 99, "actual_count": 1}
@@ -417,6 +436,8 @@ def _apply_cycle(
         )
         docs.append(doc)
         cycle_docs.append(doc)
+        manifest.needles[doc.needle] = doc.doc_id
+        manifest.graph_edges.append((doc.doc_id, f"research/{next_stem}"))
 
     manifest.pathologies["cycle"] = cycle_docs
     manifest.pathology_details["cycle"] = [
@@ -433,7 +454,7 @@ def _apply_wrong_tag_count(
     """Emit a doc with only one tag (wrong count)."""
     stem = "2026-01-01-wrong-tag-count-doc"
     path = vault_dir / "plan" / f"{stem}.md"
-    fm = '---\ntags:\n  - "#plan"\ndate: 2026-01-01\nrelated:\n  []\n---\n'
+    fm = '---\ntags:\n  - "#plan"\ndate: 2026-01-01\nrelated: []\n---\n'
     body = "# wrong tag count\n\nThis document has only one tag.\n"
     path.write_text(fm + "\n" + body, encoding="utf-8")
     doc = GeneratedDoc(
@@ -445,6 +466,7 @@ def _apply_wrong_tag_count(
         path=path,
     )
     docs.append(doc)
+    manifest.needles[doc.needle] = doc.doc_id
     manifest.pathologies["wrong_tag_count"] = [doc]
     manifest.pathology_details["wrong_tag_count"] = [{"stem": stem, "tag_count": 1}]
 
@@ -490,6 +512,8 @@ def _apply_stem_collision(
     )
 
     docs.extend([doc_adr, doc_plan])
+    manifest.needles[doc_adr.needle] = doc_adr.doc_id
+    manifest.needles[doc_plan.needle] = doc_plan.doc_id
     manifest.pathologies["stem_collision"] = [doc_adr, doc_plan]
     manifest.pathology_details["stem_collision"] = [
         {
@@ -524,6 +548,7 @@ def _apply_phantom_only_links(
         related_ids=[f"plan/{t}" for t in phantom_targets],
     )
     docs.append(doc)
+    manifest.needles[doc.needle] = doc.doc_id
     manifest.pathologies["phantom_only_links"] = [doc]
     manifest.pathology_details["phantom_only_links"] = [
         {"plan_doc": doc, "phantom_targets": phantom_targets}
@@ -541,7 +566,7 @@ def _apply_invalid_date_format(
     path = vault_dir / "adr" / f"{stem}.md"
     fm = (
         '---\ntags:\n  - "#adr"\n  - "#invalid-date-feature"\n'
-        'date: "not-a-date"\nrelated:\n  []\n---\n'
+        'date: "not-a-date"\nrelated: []\n---\n'
     )
     body = "# invalid date\n\nThis document has a non-ISO date.\n"
     path.write_text(fm + "\n" + body, encoding="utf-8")
@@ -554,6 +579,7 @@ def _apply_invalid_date_format(
         path=path,
     )
     docs.append(doc)
+    manifest.needles[doc.needle] = doc.doc_id
     manifest.pathologies["invalid_date_format"] = [doc]
     manifest.pathology_details["invalid_date_format"] = [
         {"stem": stem, "date_value": "not-a-date"}
@@ -586,6 +612,7 @@ def _apply_malformed_related_entry(
         path=path,
     )
     docs.append(doc)
+    manifest.needles[doc.needle] = doc.doc_id
     manifest.pathologies["malformed_related_entry"] = [doc]
     manifest.pathology_details["malformed_related_entry"] = [
         {"stem": stem, "bad_entry": "not-a-wiki-link"}
@@ -617,6 +644,7 @@ def _apply_body_link(
         path=path,
     )
     docs.append(doc)
+    manifest.needles[doc.needle] = doc.doc_id
     manifest.pathologies["body_link"] = [doc]
     manifest.pathology_details["body_link"] = [
         {"stem": stem, "body_link": "body-wiki-link"}
@@ -644,6 +672,7 @@ def _apply_bad_filename(
         path=path,
     )
     docs.append(doc)
+    manifest.needles[doc.needle] = doc.doc_id
     manifest.pathologies["bad_filename"] = [doc]
     manifest.pathology_details["bad_filename"] = [{"stem": stem}]
 
@@ -670,6 +699,7 @@ def _apply_unreferenced_research(
         path=path,
     )
     docs.append(doc)
+    manifest.needles[doc.needle] = doc.doc_id
     manifest.pathologies["unreferenced_research"] = [doc]
     manifest.pathology_details["unreferenced_research"] = [{"stem": stem}]
 
@@ -704,7 +734,7 @@ def build_synthetic_vault(
     root: Path,
     *,
     n_docs: int = 24,
-    graph_density: float = 0.3,
+    edge_probability: float = 0.3,
     seed: int = 42,
     pathologies: Iterable[str] | None = None,
     named_docs: dict[str, str] | None = None,
@@ -712,17 +742,21 @@ def build_synthetic_vault(
 ) -> CorpusManifest:
     """Generate a ``.vault/`` directory with predictable, searchable content.
 
-    The ``graph_density`` defaults to ``0.3`` (non-zero) so tests asserting on
-    graph connectivity (e.g. ``number_of_edges() > 0``) pass against the
-    baseline corpus without configuration.
+    The ``edge_probability`` defaults to ``0.3`` (non-zero) so tests
+    asserting on graph connectivity (e.g. ``number_of_edges() > 0``)
+    pass against the baseline corpus without configuration.
 
     Args:
         root: Project root directory. ``.vault/`` is created inside.
         n_docs: Total number of well-formed documents to generate.
             Distributed evenly across the 6 doc types.
-        graph_density: Fraction of documents that link to another document
-            via ``related:``. Must be >= 0.0 and <= 1.0. Default ``0.3``
-            ensures the baseline corpus has edges for connectivity tests.
+        edge_probability: Per-node probability that a generated document
+            receives one outgoing wiki-link to a random other document.
+            Must be >= 0.0 and <= 1.0. This is *not* a formal graph
+            density (each node is capped at one outgoing edge); the name
+            reflects the coin flip the generator performs per node.
+            Default ``0.3`` keeps the baseline corpus connected enough
+            for ``test_networkx_digraph_has_edges`` to pass.
         seed: Random seed for reproducible generation.
         pathologies: Iterable of named pathology presets to inject after
             the well-formed corpus is written. Each preset adds affected
@@ -813,9 +847,9 @@ def build_synthetic_vault(
             named_doc_map[logical_key] = named_doc
             doc_index += 1
 
-    # Build graph links based on density.
+    # Build graph links: per-node coin flip for one outgoing edge.
     for doc in docs:
-        if rng.random() < graph_density:
+        if rng.random() < edge_probability:
             candidates = [d for d in docs if d.doc_id != doc.doc_id]
             if candidates:
                 target = rng.choice(candidates)
