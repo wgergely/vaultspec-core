@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 concurrency:
   group: release-please
@@ -48,3 +49,29 @@ jobs:
             git commit -m "chore: update uv.lock for release"
             git push
           fi
+
+      - name: Dispatch PyPI publish workflow
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: |
+          if [ -z "${TAG}" ]; then
+            echo "::error::release-please reported release_created=true but tag_name output is empty"
+            exit 1
+          fi
+          echo "Dispatching publish.yml for tag: ${TAG}"
+          gh workflow run publish.yml --ref "${TAG}" -f tag="${TAG}"
+          echo "Waiting for dispatched run to appear..."
+          for _ in 1 2 3 4 5 6 7 8 9 10; do
+            RUN_ID=$(gh run list --workflow=publish.yml --event=workflow_dispatch --limit=1 --json databaseId,headBranch \
+              --jq ".[] | select(.headBranch==\"${TAG}\") | .databaseId")
+            if [ -n "${RUN_ID}" ]; then
+              echo "Dispatched run: ${RUN_ID}"
+              echo "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::publish.yml dispatch did not produce a visible run within 30s"
+          exit 1
