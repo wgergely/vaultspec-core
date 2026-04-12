@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.10](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.9...vaultspec-core-v0.1.10) (2026-04-12)
+
+
+### Features
+
+* reconciling mcp_sync — prune orphaned managed entries ([166ba69](https://github.com/wgergely/vaultspec-core/commit/166ba69727c8b0d5f1f452c381caa4772a1fec63))
+* reconciling mcp_sync — prune orphaned managed entries ([9d913bb](https://github.com/wgergely/vaultspec-core/commit/9d913bb8f01db3a3865eb79bdb48b0a5f911ac13))
+
+
+### Bug Fixes
+
+* **ci:** auto-dispatch publish from release-please on release creation ([46d0cb3](https://github.com/wgergely/vaultspec-core/commit/46d0cb3967ad00ff3b397c396514e02a4bbf3c7a)), closes [#65](https://github.com/wgergely/vaultspec-core/issues/65)
+* **mcps:** preserve user top-level keys when pruning empties .mcp.json ([4a4f773](https://github.com/wgergely/vaultspec-core/commit/4a4f77356519461a9f533771e484234d7af281fd))
+* **mcps:** security hardening — parse-failure prune gate + legacy migration audit log ([4317d54](https://github.com/wgergely/vaultspec-core/commit/4317d5432a799d5b00494b92a70cc177fe964b81))
+* trigger PyPI publish automatically on release-please releases ([ba1c4dd](https://github.com/wgergely/vaultspec-core/commit/ba1c4dd6710cd77d8091a43266fd9200d5cbe886))
+
 ## [0.1.9](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.8...vaultspec-core-v0.1.9) (2026-04-11)
 
 
