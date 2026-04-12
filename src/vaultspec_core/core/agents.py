@@ -34,14 +34,14 @@ logger = logging.getLogger(__name__)
 # Source agents are authored against Claude names; the Gemini renderer maps
 # at sync time so the source files stay single-authored.
 _CLAUDE_TO_GEMINI_TOOLS: dict[str, str] = {
-    "Read": "ReadFile",
-    "Write": "WriteFile",
-    "Edit": "Edit",
-    "Glob": "FindFiles",
-    "Grep": "SearchText",
-    "Bash": "RunShellCommand",
-    "WebFetch": "WebFetch",
-    "WebSearch": "GoogleSearch",
+    "Read": "read_file",
+    "Write": "write_file",
+    "Edit": "edit",
+    "Glob": "glob",
+    "Grep": "grep",
+    "Bash": "shell",
+    "WebFetch": "web_fetch",
+    "WebSearch": "web_search",
 }
 
 

@@ -93,7 +93,7 @@ class TestRenderGeminiAgent:
         warnings: list[str] = []
         meta = {"tools": ["Read", "BogusTool", "Bash"]}
         out = _render_gemini_agent("vaultspec-x.md", meta, "body", warnings=warnings)
-        assert _fm(out)["tools"] == ["ReadFile", "RunShellCommand"]
+        assert _fm(out)["tools"] == ["read_file", "shell"]
         assert any("BogusTool" in w for w in warnings)
         assert any("vaultspec-x" in w for w in warnings)
 
@@ -113,7 +113,7 @@ class TestRenderGeminiAgent:
     def test_non_string_tool_entries_ignored(self):
         meta = {"tools": ["Read", 42, None, "Grep"]}
         out = _render_gemini_agent("x.md", meta, "body")
-        assert _fm(out)["tools"] == ["ReadFile", "SearchText"]
+        assert _fm(out)["tools"] == ["read_file", "grep"]
 
 
 class TestTransformAgentDispatch:
@@ -128,7 +128,7 @@ class TestTransformAgentDispatch:
         meta = {"tier": "HIGH", "tools": ["Glob"]}
         rendered_meta = _fm(transform_agent(Tool.GEMINI, "a.md", meta, "body"))
         assert rendered_meta["name"] == "a"
-        assert rendered_meta["tools"] == ["FindFiles"]
+        assert rendered_meta["tools"] == ["glob"]
         assert "tier" not in rendered_meta
 
     def test_unregistered_tool_falls_through_to_passthrough(self):
@@ -142,7 +142,7 @@ class TestTransformAgentDispatch:
         rendered_meta = _fm(
             transform_agent("gemini", "a.md", {"tools": ["Read"]}, "body")
         )
-        assert rendered_meta["tools"] == ["ReadFile"]
+        assert rendered_meta["tools"] == ["read_file"]
 
     def test_warnings_threaded_through(self):
         warnings: list[str] = []
