@@ -892,6 +892,44 @@ class TestMcpSyncPrune:
             reset_config()
             shutil.rmtree(path, ignore_errors=True)
 
+    def test_prune_preserves_user_top_level_keys(self):
+        """Regression: when pruning empties ``mcpServers`` AND clears
+        the managed sidecar, the file must still survive if the user
+        added other top-level keys (e.g. ``inputs``, custom config).
+        Only when the file holds nothing but an empty ``mcpServers``
+        dict may it be unlinked.
+        """
+        path, mcps_dir = _make_workspace()
+        try:
+            (mcps_dir / "ephemeral.builtin.json").write_text(
+                json.dumps({"command": "uv"}), encoding="utf-8"
+            )
+            _init_context(path)
+            from vaultspec_core.core.mcps import mcp_sync
+
+            # First sync: install. After this the file has
+            # mcpServers + _vaultspecManaged.
+            mcp_sync()
+
+            # User manually adds a custom top-level key (e.g. inputs).
+            data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+            data["inputs"] = [{"type": "promptString", "id": "api-key"}]
+            (path / ".mcp.json").write_text(json.dumps(data), encoding="utf-8")
+
+            # Delete the source and prune.
+            (mcps_dir / "ephemeral.builtin.json").unlink()
+            mcp_sync(prune=True)
+
+            # File MUST still exist with the user's custom key intact.
+            assert (path / ".mcp.json").exists()
+            data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+            assert data["inputs"] == [{"type": "promptString", "id": "api-key"}]
+            assert data["mcpServers"] == {}
+            assert "_vaultspecManaged" not in data
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
     def test_round_trip_install_uninstall_via_sync_provider(self):
         """End-to-end: install seeds an entry via sync_provider, then
         deleting the source and re-running sync_provider with force=True

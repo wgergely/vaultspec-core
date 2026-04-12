@@ -352,9 +352,16 @@ def mcp_sync(
                 changed = True
 
         if changed and not dry_run:
-            # If pruning emptied the file entirely, remove it instead
-            # of leaving an orphan ``{"mcpServers": {}}`` artefact.
-            if not servers and _MANAGED_KEY not in existing:
+            # If pruning emptied the file entirely AND no other
+            # user-defined top-level keys remain, remove the file
+            # instead of leaving an orphan ``{"mcpServers": {}}``
+            # artefact. ``mcpServers`` is guaranteed to exist via
+            # ``setdefault`` above and ``_MANAGED_KEY`` is explicitly
+            # removed when the managed set is empty, so a single
+            # remaining key means the file holds nothing but the empty
+            # ``mcpServers`` dict. Anything else (custom user keys
+            # like ``inputs``) keeps the file alive.
+            if not servers and len(existing) == 1:
                 if mcp_json.exists():
                     mcp_json.unlink()
             else:
