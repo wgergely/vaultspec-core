@@ -29,11 +29,6 @@ from .types import SyncResult
 logger = logging.getLogger(__name__)
 
 
-# Authoring keys carried in source agent frontmatter that are vaultspec-internal
-# and must not leak into rendered provider files. Gemini's strict schema
-# rejects them outright; Claude tolerates them but should not see them either.
-_VAULTSPEC_AUTHORING_KEYS: frozenset[str] = frozenset({"tier", "mode"})
-
 # Static mapping from the Claude tool vocabulary used in
 # .vaultspec/rules/agents/*.md to Gemini CLI's first-party tool identifiers.
 # Source agents are authored against Claude names; the Gemini renderer maps

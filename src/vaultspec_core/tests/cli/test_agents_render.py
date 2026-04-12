@@ -172,7 +172,16 @@ def _source_agent_files() -> list[Path]:
     return sorted(_AGENTS_SRC.glob("*.md"))
 
 
-@pytest.mark.parametrize("agent_path", _source_agent_files(), ids=lambda p: p.name)
+# Fail loudly at collection time rather than silently producing zero
+# parametrized tests if the source-agent directory is ever moved or empty.
+_SOURCE_AGENTS = _source_agent_files()
+assert _SOURCE_AGENTS, (
+    f"No source agents found under {_AGENTS_SRC}; the parametrized "
+    "regression guard would silently produce zero tests."
+)
+
+
+@pytest.mark.parametrize("agent_path", _SOURCE_AGENTS, ids=lambda p: p.name)
 class TestSourceAgentCoverage:
     """Regression guard: every shipped source agent renders cleanly."""
 

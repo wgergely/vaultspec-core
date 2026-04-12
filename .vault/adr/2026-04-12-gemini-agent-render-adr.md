@@ -37,7 +37,7 @@ Three renderers ship in this PR:
 - **`_render_claude_agent`** - canonical Claude shape: stamps `name`
   from the filename stem, preserves `description`, preserves the
   source `tools` list verbatim (Claude tool names), drops vaultspec
-  authoring keys (`tier`, `mode`, `model`) so Claude's view of the
+  authoring keys (`tier`, `mode`) so Claude's view of the
   agent is clean rather than merely tolerated.
 - **`_render_gemini_agent`** - Gemini shape: stamps `name`, preserves
   `description`, **maps** `tools` from Claude vocabulary to Gemini
