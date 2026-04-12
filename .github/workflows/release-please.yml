@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 concurrency:
   group: release-please
@@ -48,3 +49,12 @@ jobs:
             git commit -m "chore: update uv.lock for release"
             git push
           fi
+
+      - name: Dispatch PyPI publish workflow
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: |
+          echo "Dispatching publish.yml for tag: $TAG"
+          gh workflow run publish.yml --ref "$TAG" -f tag="$TAG"
