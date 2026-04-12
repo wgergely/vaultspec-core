@@ -716,6 +716,234 @@ class TestUninstallRemovesCustomMcps:
 
 
 @pytest.mark.unit
+class TestMcpSyncPrune:
+    """Reconciling sync — prune orphans on companion uninstall."""
+
+    def test_prune_removes_orphan_managed_entry(self):
+        path, mcps_dir = _make_workspace()
+        try:
+            (mcps_dir / "ephemeral.builtin.json").write_text(
+                json.dumps({"command": "uv", "args": ["run", "ephemeral"]}),
+                encoding="utf-8",
+            )
+            _init_context(path)
+            from vaultspec_core.core.mcps import mcp_sync
+
+            # First sync: install
+            result = mcp_sync()
+            assert result.added == 1
+            data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+            assert "ephemeral" in data["mcpServers"]
+            assert data["_vaultspecManaged"] == ["ephemeral"]
+
+            # Delete the source file to simulate companion uninstall
+            (mcps_dir / "ephemeral.builtin.json").unlink()
+
+            # Second sync with prune=True: should remove the orphan
+            result = mcp_sync(prune=True)
+            assert result.pruned == 1
+            assert ("ephemeral", "[DELETE]") in result.items
+
+            # File should be removed entirely (no managed, no servers)
+            assert not (path / ".mcp.json").exists()
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_prune_default_false_leaves_orphans(self):
+        path, mcps_dir = _make_workspace()
+        try:
+            (mcps_dir / "stay.builtin.json").write_text(
+                json.dumps({"command": "uv"}), encoding="utf-8"
+            )
+            _init_context(path)
+            from vaultspec_core.core.mcps import mcp_sync
+
+            mcp_sync()
+            (mcps_dir / "stay.builtin.json").unlink()
+
+            # Default prune=False: orphan stays put
+            result = mcp_sync()
+            assert result.pruned == 0
+            data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+            assert "stay" in data["mcpServers"]
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_prune_preserves_user_added_entries(self):
+        path, mcps_dir = _make_workspace()
+        try:
+            (mcps_dir / "managed.builtin.json").write_text(
+                json.dumps({"command": "uv"}), encoding="utf-8"
+            )
+            user_data = {"mcpServers": {"my-tool": {"command": "custom", "args": []}}}
+            (path / ".mcp.json").write_text(json.dumps(user_data), encoding="utf-8")
+            _init_context(path)
+            from vaultspec_core.core.mcps import mcp_sync
+
+            mcp_sync()
+            (mcps_dir / "managed.builtin.json").unlink()
+
+            result = mcp_sync(prune=True)
+            assert result.pruned == 1
+
+            data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+            # User entry survives the orphan prune
+            assert "my-tool" in data["mcpServers"]
+            assert "managed" not in data["mcpServers"]
+            # No managed key remains since the only managed entry was pruned
+            assert "_vaultspecManaged" not in data
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_user_added_with_shared_name_never_taken_over(self):
+        """A user-added entry must not be taken over just because a
+        source file appears with the same name later. The strict
+        ownership rule: only entries created by mcp_sync itself
+        enter the managed set.
+        """
+        path, mcps_dir = _make_workspace()
+        try:
+            # User pre-registers an entry — note: file already has the
+            # _vaultspecManaged sidecar (empty), so legacy migration
+            # does NOT take ownership.
+            existing = {
+                "mcpServers": {"shared": {"command": "user-binary"}},
+                "_vaultspecManaged": [],
+            }
+            (path / ".mcp.json").write_text(json.dumps(existing), encoding="utf-8")
+
+            # Source file with the same name appears
+            (mcps_dir / "shared.builtin.json").write_text(
+                json.dumps({"command": "vaultspec-binary"}), encoding="utf-8"
+            )
+
+            _init_context(path)
+            from vaultspec_core.core.mcps import mcp_sync
+
+            result = mcp_sync()
+            # Should NOT add (entry already there) and NOT enter managed
+            assert result.added == 0
+            assert result.skipped == 1
+            assert any("user-managed" in w for w in result.warnings), result.warnings
+
+            data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+            # User's entry preserved unchanged
+            assert data["mcpServers"]["shared"]["command"] == "user-binary"
+            # Source name did NOT get added to managed set
+            assert "shared" not in data.get("_vaultspecManaged", [])
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_legacy_migration_treats_pre_existing_as_managed(self):
+        """Workspaces created before ownership tracking shipped have
+        no `_vaultspecManaged` sidecar. The migration heuristic treats
+        any pre-existing entry whose name matches a current source as
+        managed (preserves the legacy 'differs, use --force' warning).
+        """
+        path, mcps_dir = _make_workspace()
+        try:
+            # Pre-existing .mcp.json without sidecar key (legacy)
+            existing = {"mcpServers": {"legacy": {"command": "old"}}}
+            (path / ".mcp.json").write_text(json.dumps(existing), encoding="utf-8")
+            (mcps_dir / "legacy.builtin.json").write_text(
+                json.dumps({"command": "new"}), encoding="utf-8"
+            )
+
+            _init_context(path)
+            from vaultspec_core.core.mcps import mcp_sync
+
+            # First sync after upgrade — legacy migration kicks in
+            result = mcp_sync(force=True)
+            assert result.updated == 1
+
+            data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+            assert data["mcpServers"]["legacy"]["command"] == "new"
+            # Sidecar now persisted with the migrated entry
+            assert data["_vaultspecManaged"] == ["legacy"]
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_managed_key_persisted_across_syncs(self):
+        path, mcps_dir = _make_workspace()
+        try:
+            (mcps_dir / "alpha.builtin.json").write_text(
+                json.dumps({"command": "uv"}), encoding="utf-8"
+            )
+            (mcps_dir / "beta.builtin.json").write_text(
+                json.dumps({"command": "uv"}), encoding="utf-8"
+            )
+            _init_context(path)
+            from vaultspec_core.core.mcps import mcp_sync
+
+            mcp_sync()
+            data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+            assert data["_vaultspecManaged"] == ["alpha", "beta"]
+
+            # Re-sync: managed set should remain identical
+            mcp_sync()
+            data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+            assert data["_vaultspecManaged"] == ["alpha", "beta"]
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+    def test_round_trip_install_uninstall_via_sync_provider(self):
+        """End-to-end: install seeds an entry via sync_provider, then
+        deleting the source and re-running sync_provider with force=True
+        prunes the orphan cleanly. This is the canonical companion
+        install/uninstall flow rag relies on.
+        """
+        path = PROJECT_ROOT / ".pytest-tmp" / f"mcp-roundtrip-{uuid4().hex}"
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            reset_config()
+
+            from vaultspec_core.core.commands import (
+                install_run,
+                sync_provider,
+            )
+
+            install_run(
+                path=path,
+                provider="all",
+                upgrade=False,
+                dry_run=False,
+                force=False,
+            )
+
+            # Simulate a companion package dropping a source file
+            mcps_dir = path / ".vaultspec" / "rules" / "mcps"
+            (mcps_dir / "companion.builtin.json").write_text(
+                json.dumps({"command": "uv", "args": ["run", "companion"]}),
+                encoding="utf-8",
+            )
+
+            # Companion install: sync to propagate
+            sync_provider("all", force=False)
+            data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+            assert "companion" in data["mcpServers"]
+            assert "companion" in data["_vaultspecManaged"]
+
+            # Companion uninstall: delete source + sync
+            (mcps_dir / "companion.builtin.json").unlink()
+            sync_provider("all", force=True)
+
+            data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
+            assert "companion" not in data["mcpServers"]
+            assert "companion" not in data.get("_vaultspecManaged", [])
+            # vaultspec-core's own MCP entry is preserved
+            assert "vaultspec-core" in data["mcpServers"]
+        finally:
+            reset_config()
+            shutil.rmtree(path, ignore_errors=True)
+
+
+@pytest.mark.unit
 class TestInstallSeedsMcps:
     def test_install_creates_mcp_json_from_registry(self):
         path = PROJECT_ROOT / ".pytest-tmp" / f"mcps-install-{uuid4().hex}"
