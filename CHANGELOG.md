@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.11](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.10...vaultspec-core-v0.1.11) (2026-04-12)
+
+
+### Bug Fixes
+
+* **testing:** address codex review on synthetic.py inputs ([360a46c](https://github.com/wgergely/vaultspec-core/commit/360a46c2907ff7f524c171a68370e53f2bc4852a))
+* **testing:** address gemini-code-assist review on synthetic.py ([e7a9788](https://github.com/wgergely/vaultspec-core/commit/e7a9788adb3ac8bd8ea7556bf2e9a86417f2762d))
+
 ## [0.1.10](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.9...vaultspec-core-v0.1.10) (2026-04-12)
 
 
