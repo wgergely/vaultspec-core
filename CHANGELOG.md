@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.12](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.11...vaultspec-core-v0.1.12) (2026-04-12)
+
+
+### Bug Fixes
+
+* use gh api for publish dispatch instead of gh workflow run ([87d6f90](https://github.com/wgergely/vaultspec-core/commit/87d6f904ca4843b743b4fe58ee8b30e712b78639))
+
 ## [0.1.11](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.10...vaultspec-core-v0.1.11) (2026-04-12)
 
 
