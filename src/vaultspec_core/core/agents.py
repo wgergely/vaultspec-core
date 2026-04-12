@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from . import types as _t
 from .config_gen import _toml_quote
@@ -29,6 +29,141 @@ from .types import SyncResult
 logger = logging.getLogger(__name__)
 
 
+# Authoring keys carried in source agent frontmatter that are vaultspec-internal
+# and must not leak into rendered provider files. Gemini's strict schema
+# rejects them outright; Claude tolerates them but should not see them either.
+_VAULTSPEC_AUTHORING_KEYS: frozenset[str] = frozenset({"tier", "mode"})
+
+# Static mapping from the Claude tool vocabulary used in
+# .vaultspec/rules/agents/*.md to Gemini CLI's first-party tool identifiers.
+# Source agents are authored against Claude names; the Gemini renderer maps
+# at sync time so the source files stay single-authored.
+_CLAUDE_TO_GEMINI_TOOLS: dict[str, str] = {
+    "Read": "ReadFile",
+    "Write": "WriteFile",
+    "Edit": "Edit",
+    "Glob": "FindFiles",
+    "Grep": "SearchText",
+    "Bash": "RunShellCommand",
+    "WebFetch": "WebFetch",
+    "WebSearch": "GoogleSearch",
+}
+
+
+def _stem(name: str) -> str:
+    return Path(name).stem
+
+
+def _coerce_tools(meta: dict[str, Any]) -> list[str]:
+    raw = meta.get("tools")
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, str) and item]
+
+
+def _render_passthrough_agent(
+    _name: str,
+    meta: dict[str, Any],
+    body: str,
+    *,
+    warnings: list[str] | None = None,  # noqa: ARG001
+) -> str:
+    """Default agent rendering: emit source frontmatter unchanged.
+
+    Used for any provider not explicitly registered in
+    :data:`_AGENT_RENDERERS`. Preserves the historical behaviour of
+    :func:`transform_agent`.
+    """
+    return build_file(meta, body)
+
+
+def _render_claude_agent(
+    name: str,
+    meta: dict[str, Any],
+    body: str,
+    *,
+    warnings: list[str] | None = None,  # noqa: ARG001
+) -> str:
+    """Render an agent definition for Claude.
+
+    Stamps ``name`` from the filename stem, preserves ``description``,
+    ``tools`` (verbatim, in the Claude vocabulary), and ``model`` if set.
+    Drops vaultspec authoring keys (``tier``, ``mode``) so the file
+    Claude reads is clean rather than merely tolerated.
+    """
+    fm: dict[str, Any] = {"name": _stem(name)}
+    description = meta.get("description")
+    if isinstance(description, str) and description.strip():
+        fm["description"] = description.strip()
+
+    tools = _coerce_tools(meta)
+    if tools:
+        fm["tools"] = tools
+
+    model = meta.get("model")
+    if isinstance(model, str) and model.strip():
+        fm["model"] = model.strip()
+
+    return build_file(fm, body)
+
+
+def _render_gemini_agent(
+    name: str,
+    meta: dict[str, Any],
+    body: str,
+    *,
+    warnings: list[str] | None = None,
+) -> str:
+    """Render an agent definition for Gemini CLI.
+
+    Builds a frontmatter dict that satisfies Gemini's strict schema:
+    requires ``name``, drops vaultspec authoring keys, and maps every
+    entry of ``tools`` from Claude vocabulary to Gemini vocabulary via
+    :data:`_CLAUDE_TO_GEMINI_TOOLS`. Unmapped source tools are dropped
+    and a warning is appended to *warnings* (if provided) so a single
+    typo in one source file does not break the whole sync.
+    """
+    fm: dict[str, Any] = {"name": _stem(name)}
+    description = meta.get("description")
+    if isinstance(description, str) and description.strip():
+        fm["description"] = description.strip()
+
+    mapped: list[str] = []
+    for tool_name in _coerce_tools(meta):
+        gemini_name = _CLAUDE_TO_GEMINI_TOOLS.get(tool_name)
+        if gemini_name is None:
+            msg = (
+                f"Agent {_stem(name)!r}: unknown source tool {tool_name!r} "
+                f"has no Gemini equivalent; dropping."
+            )
+            logger.warning(msg)
+            if warnings is not None:
+                warnings.append(msg)
+            continue
+        mapped.append(gemini_name)
+    if mapped:
+        fm["tools"] = mapped
+
+    return build_file(fm, body)
+
+
+class _AgentRenderer(Protocol):
+    def __call__(
+        self,
+        name: str,
+        meta: dict[str, Any],
+        body: str,
+        *,
+        warnings: list[str] | None = None,
+    ) -> str: ...
+
+
+_AGENT_RENDERERS: dict[Tool, _AgentRenderer] = {
+    Tool.CLAUDE: _render_claude_agent,
+    Tool.GEMINI: _render_gemini_agent,
+}
+
+
 def collect_agents(
     warnings: list[str] | None = None,
 ) -> dict[str, tuple[Path, dict[str, Any], str]]:
@@ -45,20 +180,39 @@ def collect_agents(
     return collect_md_resources(_t.get_context().agents_src_dir, warnings=warnings)
 
 
-def transform_agent(_tool: Tool, _name: str, meta: dict[str, Any], body: str) -> str:
+def transform_agent(
+    tool: Tool | str,
+    name: str,
+    meta: dict[str, Any],
+    body: str,
+    *,
+    warnings: list[str] | None = None,
+) -> str:
     """Transform an agent definition for a specific tool destination.
 
+    Dispatches to the per-provider renderer registered in
+    :data:`_AGENT_RENDERERS`. Providers without a registered renderer
+    fall through to :func:`_render_passthrough_agent`, preserving the
+    historical behaviour. The Codex path is dispatched separately by
+    :func:`agents_sync` and never reaches this function.
+
     Args:
-        _tool: Target :class:`~vaultspec_core.core.enums.Tool` (unused; present
-            for the standard transform callback signature).
-        _name: Source filename (unused).
+        tool: Target :class:`~vaultspec_core.core.enums.Tool`.
+        name: Source filename. The stem is used to stamp ``name`` into
+            the rendered frontmatter.
         meta: Frontmatter dict from the agent source file.
         body: Markdown body of the agent source file.
+        warnings: Optional accumulator for non-fatal advisories raised
+            by the renderer (currently used by the Gemini renderer to
+            report unmapped tool names).
 
     Returns:
         Rendered file content with YAML frontmatter prepended.
     """
-    return build_file(meta, body)
+    if isinstance(tool, str):
+        tool = Tool(tool)
+    renderer = _AGENT_RENDERERS.get(tool, _render_passthrough_agent)
+    return renderer(name, meta, body, warnings=warnings)
 
 
 def _toml_multiline(value: str) -> str:
@@ -288,6 +442,7 @@ def agents_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
         all active tool destinations.
     """
     parse_warnings: list[str] = []
+    render_warnings: list[str] = []
     sources = collect_agents(warnings=parse_warnings)
     total = SyncResult()
 
@@ -301,7 +456,7 @@ def agents_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
             sources=sources,
             dest_dir=cfg.agents_dir,
             transform_fn=lambda _tool, n, m, b, _tt=tool_type: transform_agent(
-                _tt, n, m, b
+                _tt, n, m, b, warnings=render_warnings
             ),
             dest_path_fn=lambda dest_dir, name: dest_dir / name,
             prune=prune,
@@ -316,4 +471,5 @@ def agents_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
         total.merge(codex_result)
         total.per_tool[Tool.CODEX.value] = codex_result
     total.warnings.extend(parse_warnings)
+    total.warnings.extend(render_warnings)
     return total
