@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.13](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.12...vaultspec-core-v0.1.13) (2026-04-12)
+
+
+### Bug Fixes
+
+* **#76:** correct Gemini tool identifiers + add live drift + load tests ([#78](https://github.com/wgergely/vaultspec-core/issues/78)) ([c329276](https://github.com/wgergely/vaultspec-core/commit/c329276fada06ca6b5288119c0d0a8d2d253b552)), closes [#76](https://github.com/wgergely/vaultspec-core/issues/76)
+
 ## [0.1.12](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.11...vaultspec-core-v0.1.12) (2026-04-12)
 
 
