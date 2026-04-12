@@ -40,37 +40,37 @@ def _cfg(tool: Tool) -> ToolConfig:
 
 
 class TestCollectRules:
-    def test_builtin_and_custom(self, test_project):
+    def test_builtin_and_custom(self, synthetic_project):
         """Both .builtin.md and plain .md files are collected from rules/rules/."""
-        (test_project / ".vaultspec" / "rules" / "rules" / "a.builtin.md").write_text(
-            "---\nname: a\n---\n\nBuilt-in A", encoding="utf-8"
-        )
-        (test_project / ".vaultspec" / "rules" / "rules" / "b.md").write_text(
+        (
+            synthetic_project / ".vaultspec" / "rules" / "rules" / "a.builtin.md"
+        ).write_text("---\nname: a\n---\n\nBuilt-in A", encoding="utf-8")
+        (synthetic_project / ".vaultspec" / "rules" / "rules" / "b.md").write_text(
             "---\nname: b\n---\n\nCustom B", encoding="utf-8"
         )
         sources = collect_rules()
         assert "a.builtin.md" in sources
         assert "b.md" in sources
 
-    def test_empty_dirs(self, test_project):
+    def test_empty_dirs(self, synthetic_project):
         # Clear any pre-existing rules so dirs exist but are empty
-        rules_dir = test_project / ".vaultspec" / "rules" / "rules"
+        rules_dir = synthetic_project / ".vaultspec" / "rules" / "rules"
         for f in rules_dir.glob("*.md"):
             f.unlink()
         sources = collect_rules()
         assert sources == {}
 
-    def test_missing_dirs(self, test_project):
-        shutil.rmtree(test_project / ".vaultspec" / "rules")
+    def test_missing_dirs(self, synthetic_project):
+        shutil.rmtree(synthetic_project / ".vaultspec" / "rules")
         sources = collect_rules()
         assert sources == {}
 
-    def test_builtin_suffix_detected(self, test_project):
+    def test_builtin_suffix_detected(self, synthetic_project):
         """Builtin rules use .builtin.md suffix; custom rules use plain .md."""
         (
-            test_project / ".vaultspec" / "rules" / "rules" / "core.builtin.md"
+            synthetic_project / ".vaultspec" / "rules" / "rules" / "core.builtin.md"
         ).write_text("---\nname: core\n---\n\nBuilt-in content", encoding="utf-8")
-        (test_project / ".vaultspec" / "rules" / "rules" / "custom.md").write_text(
+        (synthetic_project / ".vaultspec" / "rules" / "rules" / "custom.md").write_text(
             "---\nname: custom\n---\n\nCustom content", encoding="utf-8"
         )
         sources = collect_rules()
@@ -79,16 +79,18 @@ class TestCollectRules:
 
 
 class TestCollectSkills:
-    def test_collects_all_skill_directories(self, test_project):
+    def test_collects_all_skill_directories(self, synthetic_project):
         """Any directory with a SKILL.md is collected, regardless of naming."""
         deploy_dir = (
-            test_project / ".vaultspec" / "rules" / "skills" / "vaultspec-deploy"
+            synthetic_project / ".vaultspec" / "rules" / "skills" / "vaultspec-deploy"
         )
         deploy_dir.mkdir(parents=True, exist_ok=True)
         (deploy_dir / "SKILL.md").write_text(
             "---\ndescription: Deploy\n---\n\n# Deploy", encoding="utf-8"
         )
-        helper_dir = test_project / ".vaultspec" / "rules" / "skills" / "utility-helper"
+        helper_dir = (
+            synthetic_project / ".vaultspec" / "rules" / "skills" / "utility-helper"
+        )
         helper_dir.mkdir(parents=True, exist_ok=True)
         (helper_dir / "SKILL.md").write_text(
             "---\ndescription: Helper\n---\n\n# Helper", encoding="utf-8"
@@ -97,11 +99,11 @@ class TestCollectSkills:
         assert "vaultspec-deploy" in skills
         assert "utility-helper" in skills
 
-    def test_empty_skills_dir(self, test_project):
+    def test_empty_skills_dir(self, synthetic_project):
         # Clear any pre-existing skills so the dir is empty
         import shutil as _shutil
 
-        skills_dir = test_project / ".vaultspec" / "rules" / "skills"
+        skills_dir = synthetic_project / ".vaultspec" / "rules" / "skills"
         if skills_dir.exists():
             _shutil.rmtree(skills_dir)
             skills_dir.mkdir()
@@ -109,12 +111,12 @@ class TestCollectSkills:
 
 
 class TestCollectSystemParts:
-    def test_with_tool_filter(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+    def test_with_tool_filter(self, synthetic_project):
+        (synthetic_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Base prompt", encoding="utf-8"
         )
         (
-            test_project / ".vaultspec" / "rules" / "system" / "gemini-extra.md"
+            synthetic_project / ".vaultspec" / "rules" / "system" / "gemini-extra.md"
         ).write_text("---\ntool: gemini\n---\n\n# Gemini only", encoding="utf-8")
         parts = collect_system_parts()
         assert "base" in parts
@@ -122,27 +124,27 @@ class TestCollectSystemParts:
         _path, meta, _body = parts["gemini-extra"]
         assert meta["tool"] == "gemini"
 
-    def test_missing_dir(self, test_project):
-        shutil.rmtree(test_project / ".vaultspec" / "rules" / "system")
+    def test_missing_dir(self, synthetic_project):
+        shutil.rmtree(synthetic_project / ".vaultspec" / "rules" / "system")
         assert collect_system_parts() == {}
 
 
 class TestTransformRule:
-    def test_claude_includes_name(self, test_project):
+    def test_claude_includes_name(self, synthetic_project):
         out = transform_rule(Tool.CLAUDE, "my-rule.md", {}, "Body text")
         meta, body = parse_frontmatter(out)
         assert meta["name"] == "my-rule"
         assert meta["trigger"] == "always_on"
         assert "Body text" in body
 
-    def test_gemini_includes_name(self, test_project):
+    def test_gemini_includes_name(self, synthetic_project):
         out = transform_rule(Tool.GEMINI, "rule.md", {}, "Content")
         meta, _body = parse_frontmatter(out)
         assert meta["name"] == "rule"
 
 
 class TestTransformSkill:
-    def test_extracts_description(self, test_project):
+    def test_extracts_description(self, synthetic_project):
         out = transform_skill(
             Tool.CLAUDE,
             "vaultspec-deploy",
@@ -155,9 +157,9 @@ class TestTransformSkill:
 
 
 class TestListings:
-    def test_skill_listing_format(self, test_project):
+    def test_skill_listing_format(self, synthetic_project):
         deploy_dir = (
-            test_project / ".vaultspec" / "rules" / "skills" / "vaultspec-deploy"
+            synthetic_project / ".vaultspec" / "rules" / "skills" / "vaultspec-deploy"
         )
         deploy_dir.mkdir(parents=True, exist_ok=True)
         (deploy_dir / "SKILL.md").write_text(
@@ -169,11 +171,11 @@ class TestListings:
         assert "**vaultspec-deploy**" in listing
         assert "Deploy things" in listing
 
-    def test_skill_listing_empty(self, test_project):
+    def test_skill_listing_empty(self, synthetic_project):
         # Clear any pre-existing skills so listing is empty
         import shutil as _shutil
 
-        skills_dir = test_project / ".vaultspec" / "rules" / "skills"
+        skills_dir = synthetic_project / ".vaultspec" / "rules" / "skills"
         if skills_dir.exists():
             _shutil.rmtree(skills_dir)
             skills_dir.mkdir()
@@ -182,36 +184,38 @@ class TestListings:
 
 
 class TestGenerateConfig:
-    def test_returns_none_without_rules(self, test_project):
+    def test_returns_none_without_rules(self, synthetic_project):
         """Config body is None when no synced rules exist."""
         # Clear any pre-existing synced rules from the real corpus
-        rules_dir = test_project / ".claude" / "rules"
+        rules_dir = synthetic_project / ".claude" / "rules"
         if rules_dir.exists():
             for f in rules_dir.glob("*.md"):
                 f.unlink()
         content = _generate_config_body(_cfg(Tool.CLAUDE))
         assert content is None
 
-    def test_includes_rule_references(self, test_project):
+    def test_includes_rule_references(self, synthetic_project):
         """Config body includes @rule references when synced rules exist."""
-        (test_project / ".claude" / "rules" / "my-rule.md").write_text(
+        (synthetic_project / ".claude" / "rules" / "my-rule.md").write_text(
             "rule content", encoding="utf-8"
         )
         content = _generate_config_body(_cfg(Tool.CLAUDE))
         assert content is not None
         assert "@.claude/rules/my-rule.md" in content
 
-    def test_antigravity_uses_workspace_rules_for_root_gemini(self, test_project):
-        (test_project / ".agents" / "rules").mkdir(parents=True, exist_ok=True)
-        (test_project / ".agents" / "rules" / "workspace-rule.md").write_text(
+    def test_antigravity_uses_workspace_rules_for_root_gemini(self, synthetic_project):
+        (synthetic_project / ".agents" / "rules").mkdir(parents=True, exist_ok=True)
+        (synthetic_project / ".agents" / "rules" / "workspace-rule.md").write_text(
             "rule content", encoding="utf-8"
         )
         content = _generate_config_body(_cfg(Tool.ANTIGRAVITY))
         assert content is not None
         assert "@.agents/rules/workspace-rule.md" in content
 
-    def test_codex_native_config_uses_explicit_frontmatter(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "codex-cfg.md").write_text(
+    def test_codex_native_config_uses_explicit_frontmatter(self, synthetic_project):
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "codex-cfg.md"
+        ).write_text(
             "---\n"
             "pipeline: config\n"
             "codex_model: gpt-5-codex\n"
@@ -228,12 +232,16 @@ class TestGenerateConfig:
         assert 'approval_policy = "on-request"' in content
         assert 'project_root_markers = [".git", "pyproject.toml"]' in content
 
-    def test_codex_native_config_later_file_overrides(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "01-codex.md").write_text(
+    def test_codex_native_config_later_file_overrides(self, synthetic_project):
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "01-codex.md"
+        ).write_text(
             "---\npipeline: config\ncodex_sandbox_mode: read-only\n---\n\nFirst",
             encoding="utf-8",
         )
-        (test_project / ".vaultspec" / "rules" / "system" / "02-codex.md").write_text(
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "02-codex.md"
+        ).write_text(
             "---\npipeline: config\ncodex_sandbox_mode: workspace-write\n---\n\nSecond",
             encoding="utf-8",
         )
@@ -242,9 +250,11 @@ class TestGenerateConfig:
         assert 'sandbox_mode = "workspace-write"' in content
 
     def test_codex_native_config_supports_reasoning_and_service_tier(
-        self, test_project
+        self, synthetic_project
     ):
-        (test_project / ".vaultspec" / "rules" / "system" / "codex-cfg.md").write_text(
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "codex-cfg.md"
+        ).write_text(
             "---\n"
             "pipeline: config\n"
             "codex_model_reasoning_effort: high\n"
@@ -267,55 +277,59 @@ class TestGenerateConfig:
 class TestCodexNegativeCoverage:
     """Verify Codex does NOT generate artifacts outside its native model."""
 
-    def test_codex_has_no_system_file(self, test_project):
+    def test_codex_has_no_system_file(self, synthetic_project):
         """Codex ToolConfig must not declare a system_file."""
         assert _cfg(Tool.CODEX).system_file is None
 
-    def test_codex_has_no_agents_dir(self, test_project):
+    def test_codex_has_no_agents_dir(self, synthetic_project):
         """Codex agent definitions use TOML, not a synced agents_dir."""
         assert _cfg(Tool.CODEX).agents_dir is None
 
-    def test_codex_emit_system_rule_enabled(self, test_project):
+    def test_codex_emit_system_rule_enabled(self, synthetic_project):
         """Codex emits behavioral rules via the system rule fallback."""
         assert _cfg(Tool.CODEX).emit_system_rule is True
 
-    def test_system_prompt_returns_none_for_codex(self, test_project):
+    def test_system_prompt_returns_none_for_codex(self, synthetic_project):
         """Codex has no dedicated system_file, so system prompt is None."""
-        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+        (synthetic_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Base system prompt", encoding="utf-8"
         )
         assert _generate_system_prompt(_cfg(Tool.CODEX)) is None
 
-    def test_system_rules_generated_for_codex(self, test_project):
+    def test_system_rules_generated_for_codex(self, synthetic_project):
         """Codex gets system rules via emit_system_rule=True."""
-        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+        (synthetic_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Base system prompt", encoding="utf-8"
         )
         result = _generate_system_rules(_cfg(Tool.CODEX))
         assert result is not None
         assert "Base system prompt" in result
 
-    def test_codex_native_config_returns_none_without_codex_keys(self, test_project):
+    def test_codex_native_config_returns_none_without_codex_keys(
+        self, synthetic_project
+    ):
         """If no codex_* frontmatter keys exist, native config returns None."""
-        (test_project / ".vaultspec" / "rules" / "system" / "some-part.md").write_text(
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "some-part.md"
+        ).write_text(
             "---\npipeline: config\nname: some-part\n---\n\nInternal", encoding="utf-8"
         )
         assert _generate_codex_native_config_body() is None
 
 
 class TestGenerateSystemPrompt:
-    def test_assembly_order(self, test_project):
+    def test_assembly_order(self, synthetic_project):
         # tool-specific parts come first
         (
-            test_project / ".vaultspec" / "rules" / "system" / "gemini-tools.md"
+            synthetic_project / ".vaultspec" / "rules" / "system" / "gemini-tools.md"
         ).write_text("---\ntool: gemini\n---\n\n# GEMINI TOOLS", encoding="utf-8")
         # shared parts come after, sorted by order
-        (test_project / ".vaultspec" / "rules" / "system" / "01-core.md").write_text(
-            "---\norder: 1\n---\n\n# CORE CONTENT", encoding="utf-8"
-        )
-        (test_project / ".vaultspec" / "rules" / "system" / "90-custom.md").write_text(
-            "---\norder: 90\n---\n\n# CUSTOM CONTENT", encoding="utf-8"
-        )
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "01-core.md"
+        ).write_text("---\norder: 1\n---\n\n# CORE CONTENT", encoding="utf-8")
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "90-custom.md"
+        ).write_text("---\norder: 90\n---\n\n# CUSTOM CONTENT", encoding="utf-8")
 
         content = _generate_system_prompt(_cfg(Tool.GEMINI))
         assert content is not None
@@ -326,65 +340,67 @@ class TestGenerateSystemPrompt:
         custom_pos = content.index("# CUSTOM CONTENT")
         assert tool_pos < core_pos < custom_pos
 
-    def test_shared_parts_only(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "extra.md").write_text(
+    def test_shared_parts_only(self, synthetic_project):
+        (synthetic_project / ".vaultspec" / "rules" / "system" / "extra.md").write_text(
             "---\n---\n\n# Extra", encoding="utf-8"
         )
         content = _generate_system_prompt(_cfg(Tool.GEMINI))
         assert content is not None
         assert "# Extra" in content
 
-    def test_multiple_tool_specific_parts(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "01-core.md").write_text(
-            "---\norder: 1\n---\n\n# Core", encoding="utf-8"
-        )
-        (test_project / ".vaultspec" / "rules" / "system" / "gemini-a.md").write_text(
-            "---\ntool: gemini\n---\n\n# Gemini A", encoding="utf-8"
-        )
-        (test_project / ".vaultspec" / "rules" / "system" / "gemini-b.md").write_text(
-            "---\ntool: gemini\n---\n\n# Gemini B", encoding="utf-8"
-        )
+    def test_multiple_tool_specific_parts(self, synthetic_project):
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "01-core.md"
+        ).write_text("---\norder: 1\n---\n\n# Core", encoding="utf-8")
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "gemini-a.md"
+        ).write_text("---\ntool: gemini\n---\n\n# Gemini A", encoding="utf-8")
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "gemini-b.md"
+        ).write_text("---\ntool: gemini\n---\n\n# Gemini B", encoding="utf-8")
         content = _generate_system_prompt(_cfg(Tool.GEMINI))
         assert content is not None
         assert "# Gemini A" in content
         assert "# Gemini B" in content
 
-    def test_returns_none_for_no_system_file(self, test_project):
+    def test_returns_none_for_no_system_file(self, synthetic_project):
         content = _generate_system_prompt(
             _cfg(Tool.CLAUDE)
         )  # claude has system_file=None
         assert content is None
 
-    def test_returns_none_for_empty_parts(self, test_project):
-        shutil.rmtree(test_project / ".vaultspec" / "rules" / "system")
+    def test_returns_none_for_empty_parts(self, synthetic_project):
+        shutil.rmtree(synthetic_project / ".vaultspec" / "rules" / "system")
         content = _generate_system_prompt(_cfg(Tool.GEMINI))
         assert content is None
 
-    def test_order_frontmatter_respected(self, test_project):
+    def test_order_frontmatter_respected(self, synthetic_project):
         """Files with lower order appear before files with higher/default order."""
-        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+        (synthetic_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE", encoding="utf-8"
         )
         # workflow has order: 20 (should appear first among shared)
-        (test_project / ".vaultspec" / "rules" / "system" / "workflow.md").write_text(
-            "---\norder: 20\n---\n\n# WORKFLOW", encoding="utf-8"
-        )
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "workflow.md"
+        ).write_text("---\norder: 20\n---\n\n# WORKFLOW", encoding="utf-8")
         # operations has no order (defaults to 50, should appear after workflow)
-        (test_project / ".vaultspec" / "rules" / "system" / "operations.md").write_text(
-            "---\n---\n\n# OPERATIONS", encoding="utf-8"
-        )
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "operations.md"
+        ).write_text("---\n---\n\n# OPERATIONS", encoding="utf-8")
         content = _generate_system_prompt(_cfg(Tool.GEMINI))
         assert content is not None
         workflow_pos = content.index("# WORKFLOW")
         operations_pos = content.index("# OPERATIONS")
         assert workflow_pos < operations_pos
 
-    def test_pipeline_config_excluded(self, test_project):
+    def test_pipeline_config_excluded(self, synthetic_project):
         """Parts with pipeline: config are excluded from system prompt."""
-        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+        (synthetic_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE", encoding="utf-8"
         )
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "framework.md"
+        ).write_text(
             "---\npipeline: config\n---\n\n# FRAMEWORK CONFIG", encoding="utf-8"
         )
         content = _generate_system_prompt(_cfg(Tool.GEMINI))
@@ -392,12 +408,12 @@ class TestGenerateSystemPrompt:
         assert "# BASE" in content
         assert "# FRAMEWORK CONFIG" not in content
 
-    def test_includes_skill_listing(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+    def test_includes_skill_listing(self, synthetic_project):
+        (synthetic_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Base", encoding="utf-8"
         )
         deploy_dir = (
-            test_project / ".vaultspec" / "rules" / "skills" / "vaultspec-deploy"
+            synthetic_project / ".vaultspec" / "rules" / "skills" / "vaultspec-deploy"
         )
         deploy_dir.mkdir(parents=True, exist_ok=True)
         (deploy_dir / "SKILL.md").write_text(
@@ -411,14 +427,14 @@ class TestGenerateSystemPrompt:
 
 
 class TestGenerateSystemRules:
-    def test_generates_for_tool_without_system_file(self, test_project):
+    def test_generates_for_tool_without_system_file(self, synthetic_project):
         """Claude (rules_dir but no system_file) gets behavioral rules."""
-        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+        (synthetic_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE MANDATES", encoding="utf-8"
         )
-        (test_project / ".vaultspec" / "rules" / "system" / "operations.md").write_text(
-            "---\n---\n\n# OPERATIONS", encoding="utf-8"
-        )
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "operations.md"
+        ).write_text("---\n---\n\n# OPERATIONS", encoding="utf-8")
         content = _generate_system_rules(_cfg(Tool.CLAUDE))
         assert content is not None
         assert "# BASE MANDATES" in content
@@ -427,65 +443,65 @@ class TestGenerateSystemRules:
         assert meta["name"] == "vaultspec-system"
         assert meta["trigger"] == "always_on"
 
-    def test_excludes_tool_specific_parts(self, test_project):
+    def test_excludes_tool_specific_parts(self, synthetic_project):
         """Behavioral rules exclude tool-specific parts."""
-        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+        (synthetic_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE", encoding="utf-8"
         )
         (
-            test_project / ".vaultspec" / "rules" / "system" / "gemini-tools.md"
+            synthetic_project / ".vaultspec" / "rules" / "system" / "gemini-tools.md"
         ).write_text("---\ntool: gemini\n---\n\n# GEMINI ONLY", encoding="utf-8")
-        (test_project / ".vaultspec" / "rules" / "system" / "shared.md").write_text(
-            "---\n---\n\n# SHARED", encoding="utf-8"
-        )
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "shared.md"
+        ).write_text("---\n---\n\n# SHARED", encoding="utf-8")
         content = _generate_system_rules(_cfg(Tool.CLAUDE))
         assert content is not None
         assert "# BASE" in content
         assert "# SHARED" in content
         assert "# GEMINI ONLY" not in content
 
-    def test_excludes_pipeline_config(self, test_project):
+    def test_excludes_pipeline_config(self, synthetic_project):
         """Behavioral rules exclude pipeline: config parts."""
-        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+        (synthetic_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE", encoding="utf-8"
         )
-        (test_project / ".vaultspec" / "rules" / "system" / "framework.md").write_text(
-            "---\npipeline: config\n---\n\n# CONFIG ONLY", encoding="utf-8"
-        )
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "framework.md"
+        ).write_text("---\npipeline: config\n---\n\n# CONFIG ONLY", encoding="utf-8")
         content = _generate_system_rules(_cfg(Tool.CLAUDE))
         assert content is not None
         assert "# BASE" in content
         assert "# CONFIG ONLY" not in content
 
-    def test_returns_none_without_rules_dir(self, test_project):
+    def test_returns_none_without_rules_dir(self, synthetic_project):
         """ToolConfig with no rules_dir returns None."""
         cfg = ToolConfig(name="test", rules_dir=None, skills_dir=None)
         content = _generate_system_rules(cfg)
         assert content is None
 
-    def test_returns_none_when_system_rule_emission_disabled(self, test_project):
-        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+    def test_returns_none_when_system_rule_emission_disabled(self, synthetic_project):
+        (synthetic_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE", encoding="utf-8"
         )
         # Antigravity has emit_system_rule=False
         assert _generate_system_rules(_cfg(Tool.ANTIGRAVITY)) is None
 
-    def test_returns_none_for_empty_parts(self, test_project):
-        shutil.rmtree(test_project / ".vaultspec" / "rules" / "system")
+    def test_returns_none_for_empty_parts(self, synthetic_project):
+        shutil.rmtree(synthetic_project / ".vaultspec" / "rules" / "system")
         content = _generate_system_rules(_cfg(Tool.CLAUDE))
         assert content is None
 
-    def test_order_frontmatter_respected(self, test_project):
+    def test_order_frontmatter_respected(self, synthetic_project):
         """Order frontmatter controls assembly order in rules too."""
-        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+        (synthetic_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# BASE", encoding="utf-8"
         )
-        (test_project / ".vaultspec" / "rules" / "system" / "workflow.md").write_text(
-            "---\norder: 20\n---\n\n# WORKFLOW", encoding="utf-8"
-        )
-        (test_project / ".vaultspec" / "rules" / "system" / "operations.md").write_text(
-            "---\n---\n\n# OPERATIONS", encoding="utf-8"
-        )
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "workflow.md"
+        ).write_text("---\norder: 20\n---\n\n# WORKFLOW", encoding="utf-8")
+        (
+            synthetic_project / ".vaultspec" / "rules" / "system" / "operations.md"
+        ).write_text("---\n---\n\n# OPERATIONS", encoding="utf-8")
         content = _generate_system_rules(_cfg(Tool.CLAUDE))
         assert content is not None
         workflow_pos = content.index("# WORKFLOW")

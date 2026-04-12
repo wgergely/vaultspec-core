@@ -1,17 +1,12 @@
 """Shared fixtures for vault checker tests.
 
-Resets configuration state and points checks at the bundled vaultcore
-fixture tree.
+Resets configuration state and provides a synthetic vault root for checks.
 """
-
-from pathlib import Path
 
 import pytest
 
 from ....config import reset_config
-
-_REPO_ROOT = Path(__file__).resolve().parents[5]
-TEST_PROJECT = _REPO_ROOT / "test-project"
+from ....testing import build_synthetic_vault
 
 
 @pytest.fixture(autouse=True)
@@ -22,6 +17,12 @@ def _reset_cfg():
 
 
 @pytest.fixture
-def vault_root():
-    """Return the real test-project root for checker testing."""
-    return TEST_PROJECT
+def vault_root(tmp_path):
+    """Return a synthetic vault root for checker testing."""
+    manifest = build_synthetic_vault(
+        tmp_path,
+        n_docs=24,
+        seed=42,
+        pathologies=["dangling"],
+    )
+    return manifest.root

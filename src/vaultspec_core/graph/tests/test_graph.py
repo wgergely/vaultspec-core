@@ -573,14 +573,18 @@ class TestVaultGraphPhantom:
         assert m.dangling_link_count == edge_count_to_phantoms
         assert m.dangling_link_count > 0
 
-    def test_check_schema_ignores_phantom_adr_references(self, vault_root):
+    def test_check_schema_ignores_phantom_adr_references(
+        self, vault_root, graph_manifest
+    ):
         """A plan linking only to phantom targets still reports 'no ADR reference'."""
         from ...vaultcore.checks.references import check_schema
 
         graph = VaultGraph(vault_root)
         result = check_schema(vault_root, graph=graph)
-        # 2026-02-04-displaymap-integration-plan links only to phantoms
-        plan_name = "2026-02-04-displaymap-integration-plan"
+        # Resolve the phantom-only-links plan via the manifest so the test is
+        # not coupled to a specific hardcoded filename.
+        plan_doc = graph_manifest.pathology_details["phantom_only_links"][0]["plan_doc"]
+        plan_name = plan_doc.path.stem
         node = graph.nodes[plan_name]
         assert node.doc_type == DocType.PLAN
         # All its out_link targets are phantom

@@ -1,42 +1,24 @@
 from __future__ import annotations
 
-import shutil
-import subprocess
-from typing import TYPE_CHECKING
-
 import pytest
 
-if TYPE_CHECKING:
-    import pathlib
 from tests._windows_temp_compat import install_windows_temp_compat
-from tests.constants import (
-    PROJECT_ROOT,
-)
 from vaultspec_core.config import VaultSpecConfig, get_config, reset_config
+from vaultspec_core.testing import CorpusManifest, build_synthetic_vault
 
 install_windows_temp_compat()
 
 
-def _cleanup_test_project(root: pathlib.Path) -> None:
-    """Remove transient artifacts, preserving .vault/ and README."""
-    for item in root.iterdir():
-        if item.name in (".vault", "README.md", ".gitignore"):
-            continue
-        if item.is_dir():
-            shutil.rmtree(item, ignore_errors=True)
-        else:
-            item.unlink(missing_ok=True)
+@pytest.fixture(scope="session")
+def synthetic_vault(tmp_path_factory) -> CorpusManifest:
+    """Read-only baseline synthetic vault shared across tests.
 
-
-@pytest.fixture(scope="session", autouse=True)
-def _vault_snapshot_reset():
-    """Reset test-project/.vault/ to git HEAD after the full test session."""
-    yield
-    subprocess.run(
-        ["git", "checkout", "--", "test-project/.vault/"],
-        cwd=PROJECT_ROOT,
-        check=False,
-    )
+    Generated once per session into ``tmp_path_factory.mktemp("vault")``.
+    Tests that need to mutate the corpus must request a function-scoped
+    variant or build their own via ``build_synthetic_vault(tmp_path, ...)``.
+    """
+    root = tmp_path_factory.mktemp("vault")
+    return build_synthetic_vault(root, n_docs=24, seed=42)
 
 
 @pytest.fixture

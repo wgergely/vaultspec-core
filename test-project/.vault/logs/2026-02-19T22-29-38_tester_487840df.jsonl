@@ -1,3 +1,0 @@
-{"timestamp": "2026-02-19T22:29:38.463863+00:00", "type": "session_start", "data": {"agent_name": "tester", "task_id": "487840df-795c-405d-b041-306edf42b25b", "start_time": "2026-02-19T22:29:38.463680+00:00", "root_dir": "Y:\\code\\task-worktrees\\main\\test-project"}}
-{"timestamp": "2026-02-19T22:29:38.466981+00:00", "type": "handshake_start", "data": {"agent": "tester"}}
-{"timestamp": "2026-02-19T22:30:08.468878+00:00", "type": "handshake_timeout", "data": {"agent": "tester", "elapsed": 30.001150400028564, "timeout": 30.0}}

@@ -18,8 +18,10 @@ pytestmark = [pytest.mark.unit]
 class TestSpecCliHelp:
     """Verify --help text for resource groups under the spec namespace."""
 
-    def test_main_help(self, runner, test_project):
-        result = runner.invoke(app, ["--target", str(test_project), "spec", "--help"])
+    def test_main_help(self, runner, synthetic_project):
+        result = runner.invoke(
+            app, ["--target", str(synthetic_project), "spec", "--help"]
+        )
         assert result.exit_code == 0
         for resource in [
             "rules",
@@ -29,31 +31,31 @@ class TestSpecCliHelp:
         ]:
             assert resource in result.output, f"Missing '{resource}' in help output"
 
-    def test_rules_help(self, runner, test_project):
+    def test_rules_help(self, runner, synthetic_project):
         result = runner.invoke(
-            app, ["--target", str(test_project), "spec", "rules", "--help"]
+            app, ["--target", str(synthetic_project), "spec", "rules", "--help"]
         )
         assert result.exit_code == 0
         for cmd in ["list", "add", "show", "edit", "remove", "rename", "sync"]:
             assert cmd in result.output, f"Missing '{cmd}' in rules help"
 
-    def test_skills_help(self, runner, test_project):
+    def test_skills_help(self, runner, synthetic_project):
         result = runner.invoke(
-            app, ["--target", str(test_project), "spec", "skills", "--help"]
+            app, ["--target", str(synthetic_project), "spec", "skills", "--help"]
         )
         assert result.exit_code == 0
 
-    def test_system_help(self, runner, test_project):
+    def test_system_help(self, runner, synthetic_project):
         result = runner.invoke(
-            app, ["--target", str(test_project), "spec", "system", "--help"]
+            app, ["--target", str(synthetic_project), "spec", "system", "--help"]
         )
         assert result.exit_code == 0
         for cmd in ["show", "sync"]:
             assert cmd in result.output, f"Missing '{cmd}' in system help"
 
-    def test_hooks_help(self, runner, test_project):
+    def test_hooks_help(self, runner, synthetic_project):
         result = runner.invoke(
-            app, ["--target", str(test_project), "spec", "hooks", "--help"]
+            app, ["--target", str(synthetic_project), "spec", "hooks", "--help"]
         )
         assert result.exit_code == 0
         for cmd in ["list", "run"]:
@@ -65,9 +67,9 @@ class TestSpecCliFunctional:
 
     pytestmark: ClassVar = [pytest.mark.integration]
 
-    def test_rules_list_output(self, runner, test_project):
+    def test_rules_list_output(self, runner, synthetic_project):
         result = runner.invoke(
-            app, ["--target", str(test_project), "spec", "rules", "list"]
+            app, ["--target", str(synthetic_project), "spec", "rules", "list"]
         )
         assert result.exit_code == 0
 
@@ -82,7 +84,7 @@ class TestSpecCliFunctional:
 class TestSpecCliDispatchRouting:
     """Test that core handlers can be called directly."""
 
-    def test_rules_list_handler(self, test_project):
+    def test_rules_list_handler(self, synthetic_project):
         from ...core import rules_list
 
         rules_list()

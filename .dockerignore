@@ -7,6 +7,5 @@ __pycache__
 *.pyc
 .mypy_cache
 tmp-ref
-test-project
 .vault
 test-debug.log

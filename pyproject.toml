@@ -146,6 +146,8 @@ target-version = "py313"
     "**/tests/**/*.py" = ["ARG"]
     # Core CLI modules use argparse/Path as runtime parameter types - no need to move to TYPE_CHECKING
     "src/vaultspec_core/core/*.py" = ["TC003"]
+    # Synthetic vault generator uses Path at runtime in dataclass fields and function args.
+    "src/vaultspec_core/testing/synthetic.py" = ["TC003"]
     # Diagnosis dataclasses use Tool as runtime dict key and for JSON serialization.
     "src/vaultspec_core/core/diagnosis/diagnosis.py" = ["TC001"]
     # FastMCP inspects tool annotations at runtime, so Context must be importable.

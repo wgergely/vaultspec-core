@@ -10,14 +10,14 @@ pytestmark = [pytest.mark.unit]
 
 
 class TestIncrementalRules:
-    def test_add_modify_remove_loop(self, test_project):
+    def test_add_modify_remove_loop(self, synthetic_project):
         """Standard rule lifecycle."""
-        rule_src = test_project / ".vaultspec" / "rules" / "rules" / "rule1.md"
+        rule_src = synthetic_project / ".vaultspec" / "rules" / "rules" / "rule1.md"
         rule_src.write_text("---\nname: rule1\n---\n\nOriginal body", encoding="utf-8")
 
         # 1. Add
         rules_sync()
-        dest = test_project / ".claude" / "rules" / "rule1.md"
+        dest = synthetic_project / ".claude" / "rules" / "rule1.md"
         assert dest.exists()
         content_v1 = dest.read_text(encoding="utf-8")
         assert "Original body" in content_v1
@@ -33,32 +33,32 @@ class TestIncrementalRules:
         rules_sync(prune=True)
         assert not dest.exists()
 
-    def test_idempotent_resync(self, test_project):
+    def test_idempotent_resync(self, synthetic_project):
         """Syncing with no changes doesn't update files."""
-        rule_src = test_project / ".vaultspec" / "rules" / "rules" / "stable.md"
+        rule_src = synthetic_project / ".vaultspec" / "rules" / "rules" / "stable.md"
         rule_src.write_text("---\nname: stable\n---\n\nBody", encoding="utf-8")
         rules_sync()
-        dest = test_project / ".claude" / "rules" / "stable.md"
+        dest = synthetic_project / ".claude" / "rules" / "stable.md"
         mtime1 = dest.stat().st_mtime
 
         rules_sync()
         mtime2 = dest.stat().st_mtime
         assert mtime1 == mtime2
 
-    def test_cross_destination_consistency(self, test_project):
+    def test_cross_destination_consistency(self, synthetic_project):
         """Rules are synced to all available tool destinations."""
-        (test_project / ".vaultspec" / "rules" / "rules" / "shared.md").write_text(
+        (synthetic_project / ".vaultspec" / "rules" / "rules" / "shared.md").write_text(
             "---\nname: shared\n---\n\nShared rule", encoding="utf-8"
         )
         rules_sync()
         for tool_dir in [".claude", ".gemini"]:
-            p = test_project / tool_dir / "rules" / "shared.md"
+            p = synthetic_project / tool_dir / "rules" / "shared.md"
             assert p.exists(), f"Missing in {tool_dir}"
 
-    def test_five_pass_churn(self, test_project):
+    def test_five_pass_churn(self, synthetic_project):
         """Simulate rapid changes across multiple sync passes."""
-        rules_dir = test_project / ".vaultspec" / "rules" / "rules"
-        dest = test_project / ".claude" / "rules" / "churn.md"
+        rules_dir = synthetic_project / ".vaultspec" / "rules" / "rules"
+        dest = synthetic_project / ".claude" / "rules" / "churn.md"
 
         for i in range(5):
             (rules_dir / "churn.md").write_text(
@@ -69,9 +69,11 @@ class TestIncrementalRules:
 
 
 class TestIncrementalSkills:
-    def test_skill_lifecycle(self, test_project):
+    def test_skill_lifecycle(self, synthetic_project):
         """Skill directory and SKILL.md lifecycle."""
-        skill_dir = test_project / ".vaultspec" / "rules" / "skills" / "vaultspec-test"
+        skill_dir = (
+            synthetic_project / ".vaultspec" / "rules" / "skills" / "vaultspec-test"
+        )
         skill_dir.mkdir(parents=True)
         (skill_dir / "SKILL.md").write_text(
             "---\ndescription: v1\n---\n\n# v1", encoding="utf-8"
@@ -79,7 +81,7 @@ class TestIncrementalSkills:
 
         # 1. Add
         skills_sync()
-        dest = test_project / ".claude" / "skills" / "vaultspec-test" / "SKILL.md"
+        dest = synthetic_project / ".claude" / "skills" / "vaultspec-test" / "SKILL.md"
         assert dest.exists()
         assert "description: v1" in dest.read_text(encoding="utf-8")
 
@@ -98,14 +100,14 @@ class TestIncrementalSkills:
 
 
 class TestIncrementalSystem:
-    def test_system_add_modify_cycle(self, test_project):
+    def test_system_add_modify_cycle(self, synthetic_project):
         """System prompt assembly lifecycle."""
-        base_src = test_project / ".vaultspec" / "rules" / "system" / "base.md"
+        base_src = synthetic_project / ".vaultspec" / "rules" / "system" / "base.md"
         base_src.write_text("---\n---\n\n# Base v1", encoding="utf-8")
 
         # 1. Initial sync
         system_sync()
-        gemini_sys = test_project / ".gemini" / "SYSTEM.md"
+        gemini_sys = synthetic_project / ".gemini" / "SYSTEM.md"
         assert gemini_sys.exists()
         assert "# Base v1" in gemini_sys.read_text(encoding="utf-8")
 
@@ -114,13 +116,13 @@ class TestIncrementalSystem:
         system_sync(force=True)
         assert "# Base v2" in gemini_sys.read_text(encoding="utf-8")
 
-    def test_system_idempotent(self, test_project):
+    def test_system_idempotent(self, synthetic_project):
         """Syncing system twice with no changes produces identical output."""
-        (test_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
+        (synthetic_project / ".vaultspec" / "rules" / "system" / "base.md").write_text(
             "---\n---\n\n# Stable base", encoding="utf-8"
         )
         system_sync(force=True)
-        gemini_sys = test_project / ".gemini" / "SYSTEM.md"
+        gemini_sys = synthetic_project / ".gemini" / "SYSTEM.md"
         mtime1 = gemini_sys.stat().st_mtime
 
         import time
@@ -133,12 +135,12 @@ class TestIncrementalSystem:
 
 
 class TestIncrementalConfig:
-    def test_rule_ref_change_propagates(self, test_project):
+    def test_rule_ref_change_propagates(self, synthetic_project):
         # Config body now generates @rules/... references from synced rule files.
-        rules_dest = test_project / ".claude" / "rules"
+        rules_dest = synthetic_project / ".claude" / "rules"
         (rules_dest / "alpha.md").write_text("rule alpha", encoding="utf-8")
         config_sync(force=True)
-        claude_cfg = test_project / "CLAUDE.md"
+        claude_cfg = synthetic_project / "CLAUDE.md"
         assert "@" in claude_cfg.read_text(encoding="utf-8")
         assert "alpha.md" in claude_cfg.read_text(encoding="utf-8")
 
@@ -149,13 +151,13 @@ class TestIncrementalConfig:
         assert "alpha.md" in content
         assert "beta.md" in content
 
-    def test_rule_removal_updates_config(self, test_project):
+    def test_rule_removal_updates_config(self, synthetic_project):
         # Config body reflects which rule files exist in the destination.
-        rules_dest = test_project / ".claude" / "rules"
+        rules_dest = synthetic_project / ".claude" / "rules"
         (rules_dest / "keep.md").write_text("keep rule", encoding="utf-8")
         (rules_dest / "drop.md").write_text("drop rule", encoding="utf-8")
         config_sync(force=True)
-        claude_cfg = test_project / "CLAUDE.md"
+        claude_cfg = synthetic_project / "CLAUDE.md"
         content_v1 = claude_cfg.read_text(encoding="utf-8")
         assert "keep.md" in content_v1
         assert "drop.md" in content_v1
@@ -167,15 +169,15 @@ class TestIncrementalConfig:
         assert "keep.md" in content_v2
         assert "drop.md" not in content_v2
 
-    def test_codex_config_file_exists_after_install(self, test_project):
+    def test_codex_config_file_exists_after_install(self, synthetic_project):
         # AGENTS.md is created during scaffold (like CLAUDE.md / GEMINI.md).
         # config_sync with no rule refs should not destroy it.
         config_sync(force=True)
-        codex_cfg = test_project / "AGENTS.md"
+        codex_cfg = synthetic_project / "AGENTS.md"
         assert codex_cfg.exists()
 
-    def test_codex_native_config_tracks_frontmatter_changes(self, test_project):
-        sys_dir = test_project / ".vaultspec" / "rules" / "system"
+    def test_codex_native_config_tracks_frontmatter_changes(self, synthetic_project):
+        sys_dir = synthetic_project / ".vaultspec" / "rules" / "system"
         (sys_dir / "codex-settings.md").write_text(
             "---\n"
             "pipeline: config\n"
@@ -184,7 +186,7 @@ class TestIncrementalConfig:
             encoding="utf-8",
         )
         config_sync(force=True)
-        codex_cfg = test_project / ".codex" / "config.toml"
+        codex_cfg = synthetic_project / ".codex" / "config.toml"
         content = codex_cfg.read_text(encoding="utf-8")
         assert 'approval_policy = "on-request"' in content
 
@@ -196,8 +198,8 @@ class TestIncrementalConfig:
         content = codex_cfg.read_text(encoding="utf-8")
         assert 'approval_policy = "never"' in content
 
-    def test_codex_reasoning_settings_track_changes(self, test_project):
-        sys_dir = test_project / ".vaultspec" / "rules" / "system"
+    def test_codex_reasoning_settings_track_changes(self, synthetic_project):
+        sys_dir = synthetic_project / ".vaultspec" / "rules" / "system"
         (sys_dir / "codex-reasoning.md").write_text(
             "---\n"
             "pipeline: config\n"
@@ -207,7 +209,7 @@ class TestIncrementalConfig:
             encoding="utf-8",
         )
         config_sync(force=True)
-        codex_cfg = test_project / ".codex" / "config.toml"
+        codex_cfg = synthetic_project / ".codex" / "config.toml"
         content_v1 = codex_cfg.read_text(encoding="utf-8")
         assert 'model_reasoning_effort = "low"' in content_v1
         assert "model_supports_reasoning_summaries = false" in content_v1
@@ -227,11 +229,11 @@ class TestIncrementalConfig:
 
 
 class TestMixedOperations:
-    def test_full_mixed_lifecycle(self, test_project):
+    def test_full_mixed_lifecycle(self, synthetic_project):
         """Add rules+skills, sync, modify+remove some, resync."""
-        rules_dir = test_project / ".vaultspec" / "rules" / "rules"
-        skills_dir = test_project / ".vaultspec" / "rules" / "skills"
-        system_dir = test_project / ".vaultspec" / "rules" / "system"
+        rules_dir = synthetic_project / ".vaultspec" / "rules" / "rules"
+        skills_dir = synthetic_project / ".vaultspec" / "rules" / "skills"
+        system_dir = synthetic_project / ".vaultspec" / "rules" / "system"
 
         # --- Setup: add everything ---
         (rules_dir / "r1.md").write_text(
@@ -251,11 +253,11 @@ class TestMixedOperations:
         system_sync()
 
         # Verify initial state
-        assert (test_project / ".claude" / "rules" / "r1.md").exists()
+        assert (synthetic_project / ".claude" / "rules" / "r1.md").exists()
         assert (
-            test_project / ".claude" / "skills" / "vaultspec-s1" / "SKILL.md"
+            synthetic_project / ".claude" / "skills" / "vaultspec-s1" / "SKILL.md"
         ).exists()
-        assert (test_project / ".gemini" / "SYSTEM.md").exists()
+        assert (synthetic_project / ".gemini" / "SYSTEM.md").exists()
 
         # --- Churn: Modify r1, delete r2, add s2 ---
         (rules_dir / "r1.md").write_text(
@@ -271,18 +273,18 @@ class TestMixedOperations:
         skills_sync(prune=True)
 
         # Verify churned state
-        assert "MODIFIED" in (test_project / ".claude" / "rules" / "r1.md").read_text(
-            encoding="utf-8"
-        )
-        assert not (test_project / ".claude" / "rules" / "r2.md").exists()
+        assert "MODIFIED" in (
+            synthetic_project / ".claude" / "rules" / "r1.md"
+        ).read_text(encoding="utf-8")
+        assert not (synthetic_project / ".claude" / "rules" / "r2.md").exists()
         assert (
-            test_project / ".claude" / "skills" / "vaultspec-s2" / "SKILL.md"
+            synthetic_project / ".claude" / "skills" / "vaultspec-s2" / "SKILL.md"
         ).exists()
 
 
 class TestIncrementalAgents:
-    def test_codex_agent_block_tracks_add_modify_remove(self, test_project):
-        agents_dir = test_project / ".vaultspec" / "rules" / "agents"
+    def test_codex_agent_block_tracks_add_modify_remove(self, synthetic_project):
+        agents_dir = synthetic_project / ".vaultspec" / "rules" / "agents"
         agents_dir.mkdir(parents=True, exist_ok=True)
         agent_path = agents_dir / "vaultspec-worker.md"
         agent_path.write_text(
@@ -291,7 +293,7 @@ class TestIncrementalAgents:
         )
 
         agents_sync()
-        codex_cfg = test_project / ".codex" / "config.toml"
+        codex_cfg = synthetic_project / ".codex" / "config.toml"
         assert "v1" in codex_cfg.read_text(encoding="utf-8")
 
         agent_path.write_text(

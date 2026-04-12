@@ -1,11 +1,12 @@
 """Live integration tests for every vaultspec-core CLI command.
 
-Tests run against a copy of the real test-project/ corpus.  No mocks,
-patches, or stubs.  Every command receives ``--target`` at the
-*subcommand* level (not the root callback) to prove uniform support.
+Tests run against a synthetic vault corpus.  No mocks, patches, or stubs.
+Every command receives ``--target`` at the *subcommand* level (not the root
+callback) to prove uniform support.
 
-The ``project`` fixture copies test-project/ to a fresh tmp_path for
-each test so mutations are isolated and cleanup is automatic.
+The ``synthetic_project`` fixture from conftest.py provides a fresh
+synthetic vault corpus for each test so mutations are isolated and cleanup
+is automatic.
 
 Tests are parametrized wherever possible so ``pytest-randomly`` (or
 ``-p randomly``) can shuffle execution order and surface state leakage.
@@ -13,9 +14,7 @@ Tests are parametrized wherever possible so ``pytest-randomly`` (or
 
 from __future__ import annotations
 
-import shutil
 from datetime import datetime
-from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
@@ -23,32 +22,6 @@ from typer.testing import CliRunner
 from vaultspec_core.cli import app
 
 pytestmark = [pytest.mark.integration]
-
-_REPO_ROOT = Path(__file__).resolve().parents[4]
-_TEST_PROJECT_SRC = _REPO_ROOT / "test-project"
-
-
-# ── fixtures ────────────────────────────────────────────────────────
-
-
-@pytest.fixture
-def project(tmp_path):
-    """Fresh copy of the real test-project/ corpus with vaultspec installed."""
-    dest = tmp_path / "project"
-    shutil.copytree(
-        _TEST_PROJECT_SRC,
-        dest,
-        ignore_dangling_symlinks=True,
-        ignore=shutil.ignore_patterns("*.log"),
-    )
-
-    # Install vaultspec framework so .vaultspec/ exists
-    # install_run bootstraps its own context, no need to call init_paths first
-    from vaultspec_core.core.commands import install_run
-
-    install_run(path=dest, provider="all", upgrade=False, dry_run=False, force=False)
-
-    return dest
 
 
 @pytest.fixture(scope="module")
@@ -146,9 +119,9 @@ _COMMANDS_CHECK: list[tuple[str, list[str]]] = [
     _COMMANDS_EXIT_0,
     ids=[c[0] for c in _COMMANDS_EXIT_0],
 )
-def test_subcommand_target_exit_0(cli, project, cmd_id, args):
+def test_subcommand_target_exit_0(cli, synthetic_project, cmd_id, args):
     """Every non-check command accepts --target on the subcommand and exits 0."""
-    result = _run(cli, project, *args)
+    result = _run(cli, synthetic_project, *args)
     assert result.exit_code == 0, f"[{cmd_id}] exit={result.exit_code}\n{result.output}"
 
 
@@ -157,9 +130,9 @@ def test_subcommand_target_exit_0(cli, project, cmd_id, args):
     _COMMANDS_EXIT_0,
     ids=[c[0] for c in _COMMANDS_EXIT_0],
 )
-def test_root_target_exit_0(cli, project, cmd_id, args):
+def test_root_target_exit_0(cli, synthetic_project, cmd_id, args):
     """Same commands accept --target on the root callback (backward compat)."""
-    result = _run_root_target(cli, project, *args)
+    result = _run_root_target(cli, synthetic_project, *args)
     assert result.exit_code == 0, f"[{cmd_id}] exit={result.exit_code}\n{result.output}"
 
 
@@ -168,7 +141,7 @@ def test_root_target_exit_0(cli, project, cmd_id, args):
     _COMMANDS_CHECK,
     ids=[c[0] for c in _COMMANDS_CHECK],
 )
-def test_check_subcommand_target(cli, project, cmd_id, args):
+def test_check_subcommand_target(cli, synthetic_project, cmd_id, args):
     """Check commands accept --target on the subcommand and produce output.
 
     These commands exit 1 when they find issues in the corpus  - that's
@@ -176,7 +149,7 @@ def test_check_subcommand_target(cli, project, cmd_id, args):
     ``--target``, ran against the correct directory, and produced output.
     An exit code of 2+ would indicate a crash, not a diagnostic finding.
     """
-    result = _run(cli, project, *args)
+    result = _run(cli, synthetic_project, *args)
     assert result.exit_code != 2, (
         f"[{cmd_id}] crashed: exit={result.exit_code}\n{result.output}"
     )
@@ -188,9 +161,9 @@ def test_check_subcommand_target(cli, project, cmd_id, args):
     _COMMANDS_CHECK,
     ids=[c[0] for c in _COMMANDS_CHECK],
 )
-def test_check_root_target(cli, project, cmd_id, args):
+def test_check_root_target(cli, synthetic_project, cmd_id, args):
     """Check commands accept root --target and produce output."""
-    result = _run_root_target(cli, project, *args)
+    result = _run_root_target(cli, synthetic_project, *args)
     assert result.exit_code != 2, (
         f"[{cmd_id}] crashed: exit={result.exit_code}\n{result.output}"
     )
@@ -316,17 +289,21 @@ class TestInstall:
         assert result.exit_code == 0
         assert not (target / ".vaultspec").exists()
 
-    def test_install_force_over_existing(self, cli, project):
-        result = cli.invoke(app, ["install", "--target", str(project), "--force"])
+    def test_install_force_over_existing(self, cli, synthetic_project):
+        result = cli.invoke(
+            app, ["install", "--target", str(synthetic_project), "--force"]
+        )
         assert result.exit_code == 0
-        assert (project / ".vaultspec").is_dir()
+        assert (synthetic_project / ".vaultspec").is_dir()
 
-    def test_install_upgrade(self, cli, project):
-        result = cli.invoke(app, ["install", "--target", str(project), "--upgrade"])
+    def test_install_upgrade(self, cli, synthetic_project):
+        result = cli.invoke(
+            app, ["install", "--target", str(synthetic_project), "--upgrade"]
+        )
         assert result.exit_code == 0
 
-    def test_install_without_force_fails_if_exists(self, cli, project):
-        result = cli.invoke(app, ["install", "--target", str(project)])
+    def test_install_without_force_fails_if_exists(self, cli, synthetic_project):
+        result = cli.invoke(app, ["install", "--target", str(synthetic_project)])
         assert result.exit_code != 0
 
 
@@ -339,34 +316,34 @@ _SYNC_PROVIDERS = ["all", "claude", "gemini", "antigravity", "codex"]
 
 class TestSync:
     @pytest.mark.parametrize("provider", _SYNC_PROVIDERS)
-    def test_sync_provider(self, cli, project, provider):
-        result = _run(cli, project, "sync", provider)
+    def test_sync_provider(self, cli, synthetic_project, provider):
+        result = _run(cli, synthetic_project, "sync", provider)
         assert result.exit_code == 0, f"exit={result.exit_code}\n{result.output}"
 
-    def test_sync_writes_to_target_not_cwd(self, cli, project, monkeypatch):
+    def test_sync_writes_to_target_not_cwd(self, cli, synthetic_project, monkeypatch):
         """Remove a synced file, re-sync, confirm it reappears at --target."""
-        synced = project / ".claude" / "rules" / "vaultspec.builtin.md"
+        synced = synthetic_project / ".claude" / "rules" / "vaultspec.builtin.md"
         if synced.exists():
             synced.unlink()
         # Set CWD to the project so that split_source sees CWD == target
         # (no framework-root override) and sync reads from the project's
         # own .vaultspec/ source  - the real-world single-workspace case.
-        monkeypatch.chdir(project)
-        result = _run(cli, project, "sync")
+        monkeypatch.chdir(synthetic_project)
+        result = _run(cli, synthetic_project, "sync")
         assert result.exit_code == 0
         assert synced.exists(), "sync did not regenerate file at --target"
 
     @pytest.mark.parametrize("flag", ["--dry-run", "--force"])
-    def test_sync_flags(self, cli, project, flag):
-        result = _run(cli, project, "sync", flag)
+    def test_sync_flags(self, cli, synthetic_project, flag):
+        result = _run(cli, synthetic_project, "sync", flag)
         assert result.exit_code == 0
 
-    def test_sync_core_rejected(self, cli, project):
-        result = _run(cli, project, "sync", "core")
+    def test_sync_core_rejected(self, cli, synthetic_project):
+        result = _run(cli, synthetic_project, "sync", "core")
         assert result.exit_code != 0
 
-    def test_sync_unknown_provider_fails(self, cli, project):
-        result = _run(cli, project, "sync", "nonexistent")
+    def test_sync_unknown_provider_fails(self, cli, synthetic_project):
+        result = _run(cli, synthetic_project, "sync", "nonexistent")
         assert result.exit_code != 0
 
 
@@ -376,42 +353,50 @@ class TestSync:
 
 
 class TestUninstall:
-    def test_requires_force(self, cli, project):
-        result = _run(cli, project, "uninstall")
+    def test_requires_force(self, cli, synthetic_project):
+        result = _run(cli, synthetic_project, "uninstall")
         assert result.exit_code != 0
         assert "--force" in result.output
 
-    def test_dry_run_no_removal(self, cli, project):
-        result = _run(cli, project, "uninstall", "--dry-run")
+    def test_dry_run_no_removal(self, cli, synthetic_project):
+        result = _run(cli, synthetic_project, "uninstall", "--dry-run")
         assert result.exit_code == 0
-        assert (project / ".vaultspec").exists()
+        assert (synthetic_project / ".vaultspec").exists()
 
-    def test_force_preserves_vault(self, cli, project):
-        result = cli.invoke(app, ["uninstall", "--target", str(project), "--force"])
-        assert result.exit_code == 0
-        assert (project / ".vault").is_dir()
-        assert not (project / ".vaultspec").exists()
-
-    def test_force_remove_vault(self, cli, project):
+    def test_force_preserves_vault(self, cli, synthetic_project):
         result = cli.invoke(
-            app,
-            ["uninstall", "--target", str(project), "--force", "--remove-vault"],
+            app, ["uninstall", "--target", str(synthetic_project), "--force"]
         )
         assert result.exit_code == 0
-        assert not (project / ".vault").exists()
-        assert not (project / ".vaultspec").exists()
+        assert (synthetic_project / ".vault").is_dir()
+        assert not (synthetic_project / ".vaultspec").exists()
+
+    def test_force_remove_vault(self, cli, synthetic_project):
+        result = cli.invoke(
+            app,
+            [
+                "uninstall",
+                "--target",
+                str(synthetic_project),
+                "--force",
+                "--remove-vault",
+            ],
+        )
+        assert result.exit_code == 0
+        assert not (synthetic_project / ".vault").exists()
+        assert not (synthetic_project / ".vaultspec").exists()
 
     @pytest.mark.parametrize(
         "provider",
         ["claude", "gemini", "antigravity", "codex"],
     )
-    def test_per_provider_uninstall(self, cli, project, provider):
+    def test_per_provider_uninstall(self, cli, synthetic_project, provider):
         result = cli.invoke(
             app,
-            ["uninstall", "--target", str(project), provider, "--force"],
+            ["uninstall", "--target", str(synthetic_project), provider, "--force"],
         )
         assert result.exit_code == 0
-        assert (project / ".vaultspec").exists()
+        assert (synthetic_project / ".vaultspec").exists()
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -420,11 +405,11 @@ class TestUninstall:
 
 
 class TestSpecRules:
-    def test_add_show_remove_lifecycle(self, cli, project):
+    def test_add_show_remove_lifecycle(self, cli, synthetic_project):
         # add -- use a unique name to avoid collisions with builtins
         result = _run(
             cli,
-            project,
+            synthetic_project,
             "spec",
             "rules",
             "add",
@@ -434,19 +419,25 @@ class TestSpecRules:
         )
         assert result.exit_code == 0
         rule_path = (
-            project / ".vaultspec" / "rules" / "rules" / "lifecycle-test-rule.md"
+            synthetic_project
+            / ".vaultspec"
+            / "rules"
+            / "rules"
+            / "lifecycle-test-rule.md"
         )
         assert rule_path.exists()
 
         # show
-        result = _run(cli, project, "spec", "rules", "show", "lifecycle-test-rule")
+        result = _run(
+            cli, synthetic_project, "spec", "rules", "show", "lifecycle-test-rule"
+        )
         assert result.exit_code == 0
         assert "Live rule body" in result.output
 
         # remove
         result = _run(
             cli,
-            project,
+            synthetic_project,
             "spec",
             "rules",
             "remove",
@@ -456,10 +447,10 @@ class TestSpecRules:
         assert result.exit_code == 0
         assert not rule_path.exists()
 
-    def test_rename(self, cli, project):
+    def test_rename(self, cli, synthetic_project):
         _run(
             cli,
-            project,
+            synthetic_project,
             "spec",
             "rules",
             "add",
@@ -470,7 +461,7 @@ class TestSpecRules:
         )
         result = _run(
             cli,
-            project,
+            synthetic_project,
             "spec",
             "rules",
             "rename",
@@ -478,13 +469,13 @@ class TestSpecRules:
             "rename-dst",
         )
         assert result.exit_code == 0
-        dst = project / ".vaultspec" / "rules" / "rules" / "rename-dst.md"
+        dst = synthetic_project / ".vaultspec" / "rules" / "rules" / "rename-dst.md"
         assert dst.exists()
 
-    def test_add_force_overwrites(self, cli, project):
+    def test_add_force_overwrites(self, cli, synthetic_project):
         _run(
             cli,
-            project,
+            synthetic_project,
             "spec",
             "rules",
             "add",
@@ -495,7 +486,7 @@ class TestSpecRules:
         )
         result = _run(
             cli,
-            project,
+            synthetic_project,
             "spec",
             "rules",
             "add",
@@ -507,14 +498,24 @@ class TestSpecRules:
         )
         assert result.exit_code == 0
         content = (
-            project / ".vaultspec" / "rules" / "rules" / "overwrite-me.md"
+            synthetic_project / ".vaultspec" / "rules" / "rules" / "overwrite-me.md"
         ).read_text(encoding="utf-8")
         assert "v2" in content
 
-    def test_revert(self, cli, project):
-        src = project / ".vaultspec" / "rules" / "rules" / "vaultspec.builtin.md"
+    def test_revert(self, cli, synthetic_project):
+        src = (
+            synthetic_project
+            / ".vaultspec"
+            / "rules"
+            / "rules"
+            / "vaultspec.builtin.md"
+        )
         snapshot = (
-            project / ".vaultspec" / "_snapshots" / "rules" / "vaultspec.builtin.md"
+            synthetic_project
+            / ".vaultspec"
+            / "_snapshots"
+            / "rules"
+            / "vaultspec.builtin.md"
         )
         assert snapshot.exists(), (
             "Snapshot missing after install - snapshot_builtins should have run"
@@ -522,7 +523,9 @@ class TestSpecRules:
         original = src.read_text(encoding="utf-8")
         src.write_text("MODIFIED CONTENT", encoding="utf-8")
 
-        result = _run(cli, project, "spec", "rules", "revert", "vaultspec.builtin")
+        result = _run(
+            cli, synthetic_project, "spec", "rules", "revert", "vaultspec.builtin"
+        )
         assert result.exit_code == 0
         assert src.read_text(encoding="utf-8") == original
 
@@ -530,8 +533,10 @@ class TestSpecRules:
         "subcmd",
         ["show", "edit"],
     )
-    def test_missing_resource_fails(self, cli, project, subcmd):
-        result = _run(cli, project, "spec", "rules", subcmd, "nonexistent-xyz")
+    def test_missing_resource_fails(self, cli, synthetic_project, subcmd):
+        result = _run(
+            cli, synthetic_project, "spec", "rules", subcmd, "nonexistent-xyz"
+        )
         assert result.exit_code != 0
 
 
@@ -541,11 +546,11 @@ class TestSpecRules:
 
 
 class TestSpecSkills:
-    def test_add_show_remove_lifecycle(self, cli, project):
+    def test_add_show_remove_lifecycle(self, cli, synthetic_project):
         # add
         result = _run(
             cli,
-            project,
+            synthetic_project,
             "spec",
             "skills",
             "add",
@@ -555,17 +560,25 @@ class TestSpecSkills:
             "Live skill test",
         )
         assert result.exit_code == 0
-        skill_dir = project / ".vaultspec" / "rules" / "skills" / "vaultspec-live-skill"
+        skill_dir = (
+            synthetic_project
+            / ".vaultspec"
+            / "rules"
+            / "skills"
+            / "vaultspec-live-skill"
+        )
         assert skill_dir.is_dir()
 
         # show
-        result = _run(cli, project, "spec", "skills", "show", "vaultspec-live-skill")
+        result = _run(
+            cli, synthetic_project, "spec", "skills", "show", "vaultspec-live-skill"
+        )
         assert result.exit_code == 0
 
         # remove
         result = _run(
             cli,
-            project,
+            synthetic_project,
             "spec",
             "skills",
             "remove",
@@ -575,10 +588,10 @@ class TestSpecSkills:
         assert result.exit_code == 0
         assert not skill_dir.exists()
 
-    def test_rename(self, cli, project):
+    def test_rename(self, cli, synthetic_project):
         _run(
             cli,
-            project,
+            synthetic_project,
             "spec",
             "skills",
             "add",
@@ -589,7 +602,7 @@ class TestSpecSkills:
         )
         result = _run(
             cli,
-            project,
+            synthetic_project,
             "spec",
             "skills",
             "rename",
@@ -597,12 +610,20 @@ class TestSpecSkills:
             "vaultspec-new-skill",
         )
         assert result.exit_code == 0
-        new = project / ".vaultspec" / "rules" / "skills" / "vaultspec-new-skill"
+        new = (
+            synthetic_project
+            / ".vaultspec"
+            / "rules"
+            / "skills"
+            / "vaultspec-new-skill"
+        )
         assert new.is_dir()
 
     @pytest.mark.parametrize("subcmd", ["show", "edit"])
-    def test_missing_resource_fails(self, cli, project, subcmd):
-        result = _run(cli, project, "spec", "skills", subcmd, "nonexistent-xyz")
+    def test_missing_resource_fails(self, cli, synthetic_project, subcmd):
+        result = _run(
+            cli, synthetic_project, "spec", "skills", subcmd, "nonexistent-xyz"
+        )
         assert result.exit_code != 0
 
 
@@ -612,11 +633,11 @@ class TestSpecSkills:
 
 
 class TestSpecAgents:
-    def test_add_show_remove_lifecycle(self, cli, project):
+    def test_add_show_remove_lifecycle(self, cli, synthetic_project):
         # add
         result = _run(
             cli,
-            project,
+            synthetic_project,
             "spec",
             "agents",
             "add",
@@ -626,17 +647,19 @@ class TestSpecAgents:
             "Live agent test",
         )
         assert result.exit_code == 0
-        agent_path = project / ".vaultspec" / "rules" / "agents" / "live-agent.md"
+        agent_path = (
+            synthetic_project / ".vaultspec" / "rules" / "agents" / "live-agent.md"
+        )
         assert agent_path.exists()
 
         # show
-        result = _run(cli, project, "spec", "agents", "show", "live-agent")
+        result = _run(cli, synthetic_project, "spec", "agents", "show", "live-agent")
         assert result.exit_code == 0
 
         # remove
         result = _run(
             cli,
-            project,
+            synthetic_project,
             "spec",
             "agents",
             "remove",
@@ -646,10 +669,10 @@ class TestSpecAgents:
         assert result.exit_code == 0
         assert not agent_path.exists()
 
-    def test_rename(self, cli, project):
+    def test_rename(self, cli, synthetic_project):
         _run(
             cli,
-            project,
+            synthetic_project,
             "spec",
             "agents",
             "add",
@@ -660,7 +683,7 @@ class TestSpecAgents:
         )
         result = _run(
             cli,
-            project,
+            synthetic_project,
             "spec",
             "agents",
             "rename",
@@ -668,11 +691,13 @@ class TestSpecAgents:
             "new-agent",
         )
         assert result.exit_code == 0
-        new = project / ".vaultspec" / "rules" / "agents" / "new-agent.md"
+        new = synthetic_project / ".vaultspec" / "rules" / "agents" / "new-agent.md"
         assert new.exists()
 
-    def test_show_missing_fails(self, cli, project):
-        result = _run(cli, project, "spec", "agents", "show", "nonexistent-xyz")
+    def test_show_missing_fails(self, cli, synthetic_project):
+        result = _run(
+            cli, synthetic_project, "spec", "agents", "show", "nonexistent-xyz"
+        )
         assert result.exit_code != 0
 
 
@@ -682,8 +707,10 @@ class TestSpecAgents:
 
 
 class TestSpecHooks:
-    def test_run_unknown_event_fails(self, cli, project):
-        result = _run(cli, project, "spec", "hooks", "run", "nonexistent.event")
+    def test_run_unknown_event_fails(self, cli, synthetic_project):
+        result = _run(
+            cli, synthetic_project, "spec", "hooks", "run", "nonexistent.event"
+        )
         assert result.exit_code != 0
 
 
@@ -696,28 +723,34 @@ _DOC_TYPES = ["adr", "audit", "plan", "research", "reference", "exec"]
 
 class TestVaultAdd:
     @pytest.mark.parametrize("doc_type", _DOC_TYPES)
-    def test_add_doc_type(self, cli, project, doc_type):
+    def test_add_doc_type(self, cli, synthetic_project, doc_type):
         feat = f"live-{doc_type}"
         # exec requires research -> ADR -> plan to exist first
         if doc_type == "exec":
             for prereq in ("research", "adr", "plan"):
-                pre = _run(cli, project, "vault", "add", prereq, "--feature", feat)
+                pre = _run(
+                    cli, synthetic_project, "vault", "add", prereq, "--feature", feat
+                )
                 assert pre.exit_code == 0, f"prereq {prereq} failed: {pre.output}"
-        result = _run(cli, project, "vault", "add", doc_type, "--feature", feat)
+        result = _run(
+            cli, synthetic_project, "vault", "add", doc_type, "--feature", feat
+        )
         assert result.exit_code == 0
 
-    def test_add_invalid_type_fails(self, cli, project):
-        result = _run(cli, project, "vault", "add", "invalid", "--feature", "x")
+    def test_add_invalid_type_fails(self, cli, synthetic_project):
+        result = _run(
+            cli, synthetic_project, "vault", "add", "invalid", "--feature", "x"
+        )
         assert result.exit_code != 0
 
-    def test_add_requires_feature(self, cli, project):
-        result = _run(cli, project, "vault", "add", "adr")
+    def test_add_requires_feature(self, cli, synthetic_project):
+        result = _run(cli, synthetic_project, "vault", "add", "adr")
         assert result.exit_code != 0
 
-    def test_add_strips_hash_from_feature(self, cli, project):
+    def test_add_strips_hash_from_feature(self, cli, synthetic_project):
         result = _run(
             cli,
-            project,
+            synthetic_project,
             "vault",
             "add",
             "adr",
@@ -726,13 +759,13 @@ class TestVaultAdd:
         )
         assert result.exit_code == 0
         date_str = datetime.now().strftime("%Y-%m-%d")
-        expected = project / ".vault" / "adr" / f"{date_str}-hash-feat-adr.md"
+        expected = synthetic_project / ".vault" / "adr" / f"{date_str}-hash-feat-adr.md"
         assert expected.exists()
 
-    def test_add_rejects_invalid_feature(self, cli, project):
+    def test_add_rejects_invalid_feature(self, cli, synthetic_project):
         result = _run(
             cli,
-            project,
+            synthetic_project,
             "vault",
             "add",
             "adr",
@@ -749,8 +782,8 @@ class TestVaultAdd:
 
 class TestVaultCheckFixRejection:
     @pytest.mark.parametrize("check", ["orphans", "features"])
-    def test_fix_rejected(self, cli, project, check):
-        result = _run(cli, project, "vault", "check", check, "--fix")
+    def test_fix_rejected(self, cli, synthetic_project, check):
+        result = _run(cli, synthetic_project, "vault", "check", check, "--fix")
         assert result.exit_code != 0
 
 
@@ -760,9 +793,11 @@ class TestVaultCheckFixRejection:
 
 
 class TestVaultFeature:
-    def test_feature_archive(self, cli, project):
-        _run(cli, project, "vault", "add", "adr", "--feature", "archive-me")
-        result = _run(cli, project, "vault", "feature", "archive", "archive-me")
+    def test_feature_archive(self, cli, synthetic_project):
+        _run(cli, synthetic_project, "vault", "add", "adr", "--feature", "archive-me")
+        result = _run(
+            cli, synthetic_project, "vault", "feature", "archive", "archive-me"
+        )
         assert result.exit_code == 0
 
 
@@ -787,21 +822,21 @@ class TestTargetPropagation:
         assert (target / ".claude" / "rules").is_dir()
         assert any((target / ".claude" / "rules").iterdir())
 
-    def test_sync_regenerates_at_target(self, cli, project, monkeypatch):
+    def test_sync_regenerates_at_target(self, cli, synthetic_project, monkeypatch):
         """Remove a synced file, re-sync, verify it reappears at target."""
-        synced = project / ".claude" / "rules" / "vaultspec.builtin.md"
+        synced = synthetic_project / ".claude" / "rules" / "vaultspec.builtin.md"
         if synced.exists():
             synced.unlink()
         # CWD must be the project so split_source sees CWD == target
         # (single-workspace mode) and uses the project's own .vaultspec/.
-        monkeypatch.chdir(project)
-        r = cli.invoke(app, ["sync", "--target", str(project)])
+        monkeypatch.chdir(synthetic_project)
+        r = cli.invoke(app, ["sync", "--target", str(synthetic_project)])
         assert r.exit_code == 0
         assert synced.exists(), "sync did not write to --target"
 
-    def test_sync_does_not_leak_to_cwd(self, cli, project, tmp_path):
+    def test_sync_does_not_leak_to_cwd(self, cli, synthetic_project, tmp_path):
         """sync --target must not create artifacts outside the target."""
-        r = cli.invoke(app, ["sync", "--target", str(project)])
+        r = cli.invoke(app, ["sync", "--target", str(synthetic_project)])
         assert r.exit_code == 0
         assert not (tmp_path / ".vaultspec").exists()
         assert not (tmp_path / ".claude").exists()
@@ -822,9 +857,11 @@ class TestTargetPropagation:
             ["spec", "system", "show"],
         ],
     )
-    def test_subcommand_target_reads_correct_project(self, cli, project, cmd_args):
+    def test_subcommand_target_reads_correct_project(
+        self, cli, synthetic_project, cmd_args
+    ):
         """Various commands with subcommand-level --target read from the project."""
-        result = cli.invoke(app, [*cmd_args, "--target", str(project)])
+        result = cli.invoke(app, [*cmd_args, "--target", str(synthetic_project)])
         assert result.exit_code == 0, f"exit={result.exit_code}\n{result.output}"
 
 
@@ -839,8 +876,8 @@ class TestGlobalOptions:
         result = cli.invoke(app, [flag])
         assert result.exit_code == 0
 
-    def test_no_args_prints_help(self, cli, project):
-        result = cli.invoke(app, ["--target", str(project)])
+    def test_no_args_prints_help(self, cli, synthetic_project):
+        result = cli.invoke(app, ["--target", str(synthetic_project)])
         assert result.exit_code == 0
         assert "vaultspec-core" in result.output
 

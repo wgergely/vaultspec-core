@@ -21,12 +21,6 @@ LIB_SRC: pathlib.Path = PROJECT_ROOT / "src" / "vaultspec_core"
 #: CLI entry points are now modules inside the vaultspec_core package
 SCRIPTS: pathlib.Path = PROJECT_ROOT / "src" / "vaultspec_core"
 
-#: test-project/ fixture directory (git-tracked .vault/ seed corpus)
-TEST_PROJECT: pathlib.Path = PROJECT_ROOT / "test-project"
-
-#: test-project/.vault/ documentation vault
-TEST_VAULT: pathlib.Path = TEST_PROJECT / ".vault"
-
 TEST_PORT_BASE: int = 10001
 TEST_PORT_EXECUTION: int = 10010
 
