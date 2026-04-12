@@ -82,6 +82,32 @@ class Tool(StrEnum):
     CODEX = "codex"
 
 
+class GeminiBuiltinTool(StrEnum):
+    """Canonical Gemini CLI built-in tool identifiers.
+
+    Each member's string value is the verbatim constant exported from
+    ``packages/core/src/tools/definitions/base-declarations.ts`` in
+    `google-gemini/gemini-cli`. The Gemini agent definition validator
+    (`packages/core/src/agents/agentLoader.ts`) calls
+    ``isValidToolName`` against these strings; any drift causes
+    ``Invalid tool name`` errors at agent load time.
+
+    Drift is guarded at test time by the live source-pin test
+    (``tests/cli/test_agents_render.py::TestUpstreamGeminiToolPin``),
+    which fetches ``base-declarations.ts`` from the upstream main
+    branch and asserts every enum value matches the upstream constant.
+    """
+
+    GLOB = "glob"
+    GREP_SEARCH = "grep_search"
+    READ_FILE = "read_file"
+    RUN_SHELL_COMMAND = "run_shell_command"
+    WRITE_FILE = "write_file"
+    REPLACE = "replace"
+    GOOGLE_WEB_SEARCH = "google_web_search"
+    WEB_FETCH = "web_fetch"
+
+
 class ProviderCapability(StrEnum):
     """Capabilities a provider can declare support for."""
 
