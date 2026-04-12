@@ -1,5 +1,0 @@
-# Épilogue alternatif : Le Choix de Croustillant
-
-L'aube pointait à peine quand Croustillant, le cœur léger et l'esprit rempli d'images nouvelles, retrouva le chemin de la boulangerie. Ses aventures nocturnes – le frisson du vent parisien, le spectacle des étoiles au-dessus des toits, la rencontre furtive avec un chat philosophique et un moineau curieux – lui avaient offert bien plus que la simple attente d'un client. Il avait découvert que le vrai bonheur ne résidait pas dans le fait d'être choisi, mais dans le courage de choisir sa propre voie, d'explorer, de ressentir.
-
-En se glissant discrètement sur le plateau, juste avant l'arrivée du boulanger, un sourire inattendu étirait ses pointes dorées. Les autres pâtisseries, encore endormies dans leur douce léthargie, ne tarderaient pas à s'éveiller. Croustillant n'était plus le croissant mélancolique. Il était le narrateur, l'aventurier. Et au lieu d'envier ceux qui partaient, il avait hâte de partager ses récits avec ses compagnons du fournil, prouvant qu'une vie riche ne dépend pas de sa destination, mais du chemin que l'on ose tracer soi-même. Sa propre histoire était devenue sa plus belle saveur.

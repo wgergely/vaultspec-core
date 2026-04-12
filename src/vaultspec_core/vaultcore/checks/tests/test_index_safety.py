@@ -103,11 +103,8 @@ class TestStructureSkipsIndex:
 class TestOrphansSkipsIndex:
     def test_index_file_not_flagged_as_orphan(self):
         """Index files should be skipped even if they appear orphaned."""
-        # We can't easily build a full VaultGraph from scratch for
-        # this unit test, but we can verify the skip logic by checking
-        # that is_generated_index is called in the orphans checker.
-        # The actual integration test would need the full test-project.
-        # Here we verify the predicate works correctly.
+        # Verify the predicate that drives the orphans checker's skip
+        # logic; full graph integration is covered elsewhere.
         p = _ROOT / ".vault" / "my-feat.index.md"
         assert is_generated_index(p)
 

@@ -183,10 +183,9 @@ GEMINI.md
 **/.lance/
 vault_index.json
 
-# Test project workspace
-test-project/*
-!test-project/.vault/
-!test-project/README.md
+# Defensive: prevent any local checkout from re-introducing the
+# removed test-project/ corpus.
+test-project/
 
 # Obsidian
 .vault/.obsidian/

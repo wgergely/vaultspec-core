@@ -36,7 +36,6 @@ repos:
     pass_filenames: true
     types:
     - markdown
-    exclude: ^test-project/
   - id: pymarkdown
     name: Lint Markdown style (pymarkdown)
     entry: uv run --no-sync pymarkdown --config .pymarkdown.json scan
@@ -44,7 +43,6 @@ repos:
     pass_filenames: true
     types:
     - markdown
-    exclude: ^test-project/
   - id: vault-fix
     name: Vault Doctor (Fix)
     entry: uv run --no-sync vaultspec-core vault check all --fix

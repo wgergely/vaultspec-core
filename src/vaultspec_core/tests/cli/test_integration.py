@@ -17,12 +17,12 @@ pytestmark = [pytest.mark.unit]
 class TestPathsEnvBridge:
     """Verify that path overrides (target) propagate correctly."""
 
-    def test_target_override(self, test_project: Path, runner) -> None:
+    def test_target_override(self, synthetic_project: Path, runner) -> None:
         """--target flag correctly overrides the workspace root."""
         result = runner.invoke(
-            app, ["--target", str(test_project), "vault", "check", "all"]
+            app, ["--target", str(synthetic_project), "vault", "check", "all"]
         )
-        # check all may find real issues in test-project, accept 0 or 1
+        # check all may find issues in the synthetic corpus, accept 0 or 1
         assert result.exit_code in (0, 1)
         assert "Vault Check" in result.output
 

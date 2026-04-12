@@ -23,7 +23,7 @@ pytestmark = [pytest.mark.unit]
 class TestGetVersion:
     """Verify version information is correctly retrieved."""
 
-    def test_reads_version_from_pyproject(self, test_project):
+    def test_reads_version_from_pyproject(self, synthetic_project):
         from importlib.metadata import version
 
         from vaultspec_core.cli_common import get_version
@@ -32,7 +32,7 @@ class TestGetVersion:
         expected = version("vaultspec-core")
         assert v == expected
 
-    def test_get_version_returns_string(self, test_project):
+    def test_get_version_returns_string(self, synthetic_project):
         from vaultspec_core.cli_common import get_version
 
         assert isinstance(get_version(), str)
@@ -41,16 +41,18 @@ class TestGetVersion:
 class TestHelpText:
     """Verify that --help output contains expected strings."""
 
-    def test_main_help(self, runner, test_project):
-        result = runner.invoke(app, ["--target", str(test_project), "vault", "--help"])
+    def test_main_help(self, runner, synthetic_project):
+        result = runner.invoke(
+            app, ["--target", str(synthetic_project), "vault", "--help"]
+        )
         assert result.exit_code == 0
         assert "add" in result.output
         assert "check" in result.output
         assert "stats" in result.output
 
-    def test_add_help(self, runner, test_project):
+    def test_add_help(self, runner, synthetic_project):
         result = runner.invoke(
-            app, ["--target", str(test_project), "vault", "add", "--help"]
+            app, ["--target", str(synthetic_project), "vault", "add", "--help"]
         )
         assert result.exit_code == 0
         assert "--feature" in result.output
@@ -59,11 +61,13 @@ class TestHelpText:
 class TestAddSubcommand:
     """Verify 'vault add' behavior."""
 
-    def test_add_generates_correct_filename(self, runner, test_project):
+    def test_add_generates_correct_filename(self, runner, synthetic_project):
         date_str = datetime.now().strftime("%Y-%m-%d")
 
         # Cleanup potential leftover from previous failed tests
-        expected_path = test_project / ".vault" / "adr" / f"{date_str}-test-feat-adr.md"
+        expected_path = (
+            synthetic_project / ".vault" / "adr" / f"{date_str}-test-feat-adr.md"
+        )
         if expected_path.exists():
             expected_path.unlink()
 
@@ -71,7 +75,7 @@ class TestAddSubcommand:
             app,
             [
                 "--target",
-                str(test_project),
+                str(synthetic_project),
                 "vault",
                 "add",
                 "adr",
@@ -84,11 +88,13 @@ class TestAddSubcommand:
         assert result.exit_code == 0, f"Failed: {result.output}"
         assert expected_path.exists()
 
-    def test_add_strips_hash_from_feature(self, runner, test_project):
+    def test_add_strips_hash_from_feature(self, runner, synthetic_project):
         """Creating with #feature should strip the hash."""
         date_str = datetime.now().strftime("%Y-%m-%d")
 
-        expected_path = test_project / ".vault" / "adr" / f"{date_str}-my-feat-adr.md"
+        expected_path = (
+            synthetic_project / ".vault" / "adr" / f"{date_str}-my-feat-adr.md"
+        )
         if expected_path.exists():
             expected_path.unlink()
 
@@ -96,7 +102,7 @@ class TestAddSubcommand:
             app,
             [
                 "--target",
-                str(test_project),
+                str(synthetic_project),
                 "vault",
                 "add",
                 "adr",
@@ -106,7 +112,9 @@ class TestAddSubcommand:
         )
         assert expected_path.exists()
 
-    def test_add_valid_doc_types_accepted(self, runner, tmp_path: Path, test_project):
+    def test_add_valid_doc_types_accepted(
+        self, runner, tmp_path: Path, synthetic_project
+    ):
         """Test all valid DocType choices are accepted.
 
         Uses real templates via seed_builtins - never shadow template files.
@@ -152,13 +160,16 @@ class TestAddSubcommand:
                 f"DocType {dt.value} rejected (output: {result.output})"
             )
 
-    def test_add_created_doc_passes_validation(self, runner, test_project):
+    def test_add_created_doc_passes_validation(self, runner, synthetic_project):
         """Created documents must pass the project's own frontmatter validation."""
         from vaultspec_core.vaultcore.parser import parse_vault_metadata
 
         date_str = datetime.now().strftime("%Y-%m-%d")
         expected_path = (
-            test_project / ".vault" / "research" / f"{date_str}-valid-doc-research.md"
+            synthetic_project
+            / ".vault"
+            / "research"
+            / f"{date_str}-valid-doc-research.md"
         )
         if expected_path.exists():
             expected_path.unlink()
@@ -167,7 +178,7 @@ class TestAddSubcommand:
             app,
             [
                 "--target",
-                str(test_project),
+                str(synthetic_project),
                 "vault",
                 "add",
                 "research",
@@ -188,8 +199,8 @@ class TestAddSubcommand:
 
 
 class TestNoCommand:
-    def test_no_command_prints_help(self, runner, test_project):
-        result = runner.invoke(app, ["--target", str(test_project), "vault"])
+    def test_no_command_prints_help(self, runner, synthetic_project):
+        result = runner.invoke(app, ["--target", str(synthetic_project), "vault"])
         # vault_app uses no_args_is_help=True, which Typer reports as exit code 0
         # but the CliRunner may return 2 depending on version; accept both.
         assert result.exit_code in (0, 2)

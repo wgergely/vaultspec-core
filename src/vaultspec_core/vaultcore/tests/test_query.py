@@ -1,19 +1,15 @@
 """Tests for vault query engine."""
 
-from pathlib import Path
-
 import pytest
 
 from ...config import reset_config
+from ...testing.synthetic import CorpusManifest, build_synthetic_vault
 from ..query import (
     VaultDocument,
     get_stats,
     list_documents,
     list_feature_details,
 )
-
-_REPO_ROOT = Path(__file__).resolve().parents[4]
-TEST_PROJECT = _REPO_ROOT / "test-project"
 
 pytestmark = [pytest.mark.unit]
 
@@ -25,83 +21,92 @@ def _reset_cfg():
     reset_config()
 
 
+@pytest.fixture
+def vault_project(tmp_path) -> CorpusManifest:
+    return build_synthetic_vault(
+        tmp_path,
+        n_docs=24,
+        seed=42,
+        pathologies=["dangling", "orphan"],
+    )
+
+
 class TestListDocuments:
-    def test_list_all(self):
-        docs = list_documents(TEST_PROJECT)
+    def test_list_all(self, vault_project: CorpusManifest):
+        docs = list_documents(vault_project.root)
         assert len(docs) > 0
         assert all(isinstance(d, VaultDocument) for d in docs)
 
-    def test_filter_by_type(self):
-        docs = list_documents(TEST_PROJECT, doc_type="adr")
+    def test_filter_by_type(self, vault_project: CorpusManifest):
+        docs = list_documents(vault_project.root, doc_type="adr")
         assert len(docs) > 0
         assert all(d.doc_type == "adr" for d in docs)
 
-    def test_filter_by_feature(self):
-        docs = list_documents(TEST_PROJECT)
-        # Find a real feature from the test data
+    def test_filter_by_feature(self, vault_project: CorpusManifest):
+        docs = list_documents(vault_project.root)
         features = {d.feature for d in docs if d.feature}
-        if features:
-            feature = next(iter(features))
-            filtered = list_documents(TEST_PROJECT, feature=feature)
-            assert len(filtered) > 0
-            assert all(d.feature == feature for d in filtered)
+        assert features, "Synthetic vault must produce docs with features"
+        feature = next(iter(features))
+        filtered = list_documents(vault_project.root, feature=feature)
+        assert len(filtered) > 0
+        assert all(d.feature == feature for d in filtered)
 
-    def test_filter_by_date(self):
-        docs = list_documents(TEST_PROJECT)
+    def test_filter_by_date(self, vault_project: CorpusManifest):
+        docs = list_documents(vault_project.root)
         dates = {d.date for d in docs if d.date}
-        if dates:
-            date = next(iter(dates))
-            filtered = list_documents(TEST_PROJECT, date=date)
-            assert len(filtered) > 0
-            assert all(d.date == date for d in filtered)
+        assert dates, "Synthetic vault must produce docs with dates"
+        date = next(iter(dates))
+        filtered = list_documents(vault_project.root, date=date)
+        assert len(filtered) > 0
+        assert all(d.date == date for d in filtered)
 
-    def test_list_orphaned(self):
-        docs = list_documents(TEST_PROJECT, doc_type="orphaned")
+    def test_list_orphaned(self, vault_project: CorpusManifest):
+        docs = list_documents(vault_project.root, doc_type="orphaned")
         assert isinstance(docs, list)
 
-    def test_list_invalid(self):
-        docs = list_documents(TEST_PROJECT, doc_type="invalid")
+    def test_list_invalid(self, vault_project: CorpusManifest):
+        docs = list_documents(vault_project.root, doc_type="invalid")
         assert isinstance(docs, list)
 
-    def test_document_has_all_fields(self):
-        docs = list_documents(TEST_PROJECT)
-        if docs:
-            d = docs[0]
-            assert hasattr(d, "path")
-            assert hasattr(d, "name")
-            assert hasattr(d, "doc_type")
-            assert hasattr(d, "feature")
-            assert hasattr(d, "date")
-            assert hasattr(d, "tags")
+    def test_document_has_all_fields(self, vault_project: CorpusManifest):
+        docs = list_documents(vault_project.root)
+        assert docs, "Synthetic vault must produce at least one document"
+        d = docs[0]
+        assert hasattr(d, "path")
+        assert hasattr(d, "name")
+        assert hasattr(d, "doc_type")
+        assert hasattr(d, "feature")
+        assert hasattr(d, "date")
+        assert hasattr(d, "tags")
 
 
 class TestGetStats:
-    def test_basic_stats(self):
-        stats = get_stats(TEST_PROJECT)
+    def test_basic_stats(self, vault_project: CorpusManifest):
+        stats = get_stats(vault_project.root)
         assert "total_docs" in stats
         assert "total_features" in stats
         assert "counts_by_type" in stats
 
-    def test_stats_with_feature_filter(self):
-        docs = list_documents(TEST_PROJECT)
+    def test_stats_with_feature_filter(self, vault_project: CorpusManifest):
+        docs = list_documents(vault_project.root)
         features = {d.feature for d in docs if d.feature}
-        if features:
-            feature = next(iter(features))
-            stats = get_stats(TEST_PROJECT, feature=feature)
-            assert "total_docs" in stats
+        assert features, "Synthetic vault must produce docs with features"
+        feature = next(iter(features))
+        stats = get_stats(vault_project.root, feature=feature)
+        assert "total_docs" in stats
 
-    def test_stats_includes_orphan_count(self):
-        stats = get_stats(TEST_PROJECT)
+    def test_stats_includes_orphan_count(self, vault_project: CorpusManifest):
+        stats = get_stats(vault_project.root)
         assert "orphaned_count" in stats
 
-    def test_stats_includes_dangling_count(self):
-        stats = get_stats(TEST_PROJECT)
+    def test_stats_includes_dangling_count(self, vault_project: CorpusManifest):
+        stats = get_stats(vault_project.root)
         assert "dangling_link_count" in stats
 
 
 class TestListFeatureDetails:
-    def test_returns_feature_info(self):
-        features = list_feature_details(TEST_PROJECT)
+    def test_returns_feature_info(self, vault_project: CorpusManifest):
+        features = list_feature_details(vault_project.root)
         assert isinstance(features, list)
         if features:
             f = features[0]

@@ -1,2 +1,0 @@
-{"timestamp": "2026-02-19T20:51:36.511817+00:00", "type": "session_start", "data": {"agent_name": "vaultspec-researcher", "task_id": "c2b53dad-6542-40a4-b590-3243d2de7a12", "start_time": "2026-02-19T20:51:36.511636+00:00", "root_dir": "Y:\\code\\task-worktrees\\main\\test-project"}}
-{"timestamp": "2026-02-19T20:51:36.515380+00:00", "type": "handshake_start", "data": {"agent": "vaultspec-researcher"}}
