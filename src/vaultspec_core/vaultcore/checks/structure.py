@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from ...core.helpers import atomic_write
@@ -106,7 +106,10 @@ def _fix_filename(
                 return renames
 
     if not re.match(r"^\d{4}-\d{2}-\d{2}-", filename):
-        today = datetime.now().strftime("%Y-%m-%d")
+        # UTC date prefix so the rename is deterministic regardless of
+        # the runner's local timezone.  Matches the manifest timestamps
+        # in ``core/commands.py`` that also use ``datetime.UTC``.
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         new_filename = f"{today}-{filename}"
         new_path = doc_path.parent / new_filename
 
@@ -212,6 +215,8 @@ def _rewrite_incoming_refs(
 
         # Preserve a UTF-8 BOM if present; the scanner strips it so the
         # opening ``---`` fence matches but the write-back restores it.
+        # Use the ``﻿`` escape rather than the literal character so
+        # the source is legible in editors that hide zero-width glyphs.
         bom = ""
         if content.startswith("﻿"):
             bom = "﻿"
