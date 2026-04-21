@@ -210,6 +210,30 @@ class TestUntrackManagedPaths:
             == 0
         )
 
+    def test_does_not_untrack_subdir_sentinel_match(self, tmp_path: Path) -> None:
+        """Sentinel basenames only match at the workspace root.
+
+        A user-authored ``docs/.gitignore.lock`` must not be swept up even
+        though its basename matches :data:`_MANAGED_LOCK_SENTINELS`.
+        """
+        _init_git_repo(tmp_path)
+        docs = tmp_path / "docs"
+        docs.mkdir()
+        subdir_sentinel = docs / ".gitignore.lock"
+        subdir_sentinel.write_text("custom content", encoding="utf-8")
+        _run_git(tmp_path, "add", "docs/.gitignore.lock")
+        _run_git(tmp_path, "commit", "-q", "-m", "track subdir sentinel")
+
+        untracked = _untrack_managed_paths(tmp_path, ["docs/.gitignore.lock"])
+
+        assert untracked == []
+        assert (
+            _run_git(
+                tmp_path, "ls-files", "--error-unmatch", "docs/.gitignore.lock"
+            ).returncode
+            == 0
+        )
+
 
 # ---- Domain 3: prek.toml short-circuit --------------------------------------
 
@@ -539,6 +563,76 @@ class TestStructureRenameUpdatesRefs:
         ]
         assert len(rewrite_diags) == 1
         assert "[[alpha]] -> [[gamma]]" in rewrite_diags[0].message
+
+    def test_rewrite_preserves_trailing_yaml_comment(self, tmp_path: Path) -> None:
+        """A ``related:`` entry with a trailing YAML comment must be rewritten."""
+        from vaultspec_core.vaultcore.checks._base import CheckResult
+        from vaultspec_core.vaultcore.checks.structure import (
+            _rewrite_incoming_refs,
+        )
+
+        vault = tmp_path / ".vault"
+        adr_dir = vault / "adr"
+        adr_dir.mkdir(parents=True)
+        backref = adr_dir / "2026-03-02-comment-adr.md"
+        backref.write_text(
+            "---\n"
+            "tags:\n"
+            '  - "#adr"\n'
+            '  - "#comment"\n'
+            "date: '2026-03-02'\n"
+            "related:\n"
+            '  - "[[alpha]]"  # see research note\n'
+            "---\n\n# comment adr\n",
+            encoding="utf-8",
+        )
+
+        result = CheckResult(check_name="structure", supports_fix=True)
+        _rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
+
+        written = backref.read_text(encoding="utf-8")
+        assert '"[[beta]]"' in written
+        assert "# see research note" in written, (
+            "Trailing YAML comment must survive the rewrite"
+        )
+        assert result.fixed_count == 1
+
+    def test_rewrite_detects_indented_related_key(self, tmp_path: Path) -> None:
+        """An indented ``related:`` key must still enter the rewrite scan.
+
+        YAML frontmatter permits (though the vault template does not
+        typically use) indentation of top-level keys.  The scanner must
+        not assume column-zero anchoring.
+        """
+        from vaultspec_core.vaultcore.checks._base import CheckResult
+        from vaultspec_core.vaultcore.checks.structure import (
+            _rewrite_incoming_refs,
+        )
+
+        vault = tmp_path / ".vault"
+        adr_dir = vault / "adr"
+        adr_dir.mkdir(parents=True)
+        backref = adr_dir / "2026-03-02-indent-adr.md"
+        # `related:` intentionally indented by two spaces.
+        backref.write_text(
+            "---\n"
+            "tags:\n"
+            '  - "#adr"\n'
+            '  - "#indent"\n'
+            "date: '2026-03-02'\n"
+            "  related:\n"
+            '    - "[[alpha]]"\n'
+            "---\n\n# indent adr\n",
+            encoding="utf-8",
+        )
+
+        result = CheckResult(check_name="structure", supports_fix=True)
+        _rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
+
+        written = backref.read_text(encoding="utf-8")
+        assert '"[[beta]]"' in written
+        assert '"[[alpha]]"' not in written
+        assert result.fixed_count == 1
 
     def test_rewrite_warns_on_frontmatter_budget_overflow(self, tmp_path: Path) -> None:
         """Frontmatter exceeding the line budget must surface a WARNING."""

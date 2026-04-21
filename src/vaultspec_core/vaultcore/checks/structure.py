@@ -137,7 +137,7 @@ def _fix_filename(
     return renames
 
 
-_RELATED_ENTRY_RE = re.compile(r'^(\s*-\s*["\']?\[\[)(.+?)(\]\]["\']?\s*)$')
+_RELATED_ENTRY_RE = re.compile(r'^(\s*-\s*["\']?\[\[)(.+?)(\]\]["\']?.*)$')
 _FRONTMATTER_LINE_BUDGET = 200
 
 
@@ -247,7 +247,7 @@ def _rewrite_incoming_refs(
             if not in_frontmatter:
                 continue
 
-            if line.startswith("related:"):
+            if line.strip().startswith("related:"):
                 in_related = True
                 continue
 

@@ -259,7 +259,9 @@ def _untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
         #   1. under a prefix in :data:`_UNTRACK_PREFIXES` (currently only
         #      ``.vaultspec/``);
         #   2. a managed lock sentinel whose basename is in
-        #      :data:`_MANAGED_LOCK_SENTINELS`.
+        #      :data:`_MANAGED_LOCK_SENTINELS` **and** sits at the workspace
+        #      root (``stem == basename``) so that subdirectory matches like
+        #      ``docs/.gitignore.lock`` cannot hit the allowlist.
         #
         # The sentinel allowlist is explicit so that sibling lockfiles such
         # as ``uv.lock`` or ``Cargo.lock`` can never be untracked even if
@@ -269,7 +271,7 @@ def _untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
         owned = (
             any(stem == prefix.rstrip("/") for prefix in _UNTRACK_PREFIXES)
             or any(stem.startswith(prefix) for prefix in _UNTRACK_PREFIXES)
-            or basename in _MANAGED_LOCK_SENTINELS
+            or (stem == basename and basename in _MANAGED_LOCK_SENTINELS)
         )
         if not owned:
             continue
