@@ -210,6 +210,30 @@ class TestUntrackManagedPaths:
             == 0
         )
 
+    def test_untracks_committed_claude_dir_content(self, tmp_path: Path) -> None:
+        """Files under a provider scope directory (.claude/, .gemini/, .agents/,
+        .codex/) must be eligible for untracking when passed in via the
+        managed gitignore entries (ADR D1 scope).
+        """
+        _init_git_repo(tmp_path)
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        stale = claude_dir / "settings.json"
+        stale.write_text("{}", encoding="utf-8")
+        _run_git(tmp_path, "add", ".claude/settings.json")
+        _run_git(tmp_path, "commit", "-q", "-m", "legacy tracked claude settings")
+
+        untracked = _untrack_managed_paths(tmp_path, [".claude/"])
+
+        assert untracked == [".claude/settings.json"]
+        assert (
+            _run_git(
+                tmp_path, "ls-files", "--error-unmatch", ".claude/settings.json"
+            ).returncode
+            != 0
+        )
+        assert stale.exists(), "working tree copy must be preserved"
+
     def test_does_not_untrack_subdir_sentinel_match(self, tmp_path: Path) -> None:
         """Sentinel basenames only match at the workspace root.
 
@@ -665,6 +689,47 @@ class TestStructureRenameUpdatesRefs:
         assert any("Frontmatter exceeds" in d.message for d in warnings), (
             f"expected budget WARNING, saw {[d.message for d in warnings]!r}"
         )
+
+    def test_rewrite_skips_hidden_obsidian_docs(self, tmp_path: Path) -> None:
+        """Files under ``.vault/.obsidian/`` and ``.vault/.trash/`` must not
+        be rewritten - they hold editor state, not vault content.
+        """
+        from vaultspec_core.vaultcore.checks._base import CheckResult
+        from vaultspec_core.vaultcore.checks.structure import (
+            _rewrite_incoming_refs,
+        )
+
+        vault = tmp_path / ".vault"
+        obsidian_dir = vault / ".obsidian"
+        obsidian_dir.mkdir(parents=True)
+        trash_dir = vault / ".trash"
+        trash_dir.mkdir(parents=True)
+
+        obsidian_doc = obsidian_dir / "workspace.md"
+        trash_doc = trash_dir / "2026-03-01-old-reference-research.md"
+        original = (
+            "---\n"
+            "tags:\n"
+            '  - "#research"\n'
+            '  - "#internal"\n'
+            "date: '2026-03-01'\n"
+            "related:\n"
+            '  - "[[alpha]]"\n'
+            "---\n\n# internal\n"
+        )
+        obsidian_doc.write_text(original, encoding="utf-8")
+        trash_doc.write_text(original, encoding="utf-8")
+
+        result = CheckResult(check_name="structure", supports_fix=True)
+        _rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
+
+        assert obsidian_doc.read_text(encoding="utf-8") == original, (
+            ".obsidian/ docs must not be mutated"
+        )
+        assert trash_doc.read_text(encoding="utf-8") == original, (
+            ".trash/ docs must not be mutated"
+        )
+        assert result.fixed_count == 0
 
     def test_rewrite_skips_three_node_rename_cycle(self, tmp_path: Path) -> None:
         """A 3-cycle (A -> B -> C -> A) must be detected and dropped."""

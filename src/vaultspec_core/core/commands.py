@@ -207,7 +207,22 @@ def _is_git_repo(target: Path) -> bool:
 # untracked on install if they were historically committed.  Root-level
 # files (CLAUDE.md, .mcp.json, .pre-commit-config.yaml, etc.) are excluded
 # because operators may have legitimate reasons to commit them.
-_UNTRACK_PREFIXES: tuple[str, ...] = (".vaultspec/",)
+#
+# Provider-scope directories (``.claude/``, ``.gemini/``, ``.agents/``,
+# ``.codex/``) are included per ADR D1: "Each provider's scope directory
+# recorded in the manifest, only for files that match the managed
+# gitignore entries."  Concretely, ``get_recommended_entries`` emits
+# these directories when the manifest records the provider as installed
+# and the directory exists on disk; :func:`_untrack_managed_paths` only
+# acts on entries it receives, so a provider that was never installed
+# cannot be accidentally untracked.
+_UNTRACK_PREFIXES: tuple[str, ...] = (
+    ".vaultspec/",
+    ".claude/",
+    ".gemini/",
+    ".agents/",
+    ".codex/",
+)
 
 # Advisory-lock sentinel basenames we create ourselves.  Matched against
 # the stripped candidate (no leading slash, no trailing slash) in the

@@ -210,6 +210,17 @@ def _rewrite_incoming_refs(
         return
 
     for md_path in sorted(vault_root.rglob("*.md")):
+        # Skip hidden internal directories (e.g. ``.obsidian/``,
+        # ``.trash/``, ``.vaultspec``-style dotfile scratch).  These
+        # are covered by the managed gitignore block and must not be
+        # mutated - Obsidian in particular keeps its own state files
+        # under ``.obsidian/`` that should never be edited externally.
+        try:
+            rel_parts = md_path.relative_to(vault_root).parts
+        except ValueError:
+            continue
+        if any(part.startswith(".") for part in rel_parts[:-1]):
+            continue
         try:
             # Read as bytes first so CRLF endings survive the decode;
             # ``read_text`` collapses them via universal newlines.
