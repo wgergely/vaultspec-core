@@ -248,6 +248,14 @@ def _rewrite_incoming_refs(
         changed = False
         fence_closed = False
         budget_exceeded = False
+        # Tracks wiki-link targets already present in the ``related:``
+        # block so we can drop duplicate lines that the rewrite would
+        # otherwise introduce (e.g. when two sources collapse onto the
+        # same terminal or when the terminal already appeared in the
+        # list).  Anchored/aliased forms are normalised to their stem
+        # component for dedup purposes.
+        seen_targets: set[str] = set()
+        drop_idx: list[int] = []
 
         for idx, line in enumerate(lines):
             # Guard against a missing closing fence: if the file is not
@@ -284,11 +292,40 @@ def _rewrite_incoming_refs(
                 continue
 
             target = match.group(2)
-            if target in rename_map:
-                new_target = rename_map[target]
-                lines[idx] = f"{match.group(1)}{new_target}{match.group(3)}"
+            # Extract the bare stem from Obsidian link forms:
+            # ``stem``, ``stem#heading``, ``stem|alias``, or
+            # ``stem#heading|alias``.  Rename matching is always on
+            # the stem alone; the anchor and alias are preserved on
+            # the rewritten line.
+            stem_only = target
+            trailer = ""
+            anchor_hash = stem_only.find("#")
+            alias_pipe = stem_only.find("|")
+            cut_candidates = [i for i in (anchor_hash, alias_pipe) if i >= 0]
+            if cut_candidates:
+                cut = min(cut_candidates)
+                stem_only = target[:cut]
+                trailer = target[cut:]
+
+            final_stem: str | None = None
+            if stem_only in rename_map:
+                final_stem = rename_map[stem_only]
+            if final_stem is None:
+                # Remember the existing (unrewritten) full target so
+                # later rewrites can avoid creating a duplicate.  The
+                # full target - not just the stem - is used because
+                # ``[[beta]]`` and ``[[beta#heading]]`` are distinct
+                # wiki-links that should both survive side by side.
+                seen_targets.add(target)
+                continue
+
+            new_target = f"{final_stem}{trailer}"
+            # If the exact post-rewrite target is already represented
+            # by an earlier line in this related: block, drop this
+            # line to avoid emitting a duplicate entry.
+            if new_target in seen_targets:
+                drop_idx.append(idx)
                 changed = True
-                result.fixed_count += 1
                 try:
                     rel = md_path.relative_to(root_dir)
                 except ValueError:
@@ -297,11 +334,29 @@ def _rewrite_incoming_refs(
                     CheckDiagnostic(
                         path=rel,
                         message=(
-                            f"Updated wiki-link: [[{target}]] -> [[{new_target}]]"
+                            f"Dropped duplicate wiki-link: [[{target}]] "
+                            f"-> [[{new_target}]] already present"
                         ),
                         severity=Severity.INFO,
                     )
                 )
+                continue
+
+            lines[idx] = f"{match.group(1)}{new_target}{match.group(3)}"
+            seen_targets.add(new_target)
+            changed = True
+            result.fixed_count += 1
+            try:
+                rel = md_path.relative_to(root_dir)
+            except ValueError:
+                rel = md_path
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=rel,
+                    message=f"Updated wiki-link: [[{target}]] -> [[{new_target}]]",
+                    severity=Severity.INFO,
+                )
+            )
 
         # Surface a warning diagnostic when the frontmatter exceeds the
         # line budget so operators can investigate documents whose
@@ -325,6 +380,11 @@ def _rewrite_incoming_refs(
 
         if not changed:
             continue
+
+        # Drop duplicate-collapsed lines in descending order so the
+        # surviving indices stay stable while we mutate the list.
+        for del_idx in sorted(drop_idx, reverse=True):
+            del lines[del_idx]
 
         # If the scan never saw a closing fence we are in unknown
         # territory; skip writing rather than risk corrupting a file

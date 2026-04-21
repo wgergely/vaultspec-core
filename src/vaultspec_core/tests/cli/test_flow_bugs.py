@@ -210,6 +210,37 @@ class TestUntrackManagedPaths:
             == 0
         )
 
+    def test_untracks_large_candidate_list_via_stdin(self, tmp_path: Path) -> None:
+        """Batching via ``--pathspec-from-file=-`` must survive large inputs.
+
+        Historically the helper splatted candidates onto the argv, which
+        would hit ``ARG_MAX`` (~32 KiB on Windows) once the list grew
+        past a few hundred entries.  This test seeds several hundred
+        tracked files under ``.vaultspec/`` and asserts they all get
+        untracked in one call.
+        """
+        _init_git_repo(tmp_path)
+        vaultspec_dir = tmp_path / ".vaultspec"
+        vaultspec_dir.mkdir()
+        # 400 tracked files - each name is ~30 chars long, so the bare
+        # argv payload would be ~12KB and safely within ARG_MAX, but
+        # the pathspec-from-file path proves it stays correct.
+        paths = [f".vaultspec/legacy-{i:04d}.json" for i in range(400)]
+        for rel in paths:
+            (tmp_path / rel).write_text("{}", encoding="utf-8")
+        _run_git(tmp_path, "add", *paths)
+        _run_git(tmp_path, "commit", "-q", "-m", "seed many legacy files")
+
+        untracked = _untrack_managed_paths(tmp_path, [".vaultspec/"])
+
+        assert sorted(untracked) == sorted(paths), (
+            f"Expected all {len(paths)} files untracked; got {len(untracked)}"
+        )
+        for rel in paths:
+            assert (
+                _run_git(tmp_path, "ls-files", "--error-unmatch", rel).returncode != 0
+            ), f"{rel} should no longer be tracked"
+
     def test_untracks_committed_claude_dir_content(self, tmp_path: Path) -> None:
         """Files under a provider scope directory (.claude/, .gemini/, .agents/,
         .codex/) must be eligible for untracking when passed in via the
@@ -688,6 +719,80 @@ class TestStructureRenameUpdatesRefs:
         warnings = [d for d in result.diagnostics if d.severity == Severity.WARNING]
         assert any("Frontmatter exceeds" in d.message for d in warnings), (
             f"expected budget WARNING, saw {[d.message for d in warnings]!r}"
+        )
+
+    def test_rewrite_preserves_anchor_and_alias_suffixes(self, tmp_path: Path) -> None:
+        """Wiki-links with ``#anchor`` or ``|alias`` must rewrite the stem
+        only, leaving the anchor/alias intact."""
+        from vaultspec_core.vaultcore.checks._base import CheckResult
+        from vaultspec_core.vaultcore.checks.structure import (
+            _rewrite_incoming_refs,
+        )
+
+        vault = tmp_path / ".vault"
+        adr_dir = vault / "adr"
+        adr_dir.mkdir(parents=True)
+        backref = adr_dir / "2026-03-02-anchor-adr.md"
+        backref.write_text(
+            "---\n"
+            "tags:\n"
+            '  - "#adr"\n'
+            '  - "#anchor"\n'
+            "date: '2026-03-02'\n"
+            "related:\n"
+            '  - "[[alpha#section-one]]"\n'
+            '  - "[[alpha|shown label]]"\n'
+            '  - "[[alpha#heading|alias]]"\n'
+            "---\n\n# anchor adr\n",
+            encoding="utf-8",
+        )
+
+        result = CheckResult(check_name="structure", supports_fix=True)
+        _rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
+
+        written = backref.read_text(encoding="utf-8")
+        assert "[[beta#section-one]]" in written
+        assert "[[beta|shown label]]" in written
+        assert "[[beta#heading|alias]]" in written
+        assert "[[alpha" not in written
+        assert result.fixed_count == 3
+
+    def test_rewrite_drops_duplicate_after_collapse(self, tmp_path: Path) -> None:
+        """When a rewrite would produce a duplicate ``related:`` entry
+        the duplicate line must be dropped, not written twice."""
+        from vaultspec_core.vaultcore.checks._base import CheckResult
+        from vaultspec_core.vaultcore.checks.structure import (
+            _rewrite_incoming_refs,
+        )
+
+        vault = tmp_path / ".vault"
+        adr_dir = vault / "adr"
+        adr_dir.mkdir(parents=True)
+        backref = adr_dir / "2026-03-02-dup-adr.md"
+        backref.write_text(
+            "---\n"
+            "tags:\n"
+            '  - "#adr"\n'
+            '  - "#dup"\n'
+            "date: '2026-03-02'\n"
+            "related:\n"
+            '  - "[[alpha]]"\n'
+            '  - "[[beta]]"\n'
+            "---\n\n# dup adr\n",
+            encoding="utf-8",
+        )
+
+        result = CheckResult(check_name="structure", supports_fix=True)
+        # Both alpha and beta collapse onto gamma: alpha -> beta, beta -> gamma.
+        _rewrite_incoming_refs(tmp_path, [("alpha", "beta"), ("beta", "gamma")], result)
+
+        written = backref.read_text(encoding="utf-8")
+        # Only one [[gamma]] line should remain.
+        assert written.count("[[gamma]]") == 1
+        assert "[[alpha]]" not in written
+        assert "[[beta]]" not in written
+        assert any(
+            "Dropped duplicate wiki-link" in d.message for d in result.diagnostics
         )
 
     def test_rewrite_skips_hidden_obsidian_docs(self, tmp_path: Path) -> None:

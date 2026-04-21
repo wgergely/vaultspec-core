@@ -295,6 +295,14 @@ def _untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
     if not candidates:
         return []
 
+    # The candidate list comes from :func:`get_recommended_entries` and is
+    # bounded by the number of managed prefixes we own (``.vaultspec/``,
+    # ``.claude/``, ``.gemini/``, ``.agents/``, ``.codex/``, plus a handful
+    # of root-level lock sentinels).  It is safe to splat onto the
+    # argv.  The *tracked* list returned by ``ls-files`` is the one that
+    # can grow arbitrarily large on a legacy repo; that call uses
+    # ``git rm --pathspec-from-file=-`` via stdin so it survives past
+    # ``ARG_MAX`` (~32 KiB on Windows, larger on Linux).
     try:
         ls_result = subprocess.run(
             ["git", "-C", str(target), "ls-files", "--", *candidates],
@@ -310,6 +318,7 @@ def _untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
     if not tracked:
         return []
 
+    tracked_payload = "\n".join(tracked)
     try:
         subprocess.run(
             [
@@ -319,9 +328,9 @@ def _untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
                 "rm",
                 "--cached",
                 "--ignore-unmatch",
-                "--",
-                *tracked,
+                "--pathspec-from-file=-",
             ],
+            input=tracked_payload,
             capture_output=True,
             text=True,
             check=True,
