@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#cli-restructure'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-03-16-cli-restructure-plan]]'
   - '[[2026-03-23-cli-restructure-adr]]'

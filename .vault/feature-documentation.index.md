@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#feature-documentation'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-03-21-cli-release-readiness-audit]]'
   - '[[2026-03-21-feature-documentation-code-review-audit]]'

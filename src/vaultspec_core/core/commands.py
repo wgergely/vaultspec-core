@@ -193,6 +193,131 @@ def _scaffold_provider(
 
 CANONICAL_ENTRY_PREFIX = "uv run --no-sync vaultspec-core"
 
+
+def _is_git_repo(target: Path) -> bool:
+    """Return ``True`` if *target* is inside a git repository.
+
+    Detects both plain clones (``.git`` is a directory) and linked
+    worktrees (``.git`` is a file pointing at the real gitdir).
+    """
+    return (target / ".git").exists()
+
+
+# Paths under these prefixes are owned by vaultspec-core and may be
+# untracked on install if they were historically committed.  Root-level
+# files (CLAUDE.md, .mcp.json, .pre-commit-config.yaml, etc.) are excluded
+# because operators may have legitimate reasons to commit them.
+_UNTRACK_PREFIXES: tuple[str, ...] = (".vaultspec/",)
+
+# Advisory-lock sentinel basenames we create ourselves.  Matched against
+# the stripped candidate (no leading slash, no trailing slash) in the
+# ``.lock`` ownership gate so that unrelated lockfiles (``uv.lock``,
+# ``Cargo.lock``, ``bun.lock``, ``package-lock.json`` siblings, etc.)
+# can never be untracked even if they reach the helper by accident.
+_MANAGED_LOCK_SENTINELS: frozenset[str] = frozenset(
+    {
+        ".gitignore.lock",
+        ".mcp.json.lock",
+        ".pre-commit-config.yaml.lock",
+    }
+)
+
+
+def _untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
+    """Stop tracking managed paths that were committed before they became ignored.
+
+    Iterates *entries* and retains only those under :data:`_UNTRACK_PREFIXES`
+    or those that are advisory-lock sentinels (``*.lock`` that vaultspec
+    itself produces).  For each retained candidate, invokes
+    ``git rm --cached --ignore-unmatch -- <path>``.  No-ops when the target
+    is not a git repository.  Subprocess failures are logged and do not
+    raise.
+
+    Args:
+        target: Workspace root directory.
+        entries: Managed gitignore entries computed for *target*.
+
+    Returns:
+        List of paths that were actually untracked (best-effort; may be
+        empty if git is unavailable or nothing was previously tracked).
+    """
+    if not _is_git_repo(target):
+        return []
+
+    import subprocess
+
+    candidates: list[str] = []
+    for entry in entries:
+        # Skip glob patterns; git rm --cached does not expand them on our behalf.
+        if "*" in entry or "?" in entry:
+            continue
+        # Strip leading slash from anchored entries ("/foo.lock" -> "foo.lock").
+        candidate = entry[1:] if entry.startswith("/") else entry
+        if not candidate:
+            continue
+        # Only act on paths we own.  Two ownership gates:
+        #   1. under a prefix in :data:`_UNTRACK_PREFIXES` (currently only
+        #      ``.vaultspec/``);
+        #   2. a managed lock sentinel whose basename is in
+        #      :data:`_MANAGED_LOCK_SENTINELS`.
+        #
+        # The sentinel allowlist is explicit so that sibling lockfiles such
+        # as ``uv.lock`` or ``Cargo.lock`` can never be untracked even if
+        # a future caller passes them in.
+        stem = candidate.rstrip("/")
+        basename = stem.rsplit("/", 1)[-1]
+        owned = (
+            any(stem == prefix.rstrip("/") for prefix in _UNTRACK_PREFIXES)
+            or any(stem.startswith(prefix) for prefix in _UNTRACK_PREFIXES)
+            or basename in _MANAGED_LOCK_SENTINELS
+        )
+        if not owned:
+            continue
+        candidates.append(candidate)
+
+    if not candidates:
+        return []
+
+    try:
+        ls_result = subprocess.run(
+            ["git", "-C", str(target), "ls-files", "--", *candidates],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as exc:
+        logger.warning("git ls-files probe failed during install untrack: %s", exc)
+        return []
+
+    tracked = [line.strip() for line in ls_result.stdout.splitlines() if line.strip()]
+    if not tracked:
+        return []
+
+    try:
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(target),
+                "rm",
+                "--cached",
+                "--ignore-unmatch",
+                "--",
+                *tracked,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as exc:
+        logger.warning("git rm --cached failed during install untrack: %s", exc)
+        return []
+
+    for path in tracked:
+        logger.info("Untracked previously-committed managed path: %s", path)
+    return tracked
+
+
 # Patterns that must never be committed.  Used by the
 # check-provider-artifacts pre-commit hook.
 PROVIDER_ARTIFACT_PATTERNS: tuple[str, ...] = (
@@ -209,17 +334,29 @@ PROVIDER_ARTIFACT_PATTERNS: tuple[str, ...] = (
 )
 
 
-def check_staged_provider_artifacts() -> list[str]:
+def check_staged_provider_artifacts(cwd: Path | None = None) -> list[str]:
     """Return staged file paths that match provider artifact patterns.
 
-    Runs ``git diff --cached --name-only`` and filters against
-    :data:`PROVIDER_ARTIFACT_PATTERNS`.
+    Runs ``git diff --cached --name-only --diff-filter=ACMR`` and filters
+    against :data:`PROVIDER_ARTIFACT_PATTERNS`.  The ``ACMR`` filter excludes
+    staged deletions so remediation commits (``git rm --cached ...``) are
+    not blocked by the hook that recommends them.
+
+    Args:
+        cwd: Directory to run ``git`` in.  Defaults to the caller's current
+            working directory (pre-commit hook behaviour).  Tests pass an
+            explicit path to avoid mutating global process state.
     """
     import subprocess
 
+    cmd = ["git"]
+    if cwd is not None:
+        cmd.extend(["-C", str(cwd)])
+    cmd.extend(["diff", "--cached", "--name-only", "--diff-filter=ACMR"])
+
     try:
         result = subprocess.run(
-            ["git", "diff", "--cached", "--name-only"],
+            cmd,
             capture_output=True,
             text=True,
             check=True,
@@ -307,10 +444,32 @@ def _scaffold_precommit(
     Ensures the full canonical hook set is present with canonical entry
     patterns.  Existing hooks with matching IDs are updated to the
     canonical entry; missing hooks are appended.
+
+    Skips scaffolding entirely when ``prek.toml`` is present at *target*:
+    prek treats ``.pre-commit-config.yaml`` as a duplicate configuration
+    source and emits a warning, and writing both would cause neither tool
+    to execute our hooks.  The operator is expected to transplant hooks
+    into ``prek.toml`` manually.
     """
     import yaml
 
     from .helpers import atomic_write
+
+    if (target / "prek.toml").exists():
+        logger.info(
+            "prek.toml detected at %s; skipping .pre-commit-config.yaml scaffold. "
+            "Add vaultspec-core hooks to prek.toml manually.",
+            target,
+        )
+        if (target / ".pre-commit-config.yaml").exists():
+            logger.warning(
+                "Both prek.toml and .pre-commit-config.yaml are present at %s. "
+                "prek reads prek.toml exclusively; vaultspec will not refresh the "
+                "YAML hooks.  Remove .pre-commit-config.yaml or migrate its hooks "
+                "into prek.toml to avoid stale pre-commit config.",
+                target,
+            )
+        return []
 
     config_file = target / ".pre-commit-config.yaml"
 
@@ -751,6 +910,12 @@ def install_run(
 
         write_manifest_data(path, mdata)
 
+        # Reconcile git index with the managed gitignore block so that
+        # historically-committed state files (e.g. .vaultspec/providers.json
+        # from a pre-managed-block install) stop showing up as dirty on
+        # every subsequent run.
+        _untrack_managed_paths(path, get_recommended_entries(path))
+
         return {"action": "upgrade", "seeded_count": len(seeded), "path": path}
 
     fw_dir = path / ".vaultspec"
@@ -849,6 +1014,12 @@ def install_run(
         mdata.provider_state.setdefault(name, {})
         mdata.provider_state[name]["installed_at"] = mdata.installed_at
     write_manifest_data(path, mdata)
+
+    # Reconcile git index with the managed gitignore block so that
+    # historically-committed state files (e.g. .vaultspec/providers.json
+    # from a pre-managed-block install) stop showing up as dirty on
+    # every subsequent run.
+    _untrack_managed_paths(path, recommended)
 
     result: dict[str, Any] = {
         "action": "install",

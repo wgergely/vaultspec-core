@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#module-exports'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-02-21-module-exports-adr]]'
   - '[[2026-02-21-module-exports-p1-step07-exec]]'

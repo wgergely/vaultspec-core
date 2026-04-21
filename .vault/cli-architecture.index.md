@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#cli-architecture'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-03-05-cli-architecture-audit]]'
   - '[[2026-03-05-cli-audit-notes-reference]]'

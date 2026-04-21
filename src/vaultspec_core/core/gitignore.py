@@ -31,9 +31,13 @@ def get_recommended_entries(target: Path) -> list[str]:
 
     try:
         # Internal state that must ALWAYS be ignored if framework exists
-        if (target / ".vaultspec").is_dir():
+        framework_installed = (target / ".vaultspec").is_dir()
+        if framework_installed:
             entries.add(".vaultspec/_snapshots/")
             entries.add(".vaultspec/")
+            # Advisory-lock sentinels left by helpers.advisory_lock on any
+            # file persisted under .vaultspec/ (providers.json, etc.).
+            entries.add(".vaultspec/*.lock")
         if (target / ".vault").is_dir():
             entries.add(".vault/.obsidian/")
             entries.add(".vault/.trash/")
@@ -45,6 +49,23 @@ def get_recommended_entries(target: Path) -> list[str]:
         # Global files
         if (target / ".mcp.json").exists():
             entries.add(".mcp.json")
+
+        # Root-level advisory-lock sentinels produced by ``advisory_lock``
+        # when vaultspec locks each of these managed files during install
+        # or sync.  Listed explicitly rather than via a broad ``*.lock``
+        # glob because legitimately-tracked lockfiles (uv.lock, bun.lock,
+        # Cargo.lock, ...) must not be ignored.  Each entry is anchored
+        # with a leading slash so it matches only at the repo root.  Only
+        # emitted when vaultspec itself is installed, to avoid polluting
+        # the recommended set on bare workspaces.
+        if framework_installed:
+            for managed_file in (
+                ".gitignore",
+                ".mcp.json",
+                ".pre-commit-config.yaml",
+            ):
+                if (target / managed_file).exists():
+                    entries.add(f"/{managed_file}.lock")
 
         # Use the local artifact collection logic to ensure gitignore is
         # perfectly synced with provider artifacts.

@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#packaging-restructure'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-02-21-packaging-restructure-adr]]'
   - '[[2026-02-21-packaging-restructure-p1-review-exec]]'

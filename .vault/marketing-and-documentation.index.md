@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#marketing-and-documentation'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-02-20-marketing-and-documentation-adr]]'
   - '[[2026-02-20-marketing-and-documentation-p1-plan]]'

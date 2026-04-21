@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#audit-fixes'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-02-22-audit-fixes-adr]]'
   - '[[2026-02-22-audit-fixes-execution-summary-exec]]'

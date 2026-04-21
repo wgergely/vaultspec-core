@@ -15,6 +15,7 @@ from vaultspec_core.core.diagnosis.signals import (
     FrameworkSignal,
     GitignoreSignal,
     ManifestEntrySignal,
+    PrecommitSignal,
     ProviderDirSignal,
     ResolutionAction,
 )
@@ -28,9 +29,15 @@ def _make_diagnosis(
     framework: FrameworkSignal = FrameworkSignal.PRESENT,
     builtin_version: BuiltinVersionSignal = BuiltinVersionSignal.CURRENT,
     gitignore: GitignoreSignal = GitignoreSignal.COMPLETE,
+    precommit: PrecommitSignal = PrecommitSignal.COMPLETE,
     providers: dict[Tool, ProviderDiagnosis] | None = None,
 ) -> WorkspaceDiagnosis:
-    """Build a WorkspaceDiagnosis with sensible defaults for testing."""
+    """Build a WorkspaceDiagnosis with sensible defaults for testing.
+
+    The default ``precommit`` signal is ``COMPLETE`` so that tests which
+    focus on other axes (content, manifest, gitignore) do not inadvertently
+    trigger the resolver's ``REPAIR_PRECOMMIT`` step.
+    """
     if providers is None:
         providers = {}
     return WorkspaceDiagnosis(
@@ -38,6 +45,7 @@ def _make_diagnosis(
         providers=providers,
         builtin_version=builtin_version,
         gitignore=gitignore,
+        precommit=precommit,
     )
 
 

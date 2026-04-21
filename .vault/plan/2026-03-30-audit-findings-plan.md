@@ -8,6 +8,8 @@ related:
   - '[[2026-03-27-cli-ambiguous-states-resolver-adr]]'
   - '[[2026-03-27-cli-ambiguous-states-gitignore-adr]]'
   - '[[2026-03-28-cli-ambiguous-states-audit-fixes-plan]]'
+  - '[[2026-03-27-cli-ambiguous-states-prior-art-research]]'
+  - '[[2026-03-23-audit-fixes-research]]'
 ---
 
 # `audit-findings` plan

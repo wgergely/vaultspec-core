@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#framework'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-02-16-env-var-research]]'
   - '[[2026-02-16-environment-variable-adr]]'
