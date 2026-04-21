@@ -11,10 +11,13 @@ from __future__ import annotations
 import contextvars
 import logging
 import shutil
+import subprocess
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 from . import types as _t
 from .enums import ManagedState, PrecommitHook, ProviderCapability, Tool
@@ -259,8 +262,6 @@ def _untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
     if not _is_git_repo(target):
         return []
 
-    import subprocess
-
     candidates: list[str] = []
     for entry in entries:
         # Skip glob patterns; git rm --cached does not expand them on our behalf.
@@ -373,8 +374,6 @@ def check_staged_provider_artifacts(cwd: Path | None = None) -> list[str]:
             working directory (pre-commit hook behaviour).  Tests pass an
             explicit path to avoid mutating global process state.
     """
-    import subprocess
-
     cmd = ["git"]
     if cwd is not None:
         cmd.extend(["-C", str(cwd)])
@@ -477,9 +476,6 @@ def _scaffold_precommit(
     to execute our hooks.  The operator is expected to transplant hooks
     into ``prek.toml`` manually.
     """
-    import yaml
-
-    from .helpers import atomic_write
 
     if (target / "prek.toml").exists():
         logger.info(
@@ -1230,8 +1226,6 @@ def uninstall_run(
         if "precommit" not in skip:
             if precommit_path.exists() and not dry_run:
                 try:
-                    import yaml
-
                     raw = precommit_path.read_text(encoding="utf-8")
                     data = yaml.safe_load(raw)
                     if isinstance(data, dict):
