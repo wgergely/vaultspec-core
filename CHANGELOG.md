@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.14](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.13...vaultspec-core-v0.1.14) (2026-04-21)
+
+
+### Bug Fixes
+
+* **#80:** Gemini round-8 follow-up on merged PR [#83](https://github.com/wgergely/vaultspec-core/issues/83) ([a14ff9f](https://github.com/wgergely/vaultspec-core/commit/a14ff9f61f7443ebc446462db4727cc88f802e7f)), closes [#80](https://github.com/wgergely/vaultspec-core/issues/80)
+* **#80:** install-layer hygiene + audit-driven hardening ([#83](https://github.com/wgergely/vaultspec-core/issues/83)) ([ab13b6e](https://github.com/wgergely/vaultspec-core/commit/ab13b6e232b093664208d454ba7a39e8e1441e3b)), closes [#80](https://github.com/wgergely/vaultspec-core/issues/80)
+* **ci:** exclude gemini/claude live-CLI tests from unit run ([9cc21db](https://github.com/wgergely/vaultspec-core/commit/9cc21db7589d2bca0eb91d2255b71da79cfdbd24))
+
 ## [0.1.13](https://github.com/wgergely/vaultspec-core/compare/vaultspec-core-v0.1.12...vaultspec-core-v0.1.13) (2026-04-12)
 
 
