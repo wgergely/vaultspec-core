@@ -4,10 +4,11 @@ Complete command reference for `vaultspec-core`. See the [framework manual](./RE
 
 ## Entry Points
 
-| Command                                   | Description                                                |
-| ----------------------------------------- | ---------------------------------------------------------- |
-| `vaultspec-core`                          | Workspace management, vault operations, resource sync      |
-| `python -m vaultspec_core.mcp_server.app` | stdio MCP server (documented in [MCP reference](./MCP.md)) |
+| Command                                          | Description                                                                                            |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `vaultspec-core`                                 | Workspace management, vault operations, resource sync.                                                 |
+| `vaultspec-mcp`                                  | Console script that launches the stdio MCP server.                                                     |
+| `uv run python -m vaultspec_core.mcp_server.app` | Module invocation of the MCP server (avoids binary locking on Windows). See [MCP reference](./MCP.md). |
 
 ## Global Options
 
@@ -132,6 +133,7 @@ Create a new `.vault/` document from a template.
 | `--tags TAG`    | -     | None            | Additional freeform tags beyond the required directory and feature tags. Repeatable. |
 | `--force`       | -     | off             | Overwrite an existing document at the resolved path.                                 |
 | `--dry-run`     | -     | off             | Preview without writing.                                                             |
+| `--json`        | -     | off             | Emit machine-readable output.                                                        |
 
 ______________________________________________________________________
 
@@ -151,10 +153,11 @@ List vault documents.
 
 #### Options
 
-| Option          | Short | Default | Description           |
-| --------------- | ----- | ------- | --------------------- |
-| `--feature TAG` | `-f`  | None    | Filter by feature tag |
-| `--date DATE`   | -     | None    | Filter by date        |
+| Option          | Short | Default | Description                   |
+| --------------- | ----- | ------- | ----------------------------- |
+| `--feature TAG` | `-f`  | None    | Filter by feature tag         |
+| `--date DATE`   | -     | None    | Filter by date                |
+| `--json`        | -     | off     | Emit machine-readable output. |
 
 ______________________________________________________________________
 
@@ -175,6 +178,7 @@ Show vault statistics and document counts.
 | `--type TYPE`   | -     | None    | Filter by document type                |
 | `--invalid`     | -     | off     | Show only documents with invalid links |
 | `--orphaned`    | -     | off     | Show only orphaned documents           |
+| `--json`        | -     | off     | Emit machine-readable output.          |
 
 ______________________________________________________________________
 
@@ -213,6 +217,7 @@ List all feature tags in the vault.
 | `--date DATE` | None    | Filter by date                            |
 | `--orphaned`  | off     | Show only features with no incoming links |
 | `--type TYPE` | None    | Filter by document type                   |
+| `--json`      | off     | Emit machine-readable output.             |
 
 ______________________________________________________________________
 
@@ -229,16 +234,23 @@ Generate or update `<feature>.index.md` files at the vault root. Each index link
 | Option          | Short | Default | Description                           |
 | --------------- | ----- | ------- | ------------------------------------- |
 | `--feature TAG` | `-f`  | None    | Generate index for a specific feature |
+| `--json`        | -     | off     | Emit machine-readable output.         |
 
 ______________________________________________________________________
 
 ### vault feature archive
 
 ```bash
-vaultspec-core vault feature archive FEATURE_TAG
+vaultspec-core vault feature archive FEATURE_TAG [OPTIONS]
 ```
 
 Move all documents for a feature tag to the archive.
+
+#### Options
+
+| Option   | Default | Description                   |
+| -------- | ------- | ----------------------------- |
+| `--json` | off     | Emit machine-readable output. |
 
 ______________________________________________________________________
 
@@ -262,7 +274,7 @@ Run health checks on `.vault/`. Exits with code `1` if errors are found.
 
 | Sub-command   | `--fix` | `--feature` | Description                                                      |
 | ------------- | ------- | ----------- | ---------------------------------------------------------------- |
-| `all`         | yes     | yes         | Run every check in sequence                                      |
+| `all`         | partial | yes         | Run every check in sequence                                      |
 | `body-links`  | no      | yes         | Find wiki-links and markdown path links in document body text    |
 | `dangling`    | yes     | yes         | Find `related:` wiki-links that resolve to no document           |
 | `frontmatter` | yes     | yes         | Validate frontmatter against vault schema                        |
@@ -273,11 +285,13 @@ Run health checks on `.vault/`. Exits with code `1` if errors are found.
 | `schema`      | yes     | yes         | Enforce dependency rules (ADR refs research, plan refs ADR)      |
 | `structure`   | yes     | no          | Check directory structure and filename conventions               |
 
-`yes` = fully supported, `no` = flag rejected with error. `structure` does not support `--feature` filtering.
+`yes` = fully supported, `partial` = only the sub-checks that accept `--fix` will apply fixes (`all` dispatches to every check), `no` = flag rejected with error. `structure` does not support `--feature` filtering.
 
 ## Spec Commands
 
 Group command: `vaultspec-core spec COMMAND`
+
+Every spec sub-command below also accepts the global `--target / -t DIR` and `--json` flags on top of the signatures shown.
 
 ### spec doctor
 
@@ -289,9 +303,10 @@ Run diagnostic collectors across the framework, providers, builtins, `.gitignore
 
 #### Options
 
-| Option   | Default | Description                |
-| -------- | ------- | -------------------------- |
-| `--json` | off     | Emit the diagnosis as JSON |
+| Option         | Short | Default | Description                                      |
+| -------------- | ----- | ------- | ------------------------------------------------ |
+| `--target DIR` | `-t`  | cwd     | Diagnose a directory other than the current one. |
+| `--json`       | -     | off     | Emit the diagnosis as JSON.                      |
 
 Exit codes: `0` = all ok, `1` = warnings, `2` = errors.
 
@@ -389,7 +404,9 @@ All variables are prefixed `VAULTSPEC_`. Environment variables override defaults
 | `VAULTSPEC_ANTIGRAVITY_DIR`       | str  | `.agents`    | Antigravity directory name                                                                                                                                                                                        |
 | `VAULTSPEC_IO_BUFFER_SIZE`        | int  | `8192`       | I/O read buffer size in bytes                                                                                                                                                                                     |
 | `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int  | `1000000`    | Subprocess stdout capture limit in bytes                                                                                                                                                                          |
-| `VAULTSPEC_EDITOR`                | str  | `zed -w`     | Editor command for `spec edit`. Set to your preferred editor (e.g. `code -w`, `vim`).                                                                                                                             |
+| `VAULTSPEC_LOG_LEVEL`             | str  | `INFO`       | Root log level for the CLI (e.g. `DEBUG`, `INFO`, `WARNING`). Overridden by `--debug` when set.                                                                                                                   |
+| `VAULTSPEC_ALLOW_DEV_WRITES`      | bool | unset        | Bypass the development-write guard that blocks source-repo writes. Accepts `1`/`true`/`yes`. Use with care - intended for fixture and test automation only.                                                       |
+| `VAULTSPEC_EDITOR`                | str  | `zed -w`     | Editor command for `spec {rules\|skills\|agents} edit`. Set to your preferred editor (e.g. `code -w`, `vim`).                                                                                                     |
 
 ## See Also
 

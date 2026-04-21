@@ -26,7 +26,7 @@ Use the `vaultspec-core` CLI for every read, write, and audit of `.vault/`, and 
 | Propagate edits under `.vaultspec/rules/...`          | `sync` (or `spec <resource> sync`)          |
 | Diagnose overall workspace health                     | `spec doctor`                               |
 
-`<resource>` stands for `rules`, `skills`, `agents`, `hooks`, or `mcps`; `system` also accepts `sync`.
+`<resource>` is one of `rules`, `skills`, `agents`, `hooks`, or `mcps` for `list`; one of `rules`, `skills`, `agents`, `mcps`, or `system` for `sync`.
 
 ## Runtime
 
@@ -42,7 +42,7 @@ Use the `vaultspec-core` CLI for every read, write, and audit of `.vault/`, and 
 Permitted:
 
 - Edit body prose of a `.vault/` document scaffolded by `vault add`.
-- Edit source files under `.vaultspec/rules/rules/`, `.vaultspec/rules/skills/`, or `.vaultspec/rules/agents/`, then run `vaultspec-core sync`.
+- Edit source files under `.vaultspec/rules/rules/`, `.vaultspec/rules/skills/`, `.vaultspec/rules/agents/`, `.vaultspec/rules/hooks/`, or `.vaultspec/rules/mcps/`, then run `vaultspec-core sync`.
 
 Forbidden:
 
