@@ -666,6 +666,42 @@ class TestStructureRenameUpdatesRefs:
             f"expected budget WARNING, saw {[d.message for d in warnings]!r}"
         )
 
+    def test_rewrite_skips_three_node_rename_cycle(self, tmp_path: Path) -> None:
+        """A 3-cycle (A -> B -> C -> A) must be detected and dropped."""
+        from vaultspec_core.vaultcore.checks._base import CheckResult
+        from vaultspec_core.vaultcore.checks.structure import (
+            _rewrite_incoming_refs,
+        )
+
+        vault = tmp_path / ".vault"
+        adr_dir = vault / "adr"
+        adr_dir.mkdir(parents=True)
+        backref = adr_dir / "2026-03-02-tri-cycle-adr.md"
+        original = (
+            "---\n"
+            "tags:\n"
+            '  - "#adr"\n'
+            '  - "#tri-cycle"\n'
+            "date: '2026-03-02'\n"
+            "related:\n"
+            '  - "[[alpha]]"\n'
+            "---\n\n# tri-cycle adr\n"
+        )
+        backref.write_text(original, encoding="utf-8")
+
+        result = CheckResult(check_name="structure", supports_fix=True)
+        _rewrite_incoming_refs(
+            tmp_path,
+            [("alpha", "beta"), ("beta", "gamma"), ("gamma", "alpha")],
+            result,
+        )
+
+        assert backref.read_text(encoding="utf-8") == original, (
+            "3-cycle must produce no rewrite; file must be byte-identical"
+        )
+        assert result.fixed_count == 0
+        assert not any("Updated wiki-link" in d.message for d in result.diagnostics)
+
     def test_rewrite_skips_rename_cycles(self, tmp_path: Path) -> None:
         """A 2-cycle in raw_map must not produce phantom self-rewrites."""
         from vaultspec_core.vaultcore.checks._base import CheckResult

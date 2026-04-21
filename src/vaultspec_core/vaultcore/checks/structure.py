@@ -185,18 +185,24 @@ def _rewrite_incoming_refs(
         return
 
     # Collapse rename chains so [[A]] -> [[C]] when ``A -> B`` and ``B -> C``
-    # both happened in the same check run.  Guards against cycles by
-    # capping traversal at the number of raw entries and dropping any
-    # entry whose terminal value is the original key (self-cycle).
+    # both happened in the same check run.  Cycles of any length
+    # (``A -> B -> A``, ``A -> B -> C -> A``, ...) are detected by
+    # tracking the set of visited nodes during the traversal: as soon as
+    # we encounter a node we have already seen, the chain is a cycle and
+    # the entry is dropped from the rewrite map rather than emitted as a
+    # false rewrite.
     rename_map: dict[str, str] = {}
-    limit = len(raw_map) + 1
     for old in raw_map:
+        visited: set[str] = {old}
         current = raw_map[old]
-        steps = 0
-        while current in raw_map and steps < limit:
+        cycle = False
+        while current in raw_map:
+            if current in visited:
+                cycle = True
+                break
+            visited.add(current)
             current = raw_map[current]
-            steps += 1
-        if current != old:
+        if not cycle:
             rename_map[old] = current
 
     vault_root = root_dir / ".vault"
@@ -215,11 +221,11 @@ def _rewrite_incoming_refs(
 
         # Preserve a UTF-8 BOM if present; the scanner strips it so the
         # opening ``---`` fence matches but the write-back restores it.
-        # Use the ``﻿`` escape rather than the literal character so
+        # Use the ``\ufeff`` escape rather than the literal character so
         # the source is legible in editors that hide zero-width glyphs.
         bom = ""
-        if content.startswith("﻿"):
-            bom = "﻿"
+        if content.startswith("\ufeff"):
+            bom = "\ufeff"
             content = content[1:]
 
         # Preserve the file's line-ending convention across the rewrite
