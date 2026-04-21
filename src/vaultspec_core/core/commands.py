@@ -325,6 +325,7 @@ def _untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
     # Windows under edge conditions; 100 keeps us firmly inside the
     # budget.
     _chunk_size = 100
+    actually_untracked: list[str] = []
     for chunk_start in range(0, len(tracked), _chunk_size):
         chunk = tracked[chunk_start : chunk_start + _chunk_size]
         try:
@@ -354,11 +355,15 @@ def _untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
                 chunk_start + len(chunk),
                 exc,
             )
-            return []
+            # Stop dispatching further chunks but preserve the partial
+            # result so callers and operators see exactly which paths
+            # were untracked before the failure.
+            break
+        actually_untracked.extend(chunk)
 
-    for path in tracked:
+    for path in actually_untracked:
         logger.info("Untracked previously-committed managed path: %s", path)
-    return tracked
+    return actually_untracked
 
 
 # Patterns that must never be committed.  Used by the

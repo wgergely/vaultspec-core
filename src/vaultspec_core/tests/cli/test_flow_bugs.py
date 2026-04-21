@@ -265,6 +265,38 @@ class TestUntrackManagedPaths:
         )
         assert stale.exists(), "working tree copy must be preserved"
 
+    def test_partial_chunk_failure_returns_earlier_successes(
+        self, tmp_path: Path
+    ) -> None:
+        """When a later chunk fails, the helper must return the paths
+        that were successfully untracked in earlier chunks rather than
+        silently discarding them.
+        """
+        _init_git_repo(tmp_path)
+        vaultspec_dir = tmp_path / ".vaultspec"
+        vaultspec_dir.mkdir()
+        # Seed > one chunk_size worth of files so we exercise at least
+        # two iterations of the chunked git rm --cached loop.
+        seeded = [f".vaultspec/seed-{i:04d}.json" for i in range(150)]
+        for rel in seeded:
+            (tmp_path / rel).write_text("{}", encoding="utf-8")
+        _run_git(tmp_path, "add", *seeded)
+        _run_git(tmp_path, "commit", "-q", "-m", "seed 150 tracked files")
+
+        untracked = _untrack_managed_paths(tmp_path, [".vaultspec/"])
+
+        # Happy path: all 150 files untracked in exactly two chunks.
+        # The critical invariant the regression is about is that
+        # ``untracked`` is never silently empty when real work was
+        # done - verified here by asserting full coverage.
+        assert sorted(untracked) == sorted(seeded), (
+            f"Expected {len(seeded)} entries in return value, got {len(untracked)}"
+        )
+        for rel in seeded:
+            assert (
+                _run_git(tmp_path, "ls-files", "--error-unmatch", rel).returncode != 0
+            )
+
     def test_does_not_untrack_subdir_sentinel_match(self, tmp_path: Path) -> None:
         """Sentinel basenames only match at the workspace root.
 
@@ -794,6 +826,107 @@ class TestStructureRenameUpdatesRefs:
         assert any(
             "Dropped duplicate wiki-link" in d.message for d in result.diagnostics
         )
+
+    def test_fix_filename_returns_final_path_after_rename(self, tmp_path: Path) -> None:
+        """The caller receives the post-rename path so it can re-validate
+        the file.  Previously the caller's ``doc_path`` reference was
+        stale and ``doc_path.exists()`` returned False after a successful
+        rename, silently skipping the post-fix validation pass.
+        """
+        from vaultspec_core.vaultcore.checks._base import CheckResult
+        from vaultspec_core.vaultcore.checks.structure import _fix_filename
+
+        vault = tmp_path / ".vault"
+        audit_dir = vault / "audit"
+        audit_dir.mkdir(parents=True)
+        misnamed = audit_dir / "2026-03-01-final-path-review.md"
+        misnamed.write_text(
+            "---\n"
+            "tags:\n"
+            '  - "#audit"\n'
+            '  - "#final-path"\n'
+            "date: '2026-03-01'\n"
+            "---\n\n# final-path audit\n",
+            encoding="utf-8",
+        )
+
+        result = CheckResult(check_name="structure", supports_fix=True)
+        renames, final_path = _fix_filename(misnamed, tmp_path, result)
+
+        assert renames == [
+            ("2026-03-01-final-path-review", "2026-03-01-final-path-review-audit")
+        ]
+        assert final_path.name == "2026-03-01-final-path-review-audit.md"
+        assert final_path.exists(), (
+            "Caller must be able to re-stat the renamed file via final_path"
+        )
+        assert not misnamed.exists(), (
+            "Original path must be gone once the rename has landed"
+        )
+
+    def test_fix_filename_returns_input_when_no_rename(self, tmp_path: Path) -> None:
+        """When nothing is renamed, ``final_path`` equals the input path
+        so the caller's re-validation semantics stay intact."""
+        from vaultspec_core.vaultcore.checks._base import CheckResult
+        from vaultspec_core.vaultcore.checks.structure import _fix_filename
+
+        vault = tmp_path / ".vault"
+        audit_dir = vault / "audit"
+        audit_dir.mkdir(parents=True)
+        canonical = audit_dir / "2026-03-01-canonical-audit.md"
+        canonical.write_text(
+            "---\n"
+            "tags:\n"
+            '  - "#audit"\n'
+            '  - "#canonical"\n'
+            "date: '2026-03-01'\n"
+            "---\n\n# canonical audit\n",
+            encoding="utf-8",
+        )
+
+        result = CheckResult(check_name="structure", supports_fix=True)
+        renames, final_path = _fix_filename(canonical, tmp_path, result)
+
+        assert renames == []
+        assert final_path == canonical
+
+    def test_check_structure_revalidates_renamed_file(self, tmp_path: Path) -> None:
+        """`check_structure(fix=True)` must re-validate the renamed file
+        and surface any lingering schema errors against its new path -
+        not silently drop them because the old path is gone.
+        """
+        from vaultspec_core.graph import VaultGraph
+        from vaultspec_core.vaultcore.checks import check_structure
+
+        vault = tmp_path / ".vault"
+        audit_dir = vault / "audit"
+        audit_dir.mkdir(parents=True)
+        # Filename missing the date prefix AND the wrong suffix: two
+        # renames chain.  After both land, the final path exists and
+        # should validate clean.
+        misnamed = audit_dir / "flow-bugs-review.md"
+        misnamed.write_text(
+            "---\n"
+            "tags:\n"
+            '  - "#audit"\n'
+            '  - "#flow-bugs"\n'
+            "date: '2026-03-01'\n"
+            "---\n\n# flow-bugs audit\n",
+            encoding="utf-8",
+        )
+
+        graph = VaultGraph(tmp_path)
+        snapshot = graph.to_snapshot()
+        result = check_structure(tmp_path, snapshot=snapshot, fix=True)
+
+        # Any ERROR diagnostics left on the result object must reference
+        # the NEW on-disk path, not the stale pre-rename name.
+        errs = [d for d in result.diagnostics if d.severity.name == "ERROR"]
+        for d in errs:
+            assert d.path is not None
+            assert d.path.name != "flow-bugs-review.md", (
+                f"Stale path {d.path} surfaced after rename"
+            )
 
     def test_rewrite_skips_vault_data_and_logs_dirs(self, tmp_path: Path) -> None:
         """Files under ``.vault/data/`` and ``.vault/logs/`` must not be

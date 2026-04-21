@@ -34,12 +34,19 @@ logger = logging.getLogger(__name__)
 
 def _fix_filename(
     doc_path: Path, root_dir: Path, result: CheckResult
-) -> list[tuple[str, str]]:
+) -> tuple[list[tuple[str, str]], Path]:
     """Attempt to fix filename issues: wrong suffix, missing date prefix.
 
-    Returns a list of ``(old_stem, new_stem)`` tuples for every successful
-    rename performed on *doc_path* (zero, one, or two renames per call).
-    Callers use the returned list to drive a follow-up
+    Returns a two-tuple of ``(renames, final_path)`` where *renames* is
+    the list of ``(old_stem, new_stem)`` tuples for every successful
+    rename performed on *doc_path* (zero, one, or two renames per call)
+    and *final_path* is the on-disk path after those renames land
+    (or the input *doc_path* if nothing was renamed).  The caller needs
+    *final_path* to re-validate the renamed file, because local
+    rebinding inside this function does not propagate to the caller's
+    variable.
+
+    The returned *renames* list drives a follow-up
     :func:`_rewrite_incoming_refs` pass so incoming ``[[wiki-link]]``
     references stay in sync with the new filenames.
     """
@@ -50,7 +57,7 @@ def _fix_filename(
 
     doc_type = get_doc_type(doc_path, root_dir)
     if not doc_type:
-        return renames
+        return renames, doc_path
 
     filename = doc_path.name
     rel = doc_path.relative_to(root_dir)
@@ -103,7 +110,7 @@ def _fix_filename(
                         severity=Severity.ERROR,
                     )
                 )
-                return renames
+                return renames, doc_path
 
     if not re.match(r"^\d{4}-\d{2}-\d{2}-", filename):
         # UTC date prefix so the rename is deterministic regardless of
@@ -118,7 +125,8 @@ def _fix_filename(
             doc_path.rename(new_path)
             result.fixed_count += 1
             renames.append((old_stem, new_path.stem))
-            rel = new_path.relative_to(root_dir)
+            doc_path = new_path
+            rel = doc_path.relative_to(root_dir)
             result.diagnostics.append(
                 CheckDiagnostic(
                     path=rel,
@@ -137,7 +145,7 @@ def _fix_filename(
                 )
             )
 
-    return renames
+    return renames, doc_path
 
 
 _RELATED_ENTRY_RE = re.compile(r'^(\s*-\s*["\']?\[\[)(.+?)(\]\]["\']?.*)$')
@@ -480,14 +488,18 @@ def check_structure(
         errors = VaultConstants.validate_filename(doc_path.name, doc_type)
 
         if errors and fix:
-            renames = _fix_filename(doc_path, root_dir, result)
+            renames, final_path = _fix_filename(doc_path, root_dir, result)
             all_renames.extend(renames)
-            if doc_path.exists():
-                remaining = VaultConstants.validate_filename(doc_path.name, doc_type)
+            # ``final_path`` tracks the on-disk location after any
+            # renames performed by ``_fix_filename``; the original
+            # ``doc_path`` reference is stale after a successful rename
+            # and would cause the post-fix validation to be skipped.
+            if final_path.exists():
+                remaining = VaultConstants.validate_filename(final_path.name, doc_type)
                 for msg in remaining:
                     result.diagnostics.append(
                         CheckDiagnostic(
-                            path=doc_path.relative_to(root_dir),
+                            path=final_path.relative_to(root_dir),
                             message=msg,
                             severity=Severity.ERROR,
                         )
