@@ -11,13 +11,14 @@ Complete command reference for `vaultspec-core`. See the [framework manual](./RE
 
 ## Global Options
 
-These options apply to all `vaultspec-core` commands.
+These options apply at the top level and on most subcommands. `--debug` and `--version` are top-level only; `--target` and `--json` are accepted by almost every subcommand.
 
 | Option         | Short | Default | Description                                                                                                                |
 | -------------- | ----- | ------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `--target DIR` | `-t`  | cwd     | Target workspace directory. Overrides `VAULTSPEC_TARGET_DIR`. Defaults to the current working directory if neither is set. |
-| `--debug`      | `-d`  | off     | Enable DEBUG-level logging                                                                                                 |
-| `--version`    | `-V`  | -       | Print version and exit                                                                                                     |
+| `--debug`      | `-d`  | off     | Enable DEBUG-level logging (top-level flag).                                                                               |
+| `--version`    | `-V`  | -       | Print version and exit (top-level flag).                                                                                   |
+| `--json`       | -     | off     | Emit machine-readable output. Supported on nearly every subcommand.                                                        |
 
 ## Workspace Commands
 
@@ -43,6 +44,7 @@ Deploy the vaultspec framework into the target directory.
 | `--dry-run` | off     | Preview without writing                 |
 | `--force`   | off     | Overwrite existing installation         |
 | `--skip`    | `[]`    | Skip specific sync passes (repeatable)  |
+| `--json`    | off     | Emit machine-readable output            |
 
 `core` installs `.vaultspec/` only, without any provider config.
 
@@ -70,6 +72,7 @@ Remove the vaultspec framework from the target directory.
 | `--dry-run`      | off     | Preview without deleting                       |
 | `--force`        | off     | Required to execute (uninstall is destructive) |
 | `--skip`         | `[]`    | Skip specific removal passes (repeatable)      |
+| `--json`         | off     | Emit machine-readable output                   |
 
 `.vault/` is preserved by default. Pass `--remove-vault` to delete it.
 
@@ -98,6 +101,7 @@ Sync rules, skills, agents, system prompts, and config from `.vaultspec/` to pro
 | `--dry-run` | off     | Preview changes without writing                       |
 | `--force`   | off     | Prune stale files and overwrite user-authored content |
 | `--skip`    | `[]`    | Skip specific sync passes (repeatable)                |
+| `--json`    | off     | Emit machine-readable output                          |
 
 ## Vault Commands
 
@@ -126,6 +130,8 @@ Create a new `.vault/` document from a template.
 | `--title TITLE` | -     | None            | Document title                                                                       |
 | `--related DOC` | `-r`  | None            | Related document(s). Accepts path, filename, stem, or `[[wiki-link]]`. Repeatable.   |
 | `--tags TAG`    | -     | None            | Additional freeform tags beyond the required directory and feature tags. Repeatable. |
+| `--force`       | -     | off             | Overwrite an existing document at the resolved path.                                 |
+| `--dry-run`     | -     | off             | Preview without writing.                                                             |
 
 ______________________________________________________________________
 
@@ -210,6 +216,22 @@ List all feature tags in the vault.
 
 ______________________________________________________________________
 
+### vault feature index
+
+```bash
+vaultspec-core vault feature index [OPTIONS]
+```
+
+Generate or update `<feature>.index.md` files at the vault root. Each index links to every document sharing that feature tag, making implicit feature clusters explicit in the graph.
+
+#### Options
+
+| Option          | Short | Default | Description                           |
+| --------------- | ----- | ------- | ------------------------------------- |
+| `--feature TAG` | `-f`  | None    | Generate index for a specific feature |
+
+______________________________________________________________________
+
 ### vault feature archive
 
 ```bash
@@ -238,22 +260,42 @@ Run health checks on `.vault/`. Exits with code `1` if errors are found.
 
 #### Sub-Commands
 
-| Sub-command   | `--fix` | `--feature` | Description                                                 |
-| ------------- | ------- | ----------- | ----------------------------------------------------------- |
-| `all`         | partial | yes         | Run all checks in sequence                                  |
-| `frontmatter` | yes     | yes         | Validate frontmatter against vault schema                   |
-| `links`       | yes     | yes         | Check wiki-links follow Obsidian convention                 |
-| `orphans`     | no      | yes         | Find documents with no incoming wiki-links                  |
-| `features`    | no      | yes         | Check feature tag completeness                              |
-| `references`  | yes     | yes         | Check cross-references within features                      |
-| `schema`      | yes     | yes         | Enforce dependency rules (ADR refs research, plan refs ADR) |
-| `structure`   | yes     | no          | Check directory structure and filename conventions          |
+| Sub-command   | `--fix` | `--feature` | Description                                                      |
+| ------------- | ------- | ----------- | ---------------------------------------------------------------- |
+| `all`         | yes     | yes         | Run every check in sequence                                      |
+| `body-links`  | no      | yes         | Find wiki-links and markdown path links in document body text    |
+| `dangling`    | yes     | yes         | Find `related:` wiki-links that resolve to no document           |
+| `frontmatter` | yes     | yes         | Validate frontmatter against vault schema                        |
+| `links`       | yes     | yes         | Check wiki-links follow Obsidian convention (no `.md` extension) |
+| `orphans`     | no      | yes         | Find documents with no incoming wiki-links                       |
+| `features`    | no      | yes         | Check feature tag completeness (missing doc types)               |
+| `references`  | yes     | yes         | Check cross-references within features                           |
+| `schema`      | yes     | yes         | Enforce dependency rules (ADR refs research, plan refs ADR)      |
+| `structure`   | yes     | no          | Check directory structure and filename conventions               |
 
-`yes` = fully supported, `partial` = some checks only, `no` = flag rejected with error. `structure` does not support `--feature` filtering.
+`yes` = fully supported, `no` = flag rejected with error. `structure` does not support `--feature` filtering.
 
 ## Spec Commands
 
 Group command: `vaultspec-core spec COMMAND`
+
+### spec doctor
+
+```bash
+vaultspec-core spec doctor [OPTIONS]
+```
+
+Run diagnostic collectors across the framework, providers, builtins, `.gitignore`, and configuration files. Reports findings and exits with the highest severity observed.
+
+#### Options
+
+| Option   | Default | Description                |
+| -------- | ------- | -------------------------- |
+| `--json` | off     | Emit the diagnosis as JSON |
+
+Exit codes: `0` = all ok, `1` = warnings, `2` = errors.
+
+______________________________________________________________________
 
 ### spec rules / spec skills / spec agents
 
@@ -312,6 +354,25 @@ vaultspec-core spec hooks COMMAND
 | ----------- | --------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `list`      | -                     | List hooks with name, status, event, and action count                                                                 |
 | `run`       | `EVENT [--path PATH]` | Trigger enabled hooks for the given event. Valid events: `vault.document.created`, `config.synced`, `audit.completed` |
+
+______________________________________________________________________
+
+### spec mcps
+
+```bash
+vaultspec-core spec mcps COMMAND
+```
+
+Manage MCP server definitions and the synced `.mcp.json` entries deployed into provider directories.
+
+#### Sub-Commands
+
+| Sub-command | Signature                               | Description                                |
+| ----------- | --------------------------------------- | ------------------------------------------ |
+| `list`      | -                                       | List all registered MCP server definitions |
+| `add`       | `--name NAME [--config JSON] [--force]` | Add a new custom MCP server definition     |
+| `remove`    | `NAME [--yes/--force]`                  | Remove an MCP server definition            |
+| `sync`      | `[--dry-run] [--force]`                 | Sync MCP definitions to `.mcp.json`        |
 
 ## Environment Variables
 
