@@ -309,21 +309,22 @@ vaultspec-core spec agents COMMAND
 
 #### Sub-Commands
 
-| Sub-command | Signature                                | Description                                    |
-| ----------- | ---------------------------------------- | ---------------------------------------------- |
-| `list`      | -                                        | List all resources                             |
-| `add`       | `--name NAME [--content TEXT] [--force]` | Create a resource                              |
-| `show`      | `NAME`                                   | Print resource content to stdout               |
-| `edit`      | `NAME`                                   | Open in configured editor (`VAULTSPEC_EDITOR`) |
-| `remove`    | `NAME [--force]`                         | Delete a resource. Prompts unless `--force`.   |
-| `rename`    | `OLD_NAME NEW_NAME`                      | Rename a resource                              |
-| `sync`      | `[--dry-run] [--force]`                  | Sync resources to provider directories         |
-| `revert`    | `FILENAME`                               | Revert to snapshotted original                 |
+| Sub-command | Signature                           | Description                                                      |
+| ----------- | ----------------------------------- | ---------------------------------------------------------------- |
+| `list`      | -                                   | List all resources                                               |
+| `add`       | `--name NAME [--force] [--dry-run]` | Create a resource. Extra options vary per resource type (below). |
+| `show`      | `NAME`                              | Print resource content to stdout                                 |
+| `edit`      | `NAME`                              | Open in configured editor (`VAULTSPEC_EDITOR`)                   |
+| `remove`    | `NAME [--yes\|--force]` (`-y`)      | Delete a resource. Prompts unless confirmed.                     |
+| `rename`    | `OLD_NAME NEW_NAME`                 | Rename a resource                                                |
+| `sync`      | `[--dry-run] [--force]`             | Sync resources to provider directories                           |
+| `revert`    | `FILENAME`                          | Revert to snapshotted original                                   |
 
-The `add` sub-command accepts additional options per resource type:
+`add` accepts different body-content flags per resource type:
 
-- `spec skills add` also accepts `--description` and `--template`.
-- `spec agents add` also accepts `--description`.
+- `spec rules add` accepts `--content TEXT`.
+- `spec skills add` accepts `--description TEXT` and `--template TEXT`.
+- `spec agents add` accepts `--description TEXT`.
 
 ______________________________________________________________________
 
@@ -367,12 +368,12 @@ Manage MCP server definitions and the synced `.mcp.json` entries deployed into p
 
 #### Sub-Commands
 
-| Sub-command | Signature                               | Description                                |
-| ----------- | --------------------------------------- | ------------------------------------------ |
-| `list`      | -                                       | List all registered MCP server definitions |
-| `add`       | `--name NAME [--config JSON] [--force]` | Add a new custom MCP server definition     |
-| `remove`    | `NAME [--yes/--force]`                  | Remove an MCP server definition            |
-| `sync`      | `[--dry-run] [--force]`                 | Sync MCP definitions to `.mcp.json`        |
+| Sub-command | Signature                               | Description                                                    |
+| ----------- | --------------------------------------- | -------------------------------------------------------------- |
+| `list`      | -                                       | List all registered MCP server definitions                     |
+| `add`       | `--name NAME [--config JSON] [--force]` | Add a new custom MCP server definition                         |
+| `remove`    | `NAME [--force]`                        | Remove an MCP server definition (`--force` skips confirmation) |
+| `sync`      | `[--dry-run] [--force]`                 | Sync MCP definitions to `.mcp.json`                            |
 
 ## Environment Variables
 

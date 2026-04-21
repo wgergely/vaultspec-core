@@ -2,48 +2,54 @@
 name: vaultspec-cli
 ---
 
-# Vaultspec Core CLI
+# Vaultspec core CLI
 
-This workspace is vaultspec-managed. Vault structure, tag taxonomy, frontmatter schema, and wiki-link rules are defined in the companion rule `vaultspec.builtin.md`; framework concepts live in `.vaultspec/README.md`.
+This workspace is vaultspec-managed. See `vaultspec.builtin.md` for vault structure, tag taxonomy, frontmatter schema, and wiki-link rules. See `.vaultspec/README.md` for framework concepts.
 
 ## Mandate
 
-You MUST use the `vaultspec-core` CLI for every read, write, and audit of `.vault/`, and for every sync touching `.vaultspec/`. Raw filesystem edits to `.vault/` documents, or to any generated provider directory (`.claude/`, `.gemini/`, `.agents/`, `.codex/`), are forbidden.
+Use the `vaultspec-core` CLI for every read, write, and audit of `.vault/`, and for every sync touching `.vaultspec/`. Do not edit `.vault/` documents or any generated provider directory (`.claude/`, `.gemini/`, `.agents/`, `.codex/`) directly. The CLI is the only surface that enforces templates, tag taxonomy, wiki-link resolution, schema dependencies, and provider sync; bypassing it produces drift that `vault check` and `spec doctor` will flag.
 
-The CLI is the only surface that enforces templates, tag taxonomy, wiki-link resolution, schema dependencies, and provider sync. Bypassing it produces drift that later fails `vault check` and `spec doctor`.
+## Commands
 
-## Decision triggers
+| Task                                                  | Run                                         |
+| ----------------------------------------------------- | ------------------------------------------- |
+| Create a `.vault/` document                           | `vault add <type> --feature <tag>`          |
+| List or filter vault documents                        | `vault list [--feature <tag>] [--type <t>]` |
+| Show statistics, invalid, or orphan documents         | `vault stats [--invalid] [--orphaned]`      |
+| Visualize the vault dependency graph                  | `vault graph [--feature <tag>]`             |
+| Audit drift, broken links, or missing references      | `vault check all [--fix]`                   |
+| Confirm required documents exist for a feature        | `vault check features --feature <tag>`      |
+| Archive a completed feature                           | `vault feature archive <tag>`               |
+| List registered rules, skills, agents, hooks, or MCPs | `spec <resource> list`                      |
+| Inspect the assembled system prompt                   | `spec system show`                          |
+| Propagate edits under `.vaultspec/rules/...`          | `sync` (or `spec <resource> sync`)          |
+| Diagnose overall workspace health                     | `spec doctor`                               |
 
-| When you need to...                              | Run                                                     |
-| ------------------------------------------------ | ------------------------------------------------------- |
-| Create a `.vault/` document                      | `vault add <type> --feature <tag>`                      |
-| List or filter vault documents                   | `vault list [--feature <tag>] [--type <t>]`             |
-| Inspect vault statistics or invalid/orphan docs  | `vault stats [--invalid] [--orphaned]`                  |
-| Visualise the vault dependency graph             | `vault graph [--feature <tag>]`                         |
-| Audit drift, broken links, or missing references | `vault check all [--fix]`                               |
-| Confirm required docs exist for a feature        | `vault check features --feature <tag>`                  |
-| Archive a completed feature                      | `vault feature archive <tag>`                           |
-| Inspect registered framework resources           | `spec {rules\|skills\|agents\|hooks\|mcps} list`        |
-| Inspect the assembled system prompt              | `spec system show`                                      |
-| After editing `.vaultspec/rules/...` sources     | `sync` (or `spec {rules\|skills\|agents\|system} sync`) |
-| Diagnose overall workspace health                | `spec doctor`                                           |
+`<resource>` stands for `rules`, `skills`, `agents`, `hooks`, or `mcps`; `system` also accepts `sync`.
 
 ## Runtime
 
-- Invoke as `vaultspec-core <cmd>` when the binary is on `PATH`, or `uv run --no-sync vaultspec-core <cmd>` in uv-managed environments.
-- `--target / -t DIR` operates on a directory other than the current working one.
-- `--dry-run` previews without writing; `--json` emits machine-readable output.
-- Mutating commands accept `--force` where destructive overwrite is needed.
-- Discover every flag, subcommand, and exit code with `vaultspec-core <cmd> --help`.
+- Run `vaultspec-core <cmd>` when the binary is on `PATH`. In uv-managed environments, run `uv run --no-sync vaultspec-core <cmd>`.
+- Use `--target DIR` (or `-t`) to operate on a directory other than the current one.
+- Use `--dry-run` to preview changes.
+- Use `--json` for machine-readable output.
+- Use `--force` when a mutating command must overwrite existing output.
+- Run `vaultspec-core <cmd> --help` for the full flag, subcommand, and exit-code reference.
 
 ## Allowed manual edits
 
-- OK: edit the body prose of a `.vault/` document that `vault add` already scaffolded.
-- OK: edit your own files under `.vaultspec/rules/rules/`, `.vaultspec/rules/skills/`, `.vaultspec/rules/agents/`, then run `vaultspec-core sync`.
-- NOT OK: hand-write frontmatter, filenames, or new `.vault/` documents.
-- NOT OK: edit files inside `.claude/`, `.gemini/`, `.agents/`, `.codex/` - those are regenerated by sync.
+Permitted:
+
+- Edit body prose of a `.vault/` document scaffolded by `vault add`.
+- Edit source files under `.vaultspec/rules/rules/`, `.vaultspec/rules/skills/`, or `.vaultspec/rules/agents/`, then run `vaultspec-core sync`.
+
+Forbidden:
+
+- Hand-writing frontmatter, filenames, or new `.vault/` documents.
+- Editing files inside generated provider directories; `sync` regenerates them.
 
 ## References
 
-- `.vaultspec/CLI.md` - full flag-level handbook: every command, subcommand, option, and exit code.
-- `.vaultspec/README.md` - framework concepts, workflow, and skills.
+- `.vaultspec/CLI.md` - every command, subcommand, option, and exit code.
+- `.vaultspec/README.md` - framework concepts, workflow, and skill catalog.
