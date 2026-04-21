@@ -330,3 +330,29 @@ class TestRecommendedEntries:
         (tmp_path / ".vaultspec").mkdir()
         entries = get_recommended_entries(tmp_path)
         assert ".vaultspec/_snapshots/" in entries
+
+    def test_vaultspec_lock_glob_covers_advisory_sentinels(self, tmp_path):
+        (tmp_path / ".vaultspec").mkdir()
+        entries = get_recommended_entries(tmp_path)
+        assert ".vaultspec/*.lock" in entries
+
+    def test_root_lock_sentinel_when_companion_exists(self, tmp_path):
+        (tmp_path / ".vaultspec").mkdir()
+        (tmp_path / ".gitignore").write_text("", encoding="utf-8")
+        (tmp_path / ".mcp.json").write_text("{}", encoding="utf-8")
+        (tmp_path / ".pre-commit-config.yaml").write_text("", encoding="utf-8")
+
+        entries = get_recommended_entries(tmp_path)
+
+        assert "/.gitignore.lock" in entries
+        assert "/.mcp.json.lock" in entries
+        assert "/.pre-commit-config.yaml.lock" in entries
+
+    def test_root_lock_sentinel_skipped_when_companion_absent(self, tmp_path):
+        (tmp_path / ".vaultspec").mkdir()
+
+        entries = get_recommended_entries(tmp_path)
+
+        assert "/.gitignore.lock" not in entries
+        assert "/.mcp.json.lock" not in entries
+        assert "/.pre-commit-config.yaml.lock" not in entries

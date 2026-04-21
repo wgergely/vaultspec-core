@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#graph-hardening'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-03-22-graph-hardening-adr]]'
   - '[[2026-03-22-graph-hardening-phase1-audit]]'

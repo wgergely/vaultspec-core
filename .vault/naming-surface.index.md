@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#naming-surface'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-03-11-naming-surface-audit]]'
 ---

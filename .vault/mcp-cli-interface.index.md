@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#mcp-cli-interface'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-03-11-mcp-cli-interface-audit]]'
   - '[[2026-03-17-mcp-interface-alignment-audit]]'

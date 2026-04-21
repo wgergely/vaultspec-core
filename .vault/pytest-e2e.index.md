@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#pytest-e2e'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-02-21-pytest-e2e-impl-phase1-exec]]'
   - '[[2026-02-21-pytest-e2e-impl-phase2-exec]]'

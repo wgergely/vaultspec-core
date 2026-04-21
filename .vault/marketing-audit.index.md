@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#marketing-audit'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-02-18-marketing-audit-competitor-landscape-research]]'
   - '[[2026-02-18-marketing-audit-documentation-quality-research]]'

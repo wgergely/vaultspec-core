@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#vault-doctor-suite'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-02-24-vault-doctor-suite-adr]]'
   - '[[2026-02-24-vault-doctor-suite-p1-plan]]'

@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#workspace-paths'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-02-19-workspace-path-decoupling-adr]]'
   - '[[2026-02-19-workspace-path-decoupling-research]]'

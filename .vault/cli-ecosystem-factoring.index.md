@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#cli-ecosystem-factoring'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
   - '[[2026-02-22-cli-ecosystem-factoring-phase1-summary-exec]]'

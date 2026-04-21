@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#repo-manager-extension'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-02-23-repo-manager-manifest-reference]]'
 ---

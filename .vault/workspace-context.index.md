@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#workspace-context'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-03-21-workspace-context-adr]]'
   - '[[2026-03-21-workspace-context-phase1-exec]]'

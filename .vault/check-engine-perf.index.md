@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#check-engine-perf'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-03-21-check-engine-perf-adr]]'
   - '[[2026-03-21-check-engine-perf-plan]]'

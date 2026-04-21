@@ -2,7 +2,7 @@
 generated: true
 tags:
   - '#pip-install-deployment'
-date: '2026-03-23'
+date: '2026-04-21'
 related:
   - '[[2026-02-23-pip-install-deployment-research]]'
 ---
