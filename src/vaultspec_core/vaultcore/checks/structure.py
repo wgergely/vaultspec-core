@@ -209,17 +209,37 @@ def _rewrite_incoming_refs(
     if not vault_root.is_dir():
         return
 
+    # Build a case-insensitive mirror of ``rename_map`` for fallback
+    # lookups.  Obsidian resolves wiki-links case-insensitively
+    # (``[[My-Doc]]`` hits ``my-doc.md``) but the filesystem on Linux
+    # is case-sensitive.  We try the exact-case lookup first to
+    # preserve intent and only fall back to lowercase when no exact
+    # match exists.
+    rename_map_lower = {k.lower(): v for k, v in rename_map.items()}
+
+    # Top-level vault subdirectories that are expected to contain
+    # schema-conforming documents.  Non-schema directories such as
+    # ``data/`` and ``logs/`` (explicitly recommended for gitignore
+    # by :func:`vaultspec_core.core.gitignore.get_recommended_entries`)
+    # are skipped to avoid scanning large or non-vault files.  Hidden
+    # directories (``.obsidian/``, ``.trash/``, ...) are skipped
+    # by the dot-prefix filter below.
+    non_schema_dirs = frozenset({"data", "logs"})
+
     for md_path in sorted(vault_root.rglob("*.md")):
         # Skip hidden internal directories (e.g. ``.obsidian/``,
-        # ``.trash/``, ``.vaultspec``-style dotfile scratch).  These
-        # are covered by the managed gitignore block and must not be
-        # mutated - Obsidian in particular keeps its own state files
-        # under ``.obsidian/`` that should never be edited externally.
+        # ``.trash/``, ``.vaultspec``-style dotfile scratch) and
+        # non-schema data/log directories.  These are covered by the
+        # managed gitignore block and must not be mutated - Obsidian
+        # in particular keeps its own state files under ``.obsidian/``
+        # that should never be edited externally.
         try:
             rel_parts = md_path.relative_to(vault_root).parts
         except ValueError:
             continue
-        if any(part.startswith(".") for part in rel_parts[:-1]):
+        if any(
+            part.startswith(".") or part in non_schema_dirs for part in rel_parts[:-1]
+        ):
             continue
         try:
             # Read as bytes first so CRLF endings survive the decode;
@@ -307,9 +327,16 @@ def _rewrite_incoming_refs(
                 stem_only = target[:cut]
                 trailer = target[cut:]
 
+            # Case-sensitive lookup first (preserves exact-case intent
+            # when both ``My-Doc.md`` and ``my-doc.md`` legitimately
+            # coexist on Linux); fall back to case-insensitive match
+            # so Obsidian-style cross-case links (``[[My-Doc]]`` at
+            # pointing ``my-doc.md``) are still rewritten.
             final_stem: str | None = None
             if stem_only in rename_map:
                 final_stem = rename_map[stem_only]
+            elif stem_only.lower() in rename_map_lower:
+                final_stem = rename_map_lower[stem_only.lower()]
             if final_stem is None:
                 # Remember the existing (unrewritten) full target so
                 # later rewrites can avoid creating a duplicate.  The

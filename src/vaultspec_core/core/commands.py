@@ -299,11 +299,7 @@ def _untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
     # The candidate list comes from :func:`get_recommended_entries` and is
     # bounded by the number of managed prefixes we own (``.vaultspec/``,
     # ``.claude/``, ``.gemini/``, ``.agents/``, ``.codex/``, plus a handful
-    # of root-level lock sentinels).  It is safe to splat onto the
-    # argv.  The *tracked* list returned by ``ls-files`` is the one that
-    # can grow arbitrarily large on a legacy repo; that call uses
-    # ``git rm --pathspec-from-file=-`` via stdin so it survives past
-    # ``ARG_MAX`` (~32 KiB on Windows, larger on Linux).
+    # of root-level lock sentinels).  It is safe to splat onto the argv.
     try:
         ls_result = subprocess.run(
             ["git", "-C", str(target), "ls-files", "--", *candidates],
@@ -319,26 +315,46 @@ def _untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
     if not tracked:
         return []
 
-    tracked_payload = "\n".join(tracked)
-    try:
-        subprocess.run(
-            [
-                "git",
-                "-C",
-                str(target),
-                "rm",
-                "--cached",
-                "--ignore-unmatch",
-                "--pathspec-from-file=-",
-            ],
-            input=tracked_payload,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as exc:
-        logger.warning("git rm --cached failed during install untrack: %s", exc)
-        return []
+    # Chunk ``git rm --cached`` calls so the argv stays well below
+    # ``ARG_MAX`` (~32 KiB on Windows, much larger on Linux) even on
+    # legacy repos with thousands of tracked managed files.  Chunking
+    # is preferred over ``--pathspec-from-file=-`` because that flag
+    # was introduced in git 2.26 (March 2020) and some CI runners
+    # still carry older git (notably Ubuntu 18.04 LTS with git 2.17).
+    # 200 paths at ~256 chars each ~= 50 KiB which could spill ARG_MAX on
+    # Windows under edge conditions; 100 keeps us firmly inside the
+    # budget.
+    _chunk_size = 100
+    for chunk_start in range(0, len(tracked), _chunk_size):
+        chunk = tracked[chunk_start : chunk_start + _chunk_size]
+        try:
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(target),
+                    "rm",
+                    "--cached",
+                    "--ignore-unmatch",
+                    "--",
+                    *chunk,
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except (
+            subprocess.CalledProcessError,
+            FileNotFoundError,
+            OSError,
+        ) as exc:
+            logger.warning(
+                "git rm --cached failed during install untrack (chunk %d-%d): %s",
+                chunk_start,
+                chunk_start + len(chunk),
+                exc,
+            )
+            return []
 
     for path in tracked:
         logger.info("Untracked previously-committed managed path: %s", path)

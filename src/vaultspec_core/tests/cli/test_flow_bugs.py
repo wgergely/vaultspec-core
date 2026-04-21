@@ -795,6 +795,125 @@ class TestStructureRenameUpdatesRefs:
             "Dropped duplicate wiki-link" in d.message for d in result.diagnostics
         )
 
+    def test_rewrite_skips_vault_data_and_logs_dirs(self, tmp_path: Path) -> None:
+        """Files under ``.vault/data/`` and ``.vault/logs/`` must not be
+        rewritten - those dirs hold internal state and log output.
+        """
+        from vaultspec_core.vaultcore.checks._base import CheckResult
+        from vaultspec_core.vaultcore.checks.structure import (
+            _rewrite_incoming_refs,
+        )
+
+        vault = tmp_path / ".vault"
+        data_dir = vault / "data"
+        logs_dir = vault / "logs"
+        data_dir.mkdir(parents=True)
+        logs_dir.mkdir(parents=True)
+
+        data_doc = data_dir / "snapshot.md"
+        logs_doc = logs_dir / "run.md"
+        original = (
+            "---\n"
+            "tags:\n"
+            '  - "#research"\n'
+            '  - "#internal"\n'
+            "date: '2026-03-01'\n"
+            "related:\n"
+            '  - "[[alpha]]"\n'
+            "---\n\n# internal\n"
+        )
+        data_doc.write_text(original, encoding="utf-8")
+        logs_doc.write_text(original, encoding="utf-8")
+
+        result = CheckResult(check_name="structure", supports_fix=True)
+        _rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
+
+        assert data_doc.read_text(encoding="utf-8") == original, (
+            ".vault/data/ docs must not be mutated"
+        )
+        assert logs_doc.read_text(encoding="utf-8") == original, (
+            ".vault/logs/ docs must not be mutated"
+        )
+        assert result.fixed_count == 0
+
+    def test_rewrite_handles_case_insensitive_wiki_links(self, tmp_path: Path) -> None:
+        """Obsidian resolves wiki-links case-insensitively; the rewrite
+        must still hit the rename map when only the case differs.
+        """
+        from vaultspec_core.vaultcore.checks._base import CheckResult
+        from vaultspec_core.vaultcore.checks.structure import (
+            _rewrite_incoming_refs,
+        )
+
+        vault = tmp_path / ".vault"
+        adr_dir = vault / "adr"
+        adr_dir.mkdir(parents=True)
+        backref = adr_dir / "2026-03-02-case-adr.md"
+        backref.write_text(
+            "---\n"
+            "tags:\n"
+            '  - "#adr"\n'
+            '  - "#case"\n'
+            "date: '2026-03-02'\n"
+            "related:\n"
+            '  - "[[My-Doc]]"\n'
+            "---\n\n# case adr\n",
+            encoding="utf-8",
+        )
+
+        # rename_map key is the lowercase on-disk stem.
+        result = CheckResult(check_name="structure", supports_fix=True)
+        _rewrite_incoming_refs(tmp_path, [("my-doc", "your-doc")], result)
+
+        written = backref.read_text(encoding="utf-8")
+        assert "[[your-doc]]" in written, (
+            "Case-insensitive fallback should rewrite [[My-Doc]] "
+            "when the rename map contains lowercase 'my-doc'"
+        )
+        assert "[[My-Doc]]" not in written
+        assert result.fixed_count == 1
+
+    def test_rewrite_exact_case_takes_precedence_over_lowercase(
+        self, tmp_path: Path
+    ) -> None:
+        """When both exact-case and case-insensitive matches are
+        available, the exact-case rename wins so Linux users with
+        both ``My-Doc.md`` and ``my-doc.md`` coexisting get
+        deterministic, intent-preserving behaviour.
+        """
+        from vaultspec_core.vaultcore.checks._base import CheckResult
+        from vaultspec_core.vaultcore.checks.structure import (
+            _rewrite_incoming_refs,
+        )
+
+        vault = tmp_path / ".vault"
+        adr_dir = vault / "adr"
+        adr_dir.mkdir(parents=True)
+        backref = adr_dir / "2026-03-02-case-exact-adr.md"
+        backref.write_text(
+            "---\n"
+            "tags:\n"
+            '  - "#adr"\n'
+            '  - "#case-exact"\n'
+            "date: '2026-03-02'\n"
+            "related:\n"
+            '  - "[[My-Doc]]"\n'
+            "---\n\n# case exact adr\n",
+            encoding="utf-8",
+        )
+
+        # Both an exact-case and a lowercase entry in the rename_map.
+        result = CheckResult(check_name="structure", supports_fix=True)
+        _rewrite_incoming_refs(
+            tmp_path,
+            [("My-Doc", "exact-target"), ("my-doc", "lowercase-target")],
+            result,
+        )
+
+        written = backref.read_text(encoding="utf-8")
+        assert "[[exact-target]]" in written
+        assert "[[lowercase-target]]" not in written
+
     def test_rewrite_skips_hidden_obsidian_docs(self, tmp_path: Path) -> None:
         """Files under ``.vault/.obsidian/`` and ``.vault/.trash/`` must not
         be rewritten - they hold editor state, not vault content.
