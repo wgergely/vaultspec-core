@@ -588,11 +588,9 @@ Create a new `.vault/` document from a template.
   valid for `adr`, `audit`, `reference`, and `research`.
 - `--related DOC` (`-r`) - Related document(s). Accepts path, filename, stem, or
   `[[wiki-link]]`. Repeatable.
-- `--tags TAG` - Additional tags beyond the required directory and feature tags.
-  Repeatable. The taxonomy allows exactly two, so any tag added here is written without
-  complaint and then fails the `frontmatter` check with
-  `Exactly one feature tag (#<feature>) required`. There is no supported third tag; the
-  flag exists for setting the pair itself.
+- `--tags TAG` - Accepts only the document's required directory and feature tags.
+  Repeatable; duplicates are ignored. Other tags are rejected before writing, including
+  with `--force` or `--dry-run`. Omit this option for ordinary creation.
 - `--force` (default off) - Overwrite an existing document at the resolved path.
 - `--dry-run` (default off) - Preview without writing files.
 - `--json` (default off) - Emit machine-readable JSON output in standard envelope.

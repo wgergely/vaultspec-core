@@ -12,7 +12,7 @@ related:
 <!-- FRONTMATTER RULES:
      tags: one directory tag (hardcoded #audit) and one feature tag.
      Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
-     Additional tags may be appended below the required pair.
+     Exactly these two tags are allowed; do not append additional tags.
 
      Related: use wiki-links as '[[yyyy-mm-dd-foo-bar]]'.
 

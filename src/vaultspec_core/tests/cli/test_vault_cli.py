@@ -65,6 +65,48 @@ class TestHelpText:
 class TestAddSubcommand:
     """Verify 'vault add' behavior."""
 
+    @pytest.mark.parametrize("force", [False, True])
+    @pytest.mark.parametrize("dry_run", [False, True])
+    @pytest.mark.parametrize("json_output", [False, True])
+    def test_add_rejects_extra_tags_before_writing(
+        self,
+        runner: CliRunner,
+        synthetic_project: Path,
+        force: bool,
+        dry_run: bool,
+        json_output: bool,
+    ) -> None:
+        args = [
+            "--target",
+            str(synthetic_project),
+            "vault",
+            "add",
+            "research",
+            "--feature",
+            "tag-rejection",
+            "--title",
+            "Tag rejection",
+        ]
+        if force:
+            assert runner.invoke(app, args).exit_code == 0
+        vault = synthetic_project / ".vault"
+        before = {p.relative_to(vault): p.read_bytes() for p in vault.rglob("*.md")}
+        result = runner.invoke(
+            app,
+            args
+            + ["--tags", "review"]
+            + (["--json"] if json_output else [])
+            + (["--force"] if force else [])
+            + (["--dry-run"] if dry_run else []),
+        )
+        assert result.exit_code == 1
+        assert "Unsupported tags" in result.output
+        if json_output:
+            payload = json.loads(result.stdout)
+            assert payload["status"] == "failed"
+        after = {p.relative_to(vault): p.read_bytes() for p in vault.rglob("*.md")}
+        assert after == before
+
     def test_add_generates_correct_filename(
         self, runner: CliRunner, synthetic_project: Path
     ):

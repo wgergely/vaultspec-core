@@ -6,12 +6,15 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from vaultspec_core.core.exceptions import VaultSpecError
+
 if TYPE_CHECKING:
     from pathlib import Path
 
 from vaultspec_core.vaultcore.hydration import (
     DocumentIdentity,
     TemplateFields,
+    WritePolicy,
     create_vault_doc,
     hydrate_template,
 )
@@ -339,16 +342,47 @@ class TestCreateVaultDocWithRelated:
         assert "[[2026-03-01-test-feat-research]]" in content
         assert "{yyyy-mm-dd-*}" not in content
 
-    def test_create_with_extra_tags(self, vault_env: Path) -> None:
+    @pytest.mark.parametrize("force", [False, True])
+    @pytest.mark.parametrize("dry_run", [False, True])
+    @pytest.mark.parametrize("tag", ["#scope-api", "#research"])
+    def test_create_rejects_extra_tags_without_writing(
+        self, vault_env: Path, force: bool, dry_run: bool, tag: str
+    ) -> None:
+        identity = DocumentIdentity(DocType.ADR, "tag-feat", "2026-03-15")
+        if force:
+            create_vault_doc(vault_env, identity, TemplateFields(title="Original"))
+        before = {
+            path.relative_to(vault_env): path.read_bytes()
+            for path in vault_env.rglob("*")
+            if path.is_file()
+        }
+        before_paths = set(vault_env.rglob("*"))
+        with pytest.raises(VaultSpecError, match="Unsupported tags"):
+            create_vault_doc(
+                vault_env,
+                identity,
+                TemplateFields(title="Replacement", extra_tags=[tag]),
+                write=WritePolicy(force=force, dry_run=dry_run),
+            )
+        after = {
+            path.relative_to(vault_env): path.read_bytes()
+            for path in vault_env.rglob("*")
+            if path.is_file()
+        }
+        assert after == before
+        assert set(vault_env.rglob("*")) == before_paths
+
+    def test_create_accepts_repeated_required_tags(self, vault_env: Path) -> None:
+        from vaultspec_core.vaultcore.parser import parse_vault_metadata
+
         path = create_vault_doc(
             vault_env,
             DocumentIdentity(DocType.ADR, "tag-feat", "2026-03-15"),
-            TemplateFields(title="Tags Test", extra_tags=["#scope-api"]),
+            TemplateFields(title="Tags Test", extra_tags=["#adr", "tag-feat", "#adr"]),
         )
-        content = path.read_text(encoding="utf-8")
-        assert "#scope-api" in content
-        assert "#adr" in content
-        assert "#tag-feat" in content
+        metadata, _ = parse_vault_metadata(path.read_text(encoding="utf-8"))
+        assert metadata.tags == ["#adr", "#tag-feat"]
+        assert metadata.validate() == []
 
     def test_create_without_related_defaults_to_empty(self, vault_env: Path) -> None:
         path = create_vault_doc(

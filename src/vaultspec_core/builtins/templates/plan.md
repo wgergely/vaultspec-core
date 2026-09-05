@@ -13,7 +13,7 @@ related:
 <!-- FRONTMATTER RULES:
      tags: one directory tag (hardcoded #plan) and one feature tag.
      Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
-     Additional tags may be appended below the required pair.
+     Exactly these two tags are allowed; do not append additional tags.
 
      modified: CLI-maintained last-modified stamp; set at scaffold time,
      refreshed by mutating CLI verbs and vault check fix; never hand-edit.

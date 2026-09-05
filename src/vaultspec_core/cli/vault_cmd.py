@@ -238,7 +238,7 @@ def cmd_add(
         list[str] | None,
         typer.Option(
             "--tags",
-            help="Additional tags beyond the required directory and feature tags",
+            help="Required directory or feature tags only; other tags are rejected",
         ),
     ] = None,
     force: Annotated[

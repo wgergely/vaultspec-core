@@ -140,8 +140,8 @@ class DocumentSpec(LeanModel):
             after scaffolding, routed through the shared edit engine.
         related: Optional references (path, stem, filename, or wiki-link)
             resolved to ``[[wiki-link]]`` entries in ``related:``.
-        tags: Optional additional ``#tag`` strings beyond the required
-            directory and feature tags.
+        tags: Optional repetitions of the required directory and feature
+            tags. Other tags are rejected before writing.
         tier: The plan tier (``L1``-``L4``) for a ``plan`` document; defaults
             to ``L1``. Ignored for other document types.
         topic: Optional kebab-case narrative filename infix disambiguating a

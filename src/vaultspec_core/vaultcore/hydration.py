@@ -16,7 +16,7 @@ import re
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
-from ..core.exceptions import ResourceExistsError
+from ..core.exceptions import ResourceExistsError, VaultSpecError
 from .body_schema import CURRENT_BODY_SCHEMA
 from .models import DocType
 
@@ -156,8 +156,8 @@ class TemplateFields:
             placeholders.
         related: Pre-resolved ``[[wiki-link]]`` strings to inject into the
             ``related:`` frontmatter field.
-        extra_tags: Additional ``#tag`` strings to append to the ``tags:``
-            frontmatter field (beyond the directory and feature tags).
+        extra_tags: Tags to append during rendering. Document creation accepts
+            only the required directory and feature tags and removes duplicates.
         tier: Optional plan tier value (``L1``..``L4``) substituted into the
             ``{tier}`` placeholder for plan templates.
     """
@@ -523,6 +523,8 @@ def create_vault_doc(
             binding; execution is logged with ``vaultspec-core vault exec log``.
         ResourceExistsError: If the target file already exists and the
             write policy does not force an overwrite.
+        VaultSpecError: If supplied tags are not the required directory and
+            feature tags.
     """
     from ..config import get_config
 
@@ -539,6 +541,20 @@ def create_vault_doc(
     topic = identity.topic
     plan_date = exec_binding.plan.date
     plan_stem = exec_binding.plan.stem
+
+    if fields.extra_tags:
+        required_tags = {doc_type.tag, f"#{feature}"}
+        unsupported = [
+            tag
+            for tag in fields.extra_tags
+            if (tag if tag.startswith("#") else f"#{tag}") not in required_tags
+        ]
+        if unsupported:
+            raise VaultSpecError(
+                f"Unsupported tags: {', '.join(unsupported)}. "
+                f"Only {doc_type.tag} and #{feature} are allowed."
+            )
+        fields = replace(fields, extra_tags=None)
 
     if topic is not None and doc_type not in _TOPIC_INFIX_TYPES:
         raise ValueError(
@@ -660,8 +676,8 @@ def _assert_scaffolded_content_valid(content: str, doc_type: DocType) -> None:
     Scope is deliberately narrow: this is the emit-time guard against
     the B2/B5-shape antipattern where a scaffolder writes content the
     next read-path command crashes on with an uncaught exception. It
-    is not a general lint pass -- soft frontmatter advisories (extra
-    tags, missing related entries) remain post-creation warnings via
+    is not a general lint pass -- frontmatter advisories from custom
+    templates remain post-creation warnings via
     :func:`vaultspec_core.cli.vault_cmd._validate_created_doc` and are
     not blocking here.
 

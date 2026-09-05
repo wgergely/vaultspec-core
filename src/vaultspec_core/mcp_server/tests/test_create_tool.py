@@ -113,6 +113,21 @@ async def test_create_regenerates_feature_index(vault_root: Path) -> None:
         assert "#index-feat" in index_text
 
 
+async def test_create_rejects_extra_tags_without_writing(vault_root: Path) -> None:
+    """A rejected item writes neither its document nor its feature index."""
+    vault = vault_root / ".vault"
+    before = {p.relative_to(vault): p.read_bytes() for p in vault.rglob("*.md")}
+    async with Client(create_server()) as client:
+        payload = await _create(
+            client,
+            [{"feature": "tag-rejection", "type": "research", "tags": ["review"]}],
+        )
+    assert payload["status"] == "failed"
+    assert "Unsupported tags" in payload["items"][0]["error"]["message"]
+    after = {p.relative_to(vault): p.read_bytes() for p in vault.rglob("*.md")}
+    assert after == before
+
+
 async def test_create_rejects_index_type_per_item(vault_root: Path) -> None:
     """An ``index`` spec is a per-item failure, not a whole-call error."""
     mcp = create_server()
