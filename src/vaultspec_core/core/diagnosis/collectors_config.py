@@ -59,7 +59,9 @@ def collect_config_state(tool_value: str) -> ConfigSignal:
 
     try:
         content = config_file.read_text(encoding="utf-8")
-    except OSError as exc:
+    # An undecodable file is a ValueError, not an OSError, so it escaped this
+    # net and surfaced as a raw traceback (issue #407).
+    except (OSError, UnicodeDecodeError) as exc:
         logger.warning("Cannot read config %s: %s", config_file, exc)
         return ConfigSignal.MISSING
 
@@ -86,7 +88,7 @@ def read_mcp_servers(mcp_path: Path) -> dict[str, object] | None:
 
     try:
         raw = json.loads(mcp_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as exc:
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
         logger.warning("Cannot read MCP config %s: %s", mcp_path, exc)
         return None
 
@@ -115,6 +117,20 @@ def _registry_mcp_signal(
     return ConfigSignal.OK
 
 
+def _mcp_config_is_parseable(mcp_path: Path) -> bool:
+    """Report whether *mcp_path* can be read and parsed as a JSON object.
+
+    Separates "present and undecodable or malformed" from "parsed fine, just
+    has nothing for us", which :func:`read_mcp_servers` folds together into
+    ``None``.
+    """
+    try:
+        raw = json.loads(mcp_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+        return False
+    return isinstance(raw, dict)
+
+
 def collect_mcp_config_state(target: Path) -> ConfigSignal:
     """Assess the state of the ``.mcp.json`` MCP configuration.
 
@@ -125,8 +141,16 @@ def collect_mcp_config_state(target: Path) -> ConfigSignal:
         :class:`~vaultspec_core.core.diagnosis.signals.ConfigSignal`
         reflecting the observed MCP configuration state.
     """
-    servers = read_mcp_servers(target / ".mcp.json")
+    mcp_path = target / ".mcp.json"
+    servers = read_mcp_servers(mcp_path)
     if servers is None:
+        # `read_mcp_servers` answers None for four different things: absent,
+        # unreadable, not an object, and no `mcpServers` mapping. Only the
+        # middle two mean the check could not run; the others are benign.
+        # Re-probing here rather than widening that helper's contract keeps
+        # its other callers unchanged (issue #407).
+        if mcp_path.exists() and not _mcp_config_is_parseable(mcp_path):
+            return ConfigSignal.UNREADABLE
         return ConfigSignal.PARTIAL_MCP
 
     # Check registry drift: compare deployed entries against definitions

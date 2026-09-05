@@ -362,6 +362,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             ConfigSignal.USER_MCP: ("info", "dim"),
             ConfigSignal.FOREIGN: ("info", "dim"),
             ConfigSignal.REGISTRY_DRIFT: ("warn", "yellow"),
+            ConfigSignal.UNREADABLE: ("warn", "yellow"),
         },
     )
     mcp_detail = {
@@ -371,6 +372,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
         ConfigSignal.USER_MCP: ".mcp.json includes user-managed entries",
         ConfigSignal.FOREIGN: ".mcp.json present (no vaultspec entry)",
         ConfigSignal.REGISTRY_DRIFT: ".mcp.json entries differ from registry",
+        ConfigSignal.UNREADABLE: ".mcp.json could not be read; this check did not run",
     }.get(diag.mcp, str(diag.mcp))
     rows.append(
         {
@@ -756,6 +758,14 @@ def doctor_exit_code(
         VaultContentSignal.ANNOTATIONS,
         VaultContentSignal.UNREADABLE,
     ):
+        has_warn = True
+
+    # The `mcp` row was rendered and never weighed, so a `.mcp.json` this
+    # command could not read still exited 0 while `sync` refused the same
+    # workspace (issue #407). Only the could-not-run reading is weighed here:
+    # whether the pre-existing MISSING and REGISTRY_DRIFT readings should also
+    # gate is a policy question this change deliberately leaves alone.
+    if diag.mcp == ConfigSignal.UNREADABLE:
         has_warn = True
 
     if diag.rename_integrity == RenameIntegritySignal.ERROR:

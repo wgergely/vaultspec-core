@@ -243,14 +243,19 @@ def _safe_gitattributes_state(target: Path) -> GitattributesSignal:
 
 
 def _safe_mcp_config_state(target: Path) -> ConfigSignal:
-    """Collect MCP config state, neutral to :attr:`ConfigSignal.MISSING`."""
+    """Collect MCP config state, or report that the check could not run.
+
+    ``MISSING`` said the file was absent. A collector that failed has not
+    established that, and reporting it let the row read benign while `sync`
+    refused the same workspace (issue #407).
+    """
     from .collectors import collect_mcp_config_state
 
     try:
         return collect_mcp_config_state(target)
     except Exception:
         logger.warning("MCP config state collector failed", exc_info=True)
-        return ConfigSignal.MISSING
+        return ConfigSignal.UNREADABLE
 
 
 def _safe_precommit_state(target: Path) -> PrecommitSignal:

@@ -66,7 +66,14 @@ class BuiltinVersionSignal(StrEnum):
 
 
 class ConfigSignal(StrEnum):
-    """Observed state of a provider's root configuration file."""
+    """Observed state of a provider's root configuration file.
+
+    ``UNREADABLE`` says the check could not run: the file is present and
+    could not be parsed. It is distinct from ``PARTIAL_MCP``, which is the
+    benign reading for a file that parsed fine and simply carries no
+    ``mcpServers`` mapping - conflating the two let a corrupt ``.mcp.json``
+    read as merely incomplete (issue #407).
+    """
 
     OK = "ok"
     MISSING = "missing"
@@ -74,6 +81,7 @@ class ConfigSignal(StrEnum):
     PARTIAL_MCP = "partial_mcp"
     USER_MCP = "user_mcp"
     REGISTRY_DRIFT = "registry_drift"
+    UNREADABLE = "unreadable"
 
 
 class GitignoreSignal(StrEnum):

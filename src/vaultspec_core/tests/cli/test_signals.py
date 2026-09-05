@@ -60,7 +60,15 @@ pytestmark = [pytest.mark.unit]
         ),
         (
             ConfigSignal,
-            {"OK", "MISSING", "FOREIGN", "PARTIAL_MCP", "USER_MCP", "REGISTRY_DRIFT"},
+            {
+                "OK",
+                "MISSING",
+                "FOREIGN",
+                "PARTIAL_MCP",
+                "USER_MCP",
+                "REGISTRY_DRIFT",
+                "UNREADABLE",
+            },
         ),
         (
             GitignoreSignal,
@@ -412,3 +420,80 @@ class TestCollectorFailureIsNotHealth:
         )
 
         assert plan.steps == []
+
+
+class TestUndecodableFilesAreReportedNotCrashedOn:
+    """#407's two remaining halves.
+
+    `UnicodeDecodeError` subclasses `ValueError`, not `OSError`, so it sat
+    outside every `(YAMLError, OSError)` net: an undecodable managed file made
+    `sync` and `install --force` die with a raw traceback.
+
+    Widening those nets has a trap, which these tests pin. Once a collector
+    stops raising, it also stops reaching the `_safe_*` handler that reports
+    UNREADABLE - so the row silently reverts to the benign reading unless the
+    collector reports the distinction itself.
+    """
+
+    @staticmethod
+    def _write_undecodable(path: Path) -> None:
+        path.write_bytes(b"\xff\xfe\x00garbage\n")
+
+    def test_undecodable_precommit_reads_unreadable_not_absent(
+        self, tmp_path: Path
+    ) -> None:
+        from vaultspec_core.core.diagnosis.collectors import collect_precommit_state
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        WorkspaceFactory(tmp_path).install("claude")
+        self._write_undecodable(tmp_path / ".pre-commit-config.yaml")
+
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.UNREADABLE
+
+    def test_an_absent_precommit_config_stays_benign(self, tmp_path: Path) -> None:
+        """The guard: only a file that exists and cannot be read is degraded."""
+        from vaultspec_core.core.diagnosis.collectors import collect_precommit_state
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        WorkspaceFactory(tmp_path).install("claude")
+        (tmp_path / ".pre-commit-config.yaml").unlink()
+
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.NO_FILE
+
+    def test_corrupt_mcp_config_reads_unreadable(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.diagnosis.collectors import collect_mcp_config_state
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        WorkspaceFactory(tmp_path).install("claude")
+        (tmp_path / ".mcp.json").write_text('{"mcpServers": {', encoding="utf-8")
+
+        assert collect_mcp_config_state(tmp_path) is ConfigSignal.UNREADABLE
+
+    def test_a_parseable_mcp_config_without_servers_stays_benign(
+        self, tmp_path: Path
+    ) -> None:
+        """The guard on the probe.
+
+        `read_mcp_servers` answers None for four different things. Only the
+        ones that mean "could not read" may degrade; a file that parsed fine
+        and simply carries no `mcpServers` mapping is ordinary.
+        """
+        from vaultspec_core.core.diagnosis.collectors import collect_mcp_config_state
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+        WorkspaceFactory(tmp_path).install("claude")
+        (tmp_path / ".mcp.json").write_text("{}", encoding="utf-8")
+
+        assert collect_mcp_config_state(tmp_path) is ConfigSignal.PARTIAL_MCP
+
+    def test_doctor_weighs_an_unreadable_mcp_row(self, tmp_path: Path) -> None:
+        """The `mcp` row was rendered and never weighed."""
+        from vaultspec_core.cli.spec_cmd_doctor import doctor_exit_code
+        from vaultspec_core.core.diagnosis.diagnosis import WorkspaceDiagnosis
+        from vaultspec_core.core.diagnosis.signals import FrameworkSignal
+
+        degraded = WorkspaceDiagnosis(
+            framework=FrameworkSignal.PRESENT, mcp=ConfigSignal.UNREADABLE
+        )
+
+        assert doctor_exit_code(degraded) == 1
