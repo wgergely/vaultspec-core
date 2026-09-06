@@ -40,10 +40,7 @@ optional code-grounding step. A skill runs each stage and writes a document to
 | Execute                               | `/vaultspec-execute`       | `.vault/exec/`      |
 | Review                                | `/vaultspec-code-review`   | `.vault/audit/`     |
 
-Those `/vaultspec-*` names are slash-commands you type into your coding agent, not into
-a shell - where your agent has them. The skills are written for Claude Code and
-Antigravity; Gemini and Codex are enrolled and receive the rules and agent definitions
-but no skills, so on those two the pipeline is driven from the command line instead.
+The `/vaultspec-*` names identify skills for your coding agent, not shell commands.
 
 Not every request enters the pipeline. The agent sizes the work first: a change that
 finishes in the current session, needs no handoff, stays in one package, and touches at

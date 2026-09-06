@@ -1,20 +1,9 @@
-# vaultspec MCP Server
+# vaultspec MCP server
 
-The vaultspec Model Context Protocol (MCP) server speaks JSON-RPC over stdio. It lets
-any MCP-capable client - Claude Code, Claude Desktop, Cursor, and others - operate a
-vaultspec-managed workspace directly through typed tools. That replaces shelling out to
-the command line for every read or edit.
+The server exposes Vaultspec document and workflow tools to Model Context Protocol
+(MCP) clients using JSON-RPC over standard input and output.
 
-Three terms recur throughout this page. The vault is your project's `.vault/` folder: a
-set of markdown work records covering research, decisions, plans, and their execution. A
-plan is a structured implementation document broken into checkable steps, so progress on
-a feature stays visible. A feature is the tag that binds every document tied to one
-piece of work, from its first research note to its final audit. See the
-[README](../README.md) and the [framework manual](./framework.md).
-
-Where the server is connected, the agent rules synced into your project use its tools
-first. Where it isn't, the vaultspec-core CLI carries the same operations, so a
-workspace behaves the same either way.
+For the workflow and document types, see [how a feature flows into the vault](./framework.md#how-a-feature-flows-into-the-vault).
 
 ## Setup
 
