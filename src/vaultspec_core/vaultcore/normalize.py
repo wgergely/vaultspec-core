@@ -28,6 +28,7 @@ from dataclasses import dataclass
 
 __all__ = [
     "KEBAB_CASE_PATTERN",
+    "WINDOWS_RESERVED_NAMES",
     "NormalizeResult",
     "normalize_feature_tag",
     "normalize_vault_date",
@@ -41,6 +42,25 @@ KEBAB_CASE_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 #: Path-traversal characters stripped/rejected before pattern validation, so
 #: a normalized token can never escape a directory or inject a separator.
 _TRAVERSAL_CHARS = re.compile(r"[/\\]")
+
+#: Windows reserved device base names (case-insensitive; the comparison
+#: below is against an already-lowercased token). A feature handle or tag
+#: with one of these names produces a scaffolded filename - ``con.index.md``,
+#: ``nul.md`` - that Windows treats as a device rather than a regular file,
+#: so the create would fail or behave unpredictably on that OS. Shared with
+#: :mod:`.query_rename`, which enforces the same set for a rename target;
+#: this is the one owner both now defer to.
+#:
+#: A trailing dot or space is separately invalid in a Windows filename, but
+#: needs no dedicated check here: :data:`KEBAB_CASE_PATTERN` already rejects
+#: every ``.`` and ``normalize_feature_tag`` already strips surrounding
+#: whitespace before validating, so neither can survive into a normalized
+#: token in the first place.
+WINDOWS_RESERVED_NAMES = frozenset(
+    {"con", "prn", "aux", "nul"}
+    | {f"com{i}" for i in range(1, 10)}
+    | {f"lpt{i}" for i in range(1, 10)}
+)
 
 
 @dataclass(frozen=True)
@@ -65,13 +85,14 @@ def normalize_feature_tag(raw: str, *, label: str = "feature tag") -> NormalizeR
 
     Strips a single leading ``#``, trims surrounding whitespace, lowercases,
     and folds any path-separator into a hyphen, then validates the canonical
-    kebab-case pattern (:data:`KEBAB_CASE_PATTERN`). A traversal token such as
-    ``..`` is *rejected*, not silently repaired: the pattern forbids ``.`` so a
-    residual dot (e.g. ``a..b`` or ``a.b``) fails validation rather than being
-    deleted into a valid-but-different token that could mask a typo. The
-    returned :class:`NormalizeResult` carries the ``#``-free token on success
-    (the caller re-applies ``#`` where a stored tag needs it) and a rendered
-    *label*-scoped message on failure.
+    kebab-case pattern (:data:`KEBAB_CASE_PATTERN`) and rejects a Windows
+    reserved device base name (:data:`WINDOWS_RESERVED_NAMES`). A traversal
+    token such as ``..`` is *rejected*, not silently repaired: the pattern
+    forbids ``.`` so a residual dot (e.g. ``a..b`` or ``a.b``) fails
+    validation rather than being deleted into a valid-but-different token
+    that could mask a typo. The returned :class:`NormalizeResult` carries
+    the ``#``-free token on success (the caller re-applies ``#`` where a
+    stored tag needs it) and a rendered *label*-scoped message on failure.
 
     Args:
         raw: The user-supplied handle or tag (with or without a leading
@@ -99,6 +120,16 @@ def normalize_feature_tag(raw: str, *, label: str = "feature tag") -> NormalizeR
             error=(
                 f"Invalid {label} '{raw}'. "
                 "Must be kebab-case (lowercase, digits, hyphens)."
+            ),
+        )
+
+    if cleaned in WINDOWS_RESERVED_NAMES:
+        return NormalizeResult(
+            ok=False,
+            error=(
+                f"Invalid {label} '{raw}'. "
+                f"'{cleaned}' is a reserved device name on Windows (CON, PRN, "
+                "AUX, NUL, COM1-COM9, LPT1-LPT9); choose a different value."
             ),
         )
 

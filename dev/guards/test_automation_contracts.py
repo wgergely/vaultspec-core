@@ -637,6 +637,37 @@ def test_test_tree_exclusion_patterns_match_windows_paths() -> None:
     )
 
 
+def _pytest_addopts() -> str:
+    """Return ``[tool.pytest.ini_options].addopts`` from ``pyproject.toml``."""
+    raw = tomllib.loads(_read("pyproject.toml"))
+    return cast("str", raw["tool"]["pytest"]["ini_options"]["addopts"])
+
+
+def test_pytest_addopts_deselects_every_credential_or_network_marker() -> None:
+    """A bare ``pytest`` invocation must gate the same markers `just test` does.
+
+    `dev.toolchain.EXCLUDED_MARKERS` is what every `just test` lane passes
+    explicitly via `-m`, so those invocations never depend on `addopts` at
+    all - a later `-m` on the command line simply replaces an earlier one
+    from `addopts`, it does not combine with it. A bare `pytest` invocation
+    (a contributor's shell, an editor's test runner, CI calling the binary
+    directly) has no such explicit `-m` and falls through to `addopts`
+    alone, so `addopts` is the ONLY gate for that path. Letting it drift
+    from `EXCLUDED_MARKERS` is exactly how `@pytest.mark.gemini` stopped
+    being an opt-in gate: the marker was registered and documented as
+    excluding the test, while nothing in `addopts` actually deselected it.
+    """
+    from dev import toolchain
+
+    addopts = _pytest_addopts()
+    assert f"not benchmark and {toolchain.EXCLUDED_MARKERS}" in addopts, (
+        f"pyproject.toml addopts {addopts!r} has drifted from "
+        f"dev.toolchain.EXCLUDED_MARKERS {toolchain.EXCLUDED_MARKERS!r}; a "
+        "bare `pytest` invocation would stop deselecting a credential- or "
+        "network-gated marker"
+    )
+
+
 def test_provider_capability_enum_covers_all_tools(tmp_path: Path) -> None:
     """Every Tool enum member must have a ToolConfig with non-empty capabilities."""
     from vaultspec_core.core.enums import Tool
