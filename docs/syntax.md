@@ -160,8 +160,7 @@ headings. It doesn't check every brace expression or fill missing content. See t
 
 ## Filenames
 
-`vaultspec-core vault add` decides the filename. You will read these patterns in
-directory listings, so they are here for reference:
+Core generates filenames in these forms:
 
 | Document           | Pattern                                  |
 | ------------------ | ---------------------------------------- |
@@ -170,25 +169,18 @@ directory listings, so they are here for reference:
 | Ledger             | `yyyy-mm-dd-{feature}-ledger.md`         |
 | Feature index      | `{feature}.index.md`                     |
 
-Narrative segments are lowercase kebab-case. Container identifiers keep their canonical
-uppercase form: `W01`, `P02`, `S03`.
-
-Every type but one sits directly in its directory. A ledger sits a level down, in a
-folder named for the feature:
+Narrative segments are lowercase kebab-case. Ledgers use their parent plan's date and
+feature in both the folder and filename:
 `.vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-ledger.md`.
 
-To give a feature a second decision record or a second piece of research, pass `--topic`
-to `vaultspec-core vault add` rather than inventing a filename. Only `adr`, `audit`,
-`reference`, and `research` accept it.
-
-To rename an existing document, use `vaultspec-core vault rename`, which re-points the
-`related:` entries that pointed at the old name.
+For `adr`, `audit`, `reference`, and `research`, use
+[vault add --topic](CLI.md#vaultspec-core-vault-add) to distinguish multiple records for
+a feature.
 
 ## Plan structure
 
-The tooling parses a plan's rows; for every other document it only checks them. Ledger
-rows point at the identifiers in those rows, so a change to the grammar breaks records
-already written.
+Edit plan rows with the [plan commands](CLI.md#vaultspec-core-vault-plan). Execution
+ledgers reference the plan's Step identifiers.
 
 ### Tiers
 
@@ -201,13 +193,10 @@ The tier declared in frontmatter decides which containers exist:
 | `L3` | Waves above Phases above Steps                                           |
 | `L4` | An Epic frame above Waves, and a declared project-management association |
 
-Choose by the complexity of the work, not by counting containers. A plan does not earn
-`L3` by having enough rows to fill three Waves; it earns `L3` when the work has three
-stages that must land in order.
-
-Change tier later with `vaultspec-core vault plan tier promote` or `tier demote`.
-Promotion adds containers and renumbers nothing. Demotion refuses to collapse a
-container that has several children unless you say so explicitly.
+Change tiers with `vaultspec-core vault plan tier promote` or `tier demote`. Promotion
+preserves canonical identifiers. See the
+[plan command reference](CLI.md#vaultspec-core-vault-plan) for demotion and collapse
+options.
 
 ### Row format
 
@@ -229,17 +218,14 @@ Reading that row left to right:
 | File scope, in backticks   | `` `src/billing/retry.py` ``    |
 | Trailing period            | `.`                             |
 
-`[ ]` is open and `[x]` is closed. Nothing records "in progress". If a row turns out to
-be half done, split it with `vaultspec-core vault plan step add` and close the part that
-landed.
+`[ ]` is open and `[x]` is closed. The format has no in-progress marker.
 
 Write plain ASCII hyphens. The `PLAN060` rule rejects em-dashes and en-dashes anywhere
 in a plan: body, headings, frontmatter, and comment hints. `vault plan check --fix`
 replaces them with an ASCII spaced hyphen.
 
-Wiki-links and Markdown links are forbidden in a plan body, as they are in any body. The
-documents that authorise the work go in the plan's `related:` frontmatter once, and
-every Step inherits that chain. Per-row reference footers do not exist.
+Put the records authorizing the work in the plan's `related:` frontmatter. Follow the
+[linking rules](#linking).
 
 ### Display paths
 
@@ -251,19 +237,16 @@ The identifier written in a row depends on the tier:
 | `L2`       | `P02.S07`     | `P02`         | none         |
 | `L3`, `L4` | `W01.P02.S07` | `W01.P02`     | `W01`        |
 
-Display paths are computed from the current grouping. Move a Phase to another Wave and
-every Step under it displays a new path, while its canonical identifier stays what it
-always was.
+Display paths reflect the current grouping. Moving a Phase to another Wave changes its
+Steps' display paths without changing their canonical identifiers.
 
 ### Identifiers
 
-`S##`, `P##`, and `W##` are immutable and append-only. They are numbered per document,
-and a Step's number is independent of the Phase holding it, so `S07` is `S07` wherever
-it sits.
+Canonical identifiers (`S##`, `P##`, `W##`) are numbered per plan and stay stable across
+moves and tier changes. A Step's number is independent of its Phase.
 
-Gaps are never reused. Remove Step 7 and the next Step added is 8, not 7. The number is
-retired with the row, which is what keeps the record durable: a ledger row written
-months ago names `S07`, and no later edit can hand `S07` to different work.
+Removed identifiers aren't reused. The next Step number exceeds the highest live or
+retired Step number.
 
 Route every identifier-affecting change through the commands:
 
@@ -283,11 +266,8 @@ record meant.
 
 ### One action, one row
 
-N self-similar actions means N rows. Never collapse them into "for each handler, add the
-header" or "across all callers, rename the flag". No check enforces this; it is a
-convention, and the reason is verification. A collapsed row cannot be half closed, so
-its ledger rows cannot say which callers were touched, and nothing catches the one that
-was missed.
+Write a separate Step for each independently verifiable action so each has its own
+completion state. Apply this convention during plan review; no check enforces it.
 
 ## Where to go next
 
