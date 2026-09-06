@@ -104,6 +104,59 @@ def test_folds_body_v1_records(tmp_path: Path) -> None:
     assert "- `S02` `T` `src/bar.py`" in text
 
 
+def _pre_ledger_record(root: Path, name: str, *, step_id: str, note: str) -> Path:
+    """Write a pre-ledger record: ``body-v1`` schema, ``## Changes`` body shape.
+
+    Such a record predates the Step column but carried the same ``## Changes``
+    contract, so the planner recovers real operations and its ``## Notes``
+    from it. This migration gates on the schema declaration, so the record is
+    in scope: the two do not coincide.
+    """
+    folder = root / ".vault" / "exec" / _FOLDER
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{name}.md"
+    lines = [
+        "---",
+        "tags:",
+        "  - '#exec'",
+        "  - '#demo'",
+        "date: '2026-05-17'",
+        "body_schema: 'body-v1'",
+        f"step_id: '{step_id}'",
+        "related:",
+        f"  - '[[{_PLAN_STEM}]]'",
+        "---",
+        "",
+        "# did a thing",
+        "",
+        "## Changes",
+        "",
+        "- `M` `src/a.py`",
+        "",
+        "## Notes",
+        "",
+        f"- {note}",
+        "",
+    ]
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
+def test_notes_are_carried_before_the_record_is_removed(tmp_path: Path) -> None:
+    """A recovered note must reach the ledger, not die with its record."""
+    _skeleton(tmp_path)
+    note = "Rolled back the index rebuild; it corrupts on empty features."
+    record = _pre_ledger_record(tmp_path, f"{_FOLDER}-S01", step_id="S01", note=note)
+
+    result = migrate(tmp_path)
+
+    text = _ledger(tmp_path).read_text(encoding="utf-8")
+    assert "- `S01` `M` `src/a.py`" in text
+    assert f"- `S01` {note}" in text, "a recovered note was dropped"
+    assert not record.exists()
+    assert result.counts["notes"] == 1
+
+
 def test_current_schema_records_are_never_folded(tmp_path: Path) -> None:
     """The property that makes an auto-run fold safe before release."""
     _skeleton(tmp_path)

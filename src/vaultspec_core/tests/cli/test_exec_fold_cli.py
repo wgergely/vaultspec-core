@@ -366,3 +366,31 @@ def test_flat_record_with_step_id_folds_into_the_plan_ledger(
     assert "- `S02` `T` `src/bar.py`" in _ledger(synthetic_project).read_text(
         encoding="utf-8"
     )
+
+
+def test_summary_is_kept_when_the_fold_has_nothing_to_write(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
+    """A summary is never removed on a run that leaves the ledger untouched.
+
+    The corpus was already folded, so every Step of `P01` is covered and no
+    per-Step record remains. The summary contributes no row and no note, so
+    removing it would delete a hand-authored narrative while writing nothing
+    in its place.
+    """
+    setup_test_plan(synthetic_project)
+    first = _write_v2_record(synthetic_project, "S01", "P01-S01")
+    second = _write_v2_record(synthetic_project, "S02", "P01-S02")
+    third = _write_v2_record(synthetic_project, "S03", "P01-S03")
+    assert _fold(runner, synthetic_project, "--force").exit_code == 0
+    assert not first.exists() and not second.exists() and not third.exists()
+
+    summary = _write_summary(synthetic_project)
+    before = _ledger(synthetic_project).read_text(encoding="utf-8")
+
+    result = _fold(runner, synthetic_project, "--force")
+
+    assert result.exit_code == 0, result.output
+    assert summary.exists(), "a summary was deleted while nothing was written"
+    assert _ledger(synthetic_project).read_text(encoding="utf-8") == before
+    assert "the fold writes nothing" in result.output
