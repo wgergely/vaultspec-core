@@ -1,29 +1,24 @@
 # Documentation
 
-User documentation for vaultspec-core. For what vaultspec-core is and how to install it,
-start with the [project README](../README.md).
+[Install Core](../README.md#install) to get started.
 
-## Start here
+<p id="start-here"></p>
 
-These guides assume vaultspec-core is already installed in your project. If you read
-only one, read the framework manual.
+## Use Core
 
-| Guide                            | What it covers                                                                                                       |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| [Framework manual](framework.md) | How to run the workflow day to day: the stages you move through, and which files the tool writes for you.            |
-| [Document syntax](syntax.md)     | Which parts of a document the tool writes and which parts you write. Editing the tool's half is what breaks a check. |
+- [Run a feature workflow and customize project rules](framework.md).
+- [Edit document prose and structure](syntax.md).
+- [Check your workspace and repair records](verification.md).
+- [Review implementation and test evidence](correctness.md).
 
-## Look these up when you need them
+<p id="look-these-up-when-you-need-them"></p>
 
-| Guide                                             | What it covers                                                                                |
-| ------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| [Verifying a workspace](verification.md)          | Running the health checks, reading what they report, and repairing a document that fails one. |
-| [Review a feature implementation](correctness.md) | Record review findings, address them, and verify test evidence.                               |
-| [CLI reference](CLI.md)                           | Every command, argument, flag, and exit code.                                                 |
-| [MCP server](MCP.md)                              | The Model Context Protocol server: its tools, setup, and configuration.                       |
+## Reference
 
-Not covered here: installation lives in the [project README](../README.md), and bugs and
-questions go to the [issue tracker](https://github.com/nevenincs/vaultspec-core/issues).
+- [Look up commands](CLI.md).
+- [Set up the MCP server and look up tools](MCP.md).
+
+[Report a problem](https://github.com/nevenincs/vaultspec-core/issues).
 
 ## For maintainers
 
