@@ -22,6 +22,7 @@ from vaultspec_core.builtins import builtins_root
 from vaultspec_core.core.agents import (
     _CLAUDE_ONLY_HOST_TOOLS,
     _CLAUDE_TO_GEMINI_TOOLS,
+    _render_antigravity_agent,
     _render_claude_agent,
     _render_codex_agent,
     _render_gemini_agent,
@@ -145,6 +146,134 @@ class TestRenderGeminiAgent:
         assert _fm(out)["tools"] == ["read_file", "grep_search"]
 
 
+class TestGeminiRenderByteContract:
+    """The Gemini render is frozen, byte for byte.
+
+    Adding a provider must not perturb an existing one. These expectations
+    were captured from the Gemini renderer before the Antigravity renderer
+    was registered, and are compared as exact strings rather than parsed
+    frontmatter so whitespace, key order and list style are all pinned. The
+    corpus is synthetic and inline so the contract stays stable when the
+    shipped source agents under ``.vaultspec/agents/`` are edited.
+    """
+
+    def test_full_frontmatter_render_is_unchanged(self):
+        meta = {
+            "description": "Writes things.",
+            "tier": "HIGH",
+            "mode": "read-only",
+            "tools": [
+                "Read",
+                "Write",
+                "Edit",
+                "Glob",
+                "Grep",
+                "Bash",
+                "WebFetch",
+                "WebSearch",
+                "SendMessage",
+                "TaskCreate",
+                "TaskList",
+                "TaskUpdate",
+            ],
+        }
+        rendered = _render_gemini_agent(
+            "vaultspec-writer.md", meta, "# Persona\n\nBody text.\n"
+        )
+        assert rendered == (
+            "---\n"
+            "name: vaultspec-writer\n"
+            "description: Writes things.\n"
+            "tools:\n"
+            "- read_file\n"
+            "- write_file\n"
+            "- replace\n"
+            "- glob\n"
+            "- grep_search\n"
+            "- run_shell_command\n"
+            "- web_fetch\n"
+            "- google_web_search\n"
+            "---\n"
+            "\n"
+            "# Persona\n"
+            "\n"
+            "Body text.\n"
+        )
+
+    def test_bare_frontmatter_render_is_unchanged(self):
+        rendered = _render_gemini_agent("vaultspec-minimal.md", {}, "Body only.\n")
+        assert rendered == "---\nname: vaultspec-minimal\n---\n\nBody only.\n"
+
+    def test_gemini_stays_bound_to_its_own_renderer(self):
+        from vaultspec_core.core.agents import _AGENT_RENDERERS
+
+        assert _AGENT_RENDERERS[Tool.GEMINI] is _render_gemini_agent
+
+
+class TestRenderAntigravityAgent:
+    """Antigravity emits exactly the two frontmatter keys it requires.
+
+    Antigravity's subagent schema requires ``name`` and ``description`` and
+    treats every other key as optional with a documented default. The renderer
+    therefore emits the required pair and nothing else - see
+    ``_render_antigravity_agent`` for why ``tools``, ``subagent`` and
+    ``commandExecutionPolicy`` are each deliberately absent.
+    """
+
+    def test_injects_name_from_filename_stem(self):
+        out = _render_antigravity_agent("vaultspec-writer.md", {}, "body")
+        assert _fm(out)["name"] == "vaultspec-writer"
+
+    def test_preserves_description(self):
+        out = _render_antigravity_agent("x.md", {"description": "An agent"}, "body")
+        assert _fm(out)["description"] == "An agent"
+
+    def test_description_is_stripped(self):
+        out = _render_antigravity_agent("x.md", {"description": "  padded  "}, "body")
+        assert _fm(out)["description"] == "padded"
+
+    def test_blank_description_is_omitted(self):
+        out = _render_antigravity_agent("x.md", {"description": "   "}, "b")
+        assert "description" not in _fm(out)
+
+    def test_drops_authoring_keys(self):
+        meta = {"tier": "HIGH", "mode": "read-only", "description": "d"}
+        assert _fm(_render_antigravity_agent("x.md", meta, "body")) == {
+            "name": "x",
+            "description": "d",
+        }
+
+    def test_omits_tools_even_when_authored(self):
+        # Antigravity's tool vocabulary is not Gemini's and is not fully
+        # published; an unrecognised entry can hang the subagent, so no
+        # `tools` key is emitted at all.
+        meta = {"tools": ["Read", "Bash", "view_file"]}
+        assert "tools" not in _fm(_render_antigravity_agent("x.md", meta, "body"))
+
+    def test_never_maps_into_the_gemini_vocabulary(self):
+        rendered = _render_antigravity_agent("x.md", {"tools": ["Read"]}, "body")
+        for gemini_tool in _CLAUDE_TO_GEMINI_TOOLS.values():
+            assert gemini_tool.value not in rendered
+
+    def test_relies_on_documented_defaults(self):
+        meta = {"description": "d", "tier": "HIGH", "model": "gemini-3.1-pro-preview"}
+        rendered_meta = _fm(_render_antigravity_agent("x.md", meta, "body"))
+        # `subagent` defaults to true and `commandExecutionPolicy` to
+        # `sandbox`; `model` takes a tier vocabulary this renderer does not
+        # author. None are restated.
+        for key in ("subagent", "commandExecutionPolicy", "mainAgent", "model"):
+            assert key not in rendered_meta
+
+    def test_no_warnings_are_produced(self):
+        warnings: list[str] = []
+        _render_antigravity_agent("x.md", {"tools": ["Bogus"]}, "b", warnings=warnings)
+        assert warnings == []
+
+    def test_body_is_preserved(self):
+        body = "# Heading\n\nParagraph with `code`.\n"
+        assert body in _render_antigravity_agent("x.md", {}, body)
+
+
 class TestCodexMultilinePrompt:
     """Codex agent prompts must round-trip through a TOML parser (#143).
 
@@ -229,9 +358,17 @@ class TestTransformAgentDispatch:
         assert rendered_meta["tools"] == ["glob"]
         assert "tier" not in rendered_meta
 
-    def test_unregistered_tool_falls_through_to_passthrough(self):
-        meta = {"tier": "X", "tools": ["whatever"]}
+    def test_antigravity_routes_to_antigravity_renderer(self):
+        meta = {"tier": "HIGH", "tools": ["Glob"], "description": "An agent"}
         rendered_meta = _fm(transform_agent(Tool.ANTIGRAVITY, "a.md", meta, "body"))
+        assert rendered_meta == {"name": "a", "description": "An agent"}
+
+    def test_unregistered_tool_falls_through_to_passthrough(self):
+        # Codex is the one Tool with no `_AGENT_RENDERERS` entry: its agents
+        # are rendered into `config.toml` by a separate code path, so the
+        # dispatcher's fallback is what it hits here.
+        meta = {"tier": "X", "tools": ["whatever"]}
+        rendered_meta = _fm(transform_agent(Tool.CODEX, "a.md", meta, "body"))
         # Passthrough preserves source frontmatter, including authoring keys.
         assert rendered_meta["tier"] == "X"
         assert rendered_meta["tools"] == ["whatever"]
@@ -308,6 +445,21 @@ class TestSourceAgentCoverage:
         # ever fails, the source file uses a Claude tool name that
         # has no Gemini mapping; either map it or remove it from the
         # source.
+        assert warnings == [], f"{agent_path.name}: {warnings}"
+
+    def test_antigravity_render_satisfies_schema(self, agent_path: Path):
+        meta, body = parse_frontmatter(agent_path.read_text(encoding="utf-8"))
+        warnings: list[str] = []
+        rendered = transform_agent(
+            Tool.ANTIGRAVITY, agent_path.name, meta, body, warnings=warnings
+        )
+        rendered_meta = _fm(rendered)
+
+        # Antigravity requires `name` and `description` and nothing else; the
+        # renderer must not smuggle a key past that contract.
+        assert set(rendered_meta) == {"name", "description"}
+        assert rendered_meta["name"] == agent_path.stem
+        assert rendered_meta["description"]
         assert warnings == [], f"{agent_path.name}: {warnings}"
 
     def test_claude_render_strips_authoring_keys(self, agent_path: Path):
