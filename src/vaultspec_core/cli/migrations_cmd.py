@@ -153,17 +153,28 @@ def cmd_migrations_run(
     try:
         results = run_pending_migrations(root_dir)
     except Exception as exc:
+        # A domain refusal carries the remedy on the exception, not in the
+        # message. The corrupt-manifest guard is the case that made this
+        # matter: it refuses where the driver previously replayed the whole
+        # registry, and the operator needs to be told to delete the manifest
+        # and re-run install, not just that something failed (issue #455).
+        hint = getattr(exc, "hint", "")
         if json_output:
             from vaultspec_core.cli.rendering import json_envelope
 
+            payload: dict[str, str] = {"error": str(exc)}
+            if hint:
+                payload["hint"] = hint
             typer.echo(
                 _json.dumps(
-                    json_envelope("migrations.run", "failed", {"error": str(exc)}),
+                    json_envelope("migrations.run", "failed", payload),
                     **json_format_kwargs(),
                 )
             )
         else:
             typer.echo(f"Error: migration failed: {exc}", err=True)
+            if hint:
+                typer.echo(f"  Hint: {hint}", err=True)
         raise typer.Exit(code=1) from exc
 
     outcomes = [

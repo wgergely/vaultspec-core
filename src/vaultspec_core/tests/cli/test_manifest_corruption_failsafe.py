@@ -118,19 +118,47 @@ class TestCorruptManifestRefusesToMigrate:
     def test_corrupt_manifest_does_not_replay_the_registry(
         self, tmp_path: Path
     ) -> None:
+        # `vault add` converges through `ensure_migrated` before it authors,
+        # because the schema decides where it writes. That is one of the four
+        # surfaces still authorised to run the registry after issue #443
+        # narrowed the trigger, and it is the one an ordinary user reaches
+        # first.
         factory = WorkspaceFactory(tmp_path).install("core")
         victim = _plant_replay_victim(tmp_path)
         original = victim.read_bytes()
         _truncate_manifest(tmp_path)
 
-        result = factory.run("vault", "list")
+        result = factory.run("vault", "add", "adr", "-f", "probe", "--title", "t")
 
-        assert result.exit_code == 1
+        assert result.exit_code != 0
         assert victim.exists(), (
             "a corrupt manifest must not be read as a legacy workspace with "
             f"all {len(REGISTRY)} migrations pending"
         )
         assert victim.read_bytes() == original
+
+    def test_explicit_migrations_run_refuses(self, tmp_path: Path) -> None:
+        factory = WorkspaceFactory(tmp_path).install("core")
+        victim = _plant_replay_victim(tmp_path)
+        _truncate_manifest(tmp_path)
+
+        result = factory.run("migrations", "run")
+
+        assert result.exit_code == 1
+        assert victim.exists()
+
+    def test_migrations_run_json_stays_well_formed(self, tmp_path: Path) -> None:
+        # A refusal must not break a JSON consumer: the failure envelope is
+        # still parseable and carries the remedy alongside the message.
+        factory = WorkspaceFactory(tmp_path).install("core")
+        _truncate_manifest(tmp_path)
+
+        result = factory.run("migrations", "run", "--json")
+
+        payload = json.loads(result.stdout)
+        assert payload["status"] == "failed"
+        assert "Corrupt provider manifest" in payload["data"]["error"]
+        assert payload["data"]["hint"]
 
     def test_corrupt_manifest_is_not_overwritten(self, tmp_path: Path) -> None:
         # The second half of the failure: the driver used to persist the
@@ -139,7 +167,7 @@ class TestCorruptManifestRefusesToMigrate:
         factory = WorkspaceFactory(tmp_path).install("core")
         truncated = _truncate_manifest(tmp_path)
 
-        factory.run("vault", "list")
+        factory.run("migrations", "run")
 
         assert _manifest_path(tmp_path).read_bytes() == truncated, (
             "the evidence of corruption must survive the refusal"
@@ -149,7 +177,9 @@ class TestCorruptManifestRefusesToMigrate:
         # Run the real console entry point in a real subprocess: the in-process
         # CliRunner invokes the Typer app directly and so never exercises the
         # entry point's own reporting, which is exactly the surface an upgrading
-        # user meets.
+        # user meets. `vault add` is the case with no handler of its own - the
+        # refusal is raised by the convergence hook underneath it, not by
+        # anything the command called deliberately.
         WorkspaceFactory(tmp_path).install("core")
         _truncate_manifest(tmp_path)
 
@@ -159,7 +189,12 @@ class TestCorruptManifestRefusesToMigrate:
                 "-m",
                 "vaultspec_core",
                 "vault",
-                "list",
+                "add",
+                "adr",
+                "-f",
+                "probe",
+                "--title",
+                "t",
                 "--target",
                 str(tmp_path),
             ],
@@ -180,15 +215,16 @@ class TestCorruptManifestRefusesToMigrate:
 
     def test_sync_force_recovers_the_workspace(self, tmp_path: Path) -> None:
         # The hint's remedy has to work. `sync --force` rebuilds the manifest
-        # from what is actually on disk, after which vault commands run again.
+        # from what is actually on disk, after which the converging verbs run
+        # again.
         factory = WorkspaceFactory(tmp_path).install("core")
         _truncate_manifest(tmp_path)
-        assert factory.run("vault", "list").exit_code == 1
+        assert factory.run("migrations", "run").exit_code == 1
 
         assert factory.run("sync", "--force").exit_code == 0
 
         assert json.loads(_manifest_path(tmp_path).read_text(encoding="utf-8"))
-        assert factory.run("vault", "list").exit_code == 0
+        assert factory.run("migrations", "run").exit_code == 0
 
 
 class TestHealthyManifestsStillMigrate:

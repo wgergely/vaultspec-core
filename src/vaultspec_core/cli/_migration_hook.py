@@ -79,10 +79,18 @@ def ensure_migrated(root_dir: Path) -> None:
             so the manifest version bump stays suppressed and the operator
             sees the real cause.
     """
+    from ..core.exceptions import VaultSpecError
     from ..migrations import run_pending_migrations
 
     try:
         run_pending_migrations(root_dir, use_cache=True)
+    except VaultSpecError:
+        # A domain refusal, not a defect. The corrupt-manifest guard declines
+        # to guess which migrations are pending rather than replaying all of
+        # them (issue #455), and its message and hint are the whole diagnosis.
+        # A stack trace logged over them only buries the one line the operator
+        # has to act on. Propagate bare and let the CLI render it.
+        raise
     except Exception:
         logger.exception("Pending migration failed for %s", root_dir)
         raise
