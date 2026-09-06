@@ -2961,6 +2961,16 @@ overridden by the `--target` flag.
 - `VAULTSPEC_IO_BUFFER_SIZE` (int, default `8192`) - I/O read buffer size in bytes.
 - `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` (int, default `1000000`) - Subprocess stdout capture
   limit in bytes.
+- `VAULTSPEC_LOCK_TIMEOUT_SECONDS` (float, default `120.0`) - Total seconds a single
+  advisory-lock acquisition may wait before failing with a diagnosable timeout instead
+  of blocking indefinitely. Covers the in-process and cross-process layers combined.
+  Raise it if a large corpus or a slow network volume makes legitimate contention exceed
+  the budget.
+- `VAULTSPEC_LOCK_TIMEOUT_SECONDS` (float, default `120.0`) - Total seconds a single
+  advisory-lock acquisition may wait before failing with a diagnosable timeout instead
+  of blocking indefinitely. Covers the in-process and cross-process layers combined.
+  Raise it if a large corpus or a slow network volume makes legitimate contention exceed
+  the budget.
 - `VAULTSPEC_LOG_LEVEL` (str, default `INFO`) - Root log level for the CLI, for example
   `DEBUG`, `INFO`, or `WARNING`. Overridden by `--debug` when set.
 - `VAULTSPEC_EDITOR` (str, default `zed -w`) - Editor command for

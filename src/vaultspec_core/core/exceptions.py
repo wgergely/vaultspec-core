@@ -7,6 +7,8 @@ CLI, MCP server, and programmatic callers without catching ``SystemExit``.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 
 class VaultSpecError(Exception):
     """Base exception for all vaultspec-core domain errors.
@@ -51,3 +53,39 @@ class EditorSubprocessError(VaultSpecError):
 
 class EditorCancellationError(VaultSpecError):
     """The text editor edit was cancelled by the user."""
+
+
+class AdvisoryLockTimeoutError(VaultSpecError):
+    """An :func:`~vaultspec_core.core.helpers.advisory_lock` acquisition timed out.
+
+    Deliberately **not** a subclass of :class:`TimeoutError`. ``TimeoutError``
+    is an ``OSError``, and the write paths that take advisory locks are dotted
+    with ``except OSError`` handlers that log a warning and continue - so
+    inheriting from it would let the one failure this class exists to make
+    visible be swallowed by a handler written for an unreadable file.
+
+    Attributes:
+        sentinel: The ``.lock`` file the acquisition was waiting on.
+        timeout: The budget, in seconds, that was exhausted.
+        layer: Which of the two layers gave up - ``"thread"`` for the
+            in-process :class:`threading.Lock`, ``"os"`` for the cross-process
+            file lock. The distinction narrows the diagnosis: the thread layer
+            is the one a single-threaded lock cycle deadlocks on.
+    """
+
+    def __init__(
+        self,
+        sentinel: Path,
+        timeout: float,
+        layer: str,
+        *,
+        hint: str = "",
+    ) -> None:
+        super().__init__(
+            f"Timed out after {timeout:g}s waiting for the advisory lock on "
+            f"{sentinel} ({layer} layer).",
+            hint=hint,
+        )
+        self.sentinel = sentinel
+        self.timeout = timeout
+        self.layer = layer

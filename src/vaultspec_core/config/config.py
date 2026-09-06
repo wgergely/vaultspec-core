@@ -97,6 +97,9 @@ class VaultSpecConfig:
         gemini_dir: Gemini tool directory name.
         io_buffer_size: I/O read buffer size in bytes.
         terminal_output_limit: Terminal output byte limit for subprocess capture.
+        lock_timeout_seconds: Total budget, in seconds, that a single
+            :func:`~vaultspec_core.core.helpers.advisory_lock` acquisition may
+            spend waiting before it reports a timeout instead of blocking on.
         editor: Default editor command for creating rules/skills.
     """
 
@@ -116,6 +119,9 @@ class VaultSpecConfig:
     # -- I/O -------------------------------------------------------------------
     io_buffer_size: int = 8192
     terminal_output_limit: int = 1_000_000
+
+    # -- Concurrency -----------------------------------------------------------
+    lock_timeout_seconds: float = 120.0
 
     # -- Editor ----------------------------------------------------------------
     editor: str = "zed -w"
@@ -439,6 +445,19 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
         default=1_000_000,
         description="Terminal output byte limit for subprocess capture.",
         min_value=1,
+    ),
+    # -- Concurrency -----------------------------------------------------------
+    ConfigVariable(
+        env_name="VAULTSPEC_LOCK_TIMEOUT_SECONDS",
+        attr_name="lock_timeout_seconds",
+        var_type=float,
+        default=120.0,
+        description=(
+            "Total seconds a single advisory-lock acquisition may wait "
+            "before reporting a timeout. Covers both the in-process thread "
+            "layer and the cross-process OS layer combined."
+        ),
+        min_value=0.0,
     ),
     # -- Editor ----------------------------------------------------------------
     ConfigVariable(

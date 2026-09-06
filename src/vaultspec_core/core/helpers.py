@@ -24,6 +24,8 @@ from typing import Any, Protocol
 
 import yaml
 
+from .exceptions import AdvisoryLockTimeoutError
+
 logger = logging.getLogger(__name__)
 
 __all__ = ["launch_editor", "rmtree_robust"]
@@ -65,6 +67,69 @@ _WINDOWS_LOCK_CONTENTION_ERRORS = frozenset({errno.EDEADLK, errno.EACCES})
 _WINDOWS_LOCK_RETRY_INTERVAL_SECONDS = 0.05
 
 
+# How often a bounded acquire re-tests a lock it could not take. Both layers
+# poll rather than block, because neither `fcntl.flock` with `LOCK_EX` nor
+# `msvcrt.locking` with `LK_LOCK` can be given a deadline, and the only
+# portable way to bound them is to ask non-blockingly and sleep. The interval
+# matches `_WINDOWS_LOCK_RETRY_INTERVAL_SECONDS`: at 20 wakeups a second the
+# poll is invisible next to the filesystem work the lock protects, and it
+# bounds the overshoot past the deadline to one interval.
+_LOCK_POLL_INTERVAL_SECONDS = 0.05
+
+
+def _resolve_lock_timeout(timeout: float | None) -> float:
+    """Return the acquisition budget in seconds for one :func:`advisory_lock`.
+
+    Args:
+        timeout: Explicit budget from the caller, or ``None`` to read
+            ``lock_timeout_seconds`` from the runtime config
+            (``VAULTSPEC_LOCK_TIMEOUT_SECONDS``, default 120s).
+
+    Returns:
+        The budget in seconds, never negative. ``threading.Lock.acquire``
+        rejects a negative timeout with ``ValueError`` and treats ``-1`` as
+        "block forever", so a caller that passes one would either crash or
+        silently restore the unbounded wait this budget replaces; both are
+        worse than acquiring non-blockingly. The config package is imported
+        lazily so this module keeps no import-time dependency on it.
+    """
+    if timeout is None:
+        from ..config import get_config
+
+        timeout = get_config().lock_timeout_seconds
+    return max(timeout, 0.0)
+
+
+def _lock_timeout_hint(layer: str) -> str:
+    """Return operator-facing guidance for an exhausted acquisition budget.
+
+    Args:
+        layer: ``"thread"`` or ``"os"`` - which layer gave up. The two have
+            genuinely different causes, so they get different advice.
+
+    Returns:
+        The hint text attached to the raised
+        :class:`~vaultspec_core.core.exceptions.AdvisoryLockTimeoutError`.
+    """
+    if layer == "thread":
+        return (
+            "The most likely cause is a lock cycle: this thread already holds "
+            "this sentinel further up its own call stack and is now waiting "
+            "on itself, which advisory locks, being non-reentrant, cannot "
+            "resolve. Read the traceback for an outer advisory_lock on the "
+            "same path. Otherwise another thread in this process held it for "
+            "longer than the budget. Raise VAULTSPEC_LOCK_TIMEOUT_SECONDS if "
+            "the wait was legitimate."
+        )
+    return (
+        "Another process holds this workspace lock. That is ordinary "
+        "contention if a second vaultspec command is running against the "
+        "same workspace; if none is, the holder exited without releasing, or "
+        "the volume is slow enough that the wait exceeded the budget. Raise "
+        "VAULTSPEC_LOCK_TIMEOUT_SECONDS if the wait was legitimate."
+    )
+
+
 def _is_windows_lock_contention(exc: OSError) -> bool:
     """Whether *exc* means the lock is held elsewhere rather than unusable.
 
@@ -83,8 +148,8 @@ def _is_windows_lock_contention(exc: OSError) -> bool:
     return exc.errno in _WINDOWS_LOCK_CONTENTION_ERRORS
 
 
-def _acquire_windows_lock(fd: int) -> None:
-    """Block until the byte-range lock on *fd* is held.
+def _acquire_windows_lock(fd: int, deadline: float) -> bool:
+    """Wait until the byte-range lock on *fd* is held, or *deadline* passes.
 
     :func:`msvcrt.locking` with ``LK_LOCK`` is not a blocking acquire despite
     the name: it retries ten times at one-second intervals and then reports a
@@ -98,8 +163,22 @@ def _acquire_windows_lock(fd: int) -> None:
     Any other ``OSError`` is a genuine failure - a bad descriptor, an
     unreadable volume - and propagates rather than spinning forever.
 
+    The retry is bounded by *deadline* rather than infinite (issue #457):
+    contention is worth waiting out, a lock cycle is not, and from inside the
+    loop the two are indistinguishable. ``LK_LOCK``'s own ten-second internal
+    budget means one call can overshoot the deadline by up to ten seconds
+    before this function next reads the clock. That overshoot is accepted
+    rather than engineered away: the alternative, polling ``LK_NBLCK``, trades
+    a bounded overshoot for a busier loop and a weaker acquire.
+
     Args:
         fd: Open file descriptor of the ``.lock`` sibling file.
+        deadline: :func:`time.monotonic` value past which to stop retrying.
+
+    Returns:
+        ``True`` once the lock is held, ``False`` if the deadline passed
+        first. Turning that ``False`` into a diagnosable error is the
+        caller's job, so this stays a pure acquire primitive.
 
     Raises:
         RuntimeError: If called off Windows. The sole caller reaches this
@@ -119,45 +198,150 @@ def _acquire_windows_lock(fd: int) -> None:
         except OSError as exc:
             if not _is_windows_lock_contention(exc):
                 raise
+            if time.monotonic() >= deadline:
+                return False
             time.sleep(_WINDOWS_LOCK_RETRY_INTERVAL_SECONDS)
             continue
-        return
+        return True
+
+
+def _acquire_posix_lock(fd: int, deadline: float) -> bool:
+    """Wait until the exclusive ``flock`` on *fd* is held, or *deadline* passes.
+
+    ``fcntl.flock`` with ``LOCK_EX`` blocks with no way to cancel it, so a
+    bounded acquire has to ask with ``LOCK_NB`` and sleep between attempts.
+    The alternative - an alarm signal to interrupt the blocking call - only
+    works on the main thread and would collide with any handler the embedding
+    process installed, which a library may not do.
+
+    The cost is fairness. A blocking ``LOCK_EX`` queues waiters in the kernel;
+    polling does not, so under sustained contention a waiter can lose several
+    races in a row. That is acceptable here because the budget bounds how long
+    it can lose them for and says so when it runs out, whereas the blocking
+    form's fairness came with no bound at all - and an unfair wait that ends
+    is preferable to a fair one that may not.
+
+    Args:
+        fd: Open file descriptor of the ``.lock`` sibling file.
+        deadline: :func:`time.monotonic` value past which to stop retrying.
+
+    Returns:
+        ``True`` once the lock is held, ``False`` if the deadline passed
+        first.
+
+    Raises:
+        RuntimeError: If called on Windows, which has no ``fcntl``.
+        OSError: Any failure other than "the lock is held elsewhere"
+            (``EACCES``/``EAGAIN``) - a bad descriptor, or a filesystem that
+            does not implement locking - propagates rather than being retried
+            until the budget runs out.
+    """
+    if sys.platform == "win32":
+        raise RuntimeError("_acquire_posix_lock is a POSIX-only helper")
+
+    import fcntl
+
+    while True:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            if exc.errno not in (errno.EACCES, errno.EAGAIN):
+                raise
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(_LOCK_POLL_INTERVAL_SECONDS)
+            continue
+        return True
 
 
 @contextmanager
-def advisory_lock(path: Path) -> Generator[None]:
+def advisory_lock(path: Path, *, timeout: float | None = None) -> Generator[None]:
     """Advisory file lock for serializing concurrent read-modify-write cycles.
 
     Serializes threads within the same process via a per-path
     :class:`threading.Lock`, then serializes across processes via an
     OS-level file lock (``fcntl.flock`` on Unix, ``msvcrt.locking``
-    on Windows).  Both layers block until acquired.
+    on Windows).
+
+    Both layers wait, but neither waits forever. The lock is not reentrant, so
+    a caller that reaches the same sentinel twice on one thread - directly, or
+    through a call graph that loops back into a lock-taking helper - used to
+    block on itself with no timeout and no diagnostic, and the process had to
+    be killed to find out why (issue #457). The two layers share **one**
+    budget rather than getting one each: what an operator experiences is the
+    total time the command sat still, and two independent budgets would make
+    the configured number mean half of the worst case. The budget is generous
+    by design (:data:`~vaultspec_core.config.VaultSpecConfig.lock_timeout_seconds`,
+    120s by default, ``VAULTSPEC_LOCK_TIMEOUT_SECONDS``) because ordinary
+    contention must still resolve by waiting: a full-corpus repair or a
+    migration that folds every execution record can hold a sentinel for tens
+    of seconds on a slow or network volume, and failing that wait would be a
+    worse bug than the one this bounds. It deliberately does *not* reuse
+    :data:`_WINDOWS_REPLACE_RETRY_BUDGET_SECONDS` (2s); that budget rides out
+    an antivirus scanner's momentary handle on a file, which is a different
+    phenomenon at a different timescale from a peer holding a workspace lock.
 
     Args:
         path: The file being protected.  A sibling ``.lock`` file is
             created next to it and used as the lock target.
+        timeout: Total seconds to spend acquiring both layers. ``None``
+            (the default) reads the configured budget. Mainly an override for
+            callers - tests among them - that know the wait they expect.
+
+    Raises:
+        AdvisoryLockTimeoutError: If the budget is exhausted before both
+            layers are held. The error names the sentinel, the budget, and
+            which layer gave up, and carries a hint pointing at the likely
+            cause. Nothing is left held: the thread lock is released before
+            the error leaves this function.
     """
     lock_path = path.with_suffix(path.suffix + ".lock")
 
-    # Only create the lock file's parent if it already exists.  Creating
-    # it unconditionally would cause side-effects (e.g. directory creation
-    # during dry-run operations where the target doesn't exist yet).
-    # When the parent doesn't exist, no concurrent writer can race on
-    # this file, so it is safe to skip locking entirely.
+    # Only create the lock file's parent if it already exists.  Creating it
+    # unconditionally would cause side-effects (e.g. directory creation during
+    # dry-run operations where the target doesn't exist yet), and raising
+    # would break the preview and not-yet-scaffolded-workspace callers that
+    # rely on this skip.  Callers that must not skip - `execute_edit` on a
+    # real write, `generate_feature_index_result` - create the parent
+    # themselves before locking.
+    #
+    # The skip is nevertheless recorded (issue #457): a guard that does
+    # nothing is worse than no guard, because the caller inside the `with`
+    # block believes it is protected.  At DEBUG rather than WARNING, because
+    # this function cannot tell a preview from a real write, and on a preview
+    # the skip is the designed behaviour rather than an anomaly - warning on
+    # every `--dry-run` would both cry wolf and, since the CLI writes log
+    # records to stdout, corrupt every `--json` envelope emitted from a
+    # preview.  Telling the two cases apart needs a caller-supplied signal,
+    # which belongs with the lock-graph decision rather than here.
     if not lock_path.parent.exists():
+        logger.debug(
+            "Advisory lock skipped: %s does not exist, so %s cannot be "
+            "created and this section runs unprotected",
+            lock_path.parent,
+            lock_path.name,
+        )
         yield
         return
 
+    budget = _resolve_lock_timeout(timeout)
+    deadline = time.monotonic() + budget
     resolved_key = str(lock_path.resolve())
     tlock = _get_thread_lock(resolved_key)
-    tlock.acquire()
+    if not tlock.acquire(timeout=budget):
+        raise AdvisoryLockTimeoutError(
+            lock_path, budget, "thread", hint=_lock_timeout_hint("thread")
+        )
     try:
         fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR)
         try:
             if sys.platform == "win32":
                 import msvcrt
 
-                _acquire_windows_lock(fd)
+                if not _acquire_windows_lock(fd, deadline):
+                    raise AdvisoryLockTimeoutError(
+                        lock_path, budget, "os", hint=_lock_timeout_hint("os")
+                    )
                 try:
                     yield
                 finally:
@@ -165,7 +349,10 @@ def advisory_lock(path: Path) -> Generator[None]:
             else:
                 import fcntl
 
-                fcntl.flock(fd, fcntl.LOCK_EX)
+                if not _acquire_posix_lock(fd, deadline):
+                    raise AdvisoryLockTimeoutError(
+                        lock_path, budget, "os", hint=_lock_timeout_hint("os")
+                    )
                 try:
                     yield
                 finally:
