@@ -17,9 +17,11 @@ batch) raise to the protocol ``isError`` layer.
 the regenerated feature index path both come from the current layout - so it
 converges the workspace through
 :func:`vaultspec_core.cli._migration_hook.ensure_migrated` first, exactly as
-its CLI counterparts ``vault add`` and ``vault feature index`` do.  ``find``
-and ``edit`` do not: a read converges nothing, and an edit writes to a path
-the caller named.
+its CLI counterparts ``vault add`` and ``vault feature index`` do.  That hook
+is scoped to the entries that decide where a write lands; ``create`` never
+rewrites or removes a document the call did not name, however stale the
+workspace is (issue #458).  ``find`` and ``edit`` converge nothing at all: a
+read converges nothing, and an edit writes to a path the caller named.
 """
 
 from __future__ import annotations
@@ -1139,7 +1141,9 @@ def register_document_tools(
         # workspace already has - one feature, two `generated: true` indexes
         # with divergent `related:`. This is the same write intent to a
         # schema-decided location that `vault add` and `vault feature index`
-        # carry, so it takes the same hook.
+        # carry, so it takes the same hook - scoped, as there, to the
+        # entries that place a write, so an agent creating one document
+        # cannot remove documents it never named (issue #458).
         try:
             ensure_migrated(root_dir)
         # The SDK forwards a ToolError's own text and discards the message of

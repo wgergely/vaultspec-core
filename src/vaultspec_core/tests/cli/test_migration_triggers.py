@@ -174,10 +174,18 @@ class TestAuthoringVerbTrigger:
     Renamed from ``TestScannerLazyTrigger``: these cases never really
     tested the scanner, they tested that ``vault add`` and
     ``vault feature index`` do not author into a layout a pending
-    migration is about to move. That requirement is intact and these
-    assertions are unchanged; only the trigger site moved, from the
-    scanner every read shares to a hook the two authoring verbs call
-    (issue #443).
+    migration is about to move. That requirement is intact; only the
+    trigger site moved, from the scanner every read shares to a hook the
+    two authoring verbs call (issue #443).
+
+    What the hook converges narrowed afterwards, to the entries that
+    decide where the verb's own write lands (issue #458). Every
+    relocation assertion below is unchanged by that - it is the same
+    requirement, and the same entry satisfies it. What changed is the
+    collision case, which used to observe an unrelated document being
+    rewritten in passing and now observes it being left alone. The
+    corresponding refusals are pinned in
+    ``test_scoped_migration_convergence``.
     """
 
     def test_vault_add_migrates_first(self, tmp_path: Path):
@@ -226,21 +234,16 @@ class TestAuthoringVerbTrigger:
 
         assert result.exit_code == 0, result.stdout
         assert not legacy.exists()
-        # The lazy migration trigger fired by ``vault add`` runs the
-        # 0.1.29 backfill, which seeds the canonical index's missing
-        # ``modified:`` stamp from its ``date:``, and the 0.1.55 seed,
-        # which attests the body it now carries. The collision handling
-        # still preserves the body and every other field verbatim.
-        from vaultspec_core.vaultcore.body_hash import document_body_digest
-
-        digest = document_body_digest("# canonical alpha\n")
-        canonical_after = (
-            "---\ngenerated: true\ntags:\n  - '#index'\n  - '#alpha'\n"
-            f"date: '2026-04-30'\nmodified: '2026-04-30'\n"
-            f"body_hash: '{digest}'\nrelated: []\n---\n"
-            "\n# canonical alpha\n"
-        )
-        assert target.read_text(encoding="utf-8") == canonical_after
+        # Byte-for-byte unchanged. The hook the verb fires is scoped to the
+        # relocation, so the 0.1.29 stamp backfill and the 0.1.55 fingerprint
+        # seed - both workspace-wide rewrites of documents this command was
+        # never pointed at - stay pending for an explicit convergence verb
+        # (issue #458). Before the narrowing this file came back with a
+        # ``modified:`` and a ``body_hash:`` that ``vault add adr`` had no
+        # business writing into it. The collision handling itself is
+        # unaffected: the legacy duplicate still goes, the canonical copy
+        # still stands.
+        assert target.read_text(encoding="utf-8") == canonical_before
 
     def test_feature_index_no_split_brain(self, tmp_path: Path):
         # Headline bug: vault feature index in a legacy workspace used

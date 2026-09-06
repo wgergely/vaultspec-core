@@ -381,6 +381,14 @@ async def test_mcp_create_places_the_document_by_the_current_schema(
     document itself against the stale layout.  Pinning that the created
     document is readable back through the post-migration corpus keeps the hook
     ahead of the item loop rather than beside the index call.
+
+    What the tool converges is the relocation and only the relocation.  This
+    used to assert the workspace came back ``UP_TO_DATE``, which conflated two
+    claims - that the placement entry ran, and that every other entry ran too
+    - and the second was the defect: an agent creating one document silently
+    rewrote and deleted documents nobody named (issue #458).  The claim that
+    matters here is the first, so it is now asserted on its own, with the
+    residue asserted as residue.
     """
     from vaultspec_core.mcp_server.app import create_server
 
@@ -403,10 +411,13 @@ async def test_mcp_create_places_the_document_by_the_current_schema(
         c.text for c in result.content if isinstance(c, TextContent)
     ]
 
-    from vaultspec_core.migrations import MigrationStatus, migration_status
+    from vaultspec_core.migrations import migration_status
 
-    status, names = migration_status(legacy_index_workspace)
-    assert status is MigrationStatus.UP_TO_DATE, (status, names)
+    _status, names = migration_status(legacy_index_workspace)
+    assert "index_subfolder" not in names, names
+    assert "exec_ledger_only" in names, (
+        "the content entries must remain pending for an explicit convergence"
+    )
 
     created = sorted(
         (legacy_index_workspace / ".vault" / "research").glob("*-research.md")

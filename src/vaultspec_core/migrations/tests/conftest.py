@@ -10,10 +10,16 @@ casualties under full-gate ordering).
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 import vaultspec_core.core.types as _t
+from vaultspec_core.core.manifest import ManifestData, write_manifest_data
+from vaultspec_core.migrations import reset_workspace_cache
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 @pytest.fixture(autouse=True)
@@ -51,3 +57,25 @@ def isolate_state():
     reset_console()
     reset_target()
     reset_config()
+
+
+@pytest.fixture
+def workspace(tmp_path: Path) -> Iterator[Path]:
+    """Create an installed-style workspace with a writable manifest.
+
+    Writes a stale ``vaultspec_version`` so the driver has something
+    to migrate. Resets the per-process workspace cache so each test
+    starts from a clean slate.
+
+    Returns:
+        The workspace root path. Tests still hit a real on-disk
+        manifest and a real workspace path; no library functions are
+        mocked.
+    """
+    fw_dir = tmp_path / ".vaultspec"
+    fw_dir.mkdir(parents=True, exist_ok=True)
+    data = ManifestData(vaultspec_version="0.1.0")
+    write_manifest_data(tmp_path, data)
+    reset_workspace_cache()
+    yield tmp_path
+    reset_workspace_cache()

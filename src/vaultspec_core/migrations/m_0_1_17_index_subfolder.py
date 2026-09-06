@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING
 
 from ..core.helpers import atomic_write
 from ..vaultcore.rename_engine import assert_within
-from . import Migration, MigrationError, MigrationResult
+from . import Migration, MigrationError, MigrationResult, MigrationScope
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -266,4 +266,11 @@ MIGRATION = Migration(
     name=_NAME,
     migrate=migrate,
     preview=preview,
+    # Relocating the generated indexes is precisely what decides where a
+    # freshly generated one lands, so an authoring verb runs this and
+    # only this. It touches nothing outside the set of documents the
+    # schema itself placed, and the one deletion it makes - a legacy
+    # duplicate of an index that already exists at the canonical path -
+    # is snapshotted to .vault/.trash/ first.
+    scope=MigrationScope.WRITE_PLACEMENT,
 )

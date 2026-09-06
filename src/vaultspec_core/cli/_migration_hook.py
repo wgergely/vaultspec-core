@@ -19,7 +19,9 @@ by "is this a vault command":
   *where* they write is decided by the schema.  A generated feature index
   written against a legacy layout leaves the workspace with two indexes for
   one feature, one at the legacy root and one under ``.vault/index/`` - the
-  split brain that put the trigger in the scanner in the first place.
+  split brain that put the trigger in the scanner in the first place.  They
+  converge *that* and nothing else: the hook runs only registry entries
+  declaring :attr:`~vaultspec_core.migrations.MigrationScope.WRITE_PLACEMENT`.
 - Nothing else converges.  Callers that edit, link, archive, or log against a
   document the *user named* (``vault edit``, ``vault link``, ``vault archive``,
   ``vault exec``, ``plan step check``, and their MCP equivalents ``edit``,
@@ -28,6 +30,31 @@ by "is this a vault command":
   more standing to rewrite 47 unrelated documents than a read does.
 - Reads converge nothing and instead surface the drift through
   :func:`vaultspec_core.migrations.warn_if_pending`.
+
+Scope, and why the hook is not the whole registry.  Running every pending
+entry gave a verb that writes one document the authority to rewrite and
+delete every other one.  On a months-stale workspace ``vaultspec-core vault
+add adr --feature auth`` produced one new ADR *and* ran the execution-record
+folds across the whole corpus, removing Phase Summaries and per-Step records
+the user never named, with no prompt and no preview - the same class of event
+as issue #443, differing only in that the triggering verb also wrote
+something (issue #458).  The standing an authoring verb has is exactly the
+standing it needs: to fix where its own write lands.  It has no more standing
+to delete 47 unrelated documents than a read does, which is the principle
+this module already applied to ``vault edit``, ``link`` and ``archive``, and
+applying it inconsistently to ``add`` was the defect.  So the hook passes
+:data:`~vaultspec_core.migrations.WRITE_PLACEMENT_SCOPES` and the
+content-rewriting and content-removing entries wait for
+``vaultspec-core migrations run``, ``vaultspec-core vault repair``, or
+``vaultspec-core install --upgrade`` - verbs whose whole purpose the operator
+typed out.
+
+The residue is deliberate and is *reported*, not hidden: a scoped run leaves
+the content entries pending, the manifest records only what actually ran, and
+the hook calls :func:`vaultspec_core.migrations.warn_if_pending` afterwards so
+the workspace says what is still outstanding and which command applies it.
+Convergence deferred and named is a different thing from convergence
+forgotten.
 
 The test is the *write*, never the surface.  Drawing it around CLI verbs is
 what left the MCP ``create`` tool - the primary authoring surface for agents -
@@ -57,12 +84,21 @@ __all__ = ["ensure_migrated"]
 
 
 def ensure_migrated(root_dir: Path) -> None:
-    """Apply pending schema migrations before a layout-sensitive write.
+    """Apply pending write-placement migrations before a layout-sensitive write.
 
     Delegates to :func:`vaultspec_core.migrations.run_pending_migrations`
     with the per-process workspace cache enabled, so a workspace already
     observed up to date costs one dictionary lookup rather than a manifest
     read and an advisory lock.
+
+    Scoped to :data:`~vaultspec_core.migrations.WRITE_PLACEMENT_SCOPES`.
+    The caller asked to write one document, so it converges only what
+    decides where that write lands; entries that rewrite or remove
+    documents it never named are left pending for an explicit convergence
+    verb (issue #458).  Whatever remains pending afterwards is announced
+    through :func:`vaultspec_core.migrations.warn_if_pending`, which shares
+    its once-per-workspace latch with the read path, so an authoring verb
+    in a process that has already warned does not repeat the notice.
 
     Unlike :func:`vaultspec_core.cli._cache_hook.invalidate_graph_cache`,
     this **does** propagate.  A failed cache invalidation is recoverable -
@@ -80,10 +116,14 @@ def ensure_migrated(root_dir: Path) -> None:
             sees the real cause.
     """
     from ..core.exceptions import VaultSpecError
-    from ..migrations import run_pending_migrations
+    from ..migrations import (
+        WRITE_PLACEMENT_SCOPES,
+        run_pending_migrations,
+        warn_if_pending,
+    )
 
     try:
-        run_pending_migrations(root_dir, use_cache=True)
+        run_pending_migrations(root_dir, use_cache=True, scopes=WRITE_PLACEMENT_SCOPES)
     except VaultSpecError:
         # A domain refusal, not a defect. The corrupt-manifest guard declines
         # to guess which migrations are pending rather than replaying all of
@@ -94,3 +134,8 @@ def ensure_migrated(root_dir: Path) -> None:
     except Exception:
         logger.exception("Pending migration failed for %s", root_dir)
         raise
+    # Only after a successful scoped run: on failure the exception above is
+    # the diagnosis, and a second notice about entries that did not run
+    # would compete with it.  Never raises by contract, so it cannot turn a
+    # completed convergence into a failed write.
+    warn_if_pending(root_dir)

@@ -38,7 +38,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from . import Migration, MigrationError, MigrationResult
+from . import Migration, MigrationError, MigrationResult, MigrationScope
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -170,4 +170,8 @@ MIGRATION = Migration(
     target_version=_TARGET_VERSION,
     name=_NAME,
     migrate=migrate,
+    # Rewrites the frontmatter of every document in the corpus. Additive
+    # and lossless, but still a workspace-wide rewrite of user content,
+    # and no authoring write depends on it having happened.
+    scope=MigrationScope.DOCUMENT_CONTENT,
 )
