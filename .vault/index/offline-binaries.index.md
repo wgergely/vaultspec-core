@@ -4,9 +4,9 @@ tags:
   - '#index'
   - '#offline-binaries'
 date: '2026-08-29'
-modified: '2026-08-29'
+modified: '2026-09-06'
 body_schema: 'body-v2'
-body_hash: 'sha256:00df9c50511929943fdd34515eac9b17ca45d40fb44b53106080d3f0135e7979'
+body_hash: 'sha256:6c507e66a5b96b6550abf8e914c11a52bc561d419324c9879d3d90a9564118b5'
 related:
   - '[[2026-08-29-offline-binaries-adr]]'
   - '[[2026-08-29-offline-binaries-research]]'
@@ -20,7 +20,7 @@ Auto-generated index of all documents tagged with `#offline-binaries`.
 
 ### adr
 
-- `2026-08-29-offline-binaries-adr` - `offline-binaries` adr: `ship a prepared distribution and stop installing at first launch` | (**status:** `proposed`)
+- `2026-08-29-offline-binaries-adr` - `offline-binaries` adr: `ship a prepared distribution and stop installing at first launch` | (**status:** `superseded`)
 
 ### research
 

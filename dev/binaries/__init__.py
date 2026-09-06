@@ -1,4 +1,4 @@
-"""The standalone release-binary build.
+"""The release-binary build.
 
 A release workflow runs this against a bare interpreter with no project
 environment, which is why it is an instrument rather than a harness module:
