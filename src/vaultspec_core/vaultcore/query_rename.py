@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypedDict, cast
 
 from .models import DocType
+from .normalize import WINDOWS_RESERVED_NAMES
 from .query_listing import VaultDocument, list_documents
 from .rename_ops import split_keepends
 
@@ -74,12 +75,10 @@ _RELATED_LINK_RE = re.compile(r'^\s*-\s*["\']?\[\[(.+?)\]\]["\']?.*$')
 
 #: Windows reserved device base names. A feature whose name is one of these
 #: produces an index path (``<name>.index.md``) the OS treats as a device,
-#: which would fail mid-apply; rename rejects them up front.
-_WINDOWS_RESERVED_NAMES = frozenset(
-    {"con", "prn", "aux", "nul"}
-    | {f"com{i}" for i in range(1, 10)}
-    | {f"lpt{i}" for i in range(1, 10)}
-)
+#: which would fail mid-apply; rename rejects them up front. Re-exported from
+#: :mod:`.normalize`, the one owner of the set - ``vault add`` and every
+#: other entry point reject it there too, via ``normalize_feature_tag``.
+_WINDOWS_RESERVED_NAMES = WINDOWS_RESERVED_NAMES
 
 
 def assert_within_docs(docs_dir: Path, path: Path) -> Path:

@@ -4,7 +4,8 @@ Install Core with Scoop on Windows or Homebrew on macOS and Linux. Both channels
 `vaultspec-core` and `vaultspec-mcp`.
 
 You don't need a separate Python installation. First launch needs network access to
-install the pinned Vaultspec package and its dependencies from PyPI.
+fetch `uv` and install the pinned Vaultspec package and its dependencies from PyPI;
+later launches run entirely offline.
 
 ## Coverage
 
@@ -56,7 +57,7 @@ Replace `<asset>` with the downloaded file's path. Older releases may have no bu
 attestation; a checksum match alone does not verify provenance. If verification fails,
 check the command's error before running the asset.
 
-To require a particular signing workflow, add `--signer-workflow`. For standalone
+To require a particular signing workflow, add `--signer-workflow`. For the release
 binaries:
 
 ```sh

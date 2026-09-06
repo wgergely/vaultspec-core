@@ -4,6 +4,20 @@ on:
   issues:
     types: [opened]
 
+# ANY GitHub account can fire this: `issues: opened` on a public repo is an
+# untrusted trigger, and the job holds a stored PAT. It ran with the repository
+# default token scope because it was the only workflow here declaring no
+# `permissions:` at all. Nothing below reads the default token - both steps
+# authenticate with ADD_TO_PROJECT_PAT - so the correct declaration is none.
+permissions: {}
+
+# Rapid issue creation would otherwise start unbounded parallel runs against
+# one project board, all mutating it. Keyed per issue so two different issues
+# still proceed in parallel; a duplicate event for the SAME issue serialises.
+concurrency:
+  group: add-to-project-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
 jobs:
   add-to-project:
     runs-on: [self-hosted, Linux, X64, build]

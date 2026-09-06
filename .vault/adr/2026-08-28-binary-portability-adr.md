@@ -1,17 +1,18 @@
 ---
 tags:
-  - '#adr'
-  - '#binary-portability'
+  - "#adr"
+  - "#binary-portability"
 date: '2026-08-28'
-modified: '2026-08-28'
-body_schema: 'body-v2'
-body_hash: 'sha256:a6c77484ae95e7d5fb9e2f85fb1f0b00e9f9f9114fd213b623bafd50a120c421'
 related:
   - "[[2026-03-22-clci-release-adr]]"
-  - '[[2026-08-28-binary-portability-research]]'
+  - "[[2026-08-28-binary-portability-research]]"
+superseded_by: '2026-09-06-binary-bootstrapper-adr'
+modified: '2026-09-06'
+body_schema: 'body-v2'
+body_hash: 'sha256:5ad57613701c61a2e730bf42e8fff8685672d377deafbd28e4994a69eaab2eaa'
 ---
 
-# `binary-portability` adr: `declare the binary platform contract and enforce it at build time` | (**status:** `proposed`)
+# `binary-portability` adr: `declare the binary platform contract and enforce it at build time` | (**status:** `superseded`)
 
 ## Problem Statement
 

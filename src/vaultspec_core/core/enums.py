@@ -174,11 +174,13 @@ class AntigravityModels(_TieredModelRegistry):
 
     Antigravity is model-optional and multi-vendor: the active model is chosen
     at runtime (``agy --model`` or the in-editor model picker), not codified in
-    synced agent or skill files. Antigravity does not consume a ``model``
-    frontmatter field, so this registry is reference-only and is never emitted
-    into provider artifacts. The values mirror Antigravity's default
-    Gemini-class lineup so a single source of truth still exists for tooling
-    that wants to display or validate a default tier.
+    synced agent or skill files. Its subagent frontmatter does accept a
+    ``model`` key, but over a three-value tier vocabulary (``inherit``,
+    ``flash``, ``pro``) rather than over model identifiers, so these values
+    are never emitted into provider artifacts either way. The registry stays
+    reference-only: the values mirror Antigravity's default Gemini-class
+    lineup so a single source of truth still exists for tooling that wants to
+    display or validate a default tier.
     """
 
     HIGH = "gemini-3.1-pro-preview"
@@ -228,10 +230,13 @@ class GeminiBuiltinTool(StrEnum):
     ``isValidToolName`` against these strings; any drift causes
     ``Invalid tool name`` errors at agent load time.
 
-    Drift is guarded at test time by the live source-pin test
-    (``src/vaultspec_core/tests/cli/test_agents_render.py::TestUpstreamGeminiToolPin``),
-    which fetches ``base-declarations.ts`` from the upstream main
-    branch and asserts every enum value matches the upstream constant.
+    These values are FROZEN against gemini-cli ``v0.47.0``, the last
+    release verified against this repository, and NOTHING re-checks them
+    against upstream. The live source-pin test that once did was removed
+    after its ref was pinned to a tag: comparing an immutable ref to an
+    unchanged enum has a constant result and cannot detect drift. Upstream
+    Gemini CLI is discontinued, so no successor guard was added.
+    Revalidate by hand before trusting these against any newer release.
     """
 
     GLOB = "glob"
