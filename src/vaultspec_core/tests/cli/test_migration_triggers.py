@@ -332,6 +332,16 @@ class TestVaultCheckWarnsWithoutMutation:
         assert "Misplaced feature index at .vault/ root" in flat, flat
         assert legacy.name in flat, flat
         assert "Pending schema migration to .vault/index/." in flat, flat
+        # The advice has to be advice the operator can act on. It used to add
+        # "Vault commands trigger the same migration lazily on first use",
+        # which stopped being true when the scanner trigger came out: the one
+        # operator who sees this warning is the one for whom running another
+        # vault command now does nothing at all.
+        assert (
+            "fix: Run 'vaultspec-core migrations run' to apply the "
+            "registered schema migration." in flat
+        ), flat
+        assert "lazil" not in flat.lower(), flat
         assert legacy.exists(), "vault check must not mutate"
 
     def test_check_fix_does_not_mutate_indexes(self, tmp_path: Path):
