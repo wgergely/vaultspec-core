@@ -167,6 +167,74 @@ def test_summary_kept_while_a_step_lacks_rows(tmp_path: Path) -> None:
     assert result.counts["skipped"] == 1
 
 
+def test_summary_survives_a_migration_that_writes_nothing(tmp_path: Path) -> None:
+    """A summary is never unlinked on a pass that leaves the ledger untouched.
+
+    The workspace was already folded, so the ledger covers every Step of
+    ``P01`` and no per-Step record remains. The summary yields no row and no
+    note of its own, so removing it would destroy hand-authored prose while
+    the ledger stays byte-identical.
+    """
+    folder = _skeleton(tmp_path)
+    _ledger(tmp_path).write_text(
+        "\n".join(
+            (
+                "---",
+                "tags:",
+                "  - '#exec'",
+                "  - '#demo'",
+                "date: '2026-05-17'",
+                "modified: '2026-05-17'",
+                "body_schema: 'body-v2'",
+                "related:",
+                f"  - '[[{_PLAN_STEM}]]'",
+                "---",
+                "",
+                "# `demo` ledger",
+                "",
+                "## Changes",
+                "",
+                "- `S01` `M` `src/foo.py`",
+                "- `S02` `M` `src/bar.py`",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    before = _ledger(tmp_path).read_text(encoding="utf-8")
+    prose = "The batch path is slower but correct; do not revisit."
+    summary = folder / f"{_FOLDER}-P01-summary.md"
+    summary.write_text(
+        "\n".join(
+            (
+                "---",
+                "tags:",
+                "  - '#exec'",
+                "  - '#demo'",
+                "date: '2026-05-17'",
+                "related:",
+                f"  - '[[{_PLAN_STEM}]]'",
+                "---",
+                "",
+                "# summary",
+                "",
+                "## Outcome",
+                "",
+                prose,
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    result = migrate(tmp_path)
+
+    assert summary.exists(), "a summary was deleted while nothing was written"
+    assert prose in summary.read_text(encoding="utf-8")
+    assert _ledger(tmp_path).read_text(encoding="utf-8") == before
+    assert result.counts["summaries"] == 0
+
+
 def test_flat_record_folds_into_its_plan_folder(tmp_path: Path) -> None:
     _skeleton(tmp_path)
     flat = _record(tmp_path, "2026-05-22-demo-exec", step_id="S01", flat=True)

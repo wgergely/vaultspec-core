@@ -15,7 +15,11 @@ Two record shapes predate the ledger:
 
 A Phase Summary is the union of its Phase's records. It is removed once
 every Step of that Phase has rows in the ledger, and left intact otherwise,
-so the corpus never loses evidence to the fold.
+so the corpus never loses evidence to the fold. A summary carries no rows
+and no notes of its own, so it is also left intact when the fold recovers
+nothing: the removal would otherwise destroy a hand-authored narrative on a
+run that writes nothing in its place. No file is removed on a code path
+where the write meant to preserve its content was skipped.
 
 :func:`plan_fold` only *plans*: it reads nothing and writes nothing, so a dry
 run and a real run share one code path and what an operator previews is
@@ -105,7 +109,8 @@ class FoldPlan:
         rows: Ledger ``## Changes`` rows to append, in Step order.
         notes: Ledger ``## Notes`` lines to append, in Step order.
         folded: Records whose content the rows now carry, safe to remove.
-        summaries: Phase Summaries whose every Step has rows, safe to remove.
+        summaries: Phase Summaries whose every Step has rows and whose
+            removal is accompanied by a write, safe to remove.
         skipped: Records left untouched, each with a reason.
         recovered_paths: Count of paths carried into rows, summed per record.
     """
@@ -204,6 +209,21 @@ def _summary_phase(stem: str) -> str | None:
     return f"{wave}.{phase}" if wave else phase
 
 
+def _carries(ledger_text: str, plan: FoldPlan) -> bool:
+    """Whether *ledger_text* demonstrably carries everything *plan* recovered.
+
+    Deletion is gated on this rather than on the write having changed bytes.
+    An interrupted fold re-runs with its rows already in the ledger, so a
+    byte-change gate would refuse forever and leave the duplication the
+    ordering deliberately accepts; a containment gate completes it. A plan
+    that recovered nothing carries nothing, so it backs no removal at all.
+    """
+    if not plan.rows and not plan.notes:
+        return False
+    present = {line.strip() for line in ledger_text.splitlines() if line.strip()}
+    return all(line.strip() in present for line in (*plan.rows, *plan.notes))
+
+
 def plan_fold(
     sources: Iterable[FoldSource],
     *,
@@ -259,12 +279,21 @@ def plan_fold(
         folded_ids.add(step_id)
         plan.folded.append(path)
 
+    # A summary contributes no rows and no notes of its own, so a fold that
+    # recovers nothing has nothing to write in place of the narrative it
+    # would delete. Removing one then destroys hand-authored prose on a run
+    # that leaves the ledger byte-identical, so the summary is retained.
+    carries_content = bool(plan.rows or plan.notes)
     covered_after = set(covered) | folded_ids
     for source in summaries:
         phase = _summary_phase(source.path.stem)
         steps = (phase_steps or {}).get(phase or "")
         if phase is None or steps is None:
             plan.skipped.append(SkippedRecord(source.path, "phase summary"))
+        elif not carries_content:
+            plan.skipped.append(
+                SkippedRecord(source.path, "phase summary; the fold writes nothing")
+            )
         elif steps and all(step in covered_after for step in steps):
             plan.summaries.append(source.path)
         else:
@@ -354,9 +383,10 @@ def apply_fold(
 ) -> Path:
     """Write *plan* to the feature's ledger and remove the folded records.
 
-    Folded records are removed only after the ledger carrying their content
-    is durably on disk, so an interruption leaves duplication rather than
-    loss.
+    Records are removed only after the ledger carrying their content is
+    durably on disk, so an interruption leaves duplication rather than loss,
+    and only once that ledger is confirmed to carry every row and note the
+    plan recovered. A plan that recovered nothing removes nothing.
 
     Args:
         root_dir: Project root directory.
@@ -415,7 +445,13 @@ def apply_fold(
         updated = append_notes(append_rows(text, plan.rows), plan.notes)
         if updated != text:
             atomic_write(ledger_path, refresh_modified_stamp(updated, _dt.date.today()))
+        carried = _carries(ledger_path.read_text(encoding="utf-8"), plan)
 
+    # A record is unlinked only once the ledger is on disk carrying what the
+    # fold recovered from it. No file is ever removed on a path where the
+    # write meant to preserve its content was skipped or fell short.
+    if not carried:
+        return ledger_path
     for path in plan.removed:
         if path != ledger_path:
             path.unlink(missing_ok=True)

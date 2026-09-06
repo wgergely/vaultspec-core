@@ -278,7 +278,7 @@ def cmd_add(
         WritePolicy,
         create_vault_doc,
     )
-    from vaultspec_core.vaultcore.models import DocType, vault_today
+    from vaultspec_core.vaultcore.models import DocType
 
     console = get_console()
     root_dir = _get_ctx().target_dir
@@ -297,14 +297,12 @@ def cmd_add(
     _add_ops.validate_tier(console, dt, tier)
     topic_value = _add_ops.normalize_topic(console, dt, topic)
     feat = _add_ops.normalize_feature(console, feature)
+    date_str = _add_ops.resolve_date(console, date)
     extra_tags = _add_ops.normalize_extra_tags(console, tags)
     resolved_related = _add_ops.resolve_related(console, related, root_dir)
     _add_ops.report_dependency_diagnostics(
         console, root_dir, dt, feat, json_output=json_output
     )
-
-    # Default date to today on the vault's single canonical clock (UTC).
-    date_str = date or vault_today().isoformat()
 
     identity = DocumentIdentity(
         doc_type=dt, feature=feat, date=date_str, topic=topic_value

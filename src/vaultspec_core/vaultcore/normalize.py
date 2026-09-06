@@ -1,4 +1,4 @@
-"""Shared kebab-case feature/tag normalization for the CLI and MCP surfaces.
+"""Shared identity-field normalization for the CLI and MCP surfaces.
 
 A vaultspec feature handle and every additional ``#tag`` is a kebab-case
 token: lowercase letters, digits, and hyphens, opening on an alphanumeric.
@@ -11,8 +11,13 @@ canonical pattern, returning a typed :class:`NormalizeResult` instead of
 printing or raising, so both a Typer verb and an MCP tool can render the
 outcome in their own idiom.
 
-The normalizer never fabricates a value it cannot validate: on any failure
-it returns ``ok=False`` with a human-readable ``error`` and a ``None``
+:func:`normalize_vault_date` is the same contract for the one identity field
+that is not a kebab-case handle. Together the two cover every value that
+reaches a scaffolded document's path: the feature handle, the narrative
+topic infix, each ``#tag``, and the date prefix.
+
+The normalizers never fabricate a value they cannot validate: on any failure
+they return ``ok=False`` with a human-readable ``error`` and a ``None``
 value, and the caller decides how to surface it.
 """
 
@@ -25,6 +30,7 @@ __all__ = [
     "KEBAB_CASE_PATTERN",
     "NormalizeResult",
     "normalize_feature_tag",
+    "normalize_vault_date",
 ]
 
 #: The canonical kebab-case token: opens on an alphanumeric, then any run of
@@ -97,3 +103,53 @@ def normalize_feature_tag(raw: str, *, label: str = "feature tag") -> NormalizeR
         )
 
     return NormalizeResult(ok=True, value=cleaned)
+
+
+def normalize_vault_date(raw: object, *, label: str = "date") -> NormalizeResult:
+    """Normalize a document date into the canonical ``yyyy-mm-dd`` token.
+
+    Companion to :func:`normalize_feature_tag` for the one identity field
+    that is not a kebab-case handle. A vault date is the ``date:``
+    frontmatter value and the leading segment of every scaffolded filename,
+    so - exactly like the feature handle - it decides a path. This function
+    is the single owner of that admission: it parses the value into a real
+    :class:`datetime.date` through the vault's canonical lenient parser and
+    returns the date re-rendered from that parsed value, never a substring
+    of the caller's input.
+
+    Parsing rather than pattern-matching is the point. A value that survives
+    is a calendar date by construction, so the token handed back can only
+    ever be ten characters of digits and hyphens: it cannot carry a path
+    separator, a relative segment, a drive letter, or a leading root, and it
+    therefore cannot steer the directory a document lands in. A value that
+    does not parse is refused here, before any path is composed.
+
+    The accepted input set is deliberately not narrowed: it is whatever
+    :func:`~vaultspec_core.vaultcore.models.parse_lenient_date` accepts, so
+    hand-authored frontmatter in any of the tolerated forms keeps working
+    and is simply canonicalized on the way through.
+
+    Args:
+        raw: The candidate date - a string, a :class:`datetime.date`, a
+            :class:`datetime.datetime`, or any other object (which fails).
+        label: The noun used in the failure message, so a caller can scope
+            the diagnostic to its surface.
+
+    Returns:
+        A :class:`NormalizeResult`: ``ok=True`` with the canonical
+        ``yyyy-mm-dd`` string, or ``ok=False`` with an ``error`` and a
+        ``None`` value.
+    """
+    from .models import parse_lenient_date
+
+    parsed = parse_lenient_date(raw)
+    if parsed is None:
+        rendered = raw if isinstance(raw, str) else repr(raw)
+        return NormalizeResult(
+            ok=False,
+            error=(
+                f"Invalid {label} '{rendered}'. "
+                "Must be a calendar date in (or normalizable to) YYYY-MM-DD form."
+            ),
+        )
+    return NormalizeResult(ok=True, value=parsed.isoformat())

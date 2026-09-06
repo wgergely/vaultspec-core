@@ -32,10 +32,12 @@ validation refusal, resolution failure, or write error).
 from __future__ import annotations
 
 import dataclasses
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
     from pathlib import Path
 
     from vaultspec_core.vaultcore.checks._base import CheckDiagnostic
@@ -45,6 +47,7 @@ __all__ = [
     "EditError",
     "EditResult",
     "document_lock_target",
+    "document_write_lock",
     "enforce_blob_hash",
     "execute_edit",
     "invalidate_graph_cache",
@@ -381,6 +384,47 @@ def document_lock_target(doc_path: Path, root_dir: Path) -> Path:
         rel = resolved
     digest = hashlib.sha1(rel.as_posix().encode("utf-8"), usedforsecurity=False)
     return docs_dir / "data" / "locks" / digest.hexdigest()
+
+
+@contextmanager
+def document_write_lock(doc_path: Path, root_dir: Path) -> Generator[None]:
+    """Hold *doc_path*'s per-document advisory lock for a read-modify-write.
+
+    The boundary every non-``execute_edit`` document writer needs, and the
+    reason it exists as a helper rather than three lines repeated per call
+    site: a writer that reads a document, computes a replacement, and writes
+    it back is only correct if the read and the write it authorizes are
+    atomic with respect to every other vaultspec-core mutator on that file.
+    Locking the write alone is worthless - the replacement was already
+    derived from a revision another writer may have superseded, so the write
+    lands as a deliberate, individually-atomic overwrite of content that was
+    never read. That is the silent lost update: no truncation, no error on
+    either side, and the losing writer reports success.
+
+    Callers therefore wrap the WHOLE read-modify-write, not the write.
+
+    The lock target is the same sentinel :func:`execute_edit` takes
+    (:func:`document_lock_target`), so a fix pass and an editing session
+    contend on one lock rather than two disjoint ones.
+
+    :func:`~vaultspec_core.core.helpers.advisory_lock` deliberately no-ops
+    when its sentinel's parent directory is absent, so the (per-machine,
+    already-gitignored) lock directory is materialized first: a guard that
+    silently skips is indistinguishable from one that held.
+
+    Args:
+        doc_path: The document about to be read and rewritten.
+        root_dir: The project root whose ``.vault/`` holds the document.
+
+    Yields:
+        ``None``, with the per-document lock held for the block's duration.
+    """
+    from vaultspec_core.core.helpers import advisory_lock
+
+    lock_target = document_lock_target(doc_path, root_dir)
+    lock_target.parent.mkdir(parents=True, exist_ok=True)
+    with advisory_lock(lock_target):
+        yield
 
 
 # ---------------------------------------------------------------------------

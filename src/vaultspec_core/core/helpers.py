@@ -523,20 +523,28 @@ def atomic_write(path: Path, content: str) -> None:
 
 
 def launch_editor(editor: str, file_path: str) -> None:
-    """Launch editor, handling Windows .cmd/.bat wrappers.
+    """Open *file_path* in *editor* for the scaffold-then-edit creation flows.
+
+    A thin wrapper over :func:`vaultspec_core.core.editor.spawn_editor`, which
+    owns tokenization, validation and the spawn. This entry point differs from
+    the ``edit`` verbs only in what it does with the outcome: a resource is
+    being *created* here, the file already exists on disk with its scaffold,
+    and a non-zero editor status is therefore worth a warning rather than a
+    failure.
 
     Args:
         editor: Editor command string (may include flags, e.g. ``"code --wait"``).
         file_path: Absolute path to the file to open in the editor.
+
+    Raises:
+        EditorValidationError: When the command is refused, or when the
+            invocation has no terminal to attach an editor to.
     """
-    parts = editor.split()
-    resolved = shutil.which(parts[0]) or parts[0]
-    if sys.platform == "win32" and resolved.lower().endswith((".cmd", ".bat")):
-        result = subprocess.run(["cmd.exe", "/c", resolved, *parts[1:], file_path])
-    else:
-        result = subprocess.run([resolved, *parts[1:], file_path])
-    if result.returncode != 0:
-        logger.warning("Editor exited with code %d", result.returncode)
+    from .editor import spawn_editor
+
+    returncode = spawn_editor(editor, file_path, source="the configured default editor")
+    if returncode != 0:
+        logger.warning("Editor exited with code %d", returncode)
 
 
 def collect_md_resources(

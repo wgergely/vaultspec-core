@@ -904,6 +904,37 @@ denylist covers:
   stay available)
 - `vaultspec-core vault feature index` - index documents stay uncreatable through the
   MCP surface
+- `vaultspec-core sync`, `vaultspec-core spec hooks add`,
+  `vaultspec-core spec hooks run`, and `vaultspec-core spec hooks trust` - a workspace
+  hook declares a shell command, and these are the verbs that write one, run one,
+  approve one, or fire the lifecycle event that runs them. Every other gateway defence
+  is about argv hygiene and cannot help here, because a well-formed invocation of these
+  verbs is exactly the dangerous one, and because a model's context can contain text
+  from a cloned repository. Approving a hook is an operator decision taken at a
+  terminal, so no tool call can stand in for one. The read-only
+  `vaultspec-core spec hooks list`, `vaultspec-core spec hooks show`, and
+  `vaultspec-core spec hooks status` stay available, so an agent can still read and
+  explain a workspace's hooks.
+
+#### Flags the gateway does not pass
+
+A verb can be perfectly safe to run and still declare one option that is not safe to
+accept from a tool call. `--editor` is the example: it names a command for the CLI to
+execute, which is the point of the flag at a terminal and has no meaning at all through
+`invoke`, where no terminal is attached.
+
+The gateway's other screens do not catch it. The positional guard sees no operand, and
+the flag-name guard sees an option the verb genuinely declares; neither looks at the
+value. So `--editor` is refused by name for every gateway call, whichever verb declares
+it, and it is withheld from the schemas `discover` returns.
+
+Separately, every subprocess `invoke` spawns is marked as non-interactive in its
+environment, and the CLI declines to open an editor when it sees that mark - from the
+flag, from `.vaultspec/config.toml`, from `VAULTSPEC_EDITOR`, `VISUAL` or `EDITOR`, or
+from the built-in fallback. The mark is added to the environment the gateway itself
+composes, which no tool argument reaches, so a caller can neither set nor clear it. The
+edit verbs stay reachable for everything else they do; only the interactive launch is
+off.
 
 ## Server lifetime
 

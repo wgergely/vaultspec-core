@@ -346,6 +346,8 @@ full options.
 - `vaultspec-core spec hooks status` - Report declarative hooks parsing and taxonomy
   compliance status.
 - `vaultspec-core spec hooks run` - Trigger hooks for a specific event.
+- `vaultspec-core spec hooks trust` - Approve this workspace's hooks to run their shell
+  commands as you.
 
 #### Precommit
 
@@ -2157,7 +2159,8 @@ vaultspec-core spec agents [OPTIONS] COMMAND [ARGS]...
   scaffold from a named template instead of an empty body.
 - `show NAME` - Print resource content to stdout.
 - `edit NAME [--editor EDITOR]` - Open in configured editor. Resolution order: --editor
-  flag, local config, VISUAL, EDITOR, vi.
+  flag, local config, VISUAL, EDITOR, vi. See
+  [which editors are accepted](#which-editors-are-accepted).
 - `remove NAME [--yes|--force]` (`-y`) - Delete a resource. Prompts unless confirmed.
 - `rename OLD_NAME NEW_NAME` - Rename a resource.
 - `sync` (`--dry-run`, `--force`) - Resource-scoped sync; use top-level
@@ -2170,6 +2173,43 @@ vaultspec-core spec agents [OPTIONS] COMMAND [ARGS]...
 `add` accepts the unified `--body` flag for direct content or `--from-file` to read from
 a file. Rules carry no description, so `rules add` has no `--description`; only skills
 support `--template`.
+
+#### Which editors are accepted
+
+The editor setting names a command that is executed, so it is validated before anything
+is launched. Two rules apply to every source.
+
+The command must be a program name or path followed by plain arguments. Arguments are
+expected and supported - `code --wait` and `subl -n -w` are both fine, and a quoted path
+containing spaces is fine - but shell metacharacters (`;`, `&`, `|`, `` ` ``, `$`, `%`,
+`(`, `)`), quoting syntax and control characters are refused. The editor is launched
+directly rather than through a shell, so those characters have no meaning here.
+
+The program itself must be a known text editor when the value arrives through the
+`--editor` flag or through the project-local `editor` config key. Those two travel: a
+flag can be composed by automation, and `.vaultspec/config.toml` is committed with the
+workspace, so cloning a repository is enough to inherit its value. Roughly eighty
+editors are recognised, including `vi`, `vim`, `nvim`, `nano`, `micro`, `emacs`,
+`helix`, `code`, `codium`, `cursor`, `zed`, `subl`, `kate`, `gedit`, `notepad`, and the
+JetBrains launchers. A rejection message lists the full set.
+
+The `VAULTSPEC_EDITOR`, `VISUAL` and `EDITOR` environment variables are **not** limited
+to that set. Setting an environment variable for a process already requires the ability
+to run code as that user, so screening it would protect nothing while stranding anyone
+whose editor is not recognised. If your editor is refused by the flag or the config key,
+set it in the environment instead:
+
+```bash
+export VAULTSPEC_EDITOR="/opt/my-editor --wait"
+```
+
+An editor named by a source that is simply not installed is skipped, and resolution
+continues down the ladder as before; only a value that resolves and is then refused
+stops the command, so the reason is never silently swallowed.
+
+Editing is interactive by definition. A command invoked through the MCP gateway's
+`invoke` tool has no terminal attached, so no editor is opened for it from any source,
+and the gateway refuses `--editor` outright rather than passing it through.
 
 `vaultspec-core spec <resource> sync` commands are narrow maintenance surfaces. They do
 not guarantee that provider-facing config stubs such as `AGENTS.md`, `CLAUDE.md`,
@@ -2295,6 +2335,42 @@ vaultspec-core spec hooks [OPTIONS] COMMAND [ARGS]...
 - `status` (`--json`) - Report declarative hooks parsing and taxonomy compliance status.
 - `run EVENT [--path PATH]` - Trigger enabled hooks for the given event. Valid events:
   `vault.document.created`, `config.synced`, `audit.completed`.
+- `trust [NAME] [--revoke] [--json]` - Approve this workspace's hooks to run their shell
+  commands, or withdraw that approval.
+
+#### Hook trust
+
+A hook file declares a shell command, and `.vaultspec/hooks/` is shared through git like
+the rest of your project policy, so a hook definition arrives with every clone and every
+pull. That makes the file itself the wrong place to record whether its command may run:
+anyone who can open a pull request could otherwise also grant themselves execution on
+every machine that clones the branch.
+
+vaultspec-core therefore treats a workspace's hooks as untrusted until an operator says
+otherwise, and records that decision **outside the workspace** - in the machine-global
+VaultSpec home, `~/.vaultspec/hook-trust.json`. Nothing a checkout, an archive, or a
+clone carries can put an entry there.
+
+Approval is per hook file and pinned to that file's exact contents. Editing a hook, or
+pulling a change to one, drops the approval until you grant it again, so a hook you
+approved last month cannot quietly become a different command this month. It also means
+a trusted hook stops running the moment its file changes, which is the intended trade: a
+second `vaultspec-core spec hooks trust` after an intentional edit is cheaper than an
+unnoticed one.
+
+- `vaultspec-core sync` and `vaultspec-core spec hooks run` show you each untrusted
+  hook's command and offer to remember your approval, but only at an interactive
+  terminal.
+- Anywhere without an operator - CI (`CI` is set), `--json` output, redirected input,
+  `VAULTSPEC_NON_INTERACTIVE`, or an MCP tool call - the hooks are skipped and the
+  reason is written to stderr. There is no flag that auto-approves, because a flag a
+  script can pass is a flag a repository can talk a script into passing.
+- Declining costs only the hooks. The sync itself still completes.
+- `vaultspec-core spec hooks list` shows a `trust` column, so an enabled hook that is
+  not running never has to be a mystery.
+- The gateway's `invoke` tool cannot reach `vaultspec-core spec hooks add`,
+  `vaultspec-core spec hooks run`, `vaultspec-core spec hooks trust`, or
+  `vaultspec-core sync` at all; they are denied at the MCP surface.
 
 #### Examples
 
@@ -2741,6 +2817,13 @@ vaultspec-core config set [OPTIONS] KEY VALUE
 
 Write a local configuration value. Supported keys: `editor`.
 
+The `editor` value is validated on write and again every time it is used, so a file
+written by an older version or edited by hand cannot slip past the check. See
+[which editors are accepted](#which-editors-are-accepted). Reading and clearing keep
+working on a value the edit path refuses - `vaultspec-core config get editor`,
+`vaultspec-core config list`, and `vaultspec-core config unset editor` are all
+unaffected - so an inherited setting can always be inspected and removed.
+
 #### Options
 
 - `--json` (default off) - Emit machine-readable output.
@@ -2819,7 +2902,9 @@ overridden by the `--target` flag.
 - `VAULTSPEC_EDITOR` (str, default `zed -w`) - Editor command for
   `vaultspec-core spec {rules|skills|agents} edit`. Overridden by the project-local
   config `editor` value, and the `--editor` flag. Resolved in order: `--editor` flag,
-  project config, `$VISUAL`, `$EDITOR`/`VAULTSPEC_EDITOR`, `vi`.
+  project config, `$VISUAL`, `$EDITOR`/`VAULTSPEC_EDITOR`, `vi`. Unlike the flag and the
+  config key, an editor named here is not restricted to the recognised set; see
+  [which editors are accepted](#which-editors-are-accepted).
 - `VAULTSPEC_JSON_PRETTY` (str, unset by default) - Indents `--json` output. Any value
   other than `0`, `false`, `no`, `off`, or the empty string turns it on; without it the
   envelope is written as one compact line.

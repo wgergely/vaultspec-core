@@ -115,7 +115,17 @@ def migrate(workspace: Path) -> MigrationResult:
             continue
 
         try:
-            written = write_stamp(doc, value)
+            # ``root_dir=None`` runs the rewrite without the per-document
+            # advisory lock, deliberately. This body already executes inside
+            # the migration driver's manifest lock, and the lock primitive is
+            # a non-reentrant sentinel with no timeout: adding a
+            # manifest-to-document edge here would make any future caller
+            # that holds a document lock and reaches the lazy migration
+            # trigger (``scan_vault`` runs it) an unrecoverable hang rather
+            # than a contended wait. Migrations run once per workspace at a
+            # version boundary, so the exposure they buy back is far smaller
+            # than the failure mode they would introduce.
+            written = write_stamp(doc, value, root_dir=None)
         except OSError as exc:
             raise MigrationError(
                 f"{_NAME}: failed to write stamp to {doc}: {exc}"

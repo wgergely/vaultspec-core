@@ -225,24 +225,49 @@ class TestSummaryRemoval:
         ]
 
     def test_existing_ledger_coverage_counts(self) -> None:
+        """A Step the ledger already covers counts toward its Phase."""
+        plan = plan_fold(
+            [
+                _source("2026-01-01-feat-S02", "S02"),
+                _source("2026-01-01-feat-P01-summary", None),
+            ],
+            phase_steps=self._PHASES,
+            covered=("S01",),
+        )
+
+        assert len(plan.summaries) == 1
+        assert [p.name for p in plan.folded] == ["2026-01-01-feat-S02.md"]
+        assert not plan.is_empty
+
+    def test_wave_qualified_summary_resolves_its_phase(self) -> None:
+        plan = plan_fold(
+            [
+                _source("2026-01-01-feat-W01-P02-S03", "S03"),
+                _source("2026-01-01-feat-W01-P02-summary", None),
+            ],
+            phase_steps=self._PHASES,
+        )
+
+        assert len(plan.summaries) == 1
+
+    def test_summary_is_kept_when_the_fold_writes_nothing(self) -> None:
+        """The #452 shape: every Step is already covered, so the fold recovers
+        no row and no note, yet the summary's own narrative would be deleted
+        with nothing written in its place."""
         plan = plan_fold(
             [_source("2026-01-01-feat-P01-summary", None)],
             phase_steps=self._PHASES,
             covered=("S01", "S02"),
         )
 
-        assert len(plan.summaries) == 1
-        assert plan.folded == []
-        assert not plan.is_empty
-
-    def test_wave_qualified_summary_resolves_its_phase(self) -> None:
-        plan = plan_fold(
-            [_source("2026-01-01-feat-W01-P02-summary", None)],
-            phase_steps=self._PHASES,
-            covered=("S03",),
-        )
-
-        assert len(plan.summaries) == 1
+        assert plan.rows == []
+        assert plan.notes == []
+        assert plan.summaries == []
+        assert plan.removed == []
+        assert plan.is_empty
+        assert [s.reason for s in plan.skipped] == [
+            "phase summary; the fold writes nothing"
+        ]
 
     def test_summary_kept_without_a_plan_mapping(self) -> None:
         plan = plan_fold([_source("2026-01-01-feat-P01-summary", None)])

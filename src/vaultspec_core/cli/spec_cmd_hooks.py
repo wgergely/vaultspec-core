@@ -76,6 +76,9 @@ def cmd_hooks_list(
             "status": Cell("enabled", style="bold green")
             if hook["enabled"]
             else Cell("disabled", style="dim"),
+            "trust": Cell("trusted", style="bold green")
+            if hook["trusted"]
+            else Cell("untrusted", style="yellow"),
             "event": hook["event"],
             "actions": hook["actions"],
         }
@@ -83,11 +86,23 @@ def cmd_hooks_list(
     ]
     render_listing(
         rows,
-        [Column("name"), Column("status"), Column("event"), Column("actions")],
+        [
+            Column("name"),
+            Column("status"),
+            Column("trust"),
+            Column("event"),
+            Column("actions"),
+        ],
         title="hooks",
         summary=summary_line(len(rows), "hooks"),
         empty="no hooks",
     )
+    if any(not hook["trusted"] for hook in hooks):
+        console.print(
+            "\n[dim]Untrusted hooks are never run. Their commands would "
+            "execute as you, and a repository cannot approve its own; review "
+            "them, then run[/dim] [bold]vaultspec-core spec hooks trust[/bold]."
+        )
 
 
 @hooks_app.command("add")
@@ -177,7 +192,15 @@ def cmd_hooks_show(
 def cmd_hooks_edit(
     name: Annotated[str, typer.Argument(help="Hook name")],
     editor: Annotated[
-        str | None, typer.Option("--editor", help="Override the editor binary to use")
+        str | None,
+        typer.Option(
+            "--editor",
+            help=(
+                "Override the editor for this invocation. Must name a known "
+                "editor program; arguments are allowed (e.g. 'code --wait'). "
+                "For an editor outside that set, use VAULTSPEC_EDITOR."
+            ),
+        ),
     ] = None,
     target: TargetOption = None,
 ) -> None:
@@ -382,9 +405,12 @@ def cmd_hooks_run(
 ) -> None:
     """Trigger hooks for a specific event."""
     apply_target(target)
+    from vaultspec_core.cli._hook_trust import consent_gate
     from vaultspec_core.console import get_console
     from vaultspec_core.core.commands import hooks_run
     from vaultspec_core.core.exceptions import VaultSpecError
+
+    consent_gate(event, json_output=json_output)
 
     try:
         results = hooks_run(event=event, path=path)
@@ -412,6 +438,85 @@ def cmd_hooks_run(
                 console.print(f"    {line}")
         if r["error"]:
             console.print(f"    [red]error:[/red] {r['error']}")
+
+
+@hooks_app.command("trust")
+def cmd_hooks_trust(
+    name: Annotated[
+        str | None,
+        typer.Argument(help="Hook name; omit to cover every hook in the workspace"),
+    ] = None,
+    revoke: Annotated[
+        bool,
+        typer.Option("--revoke", help="Withdraw approval for this workspace's hooks"),
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Approve this workspace's hooks to run their shell commands as you.
+
+    Hook files are shared through git, so a checkout arrives carrying commands
+    its author chose. Approval is therefore recorded on this machine rather than
+    in the workspace, and is pinned to each file's current contents: editing an
+    approved hook, or pulling a change to one, withdraws the approval until you
+    run this again. Use --revoke to withdraw it yourself.
+    """
+    apply_target(target)
+    from vaultspec_core.cli._hook_trust import describe_hook
+    from vaultspec_core.core.exceptions import ResourceNotFoundError
+    from vaultspec_core.core.types import get_context
+    from vaultspec_core.hooks import grant, load_hooks
+    from vaultspec_core.hooks import revoke as revoke_trust
+
+    ctx = get_context()
+
+    if revoke:
+        dropped = revoke_trust(ctx.hooks_dir)
+        if json_output:
+            emit_json("spec.hooks.trust", "removed", {"revoked": dropped})
+            raise typer.Exit(0)
+        from vaultspec_core.console import get_console
+
+        get_console().print(f"Withdrew approval for {dropped} hook(s).")
+        return
+
+    hooks = load_hooks(ctx.hooks_dir)
+    if name is not None:
+        hooks = [hook for hook in hooks if hook.name == name]
+        if not hooks:
+            _handle_error(
+                ResourceNotFoundError(f"Hook '{name}' not found."),
+                json_output=json_output,
+            )
+            return
+
+    paths = [hook.source_path for hook in hooks if hook.source_path is not None]
+    recorded = grant(paths)
+    approved = sorted(path.name for path in recorded)
+
+    if json_output:
+        emit_json("spec.hooks.trust", "updated", {"trusted": approved})
+        raise typer.Exit(0)
+
+    from vaultspec_core.console import get_console
+
+    console = get_console()
+    if not approved:
+        console.print("No hooks to approve.")
+        return
+    console.print(f"Approved {len(approved)} hook(s) in {ctx.hooks_dir}:")
+    # Echo the commands that were just approved rather than only the filenames.
+    # This verb is the one place an operator commits to running them, so it is
+    # the one place the record of what they agreed to has to be legible.
+    for hook in hooks:
+        if hook.source_path is None or hook.source_path not in recorded:
+            continue
+        for line in describe_hook(hook, ctx.target_dir):
+            console.print(line, highlight=False)
+    console.print(
+        "[dim]Approval is recorded on this machine and pinned to each file's "
+        "contents; editing a hook asks again.[/dim]"
+    )
 
 
 # =============================================================================

@@ -428,6 +428,101 @@ class TestSync:
 
         env = {k: v for k, v in os.environ.items() if k != "PYTEST_CURRENT_TEST"}
         env["NO_COLOR"] = "1"
+        # Point the child process's consent ledger at a directory this test
+        # owns, so approving hooks here never reaches the developer's own
+        # ledger, and no approval the developer already holds can reach here.
+        operator_home = tmp_path / "operator-home"
+        operator_home.mkdir()
+        env["HOME"] = str(operator_home)
+        env["USERPROFILE"] = str(operator_home)
+
+        def _run_cli(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [sys.executable, "-m", "vaultspec_core", *args],
+                cwd=cwd,
+                env=env,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
+            )
+
+        # Approve BOTH workspaces' hooks. Approving only the target's would
+        # leave "the CWD hook did not fire" explainable by it being untrusted
+        # rather than by it never having been loaded, which is the claim this
+        # test exists to make. With both approved, consent cannot be the
+        # reason, so the markers speak only about which workspace was read.
+        for workspace in (cwd_workspace, target_workspace):
+            approved = _run_cli(
+                "spec", "hooks", "trust", "--target", str(workspace), cwd=workspace
+            )
+            assert approved.returncode == 0, approved.stdout + approved.stderr
+
+        result = _run_cli(
+            "sync",
+            "all",
+            "--target",
+            str(target_workspace),
+            "--force",
+            cwd=cwd_workspace,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+
+        assert marker_target.exists(), (
+            "config.synced must fire the target workspace's own hook, not "
+            "the CWD workspace's"
+        )
+        assert not marker_cwd.exists(), (
+            "config.synced must not execute the CWD workspace's hook when "
+            "syncing a different --target"
+        )
+
+    def test_sync_asks_about_the_targets_hooks_not_the_cwds(
+        self, tmp_path: Path
+    ) -> None:
+        """The consent notice must name the hooks that are about to run.
+
+        ``sync --target`` fires the target workspace's hooks while its
+        ambient context still reflects the CWD/source split. A consent gate
+        that resolved the hooks directory its own way would therefore show
+        the operator one workspace's commands and withhold the other's - and
+        an operator who approved what they were shown would still not have
+        approved what would run. The gate must read the same directory the
+        firing code reads.
+
+        Same real-subprocess shape as the sibling test above, and for the
+        same reason: the CWD/target split path only activates outside pytest.
+        """
+        from vaultspec_core.core.commands import install_run
+
+        cwd_workspace = tmp_path / "cwd-workspace"
+        target_workspace = tmp_path / "target-workspace"
+        cwd_workspace.mkdir()
+        target_workspace.mkdir()
+        install_run(path=cwd_workspace, provider="all", dry_run=False, force=True)
+        install_run(path=target_workspace, provider="all", dry_run=False, force=True)
+
+        # Two commands that differ only by a token unique to each workspace,
+        # so the notice's text says unambiguously which one it is describing.
+        for workspace, tag in (
+            (cwd_workspace, "cwd-only-token"),
+            (target_workspace, "target-only-token"),
+        ):
+            (workspace / ".vaultspec" / "hooks" / "marker.yaml").write_text(
+                "event: config.synced\nenabled: true\nactions:\n"
+                f"  - type: shell\n    command: {sys.executable} -c {tag}\n",
+                encoding="utf-8",
+            )
+
+        env = {k: v for k, v in os.environ.items() if k != "PYTEST_CURRENT_TEST"}
+        env["NO_COLOR"] = "1"
+        operator_home = tmp_path / "operator-home"
+        operator_home.mkdir()
+        env["HOME"] = str(operator_home)
+        env["USERPROFILE"] = str(operator_home)
+
+        # Neither workspace is approved, so the run refuses and explains.
         result = subprocess.run(
             [
                 sys.executable,
@@ -449,13 +544,14 @@ class TestSync:
         )
         assert result.returncode == 0, result.stdout + result.stderr
 
-        assert marker_target.exists(), (
-            "config.synced must fire the target workspace's own hook, not "
-            "the CWD workspace's"
+        notice = result.stdout + result.stderr
+        assert "target-only-token" in notice, (
+            "the consent notice must describe the hooks the target workspace "
+            "declares, because those are the ones this sync would run"
         )
-        assert not marker_cwd.exists(), (
-            "config.synced must not execute the CWD workspace's hook when "
-            "syncing a different --target"
+        assert "cwd-only-token" not in notice, (
+            "the consent notice must not describe the CWD workspace's hooks, "
+            "which this sync will never run"
         )
 
     @pytest.mark.parametrize("flag", ["--dry-run", "--force"])

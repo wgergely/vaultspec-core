@@ -8,7 +8,6 @@ surfaces can stay focused on resource-specific paths and transforms.
 from __future__ import annotations
 
 import logging
-import shutil
 from collections.abc import Callable
 from pathlib import Path
 
@@ -77,17 +76,22 @@ def resource_edit(
             non-zero status.
         EditorCancellationError: If the editor session was interrupted/cancelled.
     """
+    from .editor import assert_interactive_editing_allowed
+    from .exceptions import (
+        EditorCancellationError,
+        EditorSubprocessError,
+    )
+    from .local_config import resolve_editor
+
+    # Before resolution, not after: an invocation with no terminal cannot open
+    # an editor whatever the ladder would have produced, and refusing here
+    # keeps the answer from depending on which editors happen to be installed.
+    assert_interactive_editing_allowed()
+
     _canonical, file_path = _resolve_path(name, base_dir, is_dir)
 
     if not file_path.exists():
         raise ResourceNotFoundError(f"{label} '{name}' not found.")
-
-    from .exceptions import (
-        EditorCancellationError,
-        EditorResolutionError,
-        EditorSubprocessError,
-    )
-    from .local_config import resolve_editor
 
     try:
         from .types import get_context
@@ -100,30 +104,18 @@ def resource_edit(
 
     logger.info("Opening editor (%s) for %s...", resolved_editor, _canonical)
 
-    import shlex
     import subprocess
-    import sys
 
-    parts = shlex.split(resolved_editor)
-    if not parts:
-        raise EditorResolutionError(
-            f"Empty editor command resolved from {resolved_editor!r}"
-        )
-
-    exe = shutil.which(parts[0]) or parts[0]
-    cmd = [exe, *parts[1:], str(file_path)]
+    from .editor import spawn_editor
 
     try:
-        if sys.platform == "win32" and exe.lower().endswith((".cmd", ".bat")):
-            result = subprocess.run(["cmd.exe", "/c", *cmd], shell=False)
-        else:
-            result = subprocess.run(cmd, shell=False)
+        returncode = spawn_editor(resolved_editor, file_path)
 
-        if result.returncode != 0:
-            if result.returncode == 130:
+        if returncode != 0:
+            if returncode == 130:
                 raise EditorCancellationError("Editor edit cancelled by user.")
             raise EditorSubprocessError(
-                f"Editor exited with non-zero exit code {result.returncode}."
+                f"Editor exited with non-zero exit code {returncode}."
             )
     except KeyboardInterrupt as e:
         raise EditorCancellationError("Editor edit cancelled by user (Ctrl+C).") from e

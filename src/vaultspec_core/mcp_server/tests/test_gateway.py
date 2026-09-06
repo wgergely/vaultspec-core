@@ -281,3 +281,70 @@ async def test_unparseable_reference_refuses_with_remediation(
             text = _error_text(result)
             assert "command-inventory markers" in text, tool
             assert "spec reference generate" in text, tool
+
+
+async def test_invoke_rejects_the_editor_flag(vault_root: Path) -> None:
+    """``--editor`` is refused for a gateway call even where a verb declares it.
+
+    The gateway's other two screens both pass this flag by design: the
+    positional guard sees no operand, and the flag-name guard sees a declared
+    option. Neither ever looks at the value, which for this flag is a command
+    the CLI would then execute. It is rejected by name instead, because a
+    tool call has no terminal and therefore no legitimate use for it.
+    """
+    mcp = _gateway_server()
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "invoke",
+            {
+                "verb": "spec rules edit",
+                "positionals": ["some-rule"],
+                "arguments": {"editor": "vim"},
+            },
+        )
+        assert result.is_error
+        text = _error_text(result)
+        assert "not available through the gateway" in text
+
+
+async def test_discover_withholds_the_editor_flag_from_schemas(
+    vault_root: Path,
+) -> None:
+    """A blocked flag is not advertised as a parameter it could pass."""
+    mcp = _gateway_server()
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "discover", {"query": "spec rules edit", "limit": 20}
+        )
+        payload = data_of(result)
+        edit_verbs = [v for v in payload["verbs"] if v["verb"].endswith("edit")]
+        assert edit_verbs, "discover found no edit verb to inspect"
+        for verb in edit_verbs:
+            names = [flag["name"] for flag in verb.get("flags", [])]
+            assert "--editor" not in names, verb["verb"]
+
+
+async def test_invoke_marks_its_child_as_non_interactive(vault_root: Path) -> None:
+    """A real spawned child refuses to open an editor, whatever is configured.
+
+    This is the second, independent half of the closure and it is asserted
+    end to end: the flag never leaves the handler, and even so the child that
+    does start declines to launch an editor from *any* source - the config
+    file, the environment, the built-in fallback. The refusal comes back as
+    the verb's own stderr, so it is the real CLI answering, not this test
+    inspecting the handler.
+
+    The marker lives in the environment the gateway composes, and a caller's
+    only channels into ``invoke`` are the verb path, the argument object and
+    the positionals; none of them reach that mapping, so the distinction it
+    draws cannot be spoofed from outside.
+    """
+    mcp = _gateway_server()
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "invoke",
+            {"verb": "spec rules edit", "positionals": ["any-rule-name"]},
+        )
+        payload = data_of(result)
+        assert payload["ok"] is False
+        assert "no terminal" in payload["error"]["stderr"].lower()

@@ -765,7 +765,12 @@ Body-content flags on `add` vary by resource: `vaultspec-core spec rules add` ta
 `--template TEXT`; `vaultspec-core spec agents add` takes `--description TEXT`. All
 three also accept `--from-file PATH`. `edit` accepts `--editor CMD` to override the
 editor binary for one invocation; resolution order is `--editor`, project config,
-`$VISUAL`, `$EDITOR` / `VAULTSPEC_EDITOR`, `vi`. `status` accepts `--json` and reports
+`$VISUAL`, `$EDITOR` / `VAULTSPEC_EDITOR`, `vi`. The editor command is validated before
+launch: arguments are allowed (`code --wait`), shell metacharacters are not, and a value
+from `--editor` or from the project config must name a recognised editor program. The
+environment variables are not restricted to that set and are the way to use an editor
+the list does not know. No editor is opened for an invocation with no terminal, such as
+one made through the MCP gateway. `status` accepts `--json` and reports
 the missing, drifted, and stale rows of a prune-enabled dry-run sync.
 
 ### vaultspec-core spec system
