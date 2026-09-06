@@ -145,8 +145,9 @@ def _caveats_body(product: Product) -> list[str]:
 
     The Homebrew counterpart of the Scoop manifest's ``notes``. Both channels
     render the same strings from the same Product, so a caveat that matters at
-    install time - a GPU build that has to come from elsewhere, a first launch
-    that needs network - cannot reach one channel's users and not the other's.
+    install time - a GPU build that has to come from elsewhere, a binary that
+    will not update itself - cannot reach one channel's users and not the
+    other's.
     """
     if not product.notes:
         return []
@@ -202,9 +203,12 @@ def render(
         *_caveats_body(product),
         "",
         "  test do",
-        # PyApp resolves the pinned distribution from PyPI on first launch, so
-        # this test exercises the bootstrap as well as the placement - which is
-        # the failure a user meets first if the release never reached PyPI.
+        # A cold launch on the installing machine, which is the whole of what
+        # the binary now does: it carries its interpreter, the application and
+        # every dependency, so this exercises the artifact rather than an
+        # index. `brew test` runs it networked, so the offline property is not
+        # what is proved here - .github/workflows/binaries.yml proves that
+        # before the asset exists. This proves placement and startup.
         "    assert_match version.to_s, "
         f'shell_output("#{{bin}}/{primary.name} --version")',
         "  end",

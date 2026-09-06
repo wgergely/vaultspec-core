@@ -200,6 +200,13 @@ dev/statistics/out/
 /.pre-commit-config.yaml.lock
 # <<< vaultspec-managed <<<
 
+# Release binaries built locally by `just binaries`, and the stock
+# python-build-standalone archives that build caches so a second target does
+# not re-download one. Both are large, per-platform, and reproduced by the
+# builder on demand; neither belongs to a checkout.
+dist-bin/
+.pyapp-distributions/
+
 # Local benchmark working data (raw campaign logs)
 campaign-data/
 .qdrant-initialized

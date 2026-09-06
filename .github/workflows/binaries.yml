@@ -156,8 +156,70 @@ jobs:
 
           [ "${failed}" -eq 0 ] || { echo "::error::preflight refused a build that would queue rather than run" >&2; exit 1; }
 
+  # THE WHEEL COMES FIRST, and that is the reordering this file exists to
+  # record. Until now every binary installed `vaultspec-core==<version>` from
+  # PyPI on the user's machine at first launch, so publication was a
+  # PRECONDITION of the binaries working: a green build could still hand out an
+  # artifact that would not start until publish.yml finished propagating.
+  #
+  # The binaries now carry the application, so the build needs the wheel rather
+  # than the index. Building it here rather than downloading it from PyPI keeps
+  # publication a PEER of this workflow instead of an upstream of it, and means
+  # the bytes a binary carries came from the tag being built rather than from
+  # whatever an index served at the moment the matrix ran.
+  #
+  # One wheel for every leg, not one per leg. `vaultspec-core` is pure Python
+  # and its wheel is `py3-none-any`; what differs per target is the dependency
+  # closure resolved around it, which each leg resolves for itself. Building it
+  # once also means all four binaries embed identical application bytes.
+  #
+  # HOSTED: this needs no fleet capability, and making it need one would put a
+  # queue in front of every leg.
+  wheel:
+    name: Build the wheel the binaries carry
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Build the wheel
+        shell: bash
+        run: uv build --wheel --out-dir dist
+
+      # The tag names a version and so does the wheel. If they disagree, every
+      # binary in this release would report a version the release does not
+      # carry - and would do it silently, because nothing downstream re-reads
+      # the tag once the wheel is an artifact.
+      - name: The wheel is the version the tag names
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#vaultspec-core-v}"
+          version="${version#v}"
+          expected="vaultspec_core-${version}-py3-none-any.whl"
+          if [ ! -f "dist/${expected}" ]; then
+            echo "::error::${TAG} expects dist/${expected}; built: $(ls dist)"
+            exit 1
+          fi
+          echo "wheel ${expected} matches ${TAG}"
+
+      - name: Upload the wheel
+        uses: actions/upload-artifact@v7
+        with:
+          name: project-wheel
+          path: dist/
+          if-no-files-found: error
+          retention-days: 5
+
   build:
-    needs: preflight
+    needs: [preflight, wheel]
     name: Build ${{ matrix.name }}
     strategy:
       fail-fast: false
@@ -294,22 +356,44 @@ jobs:
       - name: Install Python
         run: uv python install 3.13
 
+      - name: Download the wheel the binaries carry
+        uses: actions/download-artifact@v8
+        with:
+          name: project-wheel
+          path: dist
+
       - name: Build binaries
         shell: bash
         env:
           TAG: ${{ inputs.tag || github.ref_name }}
           TARGET: ${{ matrix.target }}
         run: |
+          set -euo pipefail
+          # Exactly one wheel, named rather than globbed into the command. A
+          # glob that matched two would pass both to the builder as one
+          # argument and the failure would surface as a resolver error about a
+          # path nobody wrote.
+          wheels=(dist/*.whl)
+          if [ ${#wheels[@]} -ne 1 ]; then
+            echo "::error::expected one wheel in dist/, found ${#wheels[@]}: ${wheels[*]}"
+            exit 1
+          fi
           uv run --no-project --python 3.13 -- \
-            python dev/binaries/build_pyapp.py --tag "${TAG}" --target "${TARGET}" --outdir dist-bin
+            python dev/binaries/build_pyapp.py --tag "${TAG}" --target "${TARGET}" \
+              --wheel "${wheels[0]}" --outdir dist-bin
 
+      # UNVERIFIED, deliberately, and the name is the contract. Nothing
+      # downstream attaches an artifact under this name; the offline gate below
+      # is what renames it to `binaries-*`, so an artifact that has not been run
+      # with the network taken away cannot reach a release by any path that
+      # skips a step. `binaries-*` means "proved offline", not "compiled".
       - name: Upload binaries
         uses: actions/upload-artifact@v7
         with:
-          name: binaries-${{ matrix.name }}
+          name: unverified-${{ matrix.name }}
           path: dist-bin/
           if-no-files-found: error
-          retention-days: 5
+          retention-days: 1
 
       # A containerised leg runs as root, and its workspace is the SAME
       # directory the runner reuses for every other job on that machine. Left
@@ -324,15 +408,341 @@ jobs:
         if: ${{ always() && matrix.container != '' }}
         run: chown -R --reference=/__w "$GITHUB_WORKSPACE"
 
+  # THE GATE. An artifact becomes a release asset only by passing through here.
+  #
+  # #340 reported binaries advertised as standalone that fail on a host with no
+  # network, and the reason nothing caught it is that nothing ever took the
+  # network away. A `--version` on a connected runner passes whether the
+  # artifact carries its application or downloads it, so the green check spoke
+  # to neither. This is the check that speaks to the property.
+  #
+  # It is also why the build leg uploads `unverified-*`: the rename to
+  # `binaries-*` happens HERE, on success, so "attached to a release" and
+  # "started with the network taken away" are the same event rather than two
+  # that a reordering could separate. A leg that fails this produces no
+  # `binaries-*` artifact, so `Attach to release` simply does not see it and the
+  # completeness assertion at the end of that job reports the release as
+  # partial - the same handling a leg that failed to compile already gets.
+  #
+  # The matrix repeats the build matrix's `name`/`runner`/`target`, which this
+  # repository has been bitten by twice (#361/#364, and the preflight selector
+  # list). ci.yml asserts on every pull request that the two agree, so a target
+  # added to one and not the other goes red on the branch that adds it rather
+  # than at release time.
+  offline:
+    needs: build
+    name: Offline ${{ matrix.name }}
+    # `!cancelled()` rather than the default, so one leg failing to compile
+    # does not skip the gate for the three that did. The cost is that a leg
+    # whose build failed also goes red HERE, on a missing `unverified-*`
+    # artifact. That is the deliberate trade: the alternative - skipping
+    # quietly when there is nothing to check - is a job that reports success
+    # having checked nothing, which is the shape this file refuses in four
+    # other places.
+    if: ${{ !cancelled() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ISOLATION differs per platform because the platforms differ in what
+          # they can take away from one process, and pretending otherwise would
+          # be the false-assurance shape this repository keeps removing.
+          #
+          # `netns` is the real thing: `docker run --network none` gives the
+          # process an empty network namespace with a loopback and nothing else,
+          # so there is no route, no resolver and no proxy to fall back to. It
+          # runs in the SAME pinned manylinux image the artifact was built in,
+          # which means this run also exercises the declared GLIBC_2.28 floor
+          # rather than the runner's newer libc.
+          #
+          # These legs are UNCONTAINERISED on purpose, unlike their build
+          # counterparts: `unshare --net` inside a container job is refused by
+          # the default seccomp profile, so the isolation has to be created by
+          # the docker daemon on the host rather than from inside a container it
+          # already started.
+          - name: linux-x86_64
+            runner: [self-hosted, Linux, X64, build]
+            target: x86_64-unknown-linux-gnu
+            isolation: netns
+            image: quay.io/pypa/manylinux_2_28_x86_64@sha256:4dc41da7df20400310c80d162a2fe2d2c2f3d9734d8dec20f6b9843711618deb
+          - name: linux-aarch64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            isolation: netns
+            image: quay.io/pypa/manylinux_2_28_aarch64@sha256:29a6ceb78de5b00494e6e7456a72782a4cb54238de102e7491d15fe47789b4d1
+          # `sandbox` is macOS's per-process equivalent: a seatbelt profile that
+          # allows everything except `network*`, applied to this one process
+          # without touching the host. `sandbox-exec` is documented as
+          # deprecated and has been for a decade; if Apple removes it this step
+          # fails rather than silently stopping isolating, which is the correct
+          # direction to fail in.
+          - name: macos-aarch64
+            runner: [self-hosted, macOS, ARM64]
+            target: aarch64-apple-darwin
+            isolation: sandbox
+            image: ""
+          # `proxy` is the WEAK one and it is labelled weak. Windows has no
+          # unprivileged per-process network isolation - the alternatives are a
+          # firewall rule, which needs administrator rights on a shared fleet
+          # host and can outlive a cancelled job, or a Windows container, which
+          # nothing in this fleet is known to serve. So this leg black-holes
+          # every proxy variable the bootstrapper's HTTP client reads and
+          # asserts that a cold start still works and fetched nothing. That
+          # catches the failure #340 reported; it does not prove the absence of
+          # a network path the way the two legs above do. The property itself is
+          # platform-independent - it is one branch in PyApp's shared Rust, and
+          # the flags that select it are asserted per target in
+          # dev/binaries/tests - so what is missing here is a second measurement
+          # of a property already measured, not the only measurement of it.
+          - name: windows-x86_64
+            runner: [self-hosted, Windows, X64]
+            target: x86_64-pc-windows-msvc
+            isolation: proxy
+            image: ""
+    runs-on: ${{ matrix.runner }}
+    steps:
+      # THIS JOB DOES NOT CHECK OUT, so on a self-hosted runner it inherits
+      # whatever the last job left in the workspace - including the sentinel
+      # the check below writes. A stale one would let this job publish an
+      # artifact on the strength of a previous run's evidence.
+      - name: Clear evidence left by an earlier run on this machine
+        shell: bash
+        run: rm -rf offline-verified offline-check.sh dist-bin
+
+      - name: Download the built artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: unverified-${{ matrix.name }}
+          path: dist-bin
+
+      # `actions/download-artifact` does not carry the execute bit. Without
+      # this the run below fails as "permission denied" on every Unix leg,
+      # which looks exactly like a broken artifact.
+      - name: Restore the execute bit
+        if: ${{ matrix.isolation != 'proxy' }}
+        shell: bash
+        run: chmod +x dist-bin/vaultspec-core-* dist-bin/vaultspec-mcp-*
+
+      - name: Run it with no network at all
+        if: ${{ matrix.isolation == 'netns' }}
+        shell: bash
+        env:
+          IMAGE: ${{ matrix.image }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          # Pulled here, WITH network, because `--network none` cannot pull.
+          docker pull "${IMAGE}"
+          cat > offline-check.sh <<'CHECK'
+          set -eux
+          # VACUITY GUARD. If this container could reach the network, every
+          # assertion below would pass while proving nothing - which is the
+          # exact shape of the green check that let #340 ship. Prove the
+          # network is gone before concluding anything from its absence.
+          if curl --silent --show-error --max-time 10 https://pypi.org > /dev/null 2>&1; then
+            echo "::error::this container reached the network; --network none is not isolating and this gate would pass vacuously"
+            exit 1
+          fi
+          echo "confirmed: no network reachable from this container"
+
+          # A COLD start. The artifact unpacks itself into a data directory on
+          # first run, so a warm one would prove only that a previous run
+          # worked.
+          export HOME=/tmp/fresh-home
+          rm -rf "$HOME"; mkdir -p "$HOME"
+
+          /artifacts/vaultspec-core-"${TARGET}" --version
+
+          # Behaviour, not exit codes. `--version` can be answered without
+          # importing much; `install` and `vault check` pull in the dependency
+          # closure - pydantic, rustworkx, PyYAML and the rest - which is the
+          # part that used to arrive over the network.
+          rm -rf /tmp/proj; mkdir -p /tmp/proj; cd /tmp/proj
+          git init -q
+          git config user.email offline@example.invalid
+          git config user.name "Offline Gate"
+          /artifacts/vaultspec-core-"${TARGET}" install
+          [ -d .vault ] || { echo "::error::install exited zero but scaffolded no .vault/"; exit 1; }
+          /artifacts/vaultspec-core-"${TARGET}" vault check all
+
+          # #340's symptom by name: the first launch fetched `uv` before it
+          # fetched anything else. Nothing should have appeared.
+          if find "$HOME" -name 'uv' -o -name 'uv.exe' | grep -q .; then
+            echo "::error::an installer was materialised under $HOME; this artifact still expects to install at launch"
+            exit 1
+          fi
+          echo "offline run complete: the artifact carried everything it needed"
+          CHECK
+          docker run --rm --network none \
+            --env "TARGET=${TARGET}" \
+            -v "${PWD}/dist-bin:/artifacts:ro" \
+            -v "${PWD}/offline-check.sh:/offline-check.sh:ro" \
+            "${IMAGE}" bash /offline-check.sh
+          echo "netns" > offline-verified
+
+      - name: Run it with the network denied to the process
+        if: ${{ matrix.isolation == 'sandbox' }}
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          # `allow default` then `deny network*`: later rules win in SBPL, so
+          # this is "everything except the network".
+          profile='(version 1)(allow default)(deny network*)'
+          # VACUITY GUARD, as above: a profile that stopped isolating would
+          # make every assertion below vacuous.
+          if sandbox-exec -p "${profile}" curl --silent --show-error --max-time 10 https://pypi.org > /dev/null 2>&1; then
+            echo "::error::the seatbelt profile did not deny the network; this gate would pass vacuously"
+            exit 1
+          fi
+          echo "confirmed: the network is denied inside this profile"
+
+          home="${RUNNER_TEMP}/offline-home"
+          project="${RUNNER_TEMP}/offline-project"
+          rm -rf "${home}" "${project}"
+          mkdir -p "${home}" "${project}"
+          binary="${PWD}/dist-bin/vaultspec-core-${TARGET}"
+
+          HOME="${home}" sandbox-exec -p "${profile}" "${binary}" --version
+
+          cd "${project}"
+          git init -q
+          git config user.email offline@example.invalid
+          git config user.name "Offline Gate"
+          HOME="${home}" sandbox-exec -p "${profile}" "${binary}" install
+          [ -d .vault ] || { echo "::error::install exited zero but scaffolded no .vault/"; exit 1; }
+          HOME="${home}" sandbox-exec -p "${profile}" "${binary}" vault check all
+
+          if find "${home}" -name 'uv' | grep -q .; then
+            echo "::error::an installer was materialised under ${home}; this artifact still expects to install at launch"
+            exit 1
+          fi
+          echo "offline run complete: the artifact carried everything it needed"
+          echo "sandbox" > "${GITHUB_WORKSPACE}/offline-verified"
+
+      - name: Run it with every route to an index black-holed
+        if: ${{ matrix.isolation == 'proxy' }}
+        shell: pwsh
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Port 9 is discard, and nothing is listening on it here. Every
+          # variable PyApp's HTTP client consults is set, so any attempt to
+          # fetch an installer or a package fails instead of succeeding
+          # quietly.
+          $blackhole = 'http://127.0.0.1:9'
+          $env:HTTP_PROXY = $blackhole
+          $env:HTTPS_PROXY = $blackhole
+          $env:ALL_PROXY = $blackhole
+          $env:http_proxy = $blackhole
+          $env:https_proxy = $blackhole
+          $env:all_proxy = $blackhole
+          $env:NO_PROXY = ''
+          $env:no_proxy = ''
+
+          # VACUITY GUARD: if a fetch still succeeds under these variables the
+          # black hole is not one, and everything below would pass vacuously.
+          & curl.exe --silent --show-error --max-time 10 https://pypi.org --output $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Output "::error::a request reached the network through the black hole; this gate would pass vacuously"
+            exit 1
+          }
+          Write-Output "confirmed: HTTP is black-holed for this process tree"
+
+          # A COLD start, as far as Windows allows one to be arranged.
+          # Redirecting LOCALAPPDATA is best-effort here and not the same
+          # instrument the Unix legs use: PyApp resolves its data directory
+          # through the known-folder API, which reads the user profile rather
+          # than the environment, so a redirected variable may be ignored. The
+          # start is cold anyway because PyApp's directory is per-version and
+          # this version has never run on this host - and the search below
+          # covers BOTH candidate roots so it cannot miss an installer by
+          # having looked in a directory the artifact never used.
+          $home_dir = Join-Path $env:RUNNER_TEMP 'offline-home'
+          $project = Join-Path $env:RUNNER_TEMP 'offline-project'
+          Remove-Item -Recurse -Force $home_dir, $project -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $home_dir, $project | Out-Null
+          $real_local = [Environment]::GetFolderPath('LocalApplicationData')
+          $env:LOCALAPPDATA = $home_dir
+          $env:APPDATA = $home_dir
+
+          $binary = Join-Path $PWD "dist-bin/vaultspec-core-$env:TARGET.exe"
+          & $binary --version
+          if ($LASTEXITCODE -ne 0) { throw "the artifact could not report its version with no index reachable" }
+
+          Set-Location $project
+          git init -q
+          git config user.email offline@example.invalid
+          git config user.name "Offline Gate"
+          & $binary install
+          if ($LASTEXITCODE -ne 0) { throw "the artifact could not install a vault with no index reachable" }
+          if (-not (Test-Path '.vault')) { throw "install exited zero but scaffolded no .vault/" }
+          & $binary vault check all
+          if ($LASTEXITCODE -ne 0) { throw "the artifact could not read back what it wrote" }
+
+          # #340's symptom by name, searched in both places the artifact could
+          # have put it. Scoped to PyApp's own directory rather than to the
+          # whole of LocalAppData, because this runner installs `uv` for the
+          # BUILD and finding that one would fail the gate for the opposite of
+          # the reason it exists.
+          $roots = @($home_dir, $real_local) |
+            Sort-Object -Unique |
+            ForEach-Object { Join-Path $_ 'pyapp' } |
+            Where-Object { Test-Path $_ }
+          $fetched = $roots | ForEach-Object {
+            Get-ChildItem -Path $_ -Recurse -Filter 'uv.exe' -ErrorAction SilentlyContinue
+          }
+          if ($fetched) {
+            Write-Output "::error::an installer was materialised at $($fetched[0].FullName); this artifact still expects to install at launch"
+            exit 1
+          }
+          Write-Output "offline run complete: the artifact carried everything it needed"
+          Set-Content -Path (Join-Path $env:GITHUB_WORKSPACE 'offline-verified') -Value 'proxy'
+
+      # THE GATE MUST HAVE RUN, not merely not failed. Each check above is
+      # selected by `matrix.isolation`, so a row carrying a value none of them
+      # matches would skip all three and arrive at the publish below having
+      # proved nothing - a green job that checked an artifact it never
+      # executed, which is the exact shape this file removes everywhere else.
+      # The sentinel is written by the check itself, as its last act, so
+      # "an artifact was verified" and "a step ran" cannot come apart.
+      - name: A check actually ran
+        shell: bash
+        env:
+          ISOLATION: ${{ matrix.isolation }}
+        run: |
+          set -euo pipefail
+          if [ ! -f offline-verified ]; then
+            echo "::error::no offline check ran for isolation='${ISOLATION}'; this job was about to publish an artifact nothing executed"
+            exit 1
+          fi
+          echo "verified under isolation: $(cat offline-verified)"
+
+      # ONLY reached when every step above passed, because nothing here is
+      # `if: always()`. This rename is the gate's whole enforcement mechanism.
+      - name: Publish the verified artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: binaries-${{ matrix.name }}
+          path: dist-bin/
+          if-no-files-found: error
+          retention-days: 5
+
   release:
     name: Attach to release
-    needs: build
-    # Runs even when a build leg failed, deliberately. `needs: build` alone
-    # SKIPS this job on any leg failure, which throws away every binary that did
-    # build: vaultspec-core-v0.1.61 had four green legs - windows, both macOS,
-    # and linux-x86_64 - and published zero assets because linux-aarch64 could
-    # not initialise its container. Four working artifacts were discarded to
-    # punish a fifth.
+    # `offline`, not `build`: this job attaches `binaries-*`, and that name is
+    # now produced by the offline gate rather than by the compile. Depending on
+    # `build` would let a release attach an artifact whose gate had not
+    # finished.
+    needs: offline
+    # Runs even when a leg failed, deliberately. `needs:` alone SKIPS this job
+    # on any leg failure, which throws away every binary that did build:
+    # vaultspec-core-v0.1.61 had four green legs - windows, both macOS, and
+    # linux-x86_64 - and published zero assets because linux-aarch64 could not
+    # initialise its container. Four working artifacts were discarded to punish
+    # a fifth.
     #
     # Attaching a partial set is coherent with how this repo already treats a
     # half-built matrix: dev/packaging omits an unbuilt platform from the
@@ -340,6 +750,12 @@ jobs:
     # stay truthful about a partial release. What must NOT happen is a partial
     # release going green, so the completeness check below fails the job AFTER
     # the assets are up.
+    #
+    # This is also what makes the offline gate enforcing rather than advisory.
+    # A leg that fails it uploads no `binaries-*` artifact at all, so the
+    # download below cannot see it, the release cannot carry it, and the
+    # completeness check reports the release as partial - without this job
+    # needing to know that an offline gate exists.
     if: ${{ !cancelled() }}
     runs-on: [self-hosted, Linux, X64, build]
     permissions:
