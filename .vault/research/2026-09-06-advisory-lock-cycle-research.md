@@ -5,7 +5,7 @@ tags:
 date: '2026-09-06'
 modified: '2026-09-06'
 body_schema: 'body-v2'
-body_hash: 'sha256:d75637dbd7063967c924cbb8172f9c171ba62a04437cb84fccfd40df7de85017'
+body_hash: 'sha256:48f78b0306a3582cd7e7160e7e5e9ecc836686da288c022343af03aac6399a1c'
 related: []
 ---
 
@@ -46,7 +46,8 @@ taken twice.
 
 ### vaultspec-core#451 removes the index-to-manifest edge
 
-Verified against that branch's source at commit `bb2d7cef`. Its `scan_vault` imports
+Verified against that branch's source at commit `bb2d7cef`, before it merged; the
+finding is unchanged on main, where the same code now sits. Its `scan_vault` imports
 and calls `warn_if_pending` rather than `run_pending_migrations`
 (`vaultcore/scanner.py:62-64`), and `warn_if_pending` resolves the workspace, reads the
 manifest through `migration_status`, and returns names - it takes no advisory lock and
@@ -68,7 +69,7 @@ advisory lock and ahead of the write they protect: `cli/vault_cmd.py:294` before
 the MCP `create` tool's first write.
 
 That is a property of where the author put them, not a property anything enforces. No
-test on that branch asserts it.
+test on that branch asserted it.
 
 ### The manifest-to-docs edge is untouched and correct
 

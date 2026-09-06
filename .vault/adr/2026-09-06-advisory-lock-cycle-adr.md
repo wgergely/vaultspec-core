@@ -5,7 +5,7 @@ tags:
 date: '2026-09-06'
 modified: '2026-09-06'
 body_schema: 'body-v2'
-body_hash: 'sha256:06c47d9503436cbf8d049b4d59d037197723410bf80e373e20a37c7ae57c8aed'
+body_hash: 'sha256:109f1734630814dde04dbb24792698885c87b7d282733d6fc1bed02fb25b445f'
 related:
   - "[[2026-09-06-advisory-lock-cycle-research]]"
   - "[[2026-08-13-plan-mutation-concurrency-adr]]"
@@ -30,10 +30,12 @@ planning happens to populate before the transaction opens
 to its status. It is documented under "Performance", its invalidator is exported in
 `__all__`, and one public call re-arms a permanent hang with nothing anywhere saying so.
 
-A decision is needed now because the cycle's most important edge is being moved for
-unrelated reasons in vaultspec-core#451, and because the same registry entry is the
-subject of vaultspec-core#458. This record settles only how the cycle is broken. It does
-not settle whether authoring verbs may run destructive migrations at all, which is
+vaultspec-core#451 has since merged, which moved that middle edge for unrelated
+reasons and, as a side effect, cut the cycle. That changes what this record is for. It is
+no longer choosing between two unbuilt options: one of them is on main. What remains to
+be settled is whether that state is the intended resolution and what keeps it true, and
+whether the alternative - a reentrant lock - should be reconsidered. This record does not
+settle whether authoring verbs may run destructive migrations at all, which is
 vaultspec-core#458's question.
 
 ## Considerations
@@ -42,14 +44,16 @@ vaultspec-core#458's question.
   manifest (`2026-09-06-advisory-lock-cycle-research`).
 - The property that prevents it is a performance memo whose invalidator is public API
   (`src/vaultspec_core/migrations/__init__.py:389-393`).
-- vaultspec-core#451 removes the index-to-manifest edge, verified by executing the same
-  composition against its branch rather than by reading it
+- vaultspec-core#451, now merged, removes the index-to-manifest edge, verified by
+  executing the same composition rather than by reading it
   (`2026-09-06-advisory-lock-cycle-research`).
 - vaultspec-core#451 does not remove the manifest-to-docs edge, and should not:
   `exec_ledger_only` rewrites vault documents (`src/vaultspec_core/vaultcore/exec_fold.py:405`).
-- vaultspec-core#451's three convergence call sites all sit outside every advisory lock,
-  by their author's placement rather than by any enforced property
-  (`2026-09-06-advisory-lock-cycle-research`).
+- The three convergence call sites all sit outside every advisory lock, by their
+  author's placement rather than by any enforced property
+  (`2026-09-06-advisory-lock-cycle-research`). That gap is now closed by
+  `TestNoLockHolderReachesTheMigrationRegistry`, which fails with a docs-domain
+  timeout if the read path regains the ability to run the registry.
 - The rename path takes no convergence hook on either branch, so with the edge cut a
   feature rename against a stale workspace proceeds under a legacy layout rather than
   deadlocking (`src/vaultspec_core/vaultcore/query_rename_apply.py:296`).
@@ -60,12 +64,12 @@ vaultspec-core#458's question.
 
 ## Considered options
 
-- **Hoist the migration trigger out of `VaultGraph`/`scan_vault`.** Cuts the
-  `index to manifest` edge, so no lock-holding caller can transitively reach the
-  registry. Already implemented by vaultspec-core#451 for a different reason, and
-  verified above to close the cycle as a side effect. Cost: the safety is positional,
-  so it holds only while every future convergence call site stays outside every lock,
-  and nothing enforces that.
+- **Hoist the migration trigger out of `VaultGraph`/`scan_vault`.** Chosen, and
+  already on main: vaultspec-core#451 implemented it for a different reason and
+  verified above to close the cycle as a side effect. No lock-holding caller can
+  transitively reach the registry. Its one weakness - the safety was positional, held
+  only by where three calls happen to sit - is answered by the containment test rather
+  than left standing.
 - **Make `advisory_lock` reentrant per (thread, sentinel).** Removes the deadlock for
   every cycle at once, present and future, rather than for this one. Rejected as the
   primary remedy: reentrancy does not make the re-entered critical section correct. The
@@ -88,9 +92,10 @@ vaultspec-core#458's question.
 
 ## Constraints
 
-vaultspec-core#451 is open, not merged. Everything this record recommends is
-conditional on it landing; if it is closed unmerged, the `index to manifest` edge
-returns and the first option has to be implemented independently.
+vaultspec-core#451 has merged, so nothing this record recommends is conditional on it
+any longer. What was a recommendation to adopt an open pull request is now a
+recommendation to keep what main already does, which is a weaker claim on a maintainer
+and a stronger one on the test suite.
 
 vaultspec-core#458 is an open maintainer decision on whether authoring verbs may run
 destructive migrations at all. It can only narrow the set of callers that reach
@@ -117,14 +122,22 @@ workspace with no `.vault/data` runs unprotected and says so only under `--debug
 
 ## Implementation
 
-Nothing is implemented by this record. The recommendation is to adopt vaultspec-core#451
-as the resolution of this cycle and to add the enforcement it lacks.
+The architectural change is not implemented by this record; it arrived with
+vaultspec-core#451. What this record's own change set adds is the enforcement that
+change lacked, because a property holding by inspection is one refactor away from not
+holding, and this cycle is the demonstration of how long that can go unnoticed.
 
-The enforcement is a lock-graph containment test in the spirit of the existing sentinel
-policy suite: acquire each sentinel family in turn, run the authoring surfaces under it,
-and fail if any of them reaches `run_pending_migrations`. Stated as a property rather
-than as a list of call sites, so a convergence hook added to a future surface is caught
-by the same assertion instead of needing to be remembered.
+The enforcement is a lock-graph containment test: hold the docs-domain sentinel as a
+rename transaction does, clear the per-process memo that hides the cycle, and regenerate
+a feature index as step (7) does. It passes on main and fails two ways on a tree where
+the read path runs the registry - a docs-domain timeout on the cycle itself, and a
+pending migration that a read silently applied. Stated as a property of the read path
+rather than as a list of call sites, so a convergence hook added to a future surface is
+caught by the same assertion instead of needing to be remembered.
+
+The two halves depend on each other more than they look. Without the bounded budget the
+containment test would hang rather than fail, which is no test at all; without the test
+the budget only reports the next cycle after it ships.
 
 The bounded acquisition budget stays as the backstop underneath both. It is what turns
 the next cycle - in a call graph nobody has walked yet - into a report naming the
@@ -147,19 +160,19 @@ failure - the lock would be doing nothing where it currently does something, and
 it silently. Cutting the edge removes the re-entry instead of permitting it, and leaves
 every sentinel meaning what it says.
 
-The evidence favours the same option for a second reason: the work is done. The
-composition that hangs on `origin/main` completes on vaultspec-core#451's branch
+The evidence favours the same option for a second reason: the work is done and in
+service. The composition that hung before vaultspec-core#451 completes after it
 (`2026-09-06-advisory-lock-cycle-research`), so the recommended change has been executed
-and observed rather than designed. Choosing reentrancy would mean re-opening a resolved
-edge in order to permit it.
+and observed rather than designed. Choosing reentrancy now would mean re-opening a
+resolved edge in order to permit re-entering it.
 
-The honest weakness is that the resulting safety is positional. Nothing in
+The honest weakness was that the resulting safety is positional. Nothing in
 vaultspec-core#451 stops a future caller putting `ensure_migrated` inside a lock; the
-three current call sites are outside every lock because their author put them there.
-That is why the recommendation is vaultspec-core#451 plus a containment test, not
-vaultspec-core#451 alone. A property that holds by inspection today is one refactor away
-from not holding, and this cycle is the demonstration of how long such a property can be
-wrong before anyone notices.
+three call sites are outside every lock because their author put them there. That is why
+the recommendation is vaultspec-core#451 plus a containment test, not vaultspec-core#451
+alone, and why the test ships with this record rather than after it. A property that
+holds by inspection today is one refactor away from not holding, and this cycle is the
+demonstration of how long such a property can be wrong before anyone notices.
 
 ## Consequences
 

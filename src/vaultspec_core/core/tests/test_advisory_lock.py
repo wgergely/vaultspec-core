@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+import vaultspec_core
 from vaultspec_core.core.exceptions import (
     AdvisoryLockTimeoutError,
     VaultSpecError,
@@ -779,6 +780,233 @@ class TestTimeoutDoesNotBreakLegitimateBlocking:
 
         assert not errors, f"the budget fired on legitimate contention: {errors}"
         assert json.loads(target.read_text())["counter"] == n_threads * 10
+
+
+@pytest.mark.unit
+class TestTheBudgetIsPerAcquisitionNotPerPass:
+    """A corpus-scale fix pass must not spend the budget by being large (#457).
+
+    Since #474, every `check --fix` / `repair` writer wraps its read-modify-
+    write in `document_write_lock`, so a full-corpus pass now takes one
+    advisory lock per document. If the budget were consumed by the pass rather
+    than by each acquisition, a large vault would start timing out simply for
+    being large - trading the latent deadlock for a live failure on the
+    project's own repository, which is the worst possible outcome of adding a
+    timeout.
+
+    It cannot, because each acquisition gets its own deadline and each critical
+    section is a single file's read, transform and write on a sentinel unique
+    to that document. This pins that by construction rather than by argument:
+    the whole pass runs under a budget 24 times smaller than the shipped
+    default, so any single acquisition that came close to the real budget would
+    raise here.
+    """
+
+    def test_a_full_fix_pass_completes_under_a_fraction_of_the_budget(
+        self, tmp_path: Path
+    ) -> None:
+        from vaultspec_core.config import reset_config
+        from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+        from vaultspec_core.vaultcore.repair import run_repair_pipeline
+
+        document_count = 250
+        WorkspaceFactory(tmp_path).install("claude")
+        research = tmp_path / ".vault" / "research"
+        research.mkdir(parents=True, exist_ok=True)
+        for index in range(document_count):
+            # A stale `modified:` stamp is what makes the fix pass rewrite the
+            # file, so every document costs one real locked read-modify-write
+            # rather than being skipped as already clean.
+            (research / f"2026-01-01-corpus-{index:05d}-research.md").write_text(
+                "---\ntags:\n  - '#research'\n  - '#corpus'\n"
+                "date: '2026-01-01'\nmodified: '2026-01-01'\n"
+                "body_schema: 'body-v1'\nrelated: []\n---\n\n"
+                f"# `corpus` research: `document {index}`\n\n"
+                "Lead prose for the document.\n\n"
+                "## Findings\n\n### A finding\n\nProse.\n\n"
+                "## Sources\n\n- `src/vaultspec_core/core/helpers.py`\n",
+                encoding="utf-8",
+            )
+
+        name = "VAULTSPEC_LOCK_TIMEOUT_SECONDS"
+        previous = os.environ.get(name)
+        os.environ[name] = "5"
+        reset_config()
+        try:
+            run = run_repair_pipeline(tmp_path)
+        finally:
+            if previous is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = previous
+            reset_config()
+
+        # The pass must actually have written under the locks; a pipeline that
+        # found nothing to fix would prove nothing about acquisition cost.
+        assert len(run.changed_files) >= document_count, (
+            f"only {len(run.changed_files)} documents were rewritten; the pass "
+            "did not exercise the per-document lock at corpus scale"
+        )
+
+
+_CYCLE_FEATURE = "demo"
+_CYCLE_FOLDER = "2026-05-17-demo"
+_CYCLE_PLAN_STEM = "2026-05-17-demo-plan"
+
+
+def _workspace_with_a_pending_fold(root: Path) -> None:
+    """Build a workspace one release behind, with a foldable execution record.
+
+    The migration must be genuinely pending and genuinely have work to do:
+    `exec_ledger_only` returns before taking any lock when it finds nothing to
+    fold, so a workspace without a per-Step record would make the containment
+    test below pass vacuously.
+
+    Args:
+        root: Directory to install the workspace into.
+    """
+    from vaultspec_core.core.manifest import read_manifest_data, write_manifest_data
+    from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+    WorkspaceFactory(root).install("claude")
+
+    # The docs-domain sentinel only exists as a real lock once `.vault/data/`
+    # does; without it `advisory_lock` skips and the cycle cannot close.
+    (root / ".vault" / "data").mkdir(parents=True, exist_ok=True)
+
+    templates = root / ".vaultspec" / "templates"
+    templates.mkdir(parents=True, exist_ok=True)
+    builtin = (
+        pathlib.Path(vaultspec_core.__file__).parent
+        / "builtins"
+        / "templates"
+        / "exec-ledger.md"
+    )
+    (templates / "exec-ledger.md").write_text(
+        builtin.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+
+    plan_dir = root / ".vault" / "plan"
+    plan_dir.mkdir(parents=True, exist_ok=True)
+    (plan_dir / f"{_CYCLE_PLAN_STEM}.md").write_text(
+        "---\ntags:\n  - '#plan'\n  - '#demo'\ndate: '2026-05-17'\n"
+        "modified: '2026-05-17'\ntier: L2\nrelated: []\n---\n\n"
+        "# `demo` plan\n\n## Description\n\nProse.\n\n"
+        "### Phase `P01` - one\n\n"
+        "- [x] `P01.S01` - first; `src/foo.py`.\n\n"
+        "## Parallelization\n\nProse.\n\n## Verification\n\nProse.\n",
+        encoding="utf-8",
+    )
+
+    folder = root / ".vault" / "exec" / _CYCLE_FOLDER
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / f"{_CYCLE_FOLDER}-P01-S01.md").write_text(
+        "---\ntags:\n  - '#exec'\n  - '#demo'\ndate: '2026-05-17'\n"
+        "body_schema: 'body-v1'\nstep_id: 'S01'\nrelated:\n"
+        f"  - '[[{_CYCLE_PLAN_STEM}]]'\n---\n\n# did a thing\n\n"
+        "## Scope\n\n- `src/foo.py`\n\n## Description\n\nProse.\n",
+        encoding="utf-8",
+    )
+
+    mdata = read_manifest_data(root)
+    mdata.vaultspec_version = "0.1.73"
+    write_manifest_data(root, mdata)
+
+
+@pytest.mark.unit
+class TestNoLockHolderReachesTheMigrationRegistry:
+    """The containment property that keeps the #457 cycle cut.
+
+    Three edges close a cycle across the docs, feature-index and manifest
+    sentinels. #451 cut the middle one - `scan_vault` no longer runs the
+    registry - and that is what stops a feature rename's step (7) deadlocking
+    on the docs-domain sentinel a `RenameTransaction` already holds.
+
+    Nothing enforces it. The three surfaces that legitimately converge
+    (`vault add`, `vault feature index`, the MCP `create` tool) call
+    `ensure_migrated` outside every lock because that is where their author
+    put it, and one refactor moving such a call inside a lock restores the
+    hang. This is the assertion that was missing while the cycle sat latent,
+    which is how it stayed wrong long enough to need an issue.
+
+    Stated as a property of the read path rather than as a list of call sites,
+    so a convergence hook added to a future surface is caught by the same
+    assertion instead of needing to be remembered.
+
+    This is the enforcement half of the ADR's recommendation. The decision it
+    guards - whether the edge stays cut by construction or the lock becomes
+    reentrant - remains proposed; this pins the behaviour main already has.
+    """
+
+    def test_a_graph_read_under_the_docs_lock_does_not_run_migrations(
+        self, tmp_path: Path
+    ) -> None:
+        """The exact composition that hangs without #451.
+
+        Hold the docs-domain sentinel as `RenameTransaction` does, clear the
+        per-process memo that hides the cycle, then regenerate a feature index
+        as step (7) does. On a tree where `scan_vault` still ran the registry
+        this never returns; the tight budget turns that into a failure this
+        test can report rather than a hung suite.
+        """
+        from vaultspec_core.config import get_config, reset_config
+        from vaultspec_core.migrations import list_pending, reset_workspace_cache
+        from vaultspec_core.vaultcore.index import generate_feature_index_result
+        from vaultspec_core.vaultcore.rename_engine import docs_lock_target
+
+        _workspace_with_a_pending_fold(tmp_path)
+        assert "exec_ledger_only" in {m.name for m in list_pending(tmp_path)}, (
+            "the fixture no longer leaves a migration pending, so this test "
+            "would pass without exercising the registry edge at all"
+        )
+
+        # Defeat the short-circuit that holds the cycle shut in practice. The
+        # whole point of #457 is that this is a public call on a cache
+        # documented as a performance optimisation.
+        reset_workspace_cache()
+
+        name = "VAULTSPEC_LOCK_TIMEOUT_SECONDS"
+        previous = os.environ.get(name)
+        os.environ[name] = "10"
+        reset_config()
+        try:
+            docs_dir = tmp_path / get_config().docs_dir
+            with advisory_lock(docs_lock_target(docs_dir)):
+                result = generate_feature_index_result(tmp_path, _CYCLE_FEATURE)
+        finally:
+            if previous is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = previous
+            reset_config()
+
+        assert result.path.exists()
+
+    def test_the_read_left_the_pending_migration_unrun(self, tmp_path: Path) -> None:
+        """Why the edge is cut, not merely ordered differently.
+
+        Completing without deadlock would also be satisfied by a read that ran
+        the migration before taking the index lock. It does not: the registry
+        deletes and relocates tracked documents, so a read must leave the
+        workspace as it found it and the entry must still be pending
+        afterwards. That is the property the cut depends on.
+        """
+        from vaultspec_core.migrations import list_pending, reset_workspace_cache
+        from vaultspec_core.vaultcore.index import generate_feature_index_result
+
+        _workspace_with_a_pending_fold(tmp_path)
+        record = (
+            tmp_path / ".vault" / "exec" / _CYCLE_FOLDER / f"{_CYCLE_FOLDER}-P01-S01.md"
+        )
+        assert record.exists()
+
+        reset_workspace_cache()
+        generate_feature_index_result(tmp_path, _CYCLE_FEATURE)
+
+        assert "exec_ledger_only" in {m.name for m in list_pending(tmp_path)}, (
+            "a read converged the workspace; the registry edge is back"
+        )
+        assert record.exists(), "a read folded and unlinked a tracked execution record"
 
 
 @pytest.mark.unit
