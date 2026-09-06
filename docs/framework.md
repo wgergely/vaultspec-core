@@ -25,33 +25,22 @@ For [Model Context Protocol (MCP)](MCP.md), edit the canonical JSON server defin
 Core merges Vaultspec-owned entries into enabled provider configurations and preserves
 unrelated entries.
 
-## How a feature flows into the vault
+<p id="how-a-feature-flows-into-the-vault"></p>
 
-You begin a pipeline with one request, and the framework drives five stages plus an
-optional code-grounding step. A skill runs each stage and writes a document to
-`.vault/`:
+## Workflow stages
 
-| Stage                                 | Skill                      | Writes to           |
-| ------------------------------------- | -------------------------- | ------------------- |
-| Research                              | `/vaultspec-research`      | `.vault/research/`  |
-| Reference *(alternative to Research)* | `/vaultspec-code-research` | `.vault/reference/` |
-| Decide                                | `/vaultspec-adr`           | `.vault/adr/`       |
-| Plan                                  | `/vaultspec-write`         | `.vault/plan/`      |
-| Execute                               | `/vaultspec-execute`       | `.vault/exec/`      |
-| Review                                | `/vaultspec-code-review`   | `.vault/audit/`     |
+Each stage has a skill for your coding agent:
+
+| Stage                        | Skill                      | Writes to           |
+| ---------------------------- | -------------------------- | ------------------- |
+| Research                     | `/vaultspec-research`      | `.vault/research/`  |
+| Code reference *(as needed)* | `/vaultspec-code-research` | `.vault/reference/` |
+| Decide                       | `/vaultspec-adr`           | `.vault/adr/`       |
+| Plan                         | `/vaultspec-write`         | `.vault/plan/`      |
+| Execute                      | `/vaultspec-execute`       | `.vault/exec/`      |
+| Review                       | `/vaultspec-code-review`   | `.vault/audit/`     |
 
 The `/vaultspec-*` names identify skills for your coding agent, not shell commands.
-
-Not every request enters the pipeline. The agent sizes the work first: a change that
-finishes in the current session, needs no handoff, stays in one package, and touches at
-most ten files is done directly, with one line saying no plan was needed. Work that
-outlives the session gets a plan; a decision that is costly to reverse (a dependency,
-schema, protocol, or public interface) gets an ADR at any size. The record types and
-their dependencies never change; sizing only decides which stages a feature enters.
-
-The agent runs the stages. Your part is two approvals, the ADR and the plan, and
-stepping in where judgment is needed: shaping the decision, sizing the plan, and
-deciding when work is done.
 
 ## Orient: see what is in flight
 
@@ -77,17 +66,17 @@ See the [status reference](CLI.md#vaultspec-core-status) for output details and 
 
 ## Begin a pipeline
 
-Tell your coding agent what to build, in plain language:
+Ask your coding agent to start research with a feature tag:
 
-> "Begin a vaultspec pipeline to implement full-text search for the API."
+> Use vaultspec-research to investigate adding full-text search to the API. Use the
+> feature tag search-api.
 
-To enter at one stage instead, invoke its skill directly, for example
-`/vaultspec-research`.
+Review the research before proceeding. Approve the ADR before planning, then approve the
+plan before implementation. Invoking a later skill directly doesn't waive its
+prerequisites.
 
-The agent stops to present the ADR and then the plan. Approving is a plain reply that
-names the record. To redirect, say what is wrong and it revises that stage's document
-rather than moving on, so a rejected research note gets rewritten before any decision is
-built on it.
+The agent may propose direct implementation for a small, single-file fix without
+architectural impact. It must explain the exception and obtain your approval first.
 
 ## Find a feature's documents
 

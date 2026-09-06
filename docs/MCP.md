@@ -4,7 +4,7 @@ The server exposes Vaultspec document and workflow tools to Model Context Protoc
 clients using JSON-RPC over standard input and output.
 
 For the workflow and document types, see
-[how a feature flows into the vault](./framework.md#how-a-feature-flows-into-the-vault).
+[workflow stages](./framework.md#workflow-stages).
 
 ## Setup
 
