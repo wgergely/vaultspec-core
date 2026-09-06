@@ -144,20 +144,11 @@ For the plan's structure and Step syntax, see [tiers](syntax.md#tiers) and
 
 ## Change a plan safely
 
-Structural changes go through `vaultspec-core vault plan`, not your editor, which is
-what keeps the `S##`, `P##`, and `W##` identifiers append-only: a removed step's
-identifier is retired and never reused, so a ledger row can never come to point at
-different work than it did when written.
+Use `vaultspec-core vault plan` to add, move, or remove Steps and their containers. Keep
+structural edits out of your text editor.
 
-```bash
-vaultspec-core vault plan step add     # append a step at the next canonical id
-vaultspec-core vault plan step insert  # place one relative to an existing step
-vaultspec-core vault plan step move    # re-parent or re-order
-vaultspec-core vault plan step remove  # retire an identifier
-vaultspec-core vault plan phase        # the same operations on phases
-```
-
-The full surface, including waves and epics, is in the [CLI reference](./CLI.md).
+Before reorganizing existing work, review the [identifier rules](syntax.md#identifiers).
+See [plan commands](CLI.md#vaultspec-core-vault-plan) for arguments and examples.
 
 ## Execute a plan
 
