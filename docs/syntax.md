@@ -132,32 +132,16 @@ code by locator instead, in backticks: `src/billing/retry.py:42`, commit `abc123
 Keep references one-way: vault documents cite code; source code must not cite vault
 documents.
 
-## Values you must never write by hand
+<p id="values-you-must-never-write-by-hand"></p>
 
-A hand-written value can disagree with the content it describes. A computed one cannot.
+## Generated metadata
 
-`modified` is a last-modified stamp, refreshed by every command that writes the
-document.
+The `modified-stamp` check compares the body against its stored `body_hash`, not
+filesystem timestamps. Without a stored hash, it can't detect an unstamped body edit.
 
-`body_hash` is a fingerprint of the body that `modified` attests. It appears in no
-template, because it cannot exist before the body it hashes. It is what makes an edit
-that skipped the tooling detectable: the `modified-stamp` check compares the live body
-against this value and never consults file timestamps.
-
-`body_schema` records which body structure the document follows, so the `body-sections`
-check knows which sections to require. New documents are written as `body-v2`.
-
-A ledger carries no `step_id`; each row's first cell holds the canonical identifier,
-`S01`, not the display path `P01.S01`.
-
-Edit a body outside the tooling without restamping, and the check says so:
-
-```
-! .vault/exec/2026-02-04-editor-demo/2026-02-04-editor-demo-S01.md
-  Stale modified stamp '2026-02-04'; the document body no longer matches its
-  attested fingerprint (unstamped edit).
-  fix: refresh to '2026-02-06' and re-attest the body
-```
+The `body-sections` check uses `body_schema` to check the document's sections. Newly
+scaffolded documents use `body-v2`. See
+[validation and repair](verification.md#check-records-before-committing).
 
 ## Template placeholders
 
