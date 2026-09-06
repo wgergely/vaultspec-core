@@ -89,25 +89,15 @@ this mode, `check` has no `fix` parameter.
 
 ### Install modes
 
-The canonical definition records the vaultspec package and module. vaultspec renders the
-launch command for the active install mode:
+For Core's generated MCP entry, the install mode determines how the server starts:
 
-- Tool mode, the default, uses `uvx --from ...` without adding vaultspec to the
-  project's dependencies. A companion may declare a dedicated tool requirement, extras
-  included: search renders `vaultspec-rag[gpu,mcp]`, which is what its installer writes
-  whichever extras you installed it with.
-- Dependency mode uses `uv run --no-sync ...` against the project's environment and
-  ships in built distributions.
-- Development mode also uses `uv run --no-sync ...`, but records a development-only
-  placement that does not ship in built distributions.
+- **Tool:** `uvx` uses an isolated tool environment and may download dependencies or
+  create that environment at launch. See
+  [uv's tool environments](https://docs.astral.sh/uv/concepts/tools/#tool-environments).
+- **Dev or dependency:** `uv run --no-sync` skips project environment synchronization.
+  Prepare that environment using your project's `uv sync` procedure before connecting.
 
-Every rendered launch is a static execution: connecting a client never installs,
-resolves, or repairs anything. Tool mode runs from `uvx`'s isolated cache and never
-touches the project's environment; dependency and development modes resolve the
-project's existing environment as-is - the `--no-sync` guard means a client connect
-never runs an implicit `uv sync`. If the environment is stale or broken, the connect
-fails with the underlying Python error instead of mutating shared state while other
-processes may hold it; repair it explicitly with `uv sync`, then reconnect.
+See [install mode selection](CLI.md#install) for precedence and dependency declarations.
 
 ### Convergence on upgrade
 
