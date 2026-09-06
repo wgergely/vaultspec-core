@@ -69,7 +69,8 @@ jobs:
           # otherwise. The default GITHUB_TOKEN CANNOT read `actions/runners` -
           # that endpoint needs admin - so without the PAT this check is blind
           # and says so rather than guessing.
-          GH_TOKEN: ${{ secrets.FLEET_PREFLIGHT_TOKEN || secrets.GITHUB_TOKEN }}
+          # NO FALLBACK. See the block below for why.
+          GH_TOKEN: ${{ secrets.FLEET_PREFLIGHT_TOKEN }}
           ALLOW_QUEUE: ${{ inputs.allow_queue }}
         run: |
           # NOT `set -e`. An unobservable preflight must not refuse a build: the
@@ -79,11 +80,18 @@ jobs:
           # cannot tell "no runner" from "cannot see runners" must not speak for
           # the first.
           set -uo pipefail
+          # UNOBSERVABLE IS A FAILURE, not a skip. GITHUB_TOKEN can NEVER read
+          # actions/runners - that endpoint needs Administration:read, which no
+          # `permissions:` value grants it - so the old fallback guaranteed a 403
+          # and the skip guaranteed a green job. A check that cannot observe its
+          # subject must fail, or it is not a check.
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::FLEET_PREFLIGHT_TOKEN is not set. This check needs a PAT with Administration:read."
+            exit 1
+          fi
           if ! runners=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runners" --jq '.runners[] | [.status, ([.labels[].name] | map(ascii_downcase) | join(","))] | @tsv' 2>&1); then
-            echo "::warning::preflight cannot read the runner list: ${runners}"
-            echo "::warning::The default GITHUB_TOKEN cannot read actions/runners. Set FLEET_PREFLIGHT_TOKEN to a PAT with administration:read to enable this check."
-            echo "::warning::SKIPPING - unobservable is not the same as unserviceable."
-            exit 0
+            echo "::error::preflight cannot read the runner list: ${runners}"
+            exit 1
           fi
           [ -n "${runners}" ] || { echo "::error::no self-hosted runners are registered"; exit 1; }
 
@@ -106,10 +114,10 @@ jobs:
           # that must be edited in lockstep with the matrix eventually is not,
           # and neither copy of the mistake was visible in review.
           #
-          # This matters more than it looks. The check is unarmed today -
-          # FLEET_PREFLIGHT_TOKEN does not exist, so every run takes the blind
-          # path above - which means the staleness is currently harmless and
-          # arming the token is exactly what would detonate it.
+          # This matters more than it looks. FLEET_PREFLIGHT_TOKEN was
+          # provisioned on 2026-09-06 and the blind path above is gone, so a
+          # stale selector list is no longer harmless - it is now load-bearing
+          # and will fail a build rather than being skipped past.
           workflow=".github/workflows/binaries.yml"
           [ -f "${workflow}" ] || { echo "::error::${workflow} not checked out; cannot derive selectors" >&2; exit 1; }
           mapfile -t selectors < <(awk -F'[][]' '/^[[:space:]]*runner:/ && NF > 2 {print $2}' "${workflow}" | tr -d ' ' | tr '[:upper:]' '[:lower:]' | sort -u)
