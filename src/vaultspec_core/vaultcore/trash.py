@@ -52,6 +52,7 @@ import datetime as _dt
 import logging
 import os
 import shutil
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -87,6 +88,20 @@ class SnapshotError(RuntimeError):
     delete: the whole point of the snapshot is that the deletion does not
     happen without it.
     """
+
+
+@dataclass(frozen=True)
+class _Entry:
+    """One copied document: where it landed, where it came from, how big.
+
+    The size is carried so a rolled-back capture can recompute the running
+    byte total from the entries that survived it, rather than by re-statting
+    files whose sources may already be gone.
+    """
+
+    copy: str
+    origin: str
+    size: int
 
 
 @dataclass(frozen=True)
@@ -154,7 +169,7 @@ class TrashWriter:
         self._label = label
         self._root: Path | None = None
         self._created = _dt.datetime.now().replace(microsecond=0)
-        self._entries: list[tuple[str, str]] = []
+        self._entries: list[_Entry] = []
         self._total_bytes = 0
 
     @property
@@ -181,6 +196,14 @@ class TrashWriter:
         short write from a full disk surfaces here rather than after the
         originals are gone.
 
+        Atomic per call. A failure rolls back only *this* call's copies and
+        leaves every earlier one in place. That distinction is the whole
+        safety property when a migration folds several folders through one
+        writer: the records of an earlier folder are already unlinked by the
+        time a later folder fails, so discarding the whole directory to
+        clean up would destroy the only remaining copy of documents that are
+        already gone from the vault.
+
         Args:
             paths: Documents that are about to be deleted.
 
@@ -195,34 +218,76 @@ class TrashWriter:
             return
 
         root = self._ensure_root()
-        for source in pending:
-            relative = self._relative_of(source)
-            destination = root / relative
-            try:
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source, destination)
-                copied = destination.stat().st_size
-                original = source.stat().st_size
-            except OSError as exc:
-                self._abandon()
-                raise SnapshotError(
-                    f"could not snapshot {source} to {destination}: {exc}"
-                ) from exc
-            if copied != original:
-                self._abandon()
-                raise SnapshotError(
-                    f"snapshot of {source} is {copied} bytes, expected {original}"
-                )
-            self._entries.append((relative.replace(os.sep, "/"), self._origin(source)))
-            self._total_bytes += original
+        committed = len(self._entries)
+        fresh: list[Path] = []
+        try:
+            self._copy_batch(root, pending, fresh)
+            self._write_index()
+        except SnapshotError:
+            self._rollback(fresh, committed)
+            raise
 
-        self._write_index()
         logger.info(
             "Snapshotted %d document(s) (%s) to %s",
             self.files,
             human_bytes(self._total_bytes),
             root,
         )
+
+    def _copy_batch(self, root: Path, pending: list[Path], fresh: list[Path]) -> None:
+        """Copy *pending* into *root*, recording each destination in *fresh*.
+
+        Args:
+            root: This writer's snapshot directory.
+            pending: Sources to copy, each known to be an existing file.
+            fresh: Accumulator the caller rolls back on failure; appended to
+                before each copy is attempted so a half-written destination
+                is still cleaned up.
+
+        Raises:
+            SnapshotError: On any copy or verification failure.
+        """
+        for source in pending:
+            relative = self._relative_of(source)
+            destination = root / relative
+            fresh.append(destination)
+            try:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
+                copied = destination.stat().st_size
+                original = source.stat().st_size
+            except OSError as exc:
+                raise SnapshotError(
+                    f"could not snapshot {source} to {destination}: {exc}"
+                ) from exc
+            if copied != original:
+                raise SnapshotError(
+                    f"snapshot of {source} is {copied} bytes, expected {original}"
+                )
+            self._entries.append(
+                _Entry(relative.replace(os.sep, "/"), self._origin(source), original)
+            )
+            self._total_bytes += original
+
+    def _rollback(self, fresh: list[Path], committed: int) -> None:
+        """Undo a failed capture, keeping everything captured before it.
+
+        Best effort by design: the caller is already aborting with a
+        :class:`SnapshotError` that explains why nothing was deleted, and a
+        cleanup error must not replace it.
+
+        Args:
+            fresh: Destinations this capture attempted.
+            committed: How many entries predated it.
+        """
+        for destination in fresh:
+            with suppress(OSError):
+                destination.unlink(missing_ok=True)
+        del self._entries[committed:]
+        self._total_bytes = sum(entry.size for entry in self._entries)
+        if self._root is not None and not self._entries:
+            shutil.rmtree(self._root, ignore_errors=True)
+            self._root = None
 
     def result(self) -> TrashSnapshot | None:
         """Return the completed snapshot, or ``None`` if nothing was copied."""
@@ -278,7 +343,7 @@ class TrashWriter:
         root = self._root
         if root is None:  # pragma: no cover - only reached after _ensure_root
             return
-        width = max((len(entry) for entry, _ in self._entries), default=0)
+        width = max((len(entry.copy) for entry in self._entries), default=0)
         lines = [
             "vaultspec-core snapshot",
             f"created:   {self._created.isoformat(sep=' ')}",
@@ -293,31 +358,16 @@ class TrashWriter:
             "",
         ]
         lines += [
-            f"  {entry.ljust(width)}  ->  {origin}"
-            for entry, origin in sorted(self._entries)
+            f"  {entry.copy.ljust(width)}  ->  {entry.origin}"
+            for entry in sorted(self._entries, key=lambda item: item.copy)
         ]
         lines.append("")
         try:
             (root / RESTORE_FILENAME).write_text("\n".join(lines), encoding="utf-8")
         except OSError as exc:
-            self._abandon()
             raise SnapshotError(
                 f"could not write {RESTORE_FILENAME} in {root}: {exc}"
             ) from exc
-
-    def _abandon(self) -> None:
-        """Drop a partial snapshot so a failed attempt leaves no half-copy.
-
-        Best effort by design: the caller is already aborting, and a
-        cleanup error must not replace the :class:`SnapshotError` that
-        explains why nothing was deleted.
-        """
-        if self._root is None:
-            return
-        shutil.rmtree(self._root, ignore_errors=True)
-        self._root = None
-        self._entries.clear()
-        self._total_bytes = 0
 
 
 def snapshot_paths(

@@ -157,8 +157,11 @@ class FoldOutcome:
 
     Attributes:
         ledger_path: The ledger the fold wrote, resolved even on a dry run.
-        snapshot: The pre-deletion snapshot of every removed record, or
-            ``None`` when the fold removed nothing.
+        snapshot: The snapshot writer's state after this fold, or ``None``
+            when nothing was removed. With a writer shared across several
+            folds - what a migration passes - this describes the whole
+            shared directory, not this fold's contribution to it, because
+            the directory is what an operator recovers from.
     """
 
     ledger_path: Path

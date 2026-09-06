@@ -132,23 +132,54 @@ class TestRefusesRatherThanDegrades:
 
         assert doc.read_bytes() == b"a\n"
 
-    def test_failure_leaves_no_partial_snapshot(self, tmp_path: Path) -> None:
+    def test_a_failed_first_capture_leaves_no_directory(self, tmp_path: Path) -> None:
+        """Nothing was committed, so the empty shell goes with the failure."""
         good = _doc(tmp_path, "exec/a.md", b"a\n")
-        # A directory where the second copy's file must go: `shutil.copy2`
-        # cannot write a file over a directory on any platform.
+        clash = _doc(tmp_path, "exec/b.md", b"b\n")
+        writer = TrashWriter(tmp_path, "probe")
+        # Resolve the directory so a destination inside it can be blocked
+        # before the first capture commits anything to it. A directory where
+        # a file must go defeats `shutil.copy2` on every platform.
+        root = writer._ensure_root()
+        (root / "exec" / "b.md").mkdir(parents=True)
+
+        with pytest.raises(SnapshotError):
+            writer.capture([good, clash])
+
+        assert not root.exists()
+        assert writer.result() is None
+        assert good.read_bytes() == b"a\n"
+        assert clash.read_bytes() == b"b\n"
+
+    def test_a_failed_capture_keeps_the_copies_taken_before_it(
+        self, tmp_path: Path
+    ) -> None:
+        """The invariant that stops a rollback from causing the loss.
+
+        A migration folding several folders through one writer has already
+        unlinked the earlier folder's records by the time a later folder
+        fails. Discarding the whole directory to tidy up would destroy the
+        only remaining copy of documents that are already gone.
+        """
+        good = _doc(tmp_path, "exec/a.md", b"a\n")
         clash = _doc(tmp_path, "exec/b.md", b"b\n")
         writer = TrashWriter(tmp_path, "probe")
         writer.capture([good])
         root = writer.root
         assert root is not None
+        good.unlink()  # what every caller does after a successful capture
         (root / "exec" / "b.md").mkdir(parents=True)
 
         with pytest.raises(SnapshotError):
             writer.capture([clash])
 
-        assert not root.exists(), "a failed capture must not leave a half-copy"
-        assert writer.result() is None
-        assert good.read_bytes() == b"a\n"
+        assert (root / "exec" / "a.md").read_bytes() == b"a\n", (
+            "a rollback must not destroy an earlier batch's backups"
+        )
+        snapshot = writer.result()
+        assert snapshot is not None
+        assert snapshot.files == 1
+        assert snapshot.total_bytes == 2
         assert clash.read_bytes() == b"b\n"
 
     def test_path_outside_the_workspace_is_refused(self, tmp_path: Path) -> None:
