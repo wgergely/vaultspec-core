@@ -123,10 +123,36 @@ def _render_preflight_phase(console: Console, phase: dict[str, Any]) -> None:
     pending = phase.get("pending_migrations", [])
     if pending:
         console.print(f"    pending migrations: {', '.join(pending)}")
+    _render_pending_deletions(console, phase)
     for migration in phase.get("applied_migrations", []):
         console.print(f"    applied migration: {migration['summary']}")
+    for snapshot in phase.get("snapshots", []):
+        console.print(f"    [dim]removed documents copied to {snapshot}[/dim]")
     if phase.get("message"):
         console.print(f"    [yellow]{phase['message']}[/yellow]")
+
+
+def _render_pending_deletions(console: Console, phase: dict[str, Any]) -> None:
+    """Warn about documents the pending migrations are about to remove.
+
+    Printed from the preflight section that was computed *before* the
+    migrations ran, so on a real repair this is a warning rather than a
+    post-mortem.
+    """
+    section: dict[str, Any] = phase.get("pending_deletions") or {}
+    if not section:
+        return
+    total: int = section.get("total", 0)
+    console.print(
+        f"    [yellow]pending migrations remove {total} document(s)[/yellow]; "
+        "copies are kept under .vault/.trash/"
+    )
+    items: list[str] = section.get("items", [])
+    for item in items:
+        console.print(f"      [red]-[/red] {item}")
+    returned: int = section.get("returned", 0)
+    if total > returned:
+        console.print(f"      [dim]... and {total - returned} more[/dim]")
 
 
 def _render_check_phase(

@@ -43,12 +43,16 @@ from .exec_ledger import (
     note_lines,
     parse_ledger_rows,
 )
+from .trash import TrashWriter
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
     from pathlib import Path
 
+    from .trash import TrashSnapshot
+
 __all__ = [
+    "FoldOutcome",
     "FoldPlan",
     "FoldSource",
     "SkippedRecord",
@@ -56,6 +60,7 @@ __all__ = [
     "collect_sources",
     "phase_steps_of",
     "plan_fold",
+    "removals_of",
     "scope_paths",
 ]
 
@@ -128,9 +133,36 @@ class FoldPlan:
         return not self.folded and not self.summaries
 
     @property
+    def recovers_content(self) -> bool:
+        """Whether the fold has anything to write in place of what it removes.
+
+        The precondition every removal shares. A fold that recovered no row
+        and no note leaves the ledger saying nothing about the records it
+        would unlink, so it must unlink none of them - the rule
+        :func:`_carries`, the summary retention in :func:`plan_fold`, and
+        :func:`removals_of` all state, and which is stated once here so they
+        cannot come to disagree.
+        """
+        return bool(self.rows or self.notes)
+
+    @property
     def removed(self) -> list[Path]:
         """Every record the fold removes: folded records and summaries."""
         return [*self.folded, *self.summaries]
+
+
+@dataclass(frozen=True)
+class FoldOutcome:
+    """What a fold wrote and what it backed up first.
+
+    Attributes:
+        ledger_path: The ledger the fold wrote, resolved even on a dry run.
+        snapshot: The pre-deletion snapshot of every removed record, or
+            ``None`` when the fold removed nothing.
+    """
+
+    ledger_path: Path
+    snapshot: TrashSnapshot | None
 
 
 def scope_paths(body: str) -> tuple[str, ...]:
@@ -218,7 +250,7 @@ def _carries(ledger_text: str, plan: FoldPlan) -> bool:
     ordering deliberately accepts; a containment gate completes it. A plan
     that recovered nothing carries nothing, so it backs no removal at all.
     """
-    if not plan.rows and not plan.notes:
+    if not plan.recovers_content:
         return False
     present = {line.strip() for line in ledger_text.splitlines() if line.strip()}
     return all(line.strip() in present for line in (*plan.rows, *plan.notes))
@@ -283,7 +315,7 @@ def plan_fold(
     # recovers nothing has nothing to write in place of the narrative it
     # would delete. Removing one then destroys hand-authored prose on a run
     # that leaves the ledger byte-identical, so the summary is retained.
-    carries_content = bool(plan.rows or plan.notes)
+    carries_content = plan.recovers_content
     covered_after = set(covered) | folded_ids
     for source in summaries:
         phase = _summary_phase(source.path.stem)
@@ -372,6 +404,33 @@ def collect_sources(
     return records, plan_stem, tuple(covered)
 
 
+def removals_of(plan: FoldPlan, ledger_path: Path | None = None) -> list[Path]:
+    """Return exactly the paths :func:`apply_fold` would unlink.
+
+    The single definition of the fold's destruction set, shared by the code
+    that deletes and by the code that previews the deletion, so a preview
+    cannot describe a different run from the one it precedes.
+
+    The pure half of the removal decision lives here so a preview can apply
+    it without a workspace: a plan that recovered nothing has nothing to
+    write in place of what it would delete, so it deletes nothing. The other
+    half - that the ledger on disk demonstrably carries what was recovered -
+    is checked in :func:`apply_fold`, and is true by construction whenever
+    its write succeeded, so the two agree on every path that completes.
+
+    Args:
+        plan: The decided fold.
+        ledger_path: The ledger the fold writes; never itself removed.
+            ``None`` from a preview, which has no reason to resolve it.
+
+    Returns:
+        The removal set, in plan order.
+    """
+    if not plan.recovers_content:
+        return []
+    return [path for path in plan.removed if path != ledger_path]
+
+
 def apply_fold(
     root_dir: Path,
     plan: FoldPlan,
@@ -380,13 +439,24 @@ def apply_fold(
     folder_date: str,
     plan_stem: str,
     dry_run: bool = False,
-) -> Path:
+    trash: TrashWriter | None = None,
+) -> FoldOutcome:
     """Write *plan* to the feature's ledger and remove the folded records.
 
     Records are removed only after the ledger carrying their content is
-    durably on disk, so an interruption leaves duplication rather than loss,
-    and only once that ledger is confirmed to carry every row and note the
-    plan recovered. A plan that recovered nothing removes nothing.
+    durably on disk, so an interruption leaves duplication rather than loss;
+    only once that ledger is confirmed to carry every row and note the plan
+    recovered; and only after a byte-identical copy of each of them is in
+    ``.vault/.trash/``, so an operator who disagrees with the fold can get
+    them back whether or not they were committed. A plan that recovered
+    nothing removes nothing, and nothing it declines to remove is
+    snapshotted: a trash directory holding files that still exist in the
+    vault would erode trust in every directory beside it.
+
+    A snapshot that cannot be written raises
+    :class:`~vaultspec_core.vaultcore.trash.SnapshotError` here, before the
+    first unlink, leaving the ledger written and every record intact: the
+    fold then re-runs to the same result rather than deleting unbacked.
 
     Args:
         root_dir: Project root directory.
@@ -395,9 +465,16 @@ def apply_fold(
         folder_date: The exec folder's date segment (the plan's date).
         plan_stem: The parent plan's stem for the ledger's ``related:``.
         dry_run: Resolve the ledger path without writing or removing.
+        trash: Snapshot writer to record the removals in. Pass one to
+            collect several folds into a single snapshot directory; the
+            default gives this fold its own.
 
     Returns:
-        The ledger's path.
+        The :class:`FoldOutcome` naming the ledger and the snapshot.
+
+    Raises:
+        SnapshotError: When the removals cannot be snapshotted. Nothing is
+            deleted.
     """
     import datetime as _dt
 
@@ -421,6 +498,12 @@ def apply_fold(
     binding = ExecBinding(plan=parent, ledger=True)
     fields = TemplateFields()
 
+    # Constructing the writer touches nothing: it resolves its directory on
+    # the first capture, so a fold that removes nothing leaves no trace. It
+    # is bound here so every exit reports the same snapshot state - which
+    # for a shared writer is the whole directory, not this fold's share.
+    writer = trash if trash is not None else TrashWriter(root_dir, "exec_fold")
+
     ledger_path = create_vault_doc(
         root_dir,
         identity,
@@ -429,7 +512,7 @@ def apply_fold(
         write=WritePolicy(force=True, dry_run=True),
     )
     if dry_run or plan.is_empty:
-        return ledger_path
+        return FoldOutcome(ledger_path=ledger_path, snapshot=writer.result())
 
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     with advisory_lock(docs_lock_target(ledger_path.parents[2])):
@@ -447,12 +530,20 @@ def apply_fold(
             atomic_write(ledger_path, refresh_modified_stamp(updated, _dt.date.today()))
         carried = _carries(ledger_path.read_text(encoding="utf-8"), plan)
 
-    # A record is unlinked only once the ledger is on disk carrying what the
-    # fold recovered from it. No file is ever removed on a path where the
-    # write meant to preserve its content was skipped or fell short.
+    # Containment first, snapshot second, unlink last. A record is unlinked
+    # only once the ledger is on disk carrying what the fold recovered from
+    # it - no file is removed on a path where the write meant to preserve
+    # its content was skipped or fell short - and the copy is taken only for
+    # records that are then actually removed.
     if not carried:
-        return ledger_path
-    for path in plan.removed:
-        if path != ledger_path:
-            path.unlink(missing_ok=True)
-    return ledger_path
+        return FoldOutcome(ledger_path=ledger_path, snapshot=writer.result())
+
+    # Snapshot outside the docs lock. `advisory_lock` is not reentrant and
+    # the writer takes no lock of its own - it owns a directory named for
+    # the instant that created it, so there is nothing to serialise.
+    removed = removals_of(plan, ledger_path)
+    writer.capture(removed)
+
+    for path in removed:
+        path.unlink(missing_ok=True)
+    return FoldOutcome(ledger_path=ledger_path, snapshot=writer.result())

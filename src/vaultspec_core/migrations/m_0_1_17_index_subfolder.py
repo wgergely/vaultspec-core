@@ -32,9 +32,69 @@ from . import Migration, MigrationError, MigrationResult
 if TYPE_CHECKING:
     from pathlib import Path
 
-__all__ = ["MIGRATION", "migrate"]
+__all__ = ["MIGRATION", "migrate", "preview"]
 
 logger = logging.getLogger(__name__)
+
+_NAME = "index_subfolder"
+
+
+def _legacy_indexes(workspace: Path) -> tuple[list[Path], Path]:
+    """Return every misplaced ``*.index.md`` and the canonical index folder.
+
+    The single definition of what this migration considers, so
+    :func:`preview` reports the same candidates :func:`migrate` acts on.
+    """
+    from ..config import get_config
+
+    cfg = get_config()
+    docs_dir = workspace / cfg.docs_dir
+    index_dir = docs_dir / cfg.index_dir
+    if not docs_dir.is_dir():
+        return [], index_dir
+
+    legacy_files: list[Path] = []
+    for item in sorted(docs_dir.rglob("*.index.md")):
+        if item.parent == index_dir:
+            continue
+        if item.is_symlink():
+            # `rglob` does not descend THROUGH a symlinked directory, but a
+            # symlinked FILE still satisfies `is_file()` because that call
+            # follows the link. Adopting one would relocate whatever it
+            # points at into `.vault/index/` - either by copying its bytes
+            # or by moving the link itself - and the index directory is read
+            # back into an agent's context, so a migration would become the
+            # step that pulls outside content in. A generated feature index
+            # is never a link; skip it and say so.
+            logger.warning(
+                "Migration index_subfolder: skipping symlinked index %s; "
+                "a generated feature index is always a regular file",
+                item,
+            )
+            continue
+        if item.is_file():
+            legacy_files.append(item)
+    return legacy_files, index_dir
+
+
+def preview(workspace: Path) -> list[Path]:
+    """Return every index this migration would delete rather than relocate.
+
+    A legacy index whose canonical counterpart does not yet exist is
+    *moved*, so its content survives and it is not a deletion. One that
+    collides with an existing canonical index is deleted outright, because
+    a generated index is a derived artifact and the migration must never
+    force manual conflict resolution over one. Only the second kind is
+    reported here, and only that kind is snapshotted.
+
+    Args:
+        workspace: Workspace root directory.
+
+    Returns:
+        The deletion set in execution order.
+    """
+    legacy_files, index_dir = _legacy_indexes(workspace)
+    return [item for item in legacy_files if (index_dir / item.name).exists()]
 
 
 def migrate(workspace: Path) -> MigrationResult:
@@ -84,40 +144,21 @@ def migrate(workspace: Path) -> MigrationResult:
     """
     from ..config import get_config
     from ..vaultcore.checks.structure import ensure_index_directory_tag
+    from ..vaultcore.trash import SnapshotError, TrashWriter
 
     cfg = get_config()
     docs_dir = workspace / cfg.docs_dir
     counts = {"moved": 0, "tagged": 0, "removed": 0}
     if not docs_dir.is_dir():
         return MigrationResult(
-            name="index_subfolder",
+            name=_NAME,
             target_version="0.1.17",
             summary="no .vault/ directory; nothing to migrate",
             counts=counts,
         )
 
-    index_dir = docs_dir / cfg.index_dir
-    legacy_files: list[Path] = []
-    for item in sorted(docs_dir.rglob("*.index.md")):
-        if item.parent == index_dir:
-            continue
-        if item.is_symlink():
-            # `rglob` does not descend THROUGH a symlinked directory, but a
-            # symlinked FILE still satisfies `is_file()` because that call
-            # follows the link. Adopting one would relocate whatever it
-            # points at into `.vault/index/` - either by copying its bytes
-            # or by moving the link itself - and the index directory is read
-            # back into an agent's context, so a migration would become the
-            # step that pulls outside content in. A generated feature index
-            # is never a link; skip it and say so.
-            logger.warning(
-                "Migration index_subfolder: skipping symlinked index %s; "
-                "a generated feature index is always a regular file",
-                item,
-            )
-            continue
-        if item.is_file():
-            legacy_files.append(item)
+    trash = TrashWriter(workspace, _NAME)
+    legacy_files, index_dir = _legacy_indexes(workspace)
     if not legacy_files:
         return MigrationResult(
             name="index_subfolder",
@@ -139,6 +180,14 @@ def migrate(workspace: Path) -> MigrationResult:
         assert_within(docs_dir, target)
 
         if target.exists():
+            # A generated duplicate still carries whatever an operator may
+            # have hand-edited into it, so it is copied out before it goes.
+            try:
+                trash.capture([legacy])
+            except SnapshotError as exc:
+                raise MigrationError(
+                    f"{_NAME}: refusing to remove {legacy} without a backup: {exc}"
+                ) from exc
             try:
                 legacy.unlink()
             except OSError as exc:
@@ -194,16 +243,19 @@ def migrate(workspace: Path) -> MigrationResult:
             f"{'duplicate' if removed_count == 1 else 'duplicates'})"
         )
 
+    snapshot = trash.result()
     return MigrationResult(
-        name="index_subfolder",
+        name=_NAME,
         target_version="0.1.17",
         summary=summary,
         counts=counts,
+        snapshot=str(snapshot.root) if snapshot is not None else None,
     )
 
 
 MIGRATION = Migration(
     target_version="0.1.17",
-    name="index_subfolder",
+    name=_NAME,
     migrate=migrate,
+    preview=preview,
 )

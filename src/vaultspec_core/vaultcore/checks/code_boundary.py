@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from ..exclusions import is_excluded_vault_path
 from ._base import CheckDiagnostic, CheckResult, Severity
 
 if TYPE_CHECKING:
@@ -105,7 +106,7 @@ def _collect_needles(root_dir: Path, feature: str | None) -> set[str]:
         return needles
 
     for path in docs_dir.rglob("*.md"):
-        if ".obsidian" in path.parts or "_archive" in path.parts:
+        if is_excluded_vault_path(path):
             continue
         if path.is_symlink() or not path.is_file():
             continue

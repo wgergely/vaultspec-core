@@ -60,6 +60,7 @@ See also:
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from . import Migration, MigrationError, MigrationResult
@@ -67,7 +68,9 @@ from . import Migration, MigrationError, MigrationResult
 if TYPE_CHECKING:
     from pathlib import Path
 
-__all__ = ["MIGRATION", "migrate"]
+    from ..vaultcore.exec_fold import FoldPlan
+
+__all__ = ["MIGRATION", "migrate", "preview"]
 
 logger = logging.getLogger(__name__)
 
@@ -91,51 +94,47 @@ def _plan_stem_from(related: object, fallback: str) -> str:
     return fallback
 
 
-def migrate(workspace: Path) -> MigrationResult:
-    """Fold every feature's per-Step execution records into one ledger each.
+@dataclass(frozen=True)
+class _FolderFold:
+    """One exec folder's decided fold, before anything is written."""
+
+    folder_name: str
+    plan_stem: str
+    feature: str
+    plan: FoldPlan
+    current: int
+
+
+def _plan_folders(workspace: Path) -> list[_FolderFold]:
+    """Decide every folder's fold without writing or removing anything.
+
+    The whole decision the migration makes, in one read-only pass, so
+    :func:`migrate` and :func:`preview` cannot disagree about which records
+    are legacy shape and which are legitimate current-schema documents.
 
     Args:
         workspace: Workspace root directory.
 
     Returns:
-        :class:`MigrationResult` whose ``counts`` carry ``folders`` (feature
-        folders consolidated), ``folded`` (records removed), ``rows`` (ledger
-        rows written), ``notes`` (note lines carried), ``paths`` (scope paths
-        recovered), and ``skipped`` (records deliberately left intact).
+        One entry per exec folder, in folder order.
 
     Raises:
-        MigrationError: When a ledger cannot be written or a folded record
-            cannot be removed. The driver propagates it unchanged so the
-            manifest version is not bumped and the next invocation retries.
+        MigrationError: When a candidate record cannot be read.
     """
     from ..config import get_config
     from ..vaultcore import parse_vault_metadata
     from ..vaultcore.body_schema import CURRENT_BODY_SCHEMA
-    from ..vaultcore.exec_fold import apply_fold, plan_fold, sources_from
+    from ..vaultcore.exec_fold import plan_fold, sources_from
 
-    cfg = get_config()
-    exec_dir = workspace / cfg.docs_dir / "exec"
-    counts = {
-        "folders": 0,
-        "folded": 0,
-        "rows": 0,
-        "notes": 0,
-        "paths": 0,
-        "skipped": 0,
-        "current": 0,
-    }
+    exec_dir = workspace / get_config().docs_dir / "exec"
     if not exec_dir.is_dir():
-        return MigrationResult(
-            name=_NAME,
-            target_version=_TARGET_VERSION,
-            summary="no .vault/exec/ directory; nothing to fold",
-            counts=counts,
-        )
+        return []
 
+    folds: list[_FolderFold] = []
     for folder in sorted(item for item in exec_dir.iterdir() if item.is_dir()):
         records: list[tuple[Path, str | None, str]] = []
         plan_stem = f"{folder.name}-plan"
-        feature = folder.name[11:] or folder.name
+        current = 0
 
         for doc in sorted(folder.glob("*.md")):
             try:
@@ -152,30 +151,120 @@ def migrate(workspace: Path) -> MigrationResult:
                 # target, so a pre-release workspace re-runs the registry on
                 # every vault command, and folding current records would make
                 # that silently eat freshly authored ones.
-                counts["current"] += 1
+                current += 1
                 continue
             records.append((doc, metadata.step_id, body))
 
-        plan = plan_fold(sources_from(records))
+        folds.append(
+            _FolderFold(
+                folder_name=folder.name,
+                plan_stem=plan_stem,
+                feature=folder.name[11:] or folder.name,
+                plan=plan_fold(sources_from(records)),
+                current=current,
+            )
+        )
+    return folds
+
+
+def preview(workspace: Path) -> list[Path]:
+    """Return every record this migration would remove from *workspace*.
+
+    Args:
+        workspace: Workspace root directory.
+
+    Returns:
+        The removal set in execution order.
+    """
+    from ..vaultcore.exec_fold import removals_of
+
+    return [
+        path
+        for fold in _plan_folders(workspace)
+        if not fold.plan.is_empty
+        for path in removals_of(fold.plan)
+    ]
+
+
+def migrate(workspace: Path) -> MigrationResult:
+    """Fold every feature's per-Step execution records into one ledger each.
+
+    Every record this removes is copied into ``.vault/.trash/`` first, in
+    one snapshot directory for the whole run, and a snapshot that cannot be
+    written aborts the migration with nothing deleted.
+
+    Args:
+        workspace: Workspace root directory.
+
+    Returns:
+        :class:`MigrationResult` whose ``counts`` carry ``folders`` (feature
+        folders consolidated), ``folded`` (records removed), ``rows`` (ledger
+        rows written), ``notes`` (note lines carried), ``paths`` (scope paths
+        recovered), ``skipped`` (records deliberately left intact) and
+        ``snapshot_bytes``, and whose ``snapshot`` names the backup
+        directory.
+
+    Raises:
+        MigrationError: When a ledger cannot be written, a folded record
+            cannot be removed, or the removals cannot be snapshotted. The
+            driver propagates it unchanged so the manifest version is not
+            bumped and the next invocation retries.
+    """
+    from ..config import get_config
+    from ..vaultcore.exec_fold import apply_fold
+    from ..vaultcore.trash import SnapshotError, TrashWriter
+
+    cfg = get_config()
+    counts = {
+        "folders": 0,
+        "folded": 0,
+        "rows": 0,
+        "notes": 0,
+        "paths": 0,
+        "skipped": 0,
+        "current": 0,
+        "snapshot_bytes": 0,
+    }
+    if not (workspace / cfg.docs_dir / "exec").is_dir():
+        return MigrationResult(
+            name=_NAME,
+            target_version=_TARGET_VERSION,
+            summary="no .vault/exec/ directory; nothing to fold",
+            counts=counts,
+        )
+
+    trash = TrashWriter(workspace, _NAME)
+
+    for fold in _plan_folders(workspace):
+        plan = fold.plan
+        counts["current"] += fold.current
         if plan.is_empty:
             counts["skipped"] += len(plan.skipped)
             continue
 
         # The shared writer, never a local copy of it: it appends the rows
-        # *and* the notes the planner recovered, and unlinks a record only
-        # once the ledger is confirmed to carry both. A second definition of
-        # this conversion is exactly how the notes came to be dropped here.
+        # *and* the notes the planner recovered, unlinks a record only once
+        # the ledger is confirmed to carry both, and copies each record into
+        # `.vault/.trash/` before unlinking it. A second definition of this
+        # conversion is exactly how the notes came to be dropped here, and a
+        # second definition of the removal is how a record would come to be
+        # deleted without a backup.
         try:
-            ledger_path = apply_fold(
+            outcome = apply_fold(
                 workspace,
                 plan,
-                feature=feature,
-                folder_date=folder.name[:10],
-                plan_stem=plan_stem,
+                feature=fold.feature,
+                folder_date=fold.folder_name[:10],
+                plan_stem=fold.plan_stem,
+                trash=trash,
             )
+        except SnapshotError as exc:
+            raise MigrationError(
+                f"{_NAME}: refusing to fold {fold.folder_name} without a backup: {exc}"
+            ) from exc
         except (OSError, ValueError) as exc:
             raise MigrationError(
-                f"{_NAME}: failed to fold {folder.name}: {exc}"
+                f"{_NAME}: failed to fold {fold.folder_name}: {exc}"
             ) from exc
 
         counts["folders"] += 1
@@ -188,9 +277,13 @@ def migrate(workspace: Path) -> MigrationResult:
             "Migration %s: folded %d record(s) of %s into %s",
             _NAME,
             len(plan.folded),
-            folder.name,
-            ledger_path.name,
+            fold.folder_name,
+            outcome.ledger_path.name,
         )
+
+    snapshot = trash.result()
+    if snapshot is not None:
+        counts["snapshot_bytes"] = snapshot.total_bytes
 
     folded = counts["folded"]
     if not folded:
@@ -206,12 +299,15 @@ def migrate(workspace: Path) -> MigrationResult:
         summary += f"; {counts['skipped']} left intact"
     if counts["current"]:
         summary += f"; {counts['current']} current-schema record(s) untouched"
+    if snapshot is not None:
+        summary += f"; {snapshot.files} copied to {cfg.docs_dir}/.trash/"
 
     return MigrationResult(
         name=_NAME,
         target_version=_TARGET_VERSION,
         summary=summary,
         counts=counts,
+        snapshot=str(snapshot.root) if snapshot is not None else None,
     )
 
 
@@ -219,4 +315,5 @@ MIGRATION = Migration(
     target_version=_TARGET_VERSION,
     name=_NAME,
     migrate=migrate,
+    preview=preview,
 )

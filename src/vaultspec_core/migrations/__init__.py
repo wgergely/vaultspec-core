@@ -64,12 +64,14 @@ if TYPE_CHECKING:
 __all__ = [
     "MIGRATION_LOGGER",
     "REGISTRY",
+    "DeletionPreview",
     "Migration",
     "MigrationError",
     "MigrationResult",
     "MigrationStatus",
     "list_pending",
     "migration_status",
+    "preview_deletions",
     "reset_workspace_cache",
     "run_pending_migrations",
     "warn_if_pending",
@@ -153,12 +155,17 @@ class MigrationResult:
             migration did, e.g. ``"relocated 12 feature indexes"``.
         counts: Free-form integer counters for additional structured
             detail (e.g. ``{"moved": 12, "skipped": 0}``).
+        snapshot: Path of the ``.vault/.trash/`` directory holding
+            byte-identical copies of every document this migration removed,
+            as a string for the ``--json`` surface. ``None`` when the
+            migration removed nothing.
     """
 
     name: str
     target_version: str
     summary: str
     counts: dict[str, int] = field(default_factory=dict)
+    snapshot: str | None = None
 
 
 @dataclass(frozen=True)
@@ -178,11 +185,19 @@ class Migration:
         name: Stable short identifier matching the module slug.
         migrate: Callable that performs the migration. Receives the
             workspace root path and returns a :class:`MigrationResult`.
+        preview: Optional callable returning every path ``migrate`` would
+            delete from the workspace as it stands right now. It must derive
+            that list from the same planning code ``migrate`` runs, never
+            from a parallel reimplementation - a preview computed
+            differently from the run it precedes is worse than no preview,
+            because it is trusted. ``None`` means the migration deletes
+            nothing an operator authored; see :func:`preview_deletions`.
     """
 
     target_version: str
     name: str
     migrate: Callable[[Path], MigrationResult]
+    preview: Callable[[Path], list[Path]] | None = None
 
 
 _workspace_cache_lock = threading.Lock()
@@ -404,6 +419,89 @@ def migration_status(
     if not pending:
         return MigrationStatus.UP_TO_DATE, []
     return MigrationStatus.PENDING, [m.name for m in pending]
+
+
+@dataclass(frozen=True)
+class DeletionPreview:
+    """What one pending migration would delete from a workspace.
+
+    Attributes:
+        name: The migration's short identifier.
+        target_version: The release that introduced the schema change.
+        paths: Every document the migration would remove, in the order it
+            would remove them. Empty when it would remove nothing.
+        previewable: Whether the migration can enumerate its deletions at
+            all. ``False`` says the list is unknown, not that it is empty -
+            a distinction an operator deciding whether to proceed needs.
+    """
+
+    name: str
+    target_version: str
+    paths: tuple[Path, ...]
+    previewable: bool
+
+
+def preview_deletions(
+    workspace: Path,
+    *,
+    manifest: ManifestData | None = None,
+    registry: list[Migration] | None = None,
+) -> list[DeletionPreview]:
+    """Enumerate every document the pending migrations would delete.
+
+    Each entry's paths come from the migration's own planner - the same
+    call ``migrate`` makes before it unlinks - so the preview and the run
+    cannot drift into different answers. Reads only; nothing here mutates
+    the workspace, and no lock is taken, because a read that acquired the
+    manifest lock could not be called from inside a driver that already
+    holds it.
+
+    Ordering, stated because it is load-bearing: the previews are all
+    computed against the workspace as it stands *now*, but the entries run
+    in sequence. Two entries that plan over the same subtree - the 0.1.58
+    and 0.1.74 execution-record folds do - each claim the same records,
+    while in the real run the first one removes them and the second finds
+    nothing left to remove. A path already claimed by an earlier entry is
+    therefore dropped from every later one, so the union is the set of
+    documents that will actually disappear rather than a double count. What
+    remains a projection is attribution: the entry credited with a deletion
+    is the first that would make it.
+
+    Args:
+        workspace: Workspace root directory.
+        manifest: Optional pre-read manifest, to avoid a second read.
+        registry: Optional registry override, for tests.
+
+    Returns:
+        One :class:`DeletionPreview` per pending migration, in execution
+        order, including the ones that would delete nothing.
+    """
+    previews: list[DeletionPreview] = []
+    claimed: set[Path] = set()
+    for migration in list_pending(workspace, manifest=manifest, registry=registry):
+        if migration.preview is None:
+            previews.append(
+                DeletionPreview(
+                    name=migration.name,
+                    target_version=migration.target_version,
+                    paths=(),
+                    previewable=False,
+                )
+            )
+            continue
+        paths = tuple(
+            path for path in migration.preview(workspace) if path not in claimed
+        )
+        claimed.update(paths)
+        previews.append(
+            DeletionPreview(
+                name=migration.name,
+                target_version=migration.target_version,
+                paths=paths,
+                previewable=True,
+            )
+        )
+    return previews
 
 
 def run_pending_migrations(
