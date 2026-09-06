@@ -1,4 +1,4 @@
-# vaultspec MCP server
+# Vaultspec MCP server
 
 The server exposes Vaultspec document and workflow tools to Model Context Protocol (MCP)
 clients using JSON-RPC over standard input and output.
@@ -8,9 +8,9 @@ For the workflow and document types, see
 
 ## Setup
 
-vaultspec keeps provider-neutral MCP definitions in `.vaultspec/mcps/*.json`.
+Vaultspec keeps provider-neutral MCP definitions in `.vaultspec/mcps/*.json`.
 Installation and `vaultspec-core spec mcps sync` render those definitions into each
-selected provider's native configuration:
+selected supported MCP provider's native configuration:
 
 | Provider    | Project scope             | Broader scope                                                            |
 | ----------- | ------------------------- | ------------------------------------------------------------------------ |
@@ -24,24 +24,15 @@ ownership in the workspace's `.vaultspec/mcp-ownership.json` and user ownership 
 `~/.vaultspec/mcp-ownership.json`, so unrelated host entries remain external. Use
 `vaultspec-core install --skip mcp` if you manage enrollment yourself.
 
-The server resolves its workspace from the client's current working directory.
-Editor-integrated clients such as Claude Code and Cursor already set the working
-directory to the project root, so this configuration needs no further changes to run
-there.
+Configure your client to launch the server with the project root as its working
+directory, or [set an explicit workspace](#point-the-server-at-a-different-workspace).
 
-The config invokes the server as a Python module
-(`python -m vaultspec_core.mcp_server.app`) rather than the `vaultspec-mcp` console
-script. On Windows, MCP clients lock the console-script executable in `.venv/Scripts/`,
-which blocks `uv sync` and other package operations while the client is connected.
-Module invocation avoids the lock.
+Keep the generated `python -m vaultspec_core.mcp_server.app` invocation. On Windows,
+running the `vaultspec-mcp` console executable can keep it locked while the client is
+connected, blocking package updates that replace it.
 
-> The module path above is the canonical invocation for this reason. The `vaultspec-mcp`
-> console script itself remains core-owned; other packages in the vaultspec family name
-> their own console scripts distinctly (for example, vaultspec-a2a's is
-> `vaultspec-a2a-mcp`) rather than colliding with it.
-
-This is the entry the installer renders into `.mcp.json` on a project installed the
-default way. Antigravity's `.agents/mcp_config.json` is byte-identical:
+In tool mode, the generated entry in Claude's `.mcp.json` and Antigravity's
+`.agents/mcp_config.json` uses this configuration:
 
 ```json
 {
