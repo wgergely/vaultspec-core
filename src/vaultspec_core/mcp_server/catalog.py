@@ -20,10 +20,10 @@ parameter schemas for ``discover`` and an accurate ``--json`` signal for
 ``invoke``. Both sources live in the same wheel and regenerate together, so the
 single-source-of-truth guarantee the ADR relies on is preserved.
 
-A small static denylist (``uninstall``, MCP-registry mutation, and index
-hand-authoring) is removed at build time and additionally queryable via
-:meth:`CommandCatalog.is_denied`, so the gateway enforces it at both
-``discover`` and ``invoke``.
+A small static denylist (``uninstall``, ``sync``, the hook lifecycle verbs,
+MCP-registry mutation, and index hand-authoring) is removed at build time and
+additionally queryable via :meth:`CommandCatalog.is_denied`, so the gateway
+enforces it at both ``discover`` and ``invoke``.
 """
 
 from __future__ import annotations
@@ -66,9 +66,28 @@ _COMMAND_SPAN = re.compile(r"`" + re.escape(_EXECUTABLE) + r"\s+([^`]+)`")
 #: not the tool surface), and index hand-authoring (``index`` documents stay
 #: uncreatable and uneditable via MCP). Read-only ``spec mcps list`` / ``spec
 #: mcps status`` are intentionally *not* denied.
+#:
+#: The hook lifecycle verbs and ``sync`` are denied for a different reason, and
+#: a security one (GHSA-w5xf-54cr-fxcq). A workspace hook declares a shell
+#: command, so ``spec hooks add``, ``spec hooks run``, ``spec hooks trust`` and
+#: the all-provider ``sync`` that fires the ``config.synced`` event are the only
+#: cataloged verbs whose *declared purpose* is to spawn a command the caller
+#: chose. Every other gateway defence is about argv hygiene and cannot help
+#: here: a well-formed, fully declared invocation of those verbs is exactly the
+#: dangerous one. Because ``discover`` and ``invoke`` are driven by a model
+#: whose context can contain text from a cloned repository, that pairing must
+#: not be reachable from the tool surface at all. Denying ``spec hooks trust``
+#: matters just as much as denying the runner: consent is an operator decision
+#: taken at a terminal, and a tool call is not one. Read-only ``spec hooks
+#: list`` / ``spec hooks show`` / ``spec hooks status`` stay available, so an
+#: agent can still read and explain a workspace's hooks.
 DENYLIST: frozenset[tuple[str, ...]] = frozenset(
     {
         ("uninstall",),
+        ("sync",),
+        ("spec", "hooks", "add"),
+        ("spec", "hooks", "run"),
+        ("spec", "hooks", "trust"),
         ("spec", "mcps", "add"),
         ("spec", "mcps", "remove"),
         ("spec", "mcps", "sync"),

@@ -904,6 +904,17 @@ denylist covers:
   stay available)
 - `vaultspec-core vault feature index` - index documents stay uncreatable through the
   MCP surface
+- `vaultspec-core sync`, `vaultspec-core spec hooks add`,
+  `vaultspec-core spec hooks run`, and `vaultspec-core spec hooks trust` - a workspace
+  hook declares a shell command, and these are the verbs that write one, run one,
+  approve one, or fire the lifecycle event that runs them. Every other gateway defence
+  is about argv hygiene and cannot help here, because a well-formed invocation of these
+  verbs is exactly the dangerous one, and because a model's context can contain text
+  from a cloned repository. Approving a hook is an operator decision taken at a
+  terminal, so no tool call can stand in for one. The read-only
+  `vaultspec-core spec hooks list`, `vaultspec-core spec hooks show`, and
+  `vaultspec-core spec hooks status` stay available, so an agent can still read and
+  explain a workspace's hooks.
 
 ## Server lifetime
 

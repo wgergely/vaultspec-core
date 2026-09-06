@@ -346,6 +346,8 @@ full options.
 - `vaultspec-core spec hooks status` - Report declarative hooks parsing and taxonomy
   compliance status.
 - `vaultspec-core spec hooks run` - Trigger hooks for a specific event.
+- `vaultspec-core spec hooks trust` - Approve this workspace's hooks to run their shell
+  commands as you.
 
 #### Precommit
 
@@ -2295,6 +2297,42 @@ vaultspec-core spec hooks [OPTIONS] COMMAND [ARGS]...
 - `status` (`--json`) - Report declarative hooks parsing and taxonomy compliance status.
 - `run EVENT [--path PATH]` - Trigger enabled hooks for the given event. Valid events:
   `vault.document.created`, `config.synced`, `audit.completed`.
+- `trust [NAME] [--revoke] [--json]` - Approve this workspace's hooks to run their shell
+  commands, or withdraw that approval.
+
+#### Hook trust
+
+A hook file declares a shell command, and `.vaultspec/hooks/` is shared through git like
+the rest of your project policy, so a hook definition arrives with every clone and every
+pull. That makes the file itself the wrong place to record whether its command may run:
+anyone who can open a pull request could otherwise also grant themselves execution on
+every machine that clones the branch.
+
+vaultspec-core therefore treats a workspace's hooks as untrusted until an operator says
+otherwise, and records that decision **outside the workspace** - in the machine-global
+VaultSpec home, `~/.vaultspec/hook-trust.json`. Nothing a checkout, an archive, or a
+clone carries can put an entry there.
+
+Approval is per hook file and pinned to that file's exact contents. Editing a hook, or
+pulling a change to one, drops the approval until you grant it again, so a hook you
+approved last month cannot quietly become a different command this month. It also means
+a trusted hook stops running the moment its file changes, which is the intended trade: a
+second `vaultspec-core spec hooks trust` after an intentional edit is cheaper than an
+unnoticed one.
+
+- `vaultspec-core sync` and `vaultspec-core spec hooks run` show you each untrusted
+  hook's command and offer to remember your approval, but only at an interactive
+  terminal.
+- Anywhere without an operator - CI (`CI` is set), `--json` output, redirected input,
+  `VAULTSPEC_NON_INTERACTIVE`, or an MCP tool call - the hooks are skipped and the
+  reason is written to stderr. There is no flag that auto-approves, because a flag a
+  script can pass is a flag a repository can talk a script into passing.
+- Declining costs only the hooks. The sync itself still completes.
+- `vaultspec-core spec hooks list` shows a `trust` column, so an enabled hook that is
+  not running never has to be a mystery.
+- The gateway's `invoke` tool cannot reach `vaultspec-core spec hooks add`,
+  `vaultspec-core spec hooks run`, `vaultspec-core spec hooks trust`, or
+  `vaultspec-core sync` at all; they are denied at the MCP surface.
 
 #### Examples
 

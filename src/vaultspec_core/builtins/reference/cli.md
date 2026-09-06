@@ -280,6 +280,8 @@ hand-edit between the markers.
 - `vaultspec-core spec hooks status` - Report declarative hooks parsing and taxonomy
   compliance status.
 - `vaultspec-core spec hooks run` - Trigger hooks for a specific event.
+- `vaultspec-core spec hooks trust` - Approve this workspace's hooks to run their shell
+  commands as you.
 
 #### Precommit
 

@@ -15,6 +15,7 @@ from ...hooks import (
     HookAction,
     HookResult,
     fire_hooks,
+    grant,
     load_hooks,
     trigger,
 )
@@ -23,6 +24,29 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 pytestmark = [pytest.mark.unit]
+
+
+def write_hook(hooks_dir: Path, name: str, event: str, command: str) -> Path:
+    """Write one shell hook definition, the way a workspace carries it."""
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    path = hooks_dir / f"{name}.yaml"
+    path.write_text(
+        f"event: {event}\nactions:\n  - type: shell\n    command: {command}\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def load_trusted(hooks_dir: Path, home: Path) -> list[Hook]:
+    """Load a hooks directory and record consent for every file in it.
+
+    Execution tests need a hook the operator has approved. They must never
+    reach the real ledger under the operator's home, so *home* is always a
+    directory the test owns.
+    """
+    hooks = load_hooks(hooks_dir)
+    grant([h.source_path for h in hooks if h.source_path is not None], home)
+    return hooks
 
 
 class TestSupportedEvents:
@@ -178,17 +202,15 @@ class TestInterpolate:
         script.write_text("import sys; print(sys.argv[1])", encoding="utf-8")
         exe = sys.executable.replace("\\", "/")
         script_path = str(script).replace("\\", "/")
-        hook = Hook(
-            name="test",
-            event="config.synced",
-            actions=[
-                HookAction(
-                    action_type="shell",
-                    command=f"{exe} {script_path} {template}",
-                ),
-            ],
+        home = tmp_path / "home"
+        write_hook(
+            tmp_path / "hooks",
+            "test",
+            "config.synced",
+            f"{exe} {script_path} {template}",
         )
-        results = trigger([hook], "config.synced", ctx)
+        hooks = load_trusted(tmp_path / "hooks", home)
+        results = trigger(hooks, "config.synced", ctx, home=home)
         assert len(results) == 1
         assert results[0].success is True
         return results[0].output
@@ -237,18 +259,16 @@ class TestTrigger:
         results = trigger([hook], "config.synced")
         assert results == []
 
-    def test_shell_execution(self):
-        hook = Hook(
-            name="test",
-            event="config.synced",
-            actions=[
-                HookAction(
-                    action_type="shell",
-                    command=f"{sys.executable.replace('\\', '/')} -V",
-                ),
-            ],
+    def test_shell_execution(self, tmp_path: Path) -> None:
+        home = tmp_path / "home"
+        write_hook(
+            tmp_path / "hooks",
+            "test",
+            "config.synced",
+            f"{sys.executable.replace('\\', '/')} -V",
         )
-        results = trigger([hook], "config.synced")
+        hooks = load_trusted(tmp_path / "hooks", home)
+        results = trigger(hooks, "config.synced", home=home)
         assert len(results) == 1
         assert results[0].success is True
         assert "Python" in results[0].output
@@ -258,20 +278,19 @@ class TestTrigger:
         script.write_text("import sys\nprint(sys.argv[1])", encoding="utf-8")
         exe = sys.executable.replace("\\", "/")
         script_path = str(script).replace("\\", "/")
-        hook = Hook(
-            name="test",
-            event="config.synced",
-            actions=[
-                HookAction(
-                    action_type="shell",
-                    command=f"{exe} {script_path} {{root}}",
-                ),
-            ],
+        home = tmp_path / "home"
+        write_hook(
+            tmp_path / "hooks",
+            "test",
+            "config.synced",
+            f"{exe} {script_path} {{root}}",
         )
+        hooks = load_trusted(tmp_path / "hooks", home)
         results = trigger(
-            [hook],
+            hooks,
             "config.synced",
             {"root": "/tmp/test"},
+            home=home,
         )
         assert len(results) == 1
         assert results[0].success is True
@@ -282,17 +301,10 @@ class TestTrigger:
         script.write_text("import sys; sys.exit(1)", encoding="utf-8")
         exe = sys.executable.replace("\\", "/")
         script_path = str(script).replace("\\", "/")
-        hook = Hook(
-            name="test",
-            event="config.synced",
-            actions=[
-                HookAction(
-                    action_type="shell",
-                    command=f"{exe} {script_path}",
-                ),
-            ],
-        )
-        results = trigger([hook], "config.synced")
+        home = tmp_path / "home"
+        write_hook(tmp_path / "hooks", "test", "config.synced", f"{exe} {script_path}")
+        hooks = load_trusted(tmp_path / "hooks", home)
+        results = trigger(hooks, "config.synced", home=home)
         assert len(results) == 1
         assert results[0].success is False
 
@@ -348,16 +360,14 @@ class TestReentrantGuard:
         )
         exe = sys.executable.replace("\\", "/")
         script_path = str(script).replace("\\", "/")
-        hook = Hook(
-            name="test",
-            event="config.synced",
-            actions=[HookAction(action_type="shell", command=f"{exe} {script_path}")],
-        )
+        home = tmp_path / "home"
+        write_hook(tmp_path / "hooks", "test", "config.synced", f"{exe} {script_path}")
+        hooks = load_trusted(tmp_path / "hooks", home)
 
         outer_results: list[HookResult] = []
 
         def run_outer() -> None:
-            outer_results.extend(trigger([hook], "config.synced"))
+            outer_results.extend(trigger(hooks, "config.synced", home=home))
 
         outer_thread = threading.Thread(target=run_outer)
         outer_thread.start()
@@ -367,7 +377,7 @@ class TestReentrantGuard:
                 time.sleep(0.02)
             assert marker.exists(), "outer trigger's shell action never started"
 
-            inner_results = trigger([hook], "config.synced")
+            inner_results = trigger(hooks, "config.synced", home=home)
             assert inner_results == []
         finally:
             outer_thread.join(timeout=5)
@@ -375,40 +385,36 @@ class TestReentrantGuard:
         assert len(outer_results) == 1
         assert outer_results[0].success is True
 
-    def test_non_reentrant_trigger_works(self):
+    def test_non_reentrant_trigger_works(self, tmp_path: Path) -> None:
         # A normal, non-concurrent call is never affected by the guard.
-        hook = Hook(
-            name="test",
-            event="config.synced",
-            actions=[
-                HookAction(
-                    action_type="shell",
-                    command=f"{sys.executable.replace('\\', '/')} -V",
-                )
-            ],
+        home = tmp_path / "home"
+        write_hook(
+            tmp_path / "hooks",
+            "test",
+            "config.synced",
+            f"{sys.executable.replace('\\', '/')} -V",
         )
-        results = trigger([hook], "config.synced")
+        hooks = load_trusted(tmp_path / "hooks", home)
+        results = trigger(hooks, "config.synced", home=home)
         assert len(results) == 1
         assert results[0].success is True
 
-    def test_guard_released_after_execution(self):
+    def test_guard_released_after_execution(self, tmp_path: Path) -> None:
         # If the guard were not released, this second call would be blocked
         # and return [] just like the reentrant case above.
-        hook = Hook(
-            name="test",
-            event="audit.completed",
-            actions=[
-                HookAction(
-                    action_type="shell",
-                    command=f"{sys.executable.replace('\\', '/')} -V",
-                )
-            ],
+        home = tmp_path / "home"
+        write_hook(
+            tmp_path / "hooks",
+            "test",
+            "audit.completed",
+            f"{sys.executable.replace('\\', '/')} -V",
         )
-        first = trigger([hook], "audit.completed")
+        hooks = load_trusted(tmp_path / "hooks", home)
+        first = trigger(hooks, "audit.completed", home=home)
         assert len(first) == 1
         assert first[0].success is True
 
-        second = trigger([hook], "audit.completed")
+        second = trigger(hooks, "audit.completed", home=home)
         assert len(second) == 1
         assert second[0].success is True
 
@@ -436,15 +442,19 @@ class TestFireHooksIntegration:
             f"  - type: shell\n"
             f"    command: {sys.executable} {script}\n"
         )
-        (tmp_path / "marker-hook.yaml").write_text(hook_content, encoding="utf-8")
+        hooks_dir = tmp_path / "hooks"
+        hooks_dir.mkdir()
+        (hooks_dir / "marker-hook.yaml").write_text(hook_content, encoding="utf-8")
 
-        hooks = load_hooks(tmp_path)
+        home = tmp_path / "home"
+        hooks = load_trusted(hooks_dir, home)
         assert len(hooks) == 1
 
         results = trigger(
             hooks,
             "vault.document.created",
             {"root": str(tmp_path), "event": "vault.document.created"},
+            home=home,
         )
         assert len(results) == 1
         assert results[0].success is True
