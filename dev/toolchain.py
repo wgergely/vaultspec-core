@@ -47,8 +47,8 @@ PYTHON_PATHS = ("src", "dev", "docs")
 #: default `pytest` invocation and the gate cannot disagree about the suite.
 INSTRUMENT_PATHS = ("dev", "docs")
 
-#: Markers requiring credentials or live network, excluded from every gate.
-EXCLUDED_MARKERS = "not gemini and not claude and not network"
+#: Markers requiring an external CLI or credentials, excluded from every gate.
+EXCLUDED_MARKERS = "not claude"
 
 #: What a lane testing the LIBRARY selects. The two populations in this suite
 #: are told apart by marker, not by directory: `repo` tests assert facts about

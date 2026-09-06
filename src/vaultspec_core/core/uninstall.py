@@ -73,11 +73,14 @@ _UNINSTALL_FILE_LABELS: dict[str, str] = {
     "AGENTS.md": "codex (config)",
     ".mcp.json": "mcp",
 }
-# Map file names → owning component for skip checks
-_UNINSTALL_FILE_OWNERS: dict[str, str] = {
-    "CLAUDE.md": "claude",
-    "GEMINI.md": "gemini",
-    "AGENTS.md": "codex",
+# Map file names → owning components (for skip filtering).
+# GEMINI.md is shared by gemini and antigravity (both set it as their
+# `config_file` in `types.py`), so it must be preserved when any of its
+# owners is skipped - mirroring `_UNINSTALL_DIR_OWNERS` above.
+_UNINSTALL_FILE_OWNERS: dict[str, list[str]] = {
+    "CLAUDE.md": ["claude"],
+    "GEMINI.md": ["gemini", "antigravity"],
+    "AGENTS.md": ["codex"],
 }
 
 
@@ -252,9 +255,13 @@ def _uninstall_everything(
             removed.append((str(directory).replace("\\", "/") + "/", label))
 
     for file in (root / "CLAUDE.md", root / "GEMINI.md", root / "AGENTS.md"):
-        owner = _UNINSTALL_FILE_OWNERS.get(file.name, "")
-        if owner in skip:
-            logger.info("Skipping %s (--skip %s)", file.name, owner)
+        skipped = [
+            owner
+            for owner in _UNINSTALL_FILE_OWNERS.get(file.name, [])
+            if owner in skip
+        ]
+        if skipped:
+            logger.info("Skipping %s (--skip %s)", file.name, ", ".join(skipped))
             continue
         if not file.exists():
             continue

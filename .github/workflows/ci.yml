@@ -293,8 +293,8 @@ jobs:
     name: broad (${{ matrix.name }})
     # The required "Tests" gate above is marker-scoped to `unit`, which hides the
     # much larger integration/behavioural suite. This job runs the full suite
-    # (excluding only the gemini/claude markers, which need external API
-    # credentials) on BOTH Linux and Windows, so a green CI no longer implies
+    # (excluding only the `claude` marker, which needs that CLI installed) on
+    # BOTH Linux and Windows, so a green CI no longer implies
     # "every test passed" when only the unit slice ran on a single OS - and so
     # platform-specific test hardcodes are caught automatically. Both fleet
     # runners are symlink-capable, so the symlink-requiring filesystem tests run
