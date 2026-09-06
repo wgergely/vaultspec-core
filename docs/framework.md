@@ -55,55 +55,25 @@ deciding when work is done.
 
 ## Orient: see what is in flight
 
-Run this first in any project you do not have fresh in your head, including your own
-after a week away.
+From your repository, check current plan progress, next open steps, and recent changes:
 
-```text
-$ vaultspec-core status
-Vault Status
-
-Plans in flight  (at least one open step)
-  2026-06-26-search-api-plan   L2   -   P1/3   4/12 steps   33%   next P02.S05   2026-06-26
-
-Recent changes
-  research
-    2026-06-26-search-api-research  2026-06-26
-  adr
-    2026-06-26-search-api-adr  2026-06-26
-
-Active features
-  search-api  3 docs plan  L2 4/12 33%  2026-06-26
+```bash
+vaultspec-core status
 ```
 
-A plan row reads left to right as: the plan's name, its tier, wave progress, phase
-progress, step progress, percent complete, the next open step, and the date it last
-changed. A bare `-` means that level does not exist at this tier, so the `L2` plan above
-has phases but no waves. The capture is cut after `Active features`: a full run also
-prints `Recently completed` when there is one, plus `Execution activity`, `Discovery`,
-`Totals`, and a `Next actions` block.
+Once a feature has a plan, use its feature tag to trace its plans, steps, and recorded
+execution evidence. Replace `search-api` with your feature tag:
 
-Pass a feature or a plan as the target to get its grounding trace: every step mapped to
-its rows in the plan's ledger, with the feature's other documents grouped underneath.
-
-```text
-$ vaultspec-core status search-api
-Grounding Trace  search-api (feature)
-
-2026-06-26-search-api-plan   L2   -   P1/3   4/12 steps   33%   next P02.S05
-    [x] P01.S01  ledger 2 rows  verify:pass
-    [x] P01.S02  ledger 1 row
-  > [ ] P02.S05  no rows
-  grounding
-    adr  2026-06-26-search-api-adr
-    research  2026-06-26-search-api-research
+```bash
+vaultspec-core status search-api
 ```
 
-`no rows` means the step is open and nothing has been executed against it yet. The `>`
-marks where work resumes.
+To narrow the view to one plan, supply its stem or path instead.
 
-The command prints a row for every step; the block above is cut to three of this plan's
-twelve so the shape stays readable. On a large plan the trace is long by design - that
-is what makes it a trace - so pipe it or pass a plan rather than a feature to narrow it.
+The `>` marker identifies the next open step. If an open step shows `no rows`, it lacks
+recorded execution evidence; that doesn't prove no work occurred.
+
+See the [status reference](CLI.md#vaultspec-core-status) for output details and options.
 
 ## Begin a pipeline
 
