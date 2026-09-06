@@ -5,8 +5,8 @@ exec-record-consolidation ADR. A ``body-v1`` corpus stores one document per
 plan Step, which on the measured production vault is 7,362 files and 17.9 MB
 - 38% of the vault by bytes and 66% of its files - of which 83.8% is prose no
 consumer reads. This migration folds each plan's records into a single
-append-only ledger, recovering the machine-usable content and discarding the
-prose.
+append-only ledger, recovering the machine-usable content - rows, and any
+notes the record carried - and discarding the rest of the prose.
 
 Unlike every migration before it, this one **removes documents**. That is the
 schema change: consolidation is not expressible as an additive rewrite. The
@@ -16,12 +16,22 @@ interruption leaves duplication rather than loss - and the discarded bodies
 remain in the commit preceding the migration, because ``.vault/`` is tracked.
 There is, however, no forward command that restores them.
 
-The migration writes facts, not inferences. A recovered row carries the paths
-the record's own ``## Scope`` section listed, which the scaffolder filled from
-the originating Step row. It never states an operation:
-``body-v1`` did not record whether a path was added, modified, or deleted, so
-rows carry ``T`` (touched), which stays distinguishable from an operation an
-executor actually reported.
+The migration writes facts, not inferences. A row recovered from a
+``## Scope`` section carries the paths the scaffolder filled from the
+originating Step row and states no operation: that schema did not record
+whether a path was added, modified, or deleted, so the row carries ``T``
+(touched), which stays distinguishable from an operation an executor
+actually reported.
+
+``body-v1`` is a schema declaration, not a body shape, and the two do not
+coincide. A pre-ledger record carried the same ``## Changes`` contract
+without the Step column (see
+:mod:`vaultspec_core.vaultcore.exec_ledger`), so a record declaring
+``body-v1`` may hold real operations and a ``## Notes`` section. The planner
+recovers both from such a record, and the ledger is written with both: this
+migration shares :func:`~vaultspec_core.vaultcore.exec_fold.apply_fold` with
+``vault exec fold`` rather than restating the write, because a local copy of
+it silently dropped those notes while unlinking the records that held them.
 
 Records that cannot be attributed to a single Step are left untouched: one
 with no ``step_id``, and a Phase summary, which rolls up Steps rather than
@@ -49,7 +59,6 @@ See also:
 
 from __future__ import annotations
 
-import datetime as _dt
 import logging
 from typing import TYPE_CHECKING, cast
 
@@ -91,8 +100,8 @@ def migrate(workspace: Path) -> MigrationResult:
     Returns:
         :class:`MigrationResult` whose ``counts`` carry ``folders`` (feature
         folders consolidated), ``folded`` (records removed), ``rows`` (ledger
-        rows written), ``paths`` (scope paths recovered), and ``skipped``
-        (records deliberately left intact).
+        rows written), ``notes`` (note lines carried), ``paths`` (scope paths
+        recovered), and ``skipped`` (records deliberately left intact).
 
     Raises:
         MigrationError: When a ledger cannot be written or a folded record
@@ -100,20 +109,9 @@ def migrate(workspace: Path) -> MigrationResult:
             manifest version is not bumped and the next invocation retries.
     """
     from ..config import get_config
-    from ..core.helpers import atomic_write
     from ..vaultcore import parse_vault_metadata
     from ..vaultcore.body_schema import CURRENT_BODY_SCHEMA
-    from ..vaultcore.exec_fold import plan_fold, sources_from
-    from ..vaultcore.exec_ledger import append_rows
-    from ..vaultcore.hydration import (
-        DocumentIdentity,
-        ExecBinding,
-        ParentPlan,
-        TemplateFields,
-        WritePolicy,
-        create_vault_doc,
-    )
-    from ..vaultcore.models import DocType, refresh_modified_stamp
+    from ..vaultcore.exec_fold import apply_fold, plan_fold, sources_from
 
     cfg = get_config()
     exec_dir = workspace / cfg.docs_dir / "exec"
@@ -121,6 +119,7 @@ def migrate(workspace: Path) -> MigrationResult:
         "folders": 0,
         "folded": 0,
         "rows": 0,
+        "notes": 0,
         "paths": 0,
         "skipped": 0,
         "current": 0,
@@ -162,54 +161,27 @@ def migrate(workspace: Path) -> MigrationResult:
             counts["skipped"] += len(plan.skipped)
             continue
 
-        parent = ParentPlan(date=folder.name[:10], stem=plan_stem)
-        identity = DocumentIdentity(
-            doc_type=DocType.EXEC, feature=feature, date=folder.name[:10]
-        )
-        binding = ExecBinding(plan=parent, ledger=True)
-
+        # The shared writer, never a local copy of it: it appends the rows
+        # *and* the notes the planner recovered, and unlinks a record only
+        # once the ledger is confirmed to carry both. A second definition of
+        # this conversion is exactly how the notes came to be dropped here.
         try:
-            ledger_path = create_vault_doc(
+            ledger_path = apply_fold(
                 workspace,
-                identity,
-                TemplateFields(),
-                exec_binding=binding,
-                write=WritePolicy(force=True, dry_run=True),
+                plan,
+                feature=feature,
+                folder_date=folder.name[:10],
+                plan_stem=plan_stem,
             )
-            if not ledger_path.exists():
-                create_vault_doc(
-                    workspace,
-                    identity,
-                    TemplateFields(),
-                    exec_binding=binding,
-                    write=WritePolicy(force=False, dry_run=False),
-                )
-            text = ledger_path.read_text(encoding="utf-8")
-            updated = append_rows(text, plan.rows)
-            if updated != text:
-                atomic_write(
-                    ledger_path, refresh_modified_stamp(updated, _dt.date.today())
-                )
         except (OSError, ValueError) as exc:
             raise MigrationError(
-                f"{_NAME}: failed to write ledger for {folder.name}: {exc}"
+                f"{_NAME}: failed to fold {folder.name}: {exc}"
             ) from exc
-
-        # Unlink only after the ledger carrying this content is on disk, so an
-        # interruption leaves duplication rather than loss.
-        for doc in plan.folded:
-            if doc == ledger_path:
-                continue
-            try:
-                doc.unlink(missing_ok=True)
-            except OSError as exc:
-                raise MigrationError(
-                    f"{_NAME}: failed to remove folded record {doc}: {exc}"
-                ) from exc
 
         counts["folders"] += 1
         counts["folded"] += len(plan.folded)
         counts["rows"] += len(plan.rows)
+        counts["notes"] += len(plan.notes)
         counts["paths"] += plan.recovered_paths
         counts["skipped"] += len(plan.skipped)
         logger.info(
