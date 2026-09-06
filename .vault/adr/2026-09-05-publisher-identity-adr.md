@@ -5,13 +5,13 @@ tags:
 date: '2026-09-05'
 modified: '2026-09-06'
 body_schema: 'body-v2'
-body_hash: 'sha256:f547d15622e8e2bc1fc79a38bd6c02c53a2854cd33d9bcb7a2ad2d3cda34d13f'
+body_hash: 'sha256:25e4f9f6f715542efbf38e84fd51389188bd0d23c2b74c6a7d92ccd1616fdef9'
 related:
   - "[[2026-09-05-publisher-identity-research]]"
   - "[[2026-08-28-binary-portability-adr]]"
 ---
 
-# `publisher-identity` adr: `attest provenance now; defer publisher identity to a route that costs nothing` | (**status:** `proposed`)
+# `publisher-identity` adr: `attest provenance now; defer publisher identity to a route that costs nothing` | (**status:** `accepted`)
 
 ## Problem Statement
 
