@@ -71,9 +71,9 @@ Ask your coding agent to start research with a feature tag:
 > Use vaultspec-research to investigate adding full-text search to the API. Use the
 > feature tag search-api.
 
-Review the research before proceeding. Approve the ADR before planning, then approve the
-plan before implementation. Invoking a later skill directly doesn't waive its
-prerequisites.
+Review the research before proceeding. Approve the architecture decision record (ADR)
+before planning, then approve the plan before implementation. Invoking a later skill
+directly doesn't waive its prerequisites.
 
 The agent may propose direct implementation for a small, single-file fix without
 architectural impact. It must explain the exception and obtain your approval first.
@@ -99,23 +99,23 @@ vaultspec-rag search "full-text ranking and tokenizer" --type vault
 
 ## Find and amend an ADR
 
-A decision lives in an Architecture Decision Record (ADR). Find it by feature:
+Find the ADRs for your feature. Replace `search-api` with its feature tag:
 
 ```bash
 vaultspec-core vault list adr --feature search-api
 ```
 
-You can amend one two ways. Ask the agent to revise the decision, and if the direction
-changes it supersedes the old ADR rather than overwriting it. Or edit the ADR's body
-prose yourself, then reconcile its frontmatter and links:
+For prose edits, follow [editing safely](syntax.md#editing-safely). Amend an existing
+ADR for refinements, narrower scope, or parameter changes, and obtain renewed approval.
 
-```bash
-vaultspec-core vault check all --fix
-```
+If the direction reverses or the rationale no longer applies, create a replacement ADR.
+Both records must exist before
+[superseding the old ADR](CLI.md#vaultspec-core-vault-adr-supersede). Obtain approval
+for the replacement decision.
 
-A plan is built on its ADR, so changing a decision can invalidate work already planned
-against it. After amending, run `vaultspec-core status <feature>` to see which plan
-steps are still open, and revise the plan before executing further.
+Superseding doesn't revise plans or retarget their authorizing links. Review affected
+plans and links, revise them where necessary, and obtain approval before continuing
+implementation.
 
 ## Make a plan
 
