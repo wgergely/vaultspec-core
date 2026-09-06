@@ -5,6 +5,7 @@ from __future__ import annotations
 import errno
 import json
 import logging
+import os
 import pathlib
 import subprocess
 import sys
@@ -616,19 +617,26 @@ class TestAdvisoryLockTimeout:
         assert caught.value.layer == "os"
         assert "another" in caught.value.hint.lower()
 
-    def test_the_default_budget_is_read_from_config(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_the_default_budget_is_read_from_config(self) -> None:
         """The budget is configurable, because no single number fits every corpus.
 
         A 1,229-document repair on a network volume and a two-document test
         workspace have wait profiles orders of magnitude apart; an operator
         who hits the ceiling legitimately needs a way past it that is not a
         source change.
+
+        The environment is set and restored directly rather than through
+        `monkeypatch`, matching `config/tests/test_config.py`. That is not a
+        concession to the repo-health guard: the thing under test *is* the
+        real `VAULTSPEC_LOCK_TIMEOUT_SECONDS` -> `from_environment` ->
+        `_resolve_lock_timeout` path, and setting a real environment variable
+        exercises it exactly as an operator would.
         """
         from vaultspec_core.config import get_config, reset_config
 
-        monkeypatch.setenv("VAULTSPEC_LOCK_TIMEOUT_SECONDS", "7.5")
+        name = "VAULTSPEC_LOCK_TIMEOUT_SECONDS"
+        previous = os.environ.get(name)
+        os.environ[name] = "7.5"
         reset_config()
         try:
             assert get_config().lock_timeout_seconds == 7.5
@@ -641,7 +649,10 @@ class TestAdvisoryLockTimeout:
             # other negatives outright.
             assert _resolve_lock_timeout(-1.0) == 0.0
         finally:
-            monkeypatch.delenv("VAULTSPEC_LOCK_TIMEOUT_SECONDS", raising=False)
+            if previous is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = previous
             reset_config()
 
     def test_the_default_budget_is_far_longer_than_a_real_critical_section(
