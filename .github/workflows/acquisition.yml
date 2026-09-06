@@ -26,6 +26,20 @@ on:
 permissions:
   contents: read
 
+# The only workflow here that could overlap with itself and had no group.
+#
+# Three triggers reach it - a weekly cron, `release: published`, and dispatch -
+# and a release published on a Monday morning can land on top of the cron. The
+# macOS leg runs on the power-gated host, where a job does not fail when the
+# host is asleep, it QUEUES; overlapping runs therefore stack on that host
+# rather than racing and resolving.
+#
+# `cancel-in-progress: false` deliberately, matching binaries.yml: acquisition
+# writes artifacts, and cancelling a run mid-write is worse than serialising.
+concurrency:
+  group: acquisition-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   acquire:
     name: acquire ${{ matrix.arch }} on ${{ matrix.image }}
