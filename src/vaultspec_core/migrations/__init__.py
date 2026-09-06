@@ -468,6 +468,15 @@ def run_pending_migrations(
         Per-migration :class:`MigrationResult` entries, in execution
         order. Empty when the workspace has no manifest or every
         registered migration is already covered.
+
+    Raises:
+        VaultSpecError: When the manifest exists but cannot be parsed. The
+            driver reads it with ``strict=True`` and lets the refusal
+            propagate: a manifest whose recorded version is unknown cannot
+            be used to decide which migrations are pending, and guessing
+            replays every one of them against a corpus that may already have
+            been migrated (issue #455). The error names the file and tells
+            the operator to delete it and re-run install.
     """
     registry_entries = sorted(
         REGISTRY if registry is None else registry,
@@ -500,11 +509,24 @@ def run_pending_migrations(
         return []
 
     with advisory_lock(manifest_path):
-        manifest = read_manifest_data(workspace)
+        # ``strict=True`` is load-bearing, and this is the only read on the
+        # path that needs it. The non-strict read returns a default
+        # ``ManifestData`` on corrupt JSON, whose empty ``vaultspec_version``
+        # is indistinguishable here from the legacy-workspace signal below -
+        # so a truncated ``providers.json`` presented as a v1.0 workspace and
+        # replayed every registered migration, including the two that unlink
+        # documents, against an already-migrated corpus. The subsequent
+        # version bump then persisted that default object, laundering the
+        # corruption into a valid manifest asserting nothing was installed
+        # (issue #455). Refusing to act is the only safe reading of a manifest
+        # we cannot read.
+        manifest = read_manifest_data(workspace, strict=True)
         # No short-circuit on an empty version here. The manifest's
         # existence was already established above, so an empty version
         # means a legacy workspace with every migration pending, not an
-        # uninstalled one (issue #408).
+        # uninstalled one (issue #408). That inference is only sound because
+        # the read above refused a corrupt manifest rather than synthesising
+        # one that looks legacy.
         current = parse_version_tuple(manifest.vaultspec_version)
         pending = list_pending(workspace, manifest=manifest, registry=registry_entries)
         if not pending:

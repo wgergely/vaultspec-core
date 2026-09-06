@@ -73,7 +73,9 @@ _register_subcommands()
 
 def run() -> None:
     """CLI entry point for console scripts."""
-    app()
+    from vaultspec_core.cli._errors import run_app
+
+    run_app(app)
 
 
 if __name__ == "__main__":

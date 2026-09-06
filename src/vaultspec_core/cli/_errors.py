@@ -44,3 +44,36 @@ def handle_error(exc: Exception, *, json_output: bool = False) -> None:
                 typer.echo(f"  Hint: {hint}", err=True)
         raise typer.Exit(code=1) from exc
     raise exc
+
+
+def run_app(app: typer.Typer) -> None:
+    """Invoke *app*, reporting a domain error that escaped a command body.
+
+    Every command that can raise :class:`VaultSpecError` from its own body
+    already routes it through :func:`handle_error`. This is the backstop for
+    the ones that cannot: a refusal raised beneath a command, by a shared
+    pre-scan step rather than by anything the command called deliberately.
+    The corrupt-manifest refusal is the motivating case - it fires inside the
+    lazy migration trigger under ``scan_vault``, so it reaches the user
+    through whichever vault command happened to scan (issue #455).
+
+    Without this, Typer's rich handler renders such a refusal as a source
+    traceback and drops the ``hint`` entirely, which on that path is the one
+    line the user actually needs: the manifest is corrupt, delete it and
+    re-run install. The exit code is 1, matching :func:`handle_error`.
+
+    Args:
+        app: The root Typer application to invoke.
+
+    Raises:
+        SystemExit: With code 1 when a :class:`VaultSpecError` escapes.
+    """
+    from vaultspec_core.core.exceptions import VaultSpecError
+
+    try:
+        app()
+    except VaultSpecError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        if getattr(exc, "hint", ""):
+            typer.echo(f"  Hint: {exc.hint}", err=True)
+        raise SystemExit(1) from exc

@@ -7,6 +7,7 @@ uninstalling one provider must not remove directories still needed by others.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -16,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from .enums import InstallMode, Tool
 from .exceptions import VaultSpecError
-from .helpers import advisory_lock, atomic_write
+from .helpers import advisory_lock, atomic_write, atomic_write_bytes
 
 if TYPE_CHECKING:
     from .types import ToolConfig
@@ -238,6 +239,19 @@ def create_manifest_exclusive(target: Path, data: ManifestData) -> bool:
     installer that established the manifest first has produced exactly the state
     this call wanted, so the caller proceeds against it untouched.
 
+    The two halves are separable and are separated here. ``O_EXCL`` decides
+    *who writes*; it says nothing about *what is on disk while the write runs*.
+    Writing the payload through the exclusively-created descriptor made this the
+    one manifest write that was not atomic, and an interruption inside it left a
+    torn ``providers.json`` that every reader then had to interpret (issue #455).
+    So the exclusive create now establishes an empty sentinel purely to win the
+    race, and :func:`~vaultspec_core.core.helpers.atomic_write_bytes` puts the
+    payload there through the same temp-fsync-rename sequence every other
+    manifest write uses. A reader therefore observes the manifest either absent,
+    empty, or complete - never half-parsed - and the sentinel is removed again if
+    the payload write fails, so a failed call leaves no manifest behind for the
+    next one to mistake for an established workspace.
+
     Args:
         target: Workspace root directory.
         data: :class:`ManifestData` instance to persist. Its ``serial`` is
@@ -265,10 +279,18 @@ def create_manifest_exclusive(target: Path, data: ManifestData) -> bool:
                 f"Could not establish provider manifest at {path}: {exc}",
                 hint="Check filesystem permissions on the .vaultspec/ directory.",
             ) from exc
+        os.close(fd)
         try:
-            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
-                handle.write(json.dumps(payload, indent=2) + "\n")
+            atomic_write_bytes(
+                path, (json.dumps(payload, indent=2) + "\n").encode("utf-8")
+            )
         except OSError as exc:
+            # Drop the sentinel we just created. Leaving a zero-length
+            # providers.json behind would make the next run read an
+            # established-but-unparseable workspace out of a write that
+            # never landed.
+            with contextlib.suppress(OSError):
+                path.unlink()
             raise VaultSpecError(
                 f"Could not write provider manifest at {path}: {exc}",
                 hint="Check filesystem permissions on the .vaultspec/ directory.",
