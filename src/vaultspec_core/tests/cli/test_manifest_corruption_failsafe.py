@@ -199,7 +199,12 @@ class TestCorruptManifestRefusesToMigrate:
                 str(tmp_path),
             ],
             capture_output=True,
-            text=True,
+            # The CLI writes UTF-8 regardless of the console codepage, so the
+            # capture must decode as UTF-8 rather than as the locale codec -
+            # cp1252 on the Windows runners, which would mangle the manifest
+            # path this test reads back.
+            encoding="utf-8",
+            errors="replace",
             cwd=tmp_path,
             timeout=180,
         )
