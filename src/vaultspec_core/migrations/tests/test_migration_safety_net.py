@@ -383,3 +383,71 @@ class TestTheNetIsNotItselfMigrated:
         assert copy.read_bytes() == payload, (
             "a rewriting migration must not touch a backup"
         )
+
+
+class TestTheNetComposesWithTheContainmentGate:
+    """A refused removal must leave no backup of a file that still exists.
+
+    ``apply_fold`` declines to unlink when the ledger cannot be confirmed to
+    carry what the plan recovered, and a plan that recovered nothing removes
+    nothing at all. The snapshot sits *inside* that decision: a trash
+    directory holding files still present in the vault is noise, and noise
+    is how an operator stops trusting the directory beside it that holds the
+    only copy of something real.
+
+    The planner cannot currently produce such a plan - every folded record
+    yields at least a coverage-only row, and a summary is retained when the
+    fold recovers nothing - so the plans here are constructed directly.
+    That is the point: the guard holds for any plan reaching the writer,
+    rather than by luck of what today's planner happens to emit.
+    """
+
+    def test_removals_of_a_plan_that_recovered_nothing_is_empty(
+        self, tmp_path: Path
+    ) -> None:
+        from vaultspec_core.vaultcore.exec_fold import FoldPlan, removals_of
+
+        record = tmp_path / "record.md"
+        plan = FoldPlan(folded=[record])
+
+        assert not plan.is_empty, "the plan does name a removal"
+        assert not plan.recovers_content
+        assert removals_of(plan) == [], (
+            "nothing is removed where the write preserves nothing"
+        )
+
+    def test_a_refused_removal_snapshots_nothing(self, tmp_path: Path) -> None:
+        from vaultspec_core.vaultcore.exec_fold import FoldPlan, apply_fold
+
+        _skeleton(tmp_path)
+        record = _record(tmp_path, f"{_FOLDER}-P01-S01", step_id="S01")
+        payload = record.read_bytes()
+        plan = FoldPlan(folded=[record])
+
+        outcome = apply_fold(
+            tmp_path,
+            plan,
+            feature="demo",
+            folder_date=_FOLDER[:10],
+            plan_stem=_PLAN_STEM,
+        )
+
+        assert record.read_bytes() == payload, (
+            "the containment gate must refuse this removal"
+        )
+        assert outcome.snapshot is None
+        assert not trash_root(tmp_path).exists(), (
+            "a refused removal must leave no backup behind"
+        )
+
+    def test_a_permitted_removal_still_snapshots(self, tmp_path: Path) -> None:
+        """The other half of the pair: the gate passing must not skip the copy."""
+        originals = _corpus(tmp_path, count=1)
+        record, payload = next(iter(originals.items()))
+
+        migrate(tmp_path)
+
+        assert not record.exists()
+        assert (
+            _sole_snapshot(tmp_path) / "exec" / _FOLDER / record.name
+        ).read_bytes() == payload
