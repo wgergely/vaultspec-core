@@ -13,7 +13,7 @@ top-level orientation entry point and does not live under the ``vault`` group.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, NoReturn
 
 import typer
 
@@ -42,6 +42,26 @@ if TYPE_CHECKING:
 def register(app: _typer.Typer) -> None:
     """Mount the top-level ``status`` command onto *app*."""
     app.command("status")(cmd_status)
+
+
+def _fail(console: Console, message: str, *, json_output: bool) -> NoReturn:
+    """Report a pre-render failure, then exit with code 1.
+
+    Mirrors the ``vaultspec.error.v1`` envelope :func:`apply_target` emits
+    for a workspace-resolution failure, so a graph-read or target-resolution
+    failure is equally parseable under ``--json``: the envelope is the only
+    thing written to stdout, and text-mode diagnostics never reach it.
+    """
+    if json_output:
+        import json
+
+        from vaultspec_core.cli.rendering import json_envelope
+
+        envelope = json_envelope("error", "failed", {"message": message})
+        print(json.dumps(envelope, **json_format_kwargs()))
+    else:
+        console.print(f"[red]{message}[/red]")
+    raise typer.Exit(code=1)
 
 
 def cmd_status(
@@ -98,7 +118,7 @@ def cmd_status(
     record, plus grounding documents grouped by type. Read-only: it never
     writes and produces no artifact.
     """
-    apply_target(target)
+    apply_target(target, json_output=json_output)
     from vaultspec_core.console import get_console
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.graph import VaultGraph
@@ -114,15 +134,13 @@ def cmd_status(
     try:
         graph = VaultGraph(root_dir)
     except OSError as exc:
-        console.print(f"[red]Error reading vault: {exc}[/red]")
-        raise typer.Exit(code=1) from exc
+        _fail(console, f"Error reading vault: {exc}", json_output=json_output)
 
     if target_arg is not None:
         try:
             trace = compute_trace(root_dir, target_arg, graph=graph, with_paths=paths)
         except TargetResolutionError as exc:
-            console.print(f"[red]{exc}[/red]")
-            raise typer.Exit(code=1) from exc
+            _fail(console, str(exc), json_output=json_output)
         _emit_status_trace(
             console, trace, paths=paths, json_output=json_output, no_hints=no_hints
         )

@@ -744,6 +744,50 @@ class TestPlanLineAndDiscovery:
         assert "widget.index" not in human.output
 
 
+class TestJSONErrors:
+    """Failures under ``--json`` emit ``vaultspec.error.v1``, not plain text.
+
+    Covers the two failure modes named in the issue: a workspace that fails
+    to resolve at all (no ``.vaultspec/`` under the target), and a target
+    argument that fails to resolve within an otherwise valid workspace. Both
+    must produce a parseable envelope on stdout and a non-zero exit, per
+    the documented contract in ``docs/CLI.md``.
+    """
+
+    def test_invalid_workspace_emits_json_error_envelope(self, tmp_path: Path) -> None:
+        # A bare directory with no .vaultspec/ fails workspace resolution
+        # before graph construction is ever reached.
+        result = _run(tmp_path, "--json")
+
+        assert result.exit_code == 1, result.output
+        payload = json.loads(result.output)
+        assert payload["schema"] == "vaultspec.error.v1"
+        assert payload["status"] == "failed"
+        assert "vaultspec_dir" in payload["data"]["message"]
+
+    def test_invalid_target_emits_json_error_envelope(self, tmp_path: Path) -> None:
+        _build_vault(tmp_path)
+
+        result = _run(tmp_path, "zzz-no-such-target-qqq", "--json")
+
+        assert result.exit_code == 1, result.output
+        payload = json.loads(result.output)
+        assert payload["schema"] == "vaultspec.error.v1"
+        assert payload["status"] == "failed"
+        assert "Could not resolve" in payload["data"]["message"]
+
+    def test_success_path_json_is_unaffected(self, tmp_path: Path) -> None:
+        """A valid workspace still emits its normal envelope and exits 0."""
+        _build_vault(tmp_path)
+
+        result = _run(tmp_path, "--json")
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["schema"] == "vaultspec.vault.status.v1"
+        assert payload["status"] == "unchanged"
+
+
 class TestExecMissingFlag:
     """A checked step lacking an execution record flags the plan line."""
 
