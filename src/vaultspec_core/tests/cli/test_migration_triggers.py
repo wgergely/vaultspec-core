@@ -5,11 +5,13 @@ migrations must run:
 
 - ``install --upgrade`` runs migrations after the upgrade re-seeds
   builtins.
-- ``scan_vault`` runs migrations lazily so any vault command sees a
-  consistent layout. Tests here use ``vault add`` and
-  ``vault feature index`` because they exercise the lazy path against
-  a workspace that was deliberately rewound to a pre-migration
-  ``vaultspec_version``.
+- ``vault add`` and ``vault feature index`` run migrations through
+  ``cli._migration_hook.ensure_migrated`` before they author, because
+  the schema decides *where* their write lands. Tests here rewind the
+  workspace to a pre-migration ``vaultspec_version`` to exercise that.
+  The trigger used to live in ``scan_vault``, which every read shares;
+  issue #443 is what that cost. The read side of the boundary is
+  pinned separately in ``test_readonly_migration_boundary``.
 - ``vault check`` (no ``--fix``) warns about pending migrations and
   must not mutate.
 
@@ -157,7 +159,18 @@ class TestInstallUpgradeTrigger:
         assert target.exists(), "migrated file must land in .vault/index/"
 
 
-class TestScannerLazyTrigger:
+class TestAuthoringVerbTrigger:
+    """The two layout-sensitive authoring verbs still converge first.
+
+    Renamed from ``TestScannerLazyTrigger``: these cases never really
+    tested the scanner, they tested that ``vault add`` and
+    ``vault feature index`` do not author into a layout a pending
+    migration is about to move. That requirement is intact and these
+    assertions are unchanged; only the trigger site moved, from the
+    scanner every read shares to a hook the two authoring verbs call
+    (issue #443).
+    """
+
     def test_vault_add_migrates_first(self, tmp_path: Path):
         factory = WorkspaceFactory(tmp_path).install("core")
         legacy = _plant_legacy_index(tmp_path, "alpha")
@@ -280,16 +293,25 @@ class TestScannerLazyTrigger:
 
 
 class TestVaultCheckWarnsWithoutMutation:
+    """``vault check`` reports the drift it finds and converges none of it.
+
+    Both cases used to pin the manifest to ``9.9.9`` - above every
+    registered target - so that no migration was pending at all. That
+    made them vacuous: they asserted a legacy file survived a check
+    that had nothing to run in the first place, which is precisely the
+    mutation they claimed to guard against. They now rewind the
+    manifest instead, so ``index_subfolder`` really is pending and
+    really would have relocated the planted file under the old
+    scanner trigger (issue #443).
+    """
+
     def test_check_warns_no_fix(self, tmp_path: Path):
-        # Set the manifest above every registered target so the lazy
-        # trigger short-circuits. The legacy file then stays on disk
-        # and the structure checker must still flag it as a pending
-        # migration warning rather than silently passing.
+        # A genuinely pending workspace: the structure checker must
+        # report the legacy index as a pending migration and leave it
+        # exactly where it found it.
         factory = WorkspaceFactory(tmp_path).install("core")
-        data = read_manifest_data(tmp_path)
-        data.vaultspec_version = "9.9.9"
-        write_manifest_data(tmp_path, data)
         legacy = _plant_legacy_index(tmp_path, "alpha")
+        _rewind_manifest(tmp_path, "0.1.0")
 
         result = factory.run("vault", "check", "structure")
 
@@ -300,14 +322,14 @@ class TestVaultCheckWarnsWithoutMutation:
 
     def test_check_fix_does_not_mutate_indexes(self, tmp_path: Path):
         # ``vault check structure --fix`` no longer relocates index
-        # files; mutation is owned by the registry only. The lazy
-        # trigger is suppressed by setting the manifest above every
-        # target so the warning path is exercised in isolation.
+        # files; mutation is owned by the registry only. ``--fix`` is
+        # a mutating pass, but it is not an *authoring* one - it does
+        # not place a document at a schema-decided location - so it
+        # does not converge the workspace either, even with the
+        # migration genuinely pending.
         factory = WorkspaceFactory(tmp_path).install("core")
-        data = read_manifest_data(tmp_path)
-        data.vaultspec_version = "9.9.9"
-        write_manifest_data(tmp_path, data)
         legacy = _plant_legacy_index(tmp_path, "alpha")
+        _rewind_manifest(tmp_path, "0.1.0")
 
         result = factory.run("vault", "check", "structure", "--fix")
 

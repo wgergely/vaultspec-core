@@ -2633,9 +2633,18 @@ flags.
 
 The migration registry runs every entry whose target version exceeds the workspace
 manifest's `vaultspec_version`, then bumps the manifest version on success. Migrations
-are idempotent and run lazily on every `vaultspec-core vault ...` command, on
-`vaultspec-core install --upgrade`, or explicitly through
-`vaultspec-core migrations run`.
+are idempotent, and because they relocate, rewrite, and delete tracked `.vault/`
+documents they only run for a caller that asked to change the workspace:
+
+- `vaultspec-core install --upgrade`, `vaultspec-core migrations run`, and
+  `vaultspec-core vault repair` - converging is what you invoked them for.
+- `vaultspec-core vault add` and `vaultspec-core vault feature index` - the schema
+  decides where their write lands, so they converge before authoring.
+
+Every other command, including every read (`vault list`, `vault graph`, `vault check`,
+and the MCP query tools), leaves the workspace exactly as it finds it and logs a warning
+naming the pending entries instead. Run `vaultspec-core migrations status` to see them,
+and `vaultspec-core migrations run` to apply them.
 
 ### vaultspec-core migrations status
 

@@ -403,7 +403,7 @@ class VaultGraph:
         from ..vaultcore.scanner import scan_vault
 
         self._encoding_issues = []
-        for path in scan_vault(self.root_dir, run_migrations=False):
+        for path in scan_vault(self.root_dir):
             self._ingest_document(path)
 
     @property

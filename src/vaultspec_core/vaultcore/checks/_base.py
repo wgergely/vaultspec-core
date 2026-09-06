@@ -36,7 +36,7 @@ __all__ = [
 ]
 
 
-def iter_document_texts(root_dir: Path, *, run_migrations: bool = True):
+def iter_document_texts(root_dir: Path):
     """Yield ``(path, text, has_crlf)`` for every readable vault document.
 
     The standalone-read fallback for content-consuming checks invoked
@@ -45,16 +45,20 @@ def iter_document_texts(root_dir: Path, *, run_migrations: bool = True):
     CRLF convention.  Unreadable or non-UTF-8 files are skipped, mirroring
     every other discovery path (``check_encoding`` surfaces them).
 
+    Reads the corpus as it stands.  The ``run_migrations`` flag this used
+    to forward to ``scan_vault`` is gone with the scanner's migration
+    trigger: a check reports on the workspace it is given and never
+    converges it (issue #443).
+
     Args:
         root_dir: Project root directory.
-        run_migrations: Forwarded to ``scan_vault``.
 
     Yields:
         ``(path, text, has_crlf)`` tuples in scan order.
     """
     from ..scanner import scan_vault
 
-    for doc_path in scan_vault(root_dir, run_migrations=run_migrations):
+    for doc_path in scan_vault(root_dir):
         try:
             raw_content = doc_path.read_bytes().decode("utf-8")
         except (OSError, UnicodeDecodeError):

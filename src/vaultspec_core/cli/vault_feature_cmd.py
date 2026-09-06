@@ -209,11 +209,16 @@ def _run_feature_index(
 ) -> None:
     """Body of ``vault feature index``."""
     apply_target(target)
+    from vaultspec_core.cli._migration_hook import ensure_migrated
     from vaultspec_core.console import get_console
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.graph import VaultGraph
 
     root_dir = _get_ctx().target_dir
+    # Converge before the graph is read, not after: this verb writes a
+    # generated index to a location the schema decides, and generating one
+    # against a legacy layout leaves two indexes for a single feature.
+    ensure_migrated(root_dir)
     graph = VaultGraph(root_dir)
     features = [feature.lstrip("#")] if feature else graph.get_features()
 
