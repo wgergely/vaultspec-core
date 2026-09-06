@@ -528,8 +528,14 @@ class TestGeminiCliLoadsRenderedAgents:
       4. assert no ``Agent loading error`` / ``Invalid tool name`` lines
          appear in the combined stdout/stderr.
 
-    The ``@pytest.mark.gemini`` marker is the opt-in gate; the test
-    asserts the binary is present once the marker selects it.
+    The ``@pytest.mark.gemini`` marker is what keeps this test out of a
+    default run: `pyproject.toml`'s `addopts` deselects it there, matching
+    what `dev.toolchain.EXCLUDED_MARKERS` already passes explicitly to every
+    `just test` lane. A binary missing after an explicit `-m gemini`
+    selection is still asserted rather than skipped - this suite's own
+    quality guard (`dev/guards/test_test_suite_quality.py`) forbids
+    `pytest.skip`, so a hard assertion naming the missing requirement is the
+    established pattern (see `test_mcp_hosts.py`'s `_host_executable`).
 
     The probe also verifies the bogus agent path actually fails: a
     deliberately broken agent file is written alongside the rendered
@@ -563,8 +569,9 @@ class TestGeminiCliLoadsRenderedAgents:
     def test_all_source_agents_load(self, tmp_path: Path):
         gemini_bin = shutil.which("gemini")
         assert gemini_bin is not None, (
-            "gemini CLI not on PATH; the @pytest.mark.gemini marker is the "
-            "opt-in gate - install gemini-cli before running this marker"
+            "gemini CLI not on PATH; the @pytest.mark.gemini marker keeps this "
+            "test out of a default run - install gemini-cli before selecting "
+            "it explicitly with `-m gemini`"
         )
 
         agents_dir = tmp_path / ".gemini" / "agents"

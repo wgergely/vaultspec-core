@@ -822,6 +822,7 @@ class TestVaultRepair:
             "modified-stamp",
             "rename-integrity",
             "encoding",
+            "foreign",
         ]
 
         factory.run("vault", "feature", "index", "--feature", "info-visibility")
