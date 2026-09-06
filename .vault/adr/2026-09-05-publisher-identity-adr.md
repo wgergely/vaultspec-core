@@ -3,9 +3,9 @@ tags:
   - '#adr'
   - '#publisher-identity'
 date: '2026-09-05'
-modified: '2026-09-05'
+modified: '2026-09-06'
 body_schema: 'body-v2'
-body_hash: 'sha256:86b0ed1cdbbbba5973ed789699a3260dde4504c18fade93de0342834dd9840e5'
+body_hash: 'sha256:16275d54a2fe313cb6756a1958d4faf49254ccd7ed78bc09beac227b5d710917'
 related:
   - "[[2026-09-05-publisher-identity-research]]"
   - "[[2026-08-28-binary-portability-adr]]"
@@ -89,11 +89,31 @@ to, and that gate is in service.
 
 ## Implementation
 
-The release job attests every artifact before it may become a release asset, so the
-ordering is the enforcement: the attestation runs ahead of upload and its failure leaves
-the upload unrun. Every attached asset is then re-verified against the published record
-as the job's final step, which is what distinguishes an attestation that was made from
-one that was merely attempted.
+Provenance is minted in a dedicated job that holds the signing credential and nothing
+else, and no artifact may become a release asset unless that job succeeded. The ordering
+is still the enforcement; it is a job edge rather than step ordering, because the
+alternative put a capability that mints OIDC tokens for any audience in the same job as
+the channel deploy key and the packaging code that generates the distribution pointers.
+Those two do not compose - an SSH key is not federated by any token - but the widest
+credential in the repository sat in its most crowded job for no reason beyond that being
+where it was first written. Every attached asset is then re-verified against the
+published record, against the subject set the signing job reports rather than one the
+verifying job derives for itself, which is what distinguishes an attestation that was
+made from one that was merely attempted.
+
+One field of the record is knowingly wrong, and is recorded here so it is not later
+rediscovered as a defect. The predicate carries the runner environment of the job that
+signed, not of the job that built; the build matrix is mixed, and each leg emits two
+binaries, so attesting from the self-hosted fleet describes the two artifacts of the
+single hosted leg as self-hosted. The alternatives were weighed and are worse: signing
+on a hosted runner would misdescribe the other six instead, and signing inside each
+build leg - the only shape under which the field is true everywhere - would spread the
+token-minting capability across four jobs, two of which run as root in a reused
+workspace and compile a third-party crate tree. The inaccurate field is one no verifier
+reads, and it has an independent path to becoming true: moving that leg onto the fleet
+is already proposed and is blocked on a host change rather than on anything in the
+release workflow. A token-minting capability in three more jobs has no path to shrinking
+on its own, which is what settles the trade.
 
 Both checks refuse to pass vacuously. An empty artifact set fails rather than attesting
 nothing, and a verification pass that examined no asset fails rather than reporting
@@ -107,7 +127,14 @@ punish missing metadata would cost users more than the gap does.
 
 The user-facing documentation states both what can be verified and what the verification
 does not prove, because the failure mode of overclaiming here is a user who believes the
-download is signed and therefore stops checking.
+download is signed and therefore stops checking. It also states WHEN, which is the
+overclaim this record made on its first pass: the wiring was documented as though it
+were already producing verifiable assets while every published release predated it, so
+the documented command failed for every download a user could obtain. A security
+instruction that reliably fails teaches people to skip security instructions, which
+costs more than the gap it was covering. The documentation now names the first release
+that will carry provenance, and a repository guard fails once that release is cut so the
+qualification cannot outlive the condition it describes.
 
 The deferred half acquires no wiring. What it acquires is a named trigger: the free
 route in `2026-09-05-publisher-identity-research`, whose outcome converts this record's
@@ -157,3 +184,12 @@ The pitfall this record most needs to survive is being read as a to-do. It is no
 Signing wiring written before the identity exists is the outcome this decision rejects,
 and a future reader who finds the deferred half unimplemented is looking at the decision
 working rather than at work left undone.
+
+The deferral has since been closed in the direction this record left open. Publisher
+identity is settled as not planned - the issues tracking it on both platforms are closed
+without work, because a paid per-year identity tied to a legal entity is not something
+this project buys. Nothing in the chosen half changes; what changes is its standing.
+Attestation is no longer the available half of a two-part answer whose other half is
+pending. It is the whole verification story, so the operating-system friction recorded
+above is permanent and is documented as permanent, and a weakness in the attestation
+lane is now a user-facing defect rather than a shortfall in a supplementary check.

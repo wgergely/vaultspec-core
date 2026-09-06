@@ -324,9 +324,184 @@ jobs:
         if: ${{ always() && matrix.container != '' }}
         run: chown -R --reference=/__w "$GITHUB_WORKSPACE"
 
+  # PROVENANCE IS MINTED HERE, in a job that holds nothing else.
+  #
+  # It used to be minted inside `Attach to release` below - the job that also
+  # checks out the org-wide distribution repository with
+  # `CHANNEL_ROOT_DEPLOY_KEY`, runs `dev/packaging` tree code, and holds
+  # `contents: write`. `id-token: write` is NOT scoped to Sigstore: any step in
+  # a job that has it can mint an OIDC token for any audience it names. The two
+  # capabilities did not compose - the deploy key is an SSH key and no OIDC
+  # token reaches it - but the repository's only token-minting grant sat in its
+  # most crowded job for no reason beyond that being where it was first
+  # written.
+  #
+  # This job holds that grant and nothing else: no checkout of any repository,
+  # no secret beyond the automatic token, no project code. It downloads the
+  # build artifacts, derives the subject list, and calls `actions/attest`.
+  # `contents: read` is the workflow default and is restated rather than
+  # inherited so the entire credential surface of the signing job is readable
+  # in one block.
+  #
+  # ATTESTED BEFORE UPLOAD, and the ordering is still the guard - it is a job
+  # edge now rather than a step edge. `release` needs this job and refuses to
+  # run unless it succeeded, so an asset that could not be attested still never
+  # becomes a release asset.
+  #
+  # THIS IS NOT A SIGNATURE, and reading it as one would be the expensive
+  # mistake. Sigstore is not in the Microsoft Trusted Root Program and is not
+  # going to be, so nothing here moves SmartScreen, Gatekeeper, or a WDAC
+  # publisher rule.
+  #
+  # Nor is it a stand-in for one that is coming. #405, #342 and #336 are closed
+  # as not planned: publisher identity costs a paid, per-year certificate on
+  # Windows and an Apple Developer membership on macOS, and this project is
+  # buying neither. Attestation is therefore not the interim half of a signing
+  # story - it is the whole verification story, which is why the guards around
+  # it in this file are worth their weight.
+  #
+  # What it does is the half that needed no certificate. Without it a user
+  # comparing a download against SHA256SUMS learns only that the file matched a
+  # list published beside it - which a tampered release publishes just as
+  # happily. An attestation binds each asset's digest to THIS repository and
+  # THIS workflow run, checkable with `gh attestation verify` by someone who
+  # trusts neither.
+  #
+  # SHA256SUMS IS DELIBERATELY NOT ATTESTED, and the reason is already written
+  # into publish.yml: that workflow attaches the wheel and sdist to this same
+  # release and merges their digests into this same file, and neither workflow
+  # knows which runs first. Whichever finishes last replaces the asset. An
+  # attestation over a file rewritten after it is minted is one a user cannot
+  # verify - `gh attestation verify` would fail on the single asset whose whole
+  # purpose is to be checked. It is a co-authored, mutable manifest; provenance
+  # belongs on the immutable artifacts it describes, not on the description.
+  #
+  # The subject list is therefore derived and passed explicitly rather than
+  # globbed. A glob would have to express that exclusion in `@actions/glob`
+  # negation syntax, whose behaviour this repository would then be trusting
+  # unverified. An enumerated list is assertable here, in the shell, before
+  # anything is signed.
+  attest:
+    name: Attest the built binaries
+    needs: build
+    # Same rule as `release` below, and for the same reason: a matrix that lost
+    # a leg still has artifacts worth attesting, and refusing to attest them
+    # would only mean the surviving assets ship with less provenance than a
+    # release that lost nothing.
+    if: ${{ !cancelled() }}
+    # ON THE FLEET, and that makes one field of the record knowingly wrong.
+    #
+    # The SLSA predicate `actions/attest` produces carries
+    # `internalParameters.github.runner_environment`, which reports the runner
+    # that executed THIS step - not the runner that built each subject. The
+    # matrix is mixed: `linux-aarch64` builds on the GitHub-hosted
+    # `ubuntu-24.04-arm`, every other leg on the fleet. Each leg emits two
+    # binaries, so attesting from a self-hosted job stamps `self-hosted` on the
+    # two that were actually built on a hosted runner.
+    #
+    # That is accepted deliberately, not overlooked. Attesting from
+    # `ubuntu-latest` would make the same field wrong for the other six instead
+    # of those two - an overstatement about six rather than an understatement
+    # about two. Attesting inside each build leg is the only shape under which
+    # the field is true for every artifact, and it pays for that by spreading
+    # `id-token: write` across four jobs, two of which run as root in a reused
+    # container workspace and compile a third-party crate tree with `cargo
+    # install pyapp --locked`. `gh attestation verify` does not read
+    # `runner_environment`; a token-minting capability is real in every job
+    # that holds it.
+    #
+    # The inaccuracy has an independent path to disappearing and the exposure
+    # has none, which is what settles the trade. #481 moves this leg onto the
+    # fleet along with every other hosted job, and that makes this record true
+    # with no further change here. It is blocked on an operator re-enrolling
+    # the ARM64 runner with a bind-mounted home rather than on anything in this
+    # file - so the field is wrong for now, is wrong about a value no verifier
+    # reads, and is not wrong permanently.
+    runs-on: [self-hosted, Linux, X64, build]
+    permissions:
+      # THE ENTIRE CREDENTIAL SURFACE OF THE SIGNING JOB. `id-token` mints the
+      # OIDC token Sigstore exchanges for a short-lived signing certificate;
+      # `attestations` is what lets the run publish the resulting bundle
+      # against this repository. Neither is a code-signing credential and
+      # neither can become one. `contents` is READ: this job attaches nothing.
+      contents: read
+      id-token: write
+      attestations: write
+    outputs:
+      # Consumed by the verification step in `release`, which re-derives its
+      # own list from its own download and refuses to proceed if the two
+      # disagree. Carrying the set across the job edge is what makes that
+      # comparison meaningful rather than a list compared with itself.
+      count: ${{ steps.subjects.outputs.count }}
+      names: ${{ steps.subjects.outputs.names }}
+    steps:
+      # A FRESH DIRECTORY, because this job has no checkout to clean one for
+      # it. The fleet reuses a workspace between jobs; `Attach to release` is
+      # protected from a previous run's leftovers only because
+      # `actions/checkout` runs `git clean` ahead of its download. Nothing does
+      # that here, and a stale `dist-bin/` would be attested as though this run
+      # had built it.
+      - name: Start from an empty artifact directory
+        shell: bash
+        run: rm -rf dist-bin
+
+      - name: Download binaries
+        uses: actions/download-artifact@v8
+        with:
+          pattern: binaries-*
+          path: dist-bin/
+          merge-multiple: true
+
+      - name: Enumerate the assets to attest
+        id: subjects
+        shell: bash
+        run: |
+          set -euo pipefail
+          # `*.sha256` is excluded as well as SHA256SUMS. In `release` the
+          # aggregate step folds those per-asset sidecars into the manifest and
+          # deletes them BEFORE the subject list was derived, so the exclusion
+          # was implicit there; here the artifacts are untouched and it has to
+          # be written down. The resulting subject set is the one that job used
+          # to derive.
+          mapfile -t subjects < <(
+            find dist-bin -maxdepth 1 -type f \
+              ! -name SHA256SUMS ! -name '*.sha256' | LC_ALL=C sort
+          )
+          # A derivation yielding nothing would attest nothing and report
+          # success - the shape v0.1.60's empty-hash manifest took out of a
+          # green run. Say the number rather than trusting the glob.
+          if [ ${#subjects[@]} -eq 0 ]; then
+            echo "::error::dist-bin holds no attestable asset; there is nothing to attest"
+            exit 1
+          fi
+          echo "attesting ${#subjects[@]} asset(s): ${subjects[*]}"
+          {
+            echo "count=${#subjects[@]}"
+            echo "paths<<SUBJECTS_EOF"
+            printf '%s\n' "${subjects[@]}"
+            echo "SUBJECTS_EOF"
+            echo "names<<NAMES_EOF"
+            printf '%s\n' "${subjects[@]}" | xargs -n 1 basename
+            echo "NAMES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Attest the release binaries
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ steps.subjects.outputs.paths }}
+
+      # This job runs outside a container and creates `dist-bin/` as the
+      # runner's user, so it leaves nothing the next job cannot clean. Removed
+      # anyway, because that directory is this job's only side effect on a
+      # workspace the fleet shares between jobs.
+      - name: Drop the downloaded artifacts
+        if: ${{ always() }}
+        shell: bash
+        run: rm -rf dist-bin
+
   release:
     name: Attach to release
-    needs: build
+    needs: [build, attest]
     # Runs even when a build leg failed, deliberately. `needs: build` alone
     # SKIPS this job on any leg failure, which throws away every binary that did
     # build: vaultspec-core-v0.1.61 had four green legs - windows, both macOS,
@@ -340,17 +515,23 @@ jobs:
     # stay truthful about a partial release. What must NOT happen is a partial
     # release going green, so the completeness check below fails the job AFTER
     # the assets are up.
-    if: ${{ !cancelled() }}
+    #
+    # A FAILED ATTESTATION IS THE ONE THING THAT DOES STOP IT. `attest` above
+    # mints provenance for exactly these artifacts, and the guarantee that no
+    # unattested asset reaches the release used to be step ordering inside this
+    # job. It is this condition now: `!cancelled()` on its own would run the
+    # upload after a failed attestation, which is the one shape that ordering
+    # existed to forbid.
+    if: ${{ !cancelled() && needs.attest.result == 'success' }}
     runs-on: [self-hosted, Linux, X64, build]
     permissions:
+      # WRITE, and only this. `id-token: write` and `attestations: write` used
+      # to sit here too, which put a grant that can mint an OIDC token for any
+      # audience in the same job as `CHANNEL_ROOT_DEPLOY_KEY` and the
+      # `dev/packaging` tree code below. They live on `attest` now, which holds
+      # no key and runs no project code; this job needs neither to upload
+      # assets nor to READ the published attestations back with `gh`.
       contents: write
-      # Both are for the attestation below. `id-token` mints the OIDC token
-      # Sigstore exchanges for a short-lived signing certificate; `attestations`
-      # is what lets the run publish the resulting bundle against this
-      # repository. Neither is a code-signing credential and neither can become
-      # one - see the step for why that distinction matters here.
-      id-token: write
-      attestations: write
     steps:
       # This repo, for the generator itself. No deploy key and no push: the
       # channel pointers no longer live here.
@@ -461,38 +642,11 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # ATTESTED BEFORE UPLOAD, and the ordering is the guard. `actions/attest`
-      # failing here fails the job with `gh release upload` still unrun, so an
-      # asset that could not be attested never becomes a release asset.
+      # PROVENANCE IS ALREADY MINTED by the `attest` job above, which this job
+      # cannot run without. What is left here is the check that it actually
+      # landed: `actions/attest` exiting zero reports that the action ran, not
+      # that a verifiable bundle exists for these bytes.
       #
-      # THIS IS NOT A SIGNATURE, and reading it as one would be the expensive
-      # mistake. Sigstore is not in the Microsoft Trusted Root Program and is
-      # not going to be, so nothing here moves SmartScreen, Gatekeeper, or a
-      # WDAC publisher rule. The publisher-identity half is #405 and it is
-      # parked on a certificate this project does not hold.
-      #
-      # What it does do is the half that needed no certificate. Until now a user
-      # comparing a download against SHA256SUMS learned only that the file
-      # matched a list published beside it - which a tampered release publishes
-      # just as happily. An attestation binds each asset's digest to THIS
-      # repository and THIS workflow run, checkable with `gh attestation verify`
-      # by someone who trusts neither.
-      #
-      # SHA256SUMS IS DELIBERATELY NOT ATTESTED, and the reason is already
-      # written into publish.yml: that workflow attaches the wheel and sdist to
-      # this same release and merges their digests into this same file, and
-      # neither workflow knows which runs first. Whichever finishes last
-      # replaces the asset. An attestation over a file rewritten after it is
-      # minted is one a user cannot verify - `gh attestation verify` would fail
-      # on the single asset whose whole purpose is to be checked. It is a
-      # co-authored, mutable manifest; provenance belongs on the immutable
-      # artifacts it describes, not on the description.
-      #
-      # The subject list is therefore derived and passed explicitly rather than
-      # globbed. A glob would have to express that exclusion in `@actions/glob`
-      # negation syntax, whose behaviour this repository would then be trusting
-      # unverified. An enumerated list is assertable here, in the shell, before
-      # anything is signed.
       # M4: the verify step below runs `gh attestation verify --signer-workflow`
       # on the fleet, and the fleet's `gh` is not pinned by anything in this
       # repository. An older one exits non-zero with "unknown flag", every asset
@@ -520,35 +674,6 @@ jobs:
             exit 1
           fi
           echo "gh can verify attestations and pin a signer workflow"
-
-      - name: Enumerate the assets to attest
-        id: subjects
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -t subjects < <(
-            find dist-bin -maxdepth 1 -type f ! -name SHA256SUMS | LC_ALL=C sort
-          )
-          # A derivation yielding nothing would attest nothing and report
-          # success - the shape v0.1.60's empty-hash manifest took out of a
-          # green run, and the shape the target derivation below already
-          # refuses. Say the number rather than trusting the glob.
-          if [ ${#subjects[@]} -eq 0 ]; then
-            echo "::error::dist-bin holds no attestable asset; there is nothing to attest"
-            exit 1
-          fi
-          echo "attesting ${#subjects[@]} asset(s): ${subjects[*]}"
-          {
-            echo "count=${#subjects[@]}"
-            echo "paths<<SUBJECTS_EOF"
-            printf '%s\n' "${subjects[@]}"
-            echo "SUBJECTS_EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Attest the release binaries
-        uses: actions/attest@v4
-        with:
-          subject-path: ${{ steps.subjects.outputs.paths }}
 
       - name: Upload to release
         shell: bash
@@ -586,14 +711,43 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag || github.ref_name }}
-          SUBJECTS: ${{ steps.subjects.outputs.paths }}
-          EXPECTED: ${{ steps.subjects.outputs.count }}
+          ATTESTED: ${{ needs.attest.outputs.names }}
+          EXPECTED: ${{ needs.attest.outputs.count }}
         run: |
           set -euo pipefail
+          # DERIVED HERE, from the files this job is about to attach, and then
+          # COMPARED with what `attest` actually signed. While both derivations
+          # lived in one job the comparison could only ever be a list against
+          # itself; across the job edge it is a real question, and the answer
+          # matters because the two jobs download the artifacts separately.
+          # This is the step where "the bytes attached are the bytes attested"
+          # stops being an assumption.
+          #
+          # The sidecar exclusion is implicit rather than written: the
+          # aggregate step above already folded every `*.sha256` into
+          # SHA256SUMS and deleted it, so only the binaries and the manifest
+          # remain. `attest` states the same exclusion explicitly because it
+          # reads the artifacts before that folding happens.
+          mapfile -t subjects < <(
+            find dist-bin -maxdepth 1 -type f ! -name SHA256SUMS | LC_ALL=C sort
+          )
+          if [ ${#subjects[@]} -eq 0 ]; then
+            echo "::error::dist-bin holds no attestable asset; there is nothing to verify"
+            exit 1
+          fi
+          attached_names=$(printf '%s\n' "${subjects[@]}" | xargs -n 1 basename | LC_ALL=C sort)
+          attested_names=$(printf '%s\n' "${ATTESTED}" | sed '/^[[:space:]]*$/d' | LC_ALL=C sort)
+          if [ "${attached_names}" != "${attested_names}" ]; then
+            echo "::error::the asset set here is not the set that was attested"
+            echo "attested:" >&2
+            printf '%s\n' "${attested_names}" >&2
+            echo "about to attach:" >&2
+            printf '%s\n' "${attached_names}" >&2
+            exit 1
+          fi
           unverified=()
           checked=0
-          while IFS= read -r asset; do
-            [ -n "${asset}" ] || continue
+          for asset in "${subjects[@]}"; do
             checked=$((checked + 1))
             # Verified against the REPOSITORY and the SIGNER WORKFLOW. `--repo`
             # alone accepts a bundle minted by any workflow in this repository
@@ -605,9 +759,11 @@ jobs:
             # report identically to a missing attestation, and the release
             # engineer is told the assets are unattested when the truth is that
             # nothing could be asked.
-            # `< /dev/null` because this loop's stdin is the subject list.
-            # `gh attestation verify` does not read stdin today; a future
-            # version that did would silently eat the remaining subjects.
+            # `< /dev/null` is kept even though this loop no longer reads
+            # its subjects from stdin. `gh attestation verify` does not read
+            # stdin today; a future version that did would inherit the job's,
+            # and a step that consumes the runner's stdin is a defect this
+            # repository has paid for elsewhere.
             if ! why=$(gh attestation verify "${asset}" \
               --repo "$GITHUB_REPOSITORY" \
               --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/binaries.yml" \
@@ -616,18 +772,18 @@ jobs:
               echo "::warning::${asset} did not verify:"
               printf '%s\n' "${why}" >&2
             fi
-          done <<< "${SUBJECTS}"
+          done
           # Same refusal as the derivation above: a loop that examined nothing
           # reports success having checked nothing.
           if [ "${checked}" -eq 0 ]; then
             echo "::error::no asset was checked for provenance; this guard cannot pass vacuously"
             exit 1
           fi
-          # The attest step and this loop read the same derived list, so a
-          # disagreement means the list changed between them - which would make
-          # both the attestation and this verdict describe a set nobody chose.
+          # Belt to the name comparison's braces. The count comes from the
+          # attesting job rather than from anything derived here, so the two
+          # cannot drift into agreement by both being wrong the same way.
           if [ "${checked}" -ne "${EXPECTED}" ]; then
-            echo "::error::verified ${checked} asset(s) but ${EXPECTED} were attested; the subject list changed mid-job"
+            echo "::error::verified ${checked} asset(s) but ${EXPECTED} were attested; the subject list changed between jobs"
             exit 1
           fi
           if [ ${#unverified[@]} -ne 0 ]; then
