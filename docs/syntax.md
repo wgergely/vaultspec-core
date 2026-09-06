@@ -109,8 +109,7 @@ tags.
 
 ## Linking
 
-Links between vault documents are Obsidian-style wiki-links, quoted, and they belong in
-`related:` only:
+Put links between vault documents in `related:` as quoted Obsidian-style wiki-links:
 
 ```yaml
 related:
@@ -118,22 +117,20 @@ related:
   - '[[2026-02-06-payment-retries-adr]]'
 ```
 
-The first ones are usually set when the document is scaffolded: every
-`vaultspec-core vault add` takes `--related`, which is how an ADR arrives already
-pointing at its research. Afterwards, change them with `vaultspec-core vault link add`
-and `vault link remove` rather than by hand. Three rules govern the result:
+When creating a document, set links with `vaultspec-core vault add --related`.
+Afterwards, use [link add](CLI.md#vaultspec-core-vault-link-add) or
+[link remove](CLI.md#vaultspec-core-vault-link-remove).
 
-- Quote them. Unquoted, YAML reads `[[...]]` as a nested sequence.
-- Use no relative paths. The namespace is flat, so `[[document-stem]]` resolves wherever
-  the document lives. A `../` prefix breaks on the first reorganisation.
-- Link only documents that exist. The `dangling` check finds the ones that do not.
+- Quote wiki-links so YAML reads them as strings, not nested sequences.
+- Store document stems without directories or `.md`: `[[document-stem]]`.
+- Link only to existing documents. The `dangling` check reports unresolved links.
 
-In body prose, use neither wiki-links nor Markdown path links. Cite code by locator
-instead, in backticks: `src/billing/retry.py:42`, commit `abc1234`, or
-`vaultspec-core@0.1.59`. The `body-links` check enforces this.
+The `body-links` check rejects wiki-links and Markdown path links in body prose. Cite
+code by locator instead, in backticks: `src/billing/retry.py:42`, commit `abc1234`, or
+`vaultspec-core@0.1.59`.
 
-Vault documents cite code; code never cites the vault. Keeping links out of body prose
-keeps the graph in one place, where the checks can see it.
+Keep references one-way: vault documents cite code; source code must not cite vault
+documents.
 
 ## Values you must never write by hand
 
