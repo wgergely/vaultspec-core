@@ -5,7 +5,7 @@ tags:
 date: '2026-09-06'
 modified: '2026-09-06'
 body_schema: 'body-v2'
-body_hash: 'sha256:ea4617f532a6d73a20a8c53936f5a1477625b019ae55df576d4aef51f1da90a4'
+body_hash: 'sha256:2a1e57734b7f335355eb07bc6c183977b85b3159f814900fc23204e442f952e8'
 related:
   - '[[2026-09-06-gemini-live-guards-research]]'
 ---
@@ -67,6 +67,6 @@ The suite no longer depends on any provider binary or on network reachability, a
 
 What is lost is real and worth stating plainly: nothing now proves a rendered agent is accepted by a `gemini` loader. The offline vocabulary check is a proxy - it proves Core emits only names the enum declares, not that the enum still matches the binary. If the frozen enum is wrong, no test in this repository will say so, and the only defence is the docstring saying it is frozen.
 
-`gemini` and `network` are left registered with no users. That is deliberate rather than overlooked: the registration and the exclusion list are bound together by a guard belonging to other work, and reconciling them from here would edit a contract this record does not own.
+`gemini` and `network` were left registered with no users. That was deliberate rather than overlooked: the registration and the exclusion list are bound together by a guard belonging to other work, and reconciling them from here would have edited a contract this record does not own. `#490` has since done that reconciliation - both markers and both `addopts` exclusions are gone, `dev.toolchain.EXCLUDED_MARKERS` is `not claude` alone, and a bare `pytest` was verified to collect the same set afterwards.
 
 This record settles the test and CI surface and nothing else. The provider's future - freeze, deprecate, or succeed by Antigravity - remains open, and the grounding research establishes the constraint any of those answers has to satisfy: Antigravity is not Gemini under another name, so a rename is not a label change.
