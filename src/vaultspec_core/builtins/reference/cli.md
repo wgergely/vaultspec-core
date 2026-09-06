@@ -798,10 +798,18 @@ enabled hooks; it takes `--path PATH`. Valid events: `vault.document.created`,
 `config.synced`, `audit.completed`.
 
 The group shares the resource CRUD shape (`list`, `add`, `show`, `edit`, `rename`,
-`remove`, `restore`, `sync`, `status`) plus `run`. `vaultspec-core spec hooks add NAME`
-takes `--event EVENT` (default `vault.document.created`) and `--command CMD` alongside
-the shared `--body`, `--from-file`, `--force`, and `--dry-run` flags; `edit` takes
-`--editor CMD`.
+`remove`, `restore`, `sync`, `status`) plus `run` and `trust`.
+`vaultspec-core spec hooks add NAME` takes `--event EVENT` (default
+`vault.document.created`) and `--command CMD` alongside the shared `--body`,
+`--from-file`, `--force`, and `--dry-run` flags; `edit` takes `--editor CMD`.
+
+A hook names a shell command, and `.vaultspec/hooks/` is shared through git, so a hook
+definition arrives with every clone. No hook runs until an operator approves it, and
+that approval is recorded outside the workspace, under the machine-global VaultSpec
+home, pinned to each file's contents. `vaultspec-core spec hooks trust [NAME]` records
+it and `--revoke` withdraws it; `run` and `sync` offer to record it at an interactive
+terminal and skip the hooks anywhere else. `list` reports each hook's trust state
+alongside its enabled state.
 
 ### vaultspec-core spec precommit
 
