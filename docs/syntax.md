@@ -1,9 +1,7 @@
 # Document syntax
 
-Every document in `.vault/` is part yours and part the tool's. Most trouble comes from
-editing the part that is not yours, so this page starts with which is which.
-
-"Scaffolded" below means created by `vaultspec-core vault add` rather than by hand.
+Create documents with `vaultspec-core vault add`; record execution with
+`vaultspec-core vault exec log`, which creates the plan's ledger when needed.
 
 ## Who owns what
 
@@ -18,7 +16,6 @@ Frontmatter, field by field:
 | `body_hash`   | The tool       | A fingerprint of the body that `modified` attests.                 |
 | `related`     | You            | `--related` when scaffolding, then `vault link add` and `remove`.  |
 | `tier`        | You            | Through `vaultspec-core vault plan tier promote` or `tier demote`. |
-| `step_id`     | The tool       | Filled from the Step the record was scaffolded against.            |
 | `generated`   | The tool       | Marks a file that is rebuilt rather than authored.                 |
 
 Bodies, by document type:
@@ -65,7 +62,7 @@ one.
 
 ## Frontmatter
 
-Every document carries the same six fields:
+Newly generated documents carry these six fields:
 
 ```yaml
 ---
@@ -81,13 +78,15 @@ related:
 ---
 ```
 
-Three document types add one field each:
+Plans add `tier`; generated indexes add `generated`:
 
-| Type  | Extra field | Holds                                                  |
-| ----- | ----------- | ------------------------------------------------------ |
-| plan  | `tier`      | The complexity tier: `L1`, `L2`, `L3`, or `L4`         |
-| exec  | `step_id`   | The canonical identifier of the Step the record covers |
-| index | `generated` | Always `true`; the file is rebuilt, never authored     |
+| Type  | Extra field | Holds                                              |
+| ----- | ----------- | -------------------------------------------------- |
+| plan  | `tier`      | The complexity tier: `L1`, `L2`, `L3`, or `L4`     |
+| index | `generated` | Always `true`; the file is rebuilt, never authored |
+
+Execution ledgers link to their parent plan in `related`; each row carries its Step
+identifier. See [execution logging](CLI.md#vaultspec-core-vault-exec-log).
 
 Add no fields beyond these. Metadata lives in frontmatter and nowhere else, so an
 invented field has no reader and fails the `frontmatter` check.
