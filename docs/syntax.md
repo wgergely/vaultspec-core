@@ -300,25 +300,13 @@ vaultspec-core vault plan step check <plan> S07
 vaultspec-core vault plan step remove <plan> S07
 ```
 
-A hand-edited row parses, so the damage is silent until
-`vaultspec-core vault plan check` runs. That verb does find it, and it is the only one
-that does: `vault check all` runs the vault checks and not the plan conventions, so a
-duplicated identifier survives a clean run of it. Measured, on a plan whose second row
-was hand-edited to claim a number already taken:
+Run `vaultspec-core vault plan check <plan>` to check plan conventions;
+`vault check all` does not include them. See [plan read commands](CLI.md#read-commands)
+for options.
 
-```
-vaultspec-core vault plan check 2026-09-03-payment-retries-plan
-```
-
-```text
-[error] PLAN021 line 13: Step canonical identifier 'S02' appears 2 times in document order.
-  fix (manual): Remove or rename the duplicate occurrences; the convention forbids re-using retired identifiers.
-```
-
-What no check can recover is that reused identifier - the fix is marked manual because
-the tool cannot know which row the ledger rows naming `S02` were written against. Once
-two rows have claimed `S07`, the records pointing at it are ambiguous, and only the
-person who wrote them knows which one they meant.
+Duplicated canonical identifiers make ledger references ambiguous. Review the execution
+records before repairing a conflict; validation cannot determine which Step an existing
+record meant.
 
 ### One action, one row
 
