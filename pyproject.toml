@@ -127,7 +127,14 @@ exclude = ["**/tests", "**/tests/**"]
 packages = ["src/vaultspec_core"]
 
 [tool.pytest.ini_options]
-addopts = "-m 'not benchmark'"
+# Every marker gating on something not installed/reachable by default is
+# deselected here too, not just by the `just test` lanes' explicit `-m`: a
+# bare `pytest` invocation (a contributor's shell, an editor's test runner)
+# has no other gate, and without this a `@pytest.mark.gemini`/`claude` test
+# shells out to a real external CLI, and a `@pytest.mark.network` test hits
+# a live upstream, on every default run. Kept in sync by hand with
+# `dev.toolchain.EXCLUDED_MARKERS`, which a repo guard cross-checks.
+addopts = "-m 'not benchmark and not gemini and not claude and not network'"
 asyncio_mode = "auto"
 log_cli = true
 log_cli_date_format = "%H:%M:%S"

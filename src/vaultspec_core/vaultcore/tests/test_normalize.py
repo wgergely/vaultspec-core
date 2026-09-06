@@ -7,13 +7,20 @@ canonical kebab-case pattern - returning a typed result rather than raising.
 The regression guarded here is the silent ``..`` deletion (``a..b`` -> ``ab``)
 that could mask a typo into a valid-but-different token; the fix rejects any
 residual ``.`` instead. No mocks, stubs, or skips: the function is pure.
+
+Also guarded: a Windows reserved device base name (``con``, ``nul``,
+``com1``, ...) is valid kebab-case and must not slip through - the resulting
+``con.index.md`` is a device name on Windows, not a regular file.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from vaultspec_core.vaultcore.normalize import normalize_feature_tag
+from vaultspec_core.vaultcore.normalize import (
+    WINDOWS_RESERVED_NAMES,
+    normalize_feature_tag,
+)
 
 pytestmark = [pytest.mark.unit]
 
@@ -86,3 +93,29 @@ def test_label_scopes_the_failure_message() -> None:
     result = normalize_feature_tag("Bad Tag", label="tag")
     assert result.ok is False
     assert "tag" in (result.error or "")
+
+
+def test_windows_reserved_device_names_are_rejected() -> None:
+    """Every reserved base name is rejected, case-insensitively.
+
+    Each of these is valid kebab-case and would otherwise pass: the
+    regression is that ``vault add --feature con`` produced an unguarded
+    ``con.index.md``, a Windows device name rather than a regular file.
+    """
+    for raw in [*sorted(WINDOWS_RESERVED_NAMES), "CON", "Nul", "Com1", "LPT9"]:
+        result = normalize_feature_tag(raw)
+        assert result.ok is False, raw
+        assert result.value is None, raw
+        assert "reserved" in (result.error or "").lower(), raw
+
+
+def test_windows_reserved_name_as_substring_is_not_rejected() -> None:
+    """Only an exact reserved base name is rejected, not merely containing one.
+
+    ``console`` and ``recon`` are ordinary kebab-case tokens; the reserved
+    check must not become a substring ban.
+    """
+    for raw in ("console", "recon", "auxiliary", "comet"):
+        result = normalize_feature_tag(raw)
+        assert result.ok is True, raw
+        assert result.value == raw, raw
