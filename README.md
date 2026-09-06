@@ -46,8 +46,8 @@ installation, see [installation options](docs/framework.md#installation-options)
 
 Open your repository in your coding agent and describe the work:
 
-> Use vaultspec-research to investigate adding full-text search to the API.
-> Use the feature tag search-api.
+> Use vaultspec-research to investigate adding full-text search to the API. Use the
+> feature tag search-api.
 
 The workflow covers research, an architecture decision record (ADR), an implementation
 plan, execution, and review. The ADR records the chosen approach and its consequences.
