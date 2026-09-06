@@ -5,7 +5,7 @@ tags:
 date: '2026-09-06'
 modified: '2026-09-06'
 body_schema: 'body-v2'
-body_hash: 'sha256:52ced8c4baf835d489c867723d95f2deefed22547aa3bdeb0ce2c64b55b29de9'
+body_hash: 'sha256:06c47d9503436cbf8d049b4d59d037197723410bf80e373e20a37c7ae57c8aed'
 related:
   - "[[2026-09-06-advisory-lock-cycle-research]]"
   - "[[2026-08-13-plan-mutation-concurrency-adr]]"
@@ -105,9 +105,15 @@ and stays.
 is relied on by `_apply_rename_plan`, which documents never creating `.vault/data`, and
 by every preview path; the callers that must not skip create the parent first
 (`src/vaultspec_core/vaultcore/edit_engine.py:705-706`,
-`src/vaultspec_core/vaultcore/index.py:142-143`). It now logs a warning rather than
-skipping silently, but the residual - a feature rename running unprotected on a
-workspace with no `.vault/data` - is a live gap this record notes and does not fix.
+`src/vaultspec_core/vaultcore/index.py:142-143`). It is now recorded rather than
+entirely silent, but only at debug level, and that limit is itself a constraint rather
+than a preference: `advisory_lock` cannot tell a preview from a real write, on a preview
+the skip is the design, and the CLI routes log records to stdout - so reporting it at
+warning level made four preview tests fail by corrupting their `--json` envelopes.
+Distinguishing the two cases needs a caller-supplied signal on the lock itself, which is
+lock-graph work and is therefore in scope for whichever option is adopted, not for the
+timeout that precedes it. Until then the residual stands: a feature rename against a
+workspace with no `.vault/data` runs unprotected and says so only under `--debug`.
 
 ## Implementation
 

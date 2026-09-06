@@ -297,18 +297,25 @@ def advisory_lock(path: Path, *, timeout: float | None = None) -> Generator[None
     """
     lock_path = path.with_suffix(path.suffix + ".lock")
 
-    # Only create the lock file's parent if it already exists.  Creating
-    # it unconditionally would cause side-effects (e.g. directory creation
-    # during dry-run operations where the target doesn't exist yet), and
-    # raising would break the preview and not-yet-scaffolded-workspace
-    # callers that rely on this skip.  But a guard that silently does
-    # nothing is worse than no guard, because the caller believes it is
-    # protected: say so, once, at warning level, so an unprotected critical
-    # section is at least diagnosable after the fact (issue #457).  Callers
-    # that must not skip - `execute_edit`, `generate_feature_index_result` -
-    # create the parent themselves before locking.
+    # Only create the lock file's parent if it already exists.  Creating it
+    # unconditionally would cause side-effects (e.g. directory creation during
+    # dry-run operations where the target doesn't exist yet), and raising
+    # would break the preview and not-yet-scaffolded-workspace callers that
+    # rely on this skip.  Callers that must not skip - `execute_edit` on a
+    # real write, `generate_feature_index_result` - create the parent
+    # themselves before locking.
+    #
+    # The skip is nevertheless recorded (issue #457): a guard that does
+    # nothing is worse than no guard, because the caller inside the `with`
+    # block believes it is protected.  At DEBUG rather than WARNING, because
+    # this function cannot tell a preview from a real write, and on a preview
+    # the skip is the designed behaviour rather than an anomaly - warning on
+    # every `--dry-run` would both cry wolf and, since the CLI writes log
+    # records to stdout, corrupt every `--json` envelope emitted from a
+    # preview.  Telling the two cases apart needs a caller-supplied signal,
+    # which belongs with the lock-graph decision rather than here.
     if not lock_path.parent.exists():
-        logger.warning(
+        logger.debug(
             "Advisory lock skipped: %s does not exist, so %s cannot be "
             "created and this section runs unprotected",
             lock_path.parent,

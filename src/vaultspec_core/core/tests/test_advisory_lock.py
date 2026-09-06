@@ -772,27 +772,31 @@ class TestTimeoutDoesNotBreakLegitimateBlocking:
 
 @pytest.mark.unit
 class TestAdvisoryLockSkipIsNoLongerSilent:
-    """A lock that does nothing must at least say so (#457).
+    """A lock that does nothing must at least leave a trace (#457).
 
     `advisory_lock` no-ops when the sentinel's parent directory is absent, so
     that a dry run does not create directories as a side effect. The skip is
     load-bearing - `_apply_rename_plan` documents relying on it, and the
-    callers that must not skip (`execute_edit`,
+    callers that must not skip (`execute_edit` on a real write,
     `generate_feature_index_result`) create the parent themselves first - so
     turning it into an error would break them.
 
-    What was wrong is that it was *silent*: a caller inside the `with` block
-    believes it is protected and there was nothing, anywhere, recording that
-    it was not. The skip stays; the silence does not.
+    What was wrong is that it left no trace at all: a caller inside the `with`
+    block believes it is protected and nothing, anywhere, recorded that it was
+    not. It is recorded at DEBUG rather than WARNING because the function
+    cannot tell a preview from a real write, and on a preview the skip is the
+    design. Warning unconditionally cried wolf on every `--dry-run` and, since
+    the CLI writes log records to stdout, corrupted the `--json` envelope of
+    every preview that emitted one - which is what these pin.
     """
 
-    def test_a_skipped_lock_warns_and_names_the_sentinel(
+    def test_a_skipped_lock_is_recorded_and_names_the_sentinel(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ) -> None:
         target = tmp_path / "absent" / "thing.json"
 
         with (
-            caplog.at_level(logging.WARNING, logger="vaultspec_core.core.helpers"),
+            caplog.at_level(logging.DEBUG, logger="vaultspec_core.core.helpers"),
             advisory_lock(target),
         ):
             pass
@@ -800,24 +804,52 @@ class TestAdvisoryLockSkipIsNoLongerSilent:
         assert not (tmp_path / "absent").exists(), (
             "the skip must not gain a directory-creating side effect"
         )
-        warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
-        assert len(warnings) == 1
-        message = warnings[0].getMessage()
+        records = [
+            r for r in caplog.records if "Advisory lock skipped" in r.getMessage()
+        ]
+        assert len(records) == 1
+        assert records[0].levelno == logging.DEBUG, (
+            "a preview skip is the designed behaviour, so it must not be "
+            "reported at a level that reaches default CLI output"
+        )
+        message = records[0].getMessage()
         assert "thing.json.lock" in message
         assert str(tmp_path / "absent") in message
 
-    def test_a_real_lock_does_not_warn(
+    def test_a_skipped_lock_stays_below_the_default_level(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """The guard on the guard: no warning when the sentinel is real."""
+        """The regression: an INFO-and-above listener must see nothing.
+
+        The CLI routes log records to stdout, so anything emitted here at INFO
+        or above lands inside a `--json` envelope and makes it unparseable.
+        Three `vault edit` preview tests and one `exec relink` preview test
+        failed on exactly that.
+        """
+        target = tmp_path / "gone" / "thing.json"
+
+        with (
+            caplog.at_level(logging.INFO, logger="vaultspec_core.core.helpers"),
+            advisory_lock(target),
+        ):
+            pass
+
+        assert not caplog.records
+
+    def test_a_real_lock_records_no_skip(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The guard on the guard: nothing is reported when the lock is real."""
         target = tmp_path / "present.json"
         target.write_text("{}")
 
         with (
-            caplog.at_level(logging.WARNING, logger="vaultspec_core.core.helpers"),
+            caplog.at_level(logging.DEBUG, logger="vaultspec_core.core.helpers"),
             advisory_lock(target),
         ):
             pass
 
         assert (tmp_path / "present.json.lock").exists()
-        assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert not [
+            r for r in caplog.records if "Advisory lock skipped" in r.getMessage()
+        ]
