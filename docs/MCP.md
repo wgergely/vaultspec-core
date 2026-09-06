@@ -88,21 +88,14 @@ the next sync declines to touch the entry rather than repairing it.
 
 ### Serving a read-only surface
 
-Six of the ten tools mutate the vault, and `invoke` can run most of the CLI. Launch the
-server with `--read-only` to withdraw them:
+Use `--read-only` to limit the tools the server advertises:
 
-```
+```bash
 vaultspec-mcp --read-only
 ```
 
-That leaves `status`, `find`, `check`, and `discover`, and removes `create`, `edit`,
-`plan_progress`, `plan_edit`, `log`, and `invoke` from the advertised listing rather
-than refusing them on call, so a client is never handed the schema of something it
-cannot use. `check` is kept but narrowed: its `fix` parameter is gone, and its
-description becomes "Run the vault health-check suite without repair."
-
-All mutating tools write directly to the working tree and never commit. Run them on a
-clean tree if you want the diff reviewable.
+This exposes only `status`, `find`, `check`, and `discover` to connected clients.
+In this mode, `check` has no `fix` parameter.
 
 ### Install modes
 
