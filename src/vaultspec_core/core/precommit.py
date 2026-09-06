@@ -294,7 +294,10 @@ def strip_managed_precommit_hooks(config_file: Path) -> bool:
             atomic_write(config_file, _dump_precommit_yaml(handler, data))
         else:
             config_file.unlink()
-    except (YAMLError, OSError):
+    # UnicodeDecodeError subclasses ValueError, not OSError, so a file that
+    # exists and cannot be decoded escaped this net and surfaced as a raw
+    # traceback (issue #407).
+    except (YAMLError, OSError, UnicodeDecodeError):
         return False
     return True
 
@@ -354,7 +357,10 @@ def _load_existing_precommit_config(
     try:
         raw = config_file.read_text(encoding="utf-8")
         loaded: object = handler.load(raw) or {}
-    except (YAMLError, OSError):
+    # UnicodeDecodeError subclasses ValueError, not OSError, so a file that
+    # exists and cannot be decoded escaped this net and surfaced as a raw
+    # traceback (issue #407).
+    except (YAMLError, OSError, UnicodeDecodeError):
         return None
     data = _as_mapping(loaded)
     if data is None:

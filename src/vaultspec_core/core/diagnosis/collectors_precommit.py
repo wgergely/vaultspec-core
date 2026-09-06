@@ -167,7 +167,9 @@ def _local_precommit_hooks(config_path: Path) -> list[dict[str, object]] | None:
 
     try:
         data: object = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    except (yaml.YAMLError, OSError) as exc:
+    # See the note in `core/precommit.py`: an undecodable file is a
+    # ValueError, not an OSError (issue #407).
+    except (yaml.YAMLError, OSError, UnicodeDecodeError) as exc:
         logger.warning("Cannot read .pre-commit-config.yaml %s: %s", config_path, exc)
         return None
 
@@ -205,8 +207,17 @@ def _collect_precommit_yaml_state(target: Path) -> PrecommitSignal:
     # expectations. P04 layers a dedicated mode-mismatch signal on top of this.
     expected_entries = canonical_hook_entries_for_mode(resolve_render_mode(target))
 
-    local_hooks = _local_precommit_hooks(target / ".pre-commit-config.yaml")
+    config_path = target / ".pre-commit-config.yaml"
+    local_hooks = _local_precommit_hooks(config_path)
     if local_hooks is None:
+        # `_local_precommit_hooks` answers None both for an absent file and for
+        # one it could not read. Widening its exception net so an undecodable
+        # file no longer escapes as a raw traceback means it no longer reaches
+        # `_safe_precommit_state`'s handler either, so the distinction has to
+        # be made here or the row silently reverts to the benign reading
+        # (issue #407).
+        if config_path.exists():
+            return PrecommitSignal.UNREADABLE
         return PrecommitSignal.NO_FILE
 
     found_ids = frozenset(

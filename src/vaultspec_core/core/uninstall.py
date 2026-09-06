@@ -188,7 +188,10 @@ def _uninstall_precommit_hooks(
             if mdata.precommit_managed:
                 mdata.precommit_managed = False
                 write_manifest_data(root, mdata)
-    except (YAMLError, OSError):
+    # UnicodeDecodeError subclasses ValueError, not OSError, so a file that
+    # exists and cannot be decoded escaped this net and surfaced as a raw
+    # traceback (issue #407).
+    except (YAMLError, OSError, UnicodeDecodeError):
         pass
 
 

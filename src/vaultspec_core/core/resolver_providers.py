@@ -316,6 +316,12 @@ def resolve_config(
             )
         return
 
+    # A check that could not run has observed nothing about the config, so it
+    # cannot justify a repair. `doctor` weighs it as a warning; preflight stays
+    # its hand rather than rewriting a file on a guess (issue #407).
+    if signal == ConfigSignal.UNREADABLE:
+        return
+
     # Config resolution only applies to "sync" action; other actions handled
     # by the main command directly. Every ConfigSignal member is covered by
     # a branch above, so this is a check-time exhaustiveness guarantee, not

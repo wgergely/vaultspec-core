@@ -702,11 +702,20 @@ class TestPrecommitYamlState:
     def test_absent_config_is_no_file(self, tmp_path: Path) -> None:
         assert collect_precommit_state(tmp_path) == PrecommitSignal.NO_FILE
 
-    def test_unparseable_config_is_no_file(self, tmp_path: Path) -> None:
+    def test_unparseable_config_is_unreadable(self, tmp_path: Path) -> None:
+        """A config that exists and cannot be parsed is not an absent one.
+
+        This asserted ``NO_FILE``. The class's stated intent - classify without
+        crashing - is unchanged, and its sibling above already refuses the same
+        conflation for a non-mapping document ("declares no hooks, not no
+        file"). A file that is present and unparseable is the case #407 exists
+        to separate: reporting absence for it let ``doctor`` exit 0 on a
+        workspace every mutating verb refused.
+        """
         (tmp_path / ".pre-commit-config.yaml").write_text(
             "repos: [unclosed\n", encoding="utf-8"
         )
-        assert collect_precommit_state(tmp_path) == PrecommitSignal.NO_FILE
+        assert collect_precommit_state(tmp_path) == PrecommitSignal.UNREADABLE
 
     def test_non_mapping_document_is_no_hooks(self, tmp_path: Path) -> None:
         """A parseable but non-mapping document declares no hooks, not no file."""
