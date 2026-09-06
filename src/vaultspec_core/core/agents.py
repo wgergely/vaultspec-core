@@ -210,6 +210,63 @@ def _render_gemini_agent(
     return build_file(fm, body)
 
 
+def _render_antigravity_agent(
+    name: str,
+    meta: dict[str, Any],
+    body: str,
+    *,
+    warnings: list[str] | None = None,  # noqa: ARG001
+) -> str:
+    """Render an agent definition for Antigravity.
+
+    Antigravity discovers workspace subagents at ``.agents/agents/<name>.md``
+    and requires exactly two frontmatter keys: ``name`` and ``description``.
+    Everything else it accepts (``tools``, ``model``, ``mainAgent``,
+    ``subagent``, ``commandExecutionPolicy``, ``mcpServers``, ``skills``) is
+    optional and carries a documented default, so this renderer emits the
+    required pair and nothing more. vaultspec authoring keys (``tier``,
+    ``mode``) are dropped, as they are for every other first-class provider.
+
+    Three deliberate omissions, each load-bearing:
+
+    ``tools``
+        Antigravity's tool vocabulary is *not* Gemini CLI's: it names
+        ``view_file``, ``replace_file_content``, ``grep_search`` and
+        ``run_command`` where Gemini names ``read_file``, ``replace``,
+        ``grep_search`` and ``run_shell_command``, so
+        :data:`_CLAUDE_TO_GEMINI_TOOLS` cannot be reused. Google publishes no
+        complete enumeration of the accepted values - only a four-item
+        ``e.g.`` list - and documents a standing defect whereby an unmapped or
+        misspelled entry can hang the subagent process at execution time. An
+        agent that declares no tool restriction loads; one that declares a
+        guessed name may not run at all, so the field is omitted until the
+        vocabulary can be pinned to a primary source the way
+        :class:`~vaultspec_core.core.enums.GeminiBuiltinTool` is.
+
+    ``subagent``
+        Defaults to ``true``, which is exactly what these personas are for.
+        Emitting the default would add a key that can only drift.
+
+    ``commandExecutionPolicy``
+        Defaults to ``sandbox``. The alternatives (``off``, ``auto``,
+        ``eager``) all trade away the operator's shell-execution safety
+        posture, and that is not a choice a sync tool should make on their
+        behalf.
+
+    Antigravity also accepts a multi-file form - a ``<name>/agent.md``
+    directory - for agents that ship sidecar assets. Sources under
+    ``.vaultspec/agents/`` are single self-contained markdown files with no
+    sidecars, so the single-file form is rendered; the directory form remains
+    available if a source ever needs one.
+    """
+    fm: dict[str, Any] = {"name": _stem(name)}
+    description = meta.get("description")
+    if isinstance(description, str) and description.strip():
+        fm["description"] = description.strip()
+
+    return build_file(fm, body)
+
+
 class _AgentRenderer(Protocol):
     def __call__(
         self,
@@ -224,6 +281,7 @@ class _AgentRenderer(Protocol):
 _AGENT_RENDERERS: dict[Tool, _AgentRenderer] = {
     Tool.CLAUDE: _render_claude_agent,
     Tool.GEMINI: _render_gemini_agent,
+    Tool.ANTIGRAVITY: _render_antigravity_agent,
 }
 
 

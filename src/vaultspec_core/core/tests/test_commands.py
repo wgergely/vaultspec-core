@@ -33,7 +33,8 @@ def test_init_run_scaffolds_antigravity_workspace_layout(tmp_path: Path) -> None
         assert (tmp_path / ".agents" / "workflows").is_dir()
         assert (tmp_path / ".agents" / "skills").is_dir()
         assert (tmp_path / ".codex" / "config.toml").is_file()
-        assert not (tmp_path / ".agents" / "agents").exists()
+        # Antigravity discovers workspace subagents at `.agents/agents/`.
+        assert (tmp_path / ".agents" / "agents").is_dir()
         mcp_config = json.loads((tmp_path / ".mcp.json").read_text(encoding="utf-8"))
         server = mcp_config["mcpServers"]["vaultspec-core"]
         assert server["command"] == "uvx"
