@@ -32,13 +32,18 @@ brew install vaultspec-core
 
 ## Verifying what you downloaded
 
-Download `SHA256SUMS` from the same release as your asset. Compare the asset's SHA-256
-hash with its entry in that file. If you downloaded all listed assets, check them
-together from their download directory with:
+Download `SHA256SUMS` from the same release as your asset. Compute the asset's SHA-256
+hash with the command for your platform, replacing `./asset` with its path:
 
-```sh
-sha256sum -c SHA256SUMS
-```
+| Platform             | Command                                                 |
+| -------------------- | ------------------------------------------------------- |
+| Windows (PowerShell) | `Get-FileHash -Algorithm SHA256 -LiteralPath './asset'` |
+| macOS                | `shasum -a 256 './asset'`                               |
+| Linux                | `sha256sum './asset'`                                   |
+
+Compare the result with the hash beside that asset's filename in `SHA256SUMS`; letter
+case doesn't matter. If they differ, don't run the asset. Download it again from the
+same release and recheck.
 
 A matching checksum confirms agreement with the release manifest. To verify an asset's
 build provenance, use [GitHub CLI](https://cli.github.com/manual/gh_attestation_verify):
