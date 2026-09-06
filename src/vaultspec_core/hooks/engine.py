@@ -6,6 +6,14 @@ and executes shell actions with re-entrancy guard and 60-second timeout.
 Key exports: :func:`load_hooks`, :func:`trigger`, :func:`fire_hooks`.
 Re-exported via :mod:`vaultspec_core.hooks`; depends on
 :func:`vaultspec_core.core.helpers.kill_process_tree` for subprocess cleanup.
+
+Loading a hook and running one are deliberately separate authorities. Hook files
+are shared through git like the rest of ``.vaultspec/``, so :func:`load_hooks`
+parses whatever the workspace carries and every listing surface can describe it,
+while :func:`trigger` spawns nothing that :mod:`vaultspec_core.hooks.trust` has
+not matched against an operator consent record held outside the workspace. This
+module is the single choke point for that check: every execution path in the
+product reaches a subprocess through :func:`trigger`.
 """
 
 from __future__ import annotations
@@ -18,6 +26,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from ..core.helpers import kill_process_tree
+from .trust import partition_by_trust
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -251,22 +260,33 @@ def trigger(
     hooks: list[Hook],
     event: str,
     context: dict[str, str] | None = None,
+    home: Path | None = None,
 ) -> list[HookResult]:
-    """Trigger all hooks matching the given event.
+    """Trigger every trusted hook matching the given event.
 
     Iterates over ``hooks``, filters to those whose ``event`` matches and
-    ``enabled`` is ``True``, and executes each action in order.  Guards
+    ``enabled`` is ``True``, drops any whose command the operator has not
+    consented to, and executes the remainder's actions in order.  Guards
     against re-entrant triggers for the same event.
+
+    Consent is the gate this function will not spawn a process without.  A hook
+    file is committed content that arrives with a clone, so its own contents
+    can never authorise it; :mod:`vaultspec_core.hooks.trust` answers from a
+    ledger kept outside the workspace and denies on every doubt.  Skipped hooks
+    are logged and produce no result, exactly as a non-matching hook does.
 
     Args:
         hooks: List of loaded hooks to evaluate.
         event: Event name to match against hook definitions.
         context: Optional mapping of ``{key}`` placeholder names to
             substitution values used in command and task templates.
+        home: Machine-global VaultSpec home holding the consent ledger.
+            Production callers pass nothing; real-filesystem tests pass their
+            own directory so they never read the operator's ledger.
 
     Returns:
         List of :class:`HookResult` objects, one per executed action.
-        Empty if no hooks matched the event.
+        Empty if no hooks matched the event or none of the matches are trusted.
     """
     if event in _triggering:
         logger.warning("Re-entrant hook trigger blocked: %s", event)
@@ -275,7 +295,14 @@ def trigger(
     ctx = context or {}
     results: list[HookResult] = []
 
-    matching = [h for h in hooks if h.event == event and h.enabled]
+    candidates = [h for h in hooks if h.event == event and h.enabled]
+    matching, untrusted = partition_by_trust(candidates, home)
+    for hook in untrusted:
+        logger.warning(
+            "Hook '%s' is not trusted in this workspace and will not run; "
+            "review it and run 'vaultspec-core spec hooks trust' to allow it",
+            hook.name,
+        )
     if not matching:
         return results
 
@@ -415,12 +442,24 @@ def fire_hooks(
     context: dict[str, str] | None = None,
     *,
     hooks_dir: Path | None = None,
+    home: Path | None = None,
 ) -> None:
     """Fire hooks for a lifecycle event, silently catching all errors.
+
+    This is the lifecycle entry point ``sync`` reaches, so it is the
+    highest-traffic route into :func:`trigger`'s consent check. It therefore
+    threads ``home`` the same way it threads ``hooks_dir``: without it, the
+    consent half of this path could only be exercised against the operator's
+    own ledger, and a path that can only be tested destructively is a path
+    that does not get tested.
 
     Args:
         event: Event name to trigger.
         context: Optional context dict passed through to hook actions.
+        home: Machine-global VaultSpec home holding the consent ledger.
+            Defaults to the operator's real home, which is what every
+            production caller wants; real-filesystem tests pass their own so
+            they neither read nor write the operator's approvals.
         hooks_dir: Directory to load hook definitions from. Defaults to the
             active :func:`~vaultspec_core.core.types.get_context`'s
             ``hooks_dir`` when omitted - the right default for a caller
@@ -440,6 +479,6 @@ def fire_hooks(
             hooks_dir = get_context().hooks_dir
 
         hooks = load_hooks(hooks_dir)
-        trigger(hooks, event, context)
+        trigger(hooks, event, context, home)
     except Exception:
         logger.warning("Hook trigger failed for %s", event, exc_info=True)

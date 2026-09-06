@@ -290,6 +290,26 @@ def cmd_sync(
         skip=set(skip),
     )
 
+    # The all-provider sync is the one CLI path that fires the ``config.synced``
+    # lifecycle event, so it is the one that must offer the operator the choice
+    # before a workspace hook's shell command could run (GHSA-w5xf-54cr-fxcq).
+    # Declining, or having no operator to ask, only costs the hooks: the sync
+    # itself is a legitimate operation and still completes.
+    if provider == "all" and not dry_run and "hooks" not in skip:
+        from vaultspec_core.cli._hook_trust import consent_gate
+        from vaultspec_core.core.provider_sync import target_hooks_dir
+
+        # The same resolver the firing code uses, deliberately. Under
+        # ``--target`` the ambient context still reflects the CWD/source split,
+        # so resolving the directory any other way here would offer the
+        # operator the CWD workspace's hooks while the target workspace's were
+        # the ones about to run.
+        consent_gate(
+            "config.synced",
+            json_output=json_output,
+            hooks_dir=target_hooks_dir(sync_target),
+        )
+
     from vaultspec_core.core.commands import sync_provider
     from vaultspec_core.core.exceptions import VaultSpecError
 

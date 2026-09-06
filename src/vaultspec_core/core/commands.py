@@ -100,11 +100,11 @@ def hooks_list_data() -> dict[str, Any]:
     Returns:
         A dict with:
         - ``"hooks"``: list of dicts with ``"name"``, ``"enabled"``,
-          ``"event"``, ``"actions"`` keys.
+          ``"event"``, ``"actions"``, ``"trusted"`` keys.
         - ``"supported_events"``: sorted list of supported event names.
         - ``"hooks_dir"``: relative path to hooks directory.
     """
-    from vaultspec_core.hooks import SUPPORTED_EVENTS, load_hooks
+    from vaultspec_core.hooks import SUPPORTED_EVENTS, is_trusted, load_hooks
 
     ctx = _t.get_context()
     hooks = load_hooks(ctx.hooks_dir)
@@ -117,6 +117,10 @@ def hooks_list_data() -> dict[str, Any]:
                 "enabled": hook.enabled,
                 "event": hook.event,
                 "actions": actions,
+                # An enabled hook that is not trusted never runs. Reporting the
+                # two flags separately is what stops "enabled" from reading as
+                # "will run" and turning a refusal into a mystery.
+                "trusted": is_trusted(hook.source_path),
             }
         )
 
