@@ -916,6 +916,26 @@ denylist covers:
   `vaultspec-core spec hooks status` stay available, so an agent can still read and
   explain a workspace's hooks.
 
+#### Flags the gateway does not pass
+
+A verb can be perfectly safe to run and still declare one option that is not safe to
+accept from a tool call. `--editor` is the example: it names a command for the CLI to
+execute, which is the point of the flag at a terminal and has no meaning at all through
+`invoke`, where no terminal is attached.
+
+The gateway's other screens do not catch it. The positional guard sees no operand, and
+the flag-name guard sees an option the verb genuinely declares; neither looks at the
+value. So `--editor` is refused by name for every gateway call, whichever verb declares
+it, and it is withheld from the schemas `discover` returns.
+
+Separately, every subprocess `invoke` spawns is marked as non-interactive in its
+environment, and the CLI declines to open an editor when it sees that mark - from the
+flag, from `.vaultspec/config.toml`, from `VAULTSPEC_EDITOR`, `VISUAL` or `EDITOR`, or
+from the built-in fallback. The mark is added to the environment the gateway itself
+composes, which no tool argument reaches, so a caller can neither set nor clear it. The
+edit verbs stay reachable for everything else they do; only the interactive launch is
+off.
+
 ## Server lifetime
 
 The server's lifetime is its client connection. It exits when stdin reaches EOF, and a

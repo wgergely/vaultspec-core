@@ -138,6 +138,10 @@ class TestEditorResolution:
     """Verify editor resolution precedence ladder.
 
     Order: flag -> config -> VISUAL -> EDITOR -> vi.
+
+    The flag and config rungs are untrusted channels, so their probe editors
+    are named after real editors on the allowlist; the environment rungs are
+    trusted and may name anything that resolves.
     """
 
     def test_resolution_ladder(self, tmp_path: Path) -> None:
@@ -151,8 +155,8 @@ class TestEditorResolution:
         ed_editor = _write_probe_editor(bindir, "vsed-editor")
         ed_visual = _write_probe_editor(bindir, "vsed-visual")
         ed_vaultspec = _write_probe_editor(bindir, "vsed-vaultspec")
-        ed_config = _write_probe_editor(bindir, "vsed-config")
-        ed_flag = _write_probe_editor(bindir, "vsed-flag")
+        ed_config = _write_probe_editor(bindir, "nano")
+        ed_flag = _write_probe_editor(bindir, "micro")
 
         # Save old values
         old_path = os.environ.get("PATH")
@@ -238,8 +242,8 @@ class TestEditorSubprocessSafety:
         # (non-zero -> 3), and a script exiting 130 (cancellation -> 4).
         bindir = tmp_path / "bin"
         bindir.mkdir()
-        ed_fail5 = _write_probe_editor(bindir, "vsed-fail5", exit_code=5)
-        ed_cancel = _write_probe_editor(bindir, "vsed-cancel", exit_code=130)
+        ed_fail5 = _write_probe_editor(bindir, "micro", exit_code=5)
+        ed_cancel = _write_probe_editor(bindir, "nano", exit_code=130)
 
         old_path = os.environ.get("PATH")
         try:

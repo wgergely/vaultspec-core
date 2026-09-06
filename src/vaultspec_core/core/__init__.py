@@ -17,6 +17,15 @@ from .agents import collect_agents as collect_agents
 from .agents import transform_agent as transform_agent
 from .config_gen import config_show as config_show
 from .config_gen import config_sync as config_sync
+from .editor import (
+    EDITOR_PROGRAM_ALLOWLIST as EDITOR_PROGRAM_ALLOWLIST,
+)
+from .editor import (
+    EditorValidationError as EditorValidationError,
+)
+from .editor import (
+    validate_editor_command as validate_editor_command,
+)
 from .enums import InstallMode as InstallMode
 from .enums import McpScope as McpScope
 from .enums import McpTargetFormat as McpTargetFormat

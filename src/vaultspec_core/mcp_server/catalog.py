@@ -40,7 +40,9 @@ if TYPE_CHECKING:
     from typer._click.core import Context as ClickContext
 
 __all__ = [
+    "BLOCKED_FLAGS",
     "DENYLIST",
+    "RESERVED_FLAGS",
     "CatalogEntry",
     "CatalogParseError",
     "CommandArgument",
@@ -104,6 +106,23 @@ _JSON_FLAG = "--json"
 #: argument object: the server injects ``--target`` and appends ``--json``, and
 #: ``--help`` would suppress the command.
 RESERVED_FLAGS: frozenset[str] = frozenset({"--target", _JSON_FLAG, "--help"})
+
+#: Flags refused for every gateway-originated call and hidden from the schemas
+#: ``discover`` returns, whichever verb declares them.
+#:
+#: ``--editor`` names a command the CLI then executes. On a terminal that is
+#: the point of the flag; through a tool call there is no terminal to attach an
+#: editor to, so the flag has no legitimate use and its value would be nothing
+#: but an execution primitive handed to a caller whose input is untrusted.
+#: Rejecting the one flag rather than denying the ``edit`` verbs outright keeps
+#: the rest of each verb reachable and states the actual rule, and it does not
+#: have to be revisited every time another verb grows an ``--editor``.
+#:
+#: This screens the *name*, which is the half the gateway can decide with
+#: certainty. It is paired with, not a substitute for, the marker the gateway
+#: puts in the child environment and the validation the CLI performs on the
+#: value; either alone would be one mistake away from reopening the hole.
+BLOCKED_FLAGS: frozenset[str] = frozenset({"--editor"})
 
 
 class CatalogParseError(ValueError):

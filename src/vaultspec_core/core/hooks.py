@@ -8,7 +8,6 @@ verification for hooks.
 from __future__ import annotations
 
 import logging
-import shutil
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -159,12 +158,16 @@ def hooks_edit(name: str, editor: str | None = None) -> Path:
     Raises:
         ResourceNotFoundError: If the hook does not exist.
     """
+    from .editor import assert_interactive_editing_allowed
     from .exceptions import (
         EditorCancellationError,
-        EditorResolutionError,
         EditorSubprocessError,
     )
     from .local_config import resolve_editor
+
+    # Before resolution, not after: an invocation with no terminal cannot open
+    # an editor whatever the ladder would have produced.
+    assert_interactive_editing_allowed()
 
     file_path = resolve_hook_path(name)
     if not file_path.exists():
@@ -173,29 +176,18 @@ def hooks_edit(name: str, editor: str | None = None) -> Path:
     target_dir = _t.get_context().target_dir
     resolved_editor = resolve_editor(editor, target_dir)
 
-    import shlex
     import subprocess
 
-    parts = shlex.split(resolved_editor)
-    if not parts:
-        raise EditorResolutionError(
-            f"Empty editor command resolved from {resolved_editor!r}"
-        )
-
-    exe = shutil.which(parts[0]) or parts[0]
-    cmd = [exe, *parts[1:], str(file_path)]
+    from .editor import spawn_editor
 
     try:
-        if sys.platform == "win32" and exe.lower().endswith((".cmd", ".bat")):
-            result = subprocess.run(["cmd.exe", "/c", *cmd], shell=False)
-        else:
-            result = subprocess.run(cmd, shell=False)
+        returncode = spawn_editor(resolved_editor, file_path)
 
-        if result.returncode != 0:
-            if result.returncode == 130:
+        if returncode != 0:
+            if returncode == 130:
                 raise EditorCancellationError("Editor edit cancelled by user.")
             raise EditorSubprocessError(
-                f"Editor exited with non-zero exit code {result.returncode}."
+                f"Editor exited with non-zero exit code {returncode}."
             )
     except KeyboardInterrupt as e:
         raise EditorCancellationError("Editor edit cancelled by user (Ctrl+C).") from e
