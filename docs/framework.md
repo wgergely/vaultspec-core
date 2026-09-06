@@ -80,19 +80,18 @@ architectural impact. It must explain the exception and obtain your approval fir
 
 ## Find a feature's documents
 
-List a feature's records, optionally by type:
+List a feature's records:
 
-```text
-$ vaultspec-core vault list --feature search-api
-Vault documents
-  2026-06-26-search-api-research research #search-api 2026-06-26
-  2026-06-26-search-api-adr adr #search-api 2026-06-26
-  2026-06-26-search-api-plan plan #search-api 2026-06-26
+```bash
+vaultspec-core vault list --feature search-api
 ```
 
-When you do not know the name, search by meaning instead. That needs
-[vaultspec-rag](https://github.com/nevenincs/vaultspec-rag), a separate package which is
-not installed with vaultspec-core:
+See the [list reference](CLI.md#vaultspec-core-vault-list) for type filters and
+pagination.
+
+For semantic search, [install RAG](https://github.com/nevenincs/vaultspec-rag#install)
+and [index your project](https://github.com/nevenincs/vaultspec-rag#use-it) first. RAG
+is a separate package; Core doesn't install it.
 
 ```bash
 vaultspec-rag search "full-text ranking and tokenizer" --type vault
