@@ -311,6 +311,44 @@ def _stamp_last_synced(target_dir: Path, candidates: Iterable[str]) -> None:
         write_manifest_data(target_dir, mdata)
 
 
+def _target_hooks_dir(target_dir: Path) -> Path:
+    """Return *target_dir*'s own ``.vaultspec/hooks`` directory.
+
+    ``sync --target`` reads its source content (rules, skills, agents) from
+    the CWD workspace while writing to *target_dir* - the correct model for
+    a sync (see :func:`~vaultspec_core.cli._target.apply_target`'s
+    ``split_source``). Hooks are different: they react to an event that just
+    happened *to* a workspace, so the ``config.synced`` hook fired after a
+    sync must come from the workspace that was actually synced, not from
+    whichever workspace happens to be the ambient CWD - otherwise a
+    ``--target`` sync executes another workspace's hook definitions against
+    the target, which is surprising at best and widens the blast radius of
+    hook execution at worst.
+
+    Resolved independently of the ambient context (rather than read off
+    ``get_context()``) so this is correct even when the ambient context is
+    mid-sync and reflects the CWD/source split.
+
+    Falls back to the ambient context's ``hooks_dir`` if resolution fails
+    for any reason: ``fire_hooks`` itself is a best-effort, silently-caught
+    side effect of a sync (see its docstring), and a hooks-directory
+    resolution problem must degrade the same way rather than fail a sync
+    that otherwise completed.
+    """
+    from ..config import resolve_workspace
+
+    try:
+        return resolve_workspace(target_override=target_dir).vaultspec_dir / "hooks"
+    except Exception:
+        logger.warning(
+            "Could not resolve %s's own hooks directory; falling back to the "
+            "ambient workspace context",
+            target_dir,
+            exc_info=True,
+        )
+        return _t.get_context().hooks_dir
+
+
 def _sync_all_providers(
     ctx: _t.WorkspaceContext,
     *,
@@ -333,6 +371,7 @@ def _sync_all_providers(
             fire_hooks(
                 "config.synced",
                 {"root": str(ctx.target_dir), "event": "config.synced"},
+                hooks_dir=_target_hooks_dir(ctx.target_dir),
             )
             logger.info("Done.")
         return results

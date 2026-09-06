@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -67,24 +67,55 @@ try:
     def _yaml_load_impl(text: str) -> dict[str, Any]:
         """Load YAML text via PyYAML, falling back to the simple parser on error.
 
+        A YAML document is not necessarily a mapping (a sequence or a bare
+        scalar are both legal YAML). Every caller of this function treats its
+        result as a ``dict`` without checking, so a non-mapping result is
+        coerced to ``{}`` here at the parser boundary rather than raising:
+        this is the same "malformed document degrades to empty metadata"
+        model ``parse_vault_metadata``'s hand-written scanner already applies
+        (a sequence frontmatter block simply matches none of its known
+        ``key:`` patterns), and it lets the existing ``vault check
+        frontmatter`` diagnostics - which already report missing tags/date as
+        check violations - catch the malformed document downstream instead
+        of a crash pre-empting every command that builds the graph.
+
         Args:
             text: Raw YAML text (without ``---`` delimiters).
 
         Returns:
-            Dictionary of parsed key-value pairs.
+            Dictionary of parsed key-value pairs; ``{}`` when the document
+            parses to ``None`` or to a non-mapping value.
         """
         try:
-            return yaml.load(text, Loader=SafeLoader) or {}
+            loaded = yaml.load(text, Loader=SafeLoader)
         except yaml.YAMLError as e:
             # PyYAML chokes on unquoted colons in values (e.g.
             # ``description: A test: with colons``).  Fall back to
             # the simple key-value splitter which handles them fine.
+            #
+            # Log only a summary line, not the full frontmatter block: this
+            # warning is the kind of thing that ends up pasted verbatim into
+            # a public bug report, and the block itself may carry sensitive
+            # values the author never intended to publish.
             logger.warning(
-                "PyYAML parse error on content:\n%s\nfalling back to simple parser: %s",
-                text,
+                "PyYAML parse error on %d-char frontmatter block (starts %r): "
+                "%s; falling back to simple parser",
+                len(text),
+                text.strip().splitlines()[0][:80] if text.strip() else "",
                 e,
             )
             return _simple_yaml_load(text)
+        if loaded is None:
+            return {}
+        if not isinstance(loaded, dict):
+            logger.warning(
+                "Frontmatter parsed to a %s, not a mapping (starts %r); "
+                "treating as empty metadata",
+                type(loaded).__name__,
+                text.strip().splitlines()[0][:80] if text.strip() else "",
+            )
+            return {}
+        return cast("dict[str, Any]", loaded)
 
     _yaml_load = _yaml_load_impl
 
@@ -126,8 +157,17 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
     try:
         frontmatter = _yaml_load(match.group(1))
     except Exception as e:
-        logger.error("DEBUG: YAML PARSE ERROR on content:\n%s\n", match.group(1))
-        logger.warning("Failed to parse frontmatter: %s", e, exc_info=True)
+        # Summarize rather than dump the block: this is the kind of warning
+        # that gets pasted verbatim into a public bug report, and the block
+        # itself may carry values the author never intended to publish.
+        yaml_block = match.group(1)
+        logger.warning(
+            "Failed to parse %d-char frontmatter block (starts %r): %s",
+            len(yaml_block),
+            yaml_block.strip().splitlines()[0][:80] if yaml_block.strip() else "",
+            e,
+            exc_info=True,
+        )
         frontmatter = {}
     body = match.group(2)
     return frontmatter, body

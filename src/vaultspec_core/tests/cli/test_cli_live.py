@@ -374,6 +374,90 @@ class TestSync:
         assert result.returncode == 0, result.stdout + result.stderr
         assert synced.exists(), "sync did not regenerate file at --target"
 
+    def test_sync_all_fires_the_targets_own_hooks_not_the_cwds(
+        self, tmp_path: Path
+    ) -> None:
+        """The ``config.synced`` hook fired by ``sync --target`` must load
+        its definition from the *target* workspace, not the process CWD.
+
+        ``sync --target`` deliberately reads its source content (rules,
+        skills, agents) from the CWD workspace while writing to the target -
+        the right model for a sync. Hooks are different: they react to an
+        event that just happened *to* a workspace, so the hook that fires
+        must be declared by the workspace that was actually synced. Uses a
+        real subprocess (not ``CliRunner``) with a genuinely different
+        process CWD, and clears ``PYTEST_CURRENT_TEST`` from its environment
+        so the real CWD/target split path activates exactly as it does
+        outside tests (see ``_resolve_framework_root``'s pytest guard in
+        ``cli/_target.py``) - the actual bug only reproduces in that path.
+        """
+        from vaultspec_core.core.commands import install_run
+
+        cwd_workspace = tmp_path / "cwd-workspace"
+        target_workspace = tmp_path / "target-workspace"
+        cwd_workspace.mkdir()
+        target_workspace.mkdir()
+        install_run(path=cwd_workspace, provider="all", dry_run=False, force=True)
+        install_run(path=target_workspace, provider="all", dry_run=False, force=True)
+
+        marker_cwd = cwd_workspace / "fired-from-cwd.txt"
+        marker_target = target_workspace / "fired-from-target.txt"
+        # A helper script per marker avoids the Windows shlex quoting pitfall
+        # of embedding quoted Python source directly in a YAML command
+        # string (see TestFireHooksIntegration in hooks/tests/test_hooks.py).
+        script_cwd = tmp_path / "mark_cwd.py"
+        script_target = tmp_path / "mark_target.py"
+        script_cwd.write_text(
+            f"import pathlib; pathlib.Path({str(marker_cwd)!r}).touch()",
+            encoding="utf-8",
+        )
+        script_target.write_text(
+            f"import pathlib; pathlib.Path({str(marker_target)!r}).touch()",
+            encoding="utf-8",
+        )
+        (cwd_workspace / ".vaultspec" / "hooks" / "marker.yaml").write_text(
+            "event: config.synced\nenabled: true\nactions:\n"
+            f"  - type: shell\n    command: {sys.executable} {script_cwd}\n",
+            encoding="utf-8",
+        )
+        (target_workspace / ".vaultspec" / "hooks" / "marker.yaml").write_text(
+            "event: config.synced\nenabled: true\nactions:\n"
+            f"  - type: shell\n    command: {sys.executable} {script_target}\n",
+            encoding="utf-8",
+        )
+
+        env = {k: v for k, v in os.environ.items() if k != "PYTEST_CURRENT_TEST"}
+        env["NO_COLOR"] = "1"
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "vaultspec_core",
+                "sync",
+                "all",
+                "--target",
+                str(target_workspace),
+                "--force",
+            ],
+            cwd=cwd_workspace,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+
+        assert marker_target.exists(), (
+            "config.synced must fire the target workspace's own hook, not "
+            "the CWD workspace's"
+        )
+        assert not marker_cwd.exists(), (
+            "config.synced must not execute the CWD workspace's hook when "
+            "syncing a different --target"
+        )
+
     @pytest.mark.parametrize("flag", ["--dry-run", "--force"])
     def test_sync_flags(
         self, cli: CliRunner, synthetic_project: Path, flag: str

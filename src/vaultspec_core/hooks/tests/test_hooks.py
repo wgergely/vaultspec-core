@@ -14,6 +14,7 @@ from ...hooks import (
     Hook,
     HookAction,
     HookResult,
+    fire_hooks,
     load_hooks,
     trigger,
 )
@@ -453,3 +454,41 @@ class TestFireHooksIntegration:
         hooks = load_hooks(tmp_path)
         results = trigger(hooks, "vault.document.created")
         assert results == []
+
+
+class TestFireHooksExplicitDirectory:
+    """``fire_hooks(hooks_dir=...)`` must load from that directory, not the
+    ambient workspace context.
+
+    Regression coverage for the sync ``--target`` bug where the hook
+    definitions loaded came from whichever workspace happened to be
+    ambient rather than the one a caller explicitly names. Passing
+    ``hooks_dir`` also means a caller can exercise ``fire_hooks`` without
+    workspace initialisation at all.
+    """
+
+    def test_loads_from_the_explicit_directory_not_the_ambient_context(
+        self, tmp_path: Path
+    ) -> None:
+        explicit_dir = tmp_path / "explicit-hooks"
+        explicit_dir.mkdir()
+        marker = tmp_path / "fired.txt"
+        script = tmp_path / "create_marker.py"
+        script.write_text(
+            f"import pathlib; pathlib.Path({str(marker)!r}).touch()",
+            encoding="utf-8",
+        )
+        (explicit_dir / "marker.yaml").write_text(
+            "event: config.synced\nenabled: true\nactions:\n"
+            f"  - type: shell\n    command: {sys.executable} {script}\n",
+            encoding="utf-8",
+        )
+
+        # Deliberately do not initialise any workspace context: the whole
+        # point of the explicit hooks_dir parameter is that fire_hooks does
+        # not need one when it is given.
+        fire_hooks("config.synced", hooks_dir=explicit_dir)
+
+        assert marker.exists(), (
+            "fire_hooks(hooks_dir=...) must load hooks from the directory it was given"
+        )

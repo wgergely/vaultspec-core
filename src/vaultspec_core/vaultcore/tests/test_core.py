@@ -321,3 +321,39 @@ class TestFrontmatterRoundTrip:
         vault_meta, _vault_body = parse_vault_metadata(content)
         assert vault_meta.tags == ["#plan", "#editor-demo"]
         assert vault_meta.related == []
+
+
+class TestParseFrontmatterNonMapping:
+    """YAML documents are not necessarily mappings; ``parse_frontmatter``
+    must never hand a caller anything but a ``dict``.
+
+    Every consumer of ``parse_frontmatter`` (roughly a dozen call sites,
+    including graph construction) calls ``.get()`` on the returned value
+    without checking its type first, so a sequence or scalar frontmatter
+    block has to degrade to empty metadata at this boundary rather than
+    surface as an ``AttributeError`` deep inside a caller.
+    """
+
+    def test_sequence_frontmatter_degrades_to_empty_dict(self):
+        content = "---\n- a\n- b\n---\n\nBody.\n"
+        meta, body = parse_frontmatter(content)
+        assert meta == {}
+        assert "Body." in body
+
+    def test_scalar_frontmatter_degrades_to_empty_dict(self):
+        content = "---\njust a bare scalar\n---\n\nBody.\n"
+        meta, body = parse_frontmatter(content)
+        assert meta == {}
+        assert "Body." in body
+
+    def test_result_always_supports_get(self):
+        # The actual contract under test: whatever parse_frontmatter returns,
+        # a consumer calling .get("related", []) the way graph/api.py does
+        # must not raise.
+        for content in (
+            "---\n- a\n- b\n---\nBody.\n",
+            "---\njust a bare scalar\n---\nBody.\n",
+            "---\ntags: ['#a']\n---\nBody.\n",
+        ):
+            meta, _body = parse_frontmatter(content)
+            meta.get("related", [])  # must not raise AttributeError

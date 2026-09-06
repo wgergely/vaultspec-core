@@ -410,17 +410,36 @@ def _execute_shell(
         )
 
 
-def fire_hooks(event: str, context: dict[str, str] | None = None) -> None:
+def fire_hooks(
+    event: str,
+    context: dict[str, str] | None = None,
+    *,
+    hooks_dir: Path | None = None,
+) -> None:
     """Fire hooks for a lifecycle event, silently catching all errors.
 
     Args:
         event: Event name to trigger.
         context: Optional context dict passed through to hook actions.
+        hooks_dir: Directory to load hook definitions from. Defaults to the
+            active :func:`~vaultspec_core.core.types.get_context`'s
+            ``hooks_dir`` when omitted - the right default for a caller
+            operating on a single, ambient workspace. A caller that just
+            finished acting on a *different* workspace than the ambient one
+            (for example ``sync --target``, which reads its source content
+            from the CWD workspace while writing to a separate target) must
+            pass the target's own hooks directory explicitly: hooks react to
+            an event that happened *to* a workspace, so they must be the
+            hooks *that* workspace declares, not whichever happens to be
+            ambient when the event fires.
     """
     try:
-        from ..core.types import get_context
+        if hooks_dir is None:
+            from ..core.types import get_context
 
-        hooks = load_hooks(get_context().hooks_dir)
+            hooks_dir = get_context().hooks_dir
+
+        hooks = load_hooks(hooks_dir)
         trigger(hooks, event, context)
     except Exception:
         logger.warning("Hook trigger failed for %s", event, exc_info=True)
