@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from ..config import get_config
 from ..core.exceptions import VaultSpecError
 from .checks.exec_mapping import link_stem
+from .exclusions import is_excluded_vault_path
 from .parser import parse_vault_metadata
 from .rename_engine import RenameTransaction, assert_within, docs_lock_target
 
@@ -600,7 +601,7 @@ def _cross_link_paths(
             relative = path.relative_to(docs_dir)
         except ValueError:
             continue
-        if path in source_paths or "_archive" in relative.parts:
+        if path in source_paths or is_excluded_vault_path(relative):
             continue
         if path.is_symlink() or not path.is_file():
             continue
@@ -638,7 +639,7 @@ def _restore_cross_link_paths(
             relative = path.relative_to(docs_dir)
         except ValueError:
             continue
-        if "_archive" in relative.parts or path.is_symlink() or not path.is_file():
+        if is_excluded_vault_path(relative) or path.is_symlink() or not path.is_file():
             continue
         try:
             metadata, _body = parse_vault_metadata(path.read_text(encoding="utf-8"))

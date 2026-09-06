@@ -190,6 +190,7 @@ def collect_vault_content_state(target: Path) -> tuple[VaultContentSignal, int, 
     """
     from ...config import get_config
     from ...vaultcore.checks.annotations import strip_template_annotations
+    from ...vaultcore.exclusions import is_excluded_vault_path
 
     vault_dir = target / get_config().docs_dir
     if not vault_dir.is_dir():
@@ -198,7 +199,7 @@ def collect_vault_content_state(target: Path) -> tuple[VaultContentSignal, int, 
     annotated = 0
     unreadable = 0
     for path in sorted(vault_dir.rglob("*.md")):
-        if ".obsidian" in path.parts or "_archive" in path.parts:
+        if is_excluded_vault_path(path):
             continue
         try:
             content = path.read_text(encoding="utf-8")

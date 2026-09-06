@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from ..exclusions import is_excluded_vault_path
 from ._base import CheckDiagnostic, CheckResult, Severity
 
 if TYPE_CHECKING:
@@ -49,7 +50,7 @@ def check_encoding(root_dir: Path, *, graph: VaultGraph | None = None) -> CheckR
     observed (:attr:`~vaultspec_core.graph.api.VaultGraph.encoding_issues`),
     folding this check into the run's single read of the corpus. Standalone,
     it walks ``<root>/<docs_dir>/**/*.md`` directly (mirroring
-    ``scan_vault``'s exclusions: ``.obsidian`` and ``_archive`` subtrees and
+    ``scan_vault``'s exclusions: every non-corpus subtree and
     symlinks are skipped) rather than consulting the parsed snapshot, because
     a non-UTF-8 document never enters the snapshot in the first place. Either
     way, a clean decode (including a UTF-8-BOM file, which is valid UTF-8)
@@ -107,7 +108,7 @@ def check_encoding(root_dir: Path, *, graph: VaultGraph | None = None) -> CheckR
         return result
 
     for path in sorted(docs_dir.rglob("*.md")):
-        if ".obsidian" in path.parts or "_archive" in path.parts:
+        if is_excluded_vault_path(path):
             continue
         if path.is_symlink() or not path.is_file():
             continue

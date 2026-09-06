@@ -79,6 +79,7 @@ def migrate(workspace: Path) -> MigrationResult:
     from ..config import get_config
     from ..vaultcore import normalize_date, parse_vault_metadata
     from ..vaultcore.checks.modified_stamp import filename_date, write_stamp
+    from ..vaultcore.exclusions import is_excluded_vault_path
 
     cfg = get_config()
     docs_dir = workspace / cfg.docs_dir
@@ -91,7 +92,11 @@ def migrate(workspace: Path) -> MigrationResult:
             counts=counts,
         )
 
-    documents = sorted(item for item in docs_dir.rglob("*.md") if item.is_file())
+    documents = sorted(
+        item
+        for item in docs_dir.rglob("*.md")
+        if item.is_file() and not is_excluded_vault_path(item.relative_to(docs_dir))
+    )
 
     for doc in documents:
         try:

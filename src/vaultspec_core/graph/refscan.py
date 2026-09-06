@@ -25,6 +25,7 @@ from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
 from ..core.exceptions import VaultSpecError
+from ..vaultcore.exclusions import EXCLUDED_VAULT_DIR_NAMES
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -159,7 +160,7 @@ def read_vault_at_ref(root_dir: Path, ref: str, docs_dir: str) -> list[tuple[str
         if not tree_path.endswith(".md"):
             continue
         parts = PurePosixPath(tree_path).parts
-        if ".obsidian" in parts or "_archive" in parts:
+        if EXCLUDED_VAULT_DIR_NAMES.intersection(parts):
             continue
         blob = _run_git(root_dir, ["cat-file", "blob", f"{commit}:{tree_path}"])
         try:
