@@ -7,16 +7,23 @@ zero before writing, so an interruption inside the restore left a zero-length
 caught ``OSError`` and continued after a ``logger.warning``, so a vault left in
 a mixed state reported nothing at all (issue #456).
 
-Every failure here is induced through the real filesystem - a read-only
-destination, a directory planted where a document belongs - and every assertion
-reads real bytes. No mocks, no patches.
+Every failure here is induced through the real filesystem - a non-empty
+directory planted where a document belongs, a second hard link witnessing which
+write semantics ran - and every assertion reads real bytes. No mocks, no
+patches.
+
+The obstacle is a directory rather than a read-only file because read-only is
+not portable as a *write* barrier: on POSIX the replace depends on the parent
+directory's permissions, not the destination's, so a chmod that blocks the
+restore on Windows lets it through on Linux and the test proves nothing there.
+A non-empty directory at the document path defeats both the pre-restore read
+and the rename on every platform.
 """
 
 from __future__ import annotations
 
 import contextlib
 import os
-import stat
 from typing import TYPE_CHECKING
 
 import pytest
@@ -24,7 +31,6 @@ import pytest
 from ..rename_engine import RenameTransaction, RollbackError, _safe_restore_bytes
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
     from pathlib import Path
 
 pytestmark = [pytest.mark.unit]
@@ -32,18 +38,18 @@ pytestmark = [pytest.mark.unit]
 ORIGINAL = b"# the document\nthe rollback exists to bring these bytes back\n"
 
 
-@pytest.fixture
-def read_only_cleanup() -> Iterator[list[Path]]:
-    """Restore the write bit on any path a test made read-only.
+def _obstruct(path: Path) -> None:
+    """Replace the document at *path* with a non-empty directory.
 
-    ``tmp_path`` teardown cannot delete a read-only file on Windows, so the
-    paths are handed back here rather than left for the fixture to trip over.
+    Models the drift a rollback cannot undo: something outside the transaction
+    put a directory where the snapshotted document was. The restore then fails
+    identically on every platform - reading it raises ``IsADirectoryError`` on
+    POSIX and ``PermissionError`` on Windows, both ``OSError`` - and the rename
+    behind it could not have landed either.
     """
-    paths: list[Path] = []
-    yield paths
-    for path in paths:
-        with contextlib.suppress(OSError):
-            os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
+    path.unlink()
+    path.mkdir()
+    (path / "occupant.txt").write_text("not the document", encoding="utf-8")
 
 
 def _plant_hard_link(link: Path, target: Path) -> bool:
@@ -113,42 +119,36 @@ class TestRestoreIsAtomic:
 
 
 class TestFailedRollbackRaises:
-    def test_unrestorable_document_raises_rollback_error(
-        self, tmp_path: Path, read_only_cleanup: list[Path]
-    ) -> None:
+    def test_unrestorable_document_raises_rollback_error(self, tmp_path: Path) -> None:
         doc = tmp_path / "note.md"
         doc.write_bytes(ORIGINAL)
-        read_only_cleanup.append(doc)
 
         with (
             pytest.raises(RollbackError) as caught,
             RenameTransaction(tmp_path) as tx,
         ):
             tx.snapshot([doc])
-            doc.write_bytes(b"mutated by the failed operation\n")
-            os.chmod(doc, stat.S_IREAD)
+            _obstruct(doc)
             raise RuntimeError("the operation failed")
 
         assert str(doc) in str(caught.value)
         assert caught.value.hint
 
     def test_rollback_error_preserves_the_original_failure(
-        self, tmp_path: Path, read_only_cleanup: list[Path]
+        self, tmp_path: Path
     ) -> None:
         # The operator has to learn two things: what failed, and that the
         # recovery from it also failed. Reporting only the second would hide
         # the cause; reporting only the first would hide the mixed vault.
         doc = tmp_path / "note.md"
         doc.write_bytes(ORIGINAL)
-        read_only_cleanup.append(doc)
 
         with (
             pytest.raises(RollbackError) as caught,
             RenameTransaction(tmp_path) as tx,
         ):
             tx.snapshot([doc])
-            doc.write_bytes(b"mutated by the failed operation\n")
-            os.chmod(doc, stat.S_IREAD)
+            _obstruct(doc)
             raise RuntimeError("collision at the computed destination")
 
         assert isinstance(caught.value.__cause__, RuntimeError)
@@ -157,25 +157,21 @@ class TestFailedRollbackRaises:
             "a plain-text renderer prints str(exc); the trigger has to be in it"
         )
 
-    def test_every_restorable_document_is_still_restored(
-        self, tmp_path: Path, read_only_cleanup: list[Path]
-    ) -> None:
+    def test_every_restorable_document_is_still_restored(self, tmp_path: Path) -> None:
         # Aggregating rather than raising on the first failure is what keeps
         # one unrestorable path from stranding the documents behind it.
         blocked = tmp_path / "blocked.md"
         recoverable = tmp_path / "recoverable.md"
         for path in (blocked, recoverable):
             path.write_bytes(ORIGINAL)
-        read_only_cleanup.append(blocked)
 
         with (
             pytest.raises(RollbackError) as caught,
             RenameTransaction(tmp_path) as tx,
         ):
             tx.snapshot([blocked, recoverable])
-            blocked.write_bytes(b"mutated\n")
             recoverable.write_bytes(b"mutated\n")
-            os.chmod(blocked, stat.S_IREAD)
+            _obstruct(blocked)
             raise RuntimeError("the operation failed")
 
         assert recoverable.read_bytes() == ORIGINAL
