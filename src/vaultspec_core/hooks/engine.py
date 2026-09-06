@@ -442,12 +442,24 @@ def fire_hooks(
     context: dict[str, str] | None = None,
     *,
     hooks_dir: Path | None = None,
+    home: Path | None = None,
 ) -> None:
     """Fire hooks for a lifecycle event, silently catching all errors.
+
+    This is the lifecycle entry point ``sync`` reaches, so it is the
+    highest-traffic route into :func:`trigger`'s consent check. It therefore
+    threads ``home`` the same way it threads ``hooks_dir``: without it, the
+    consent half of this path could only be exercised against the operator's
+    own ledger, and a path that can only be tested destructively is a path
+    that does not get tested.
 
     Args:
         event: Event name to trigger.
         context: Optional context dict passed through to hook actions.
+        home: Machine-global VaultSpec home holding the consent ledger.
+            Defaults to the operator's real home, which is what every
+            production caller wants; real-filesystem tests pass their own so
+            they neither read nor write the operator's approvals.
         hooks_dir: Directory to load hook definitions from. Defaults to the
             active :func:`~vaultspec_core.core.types.get_context`'s
             ``hooks_dir`` when omitted - the right default for a caller
@@ -467,6 +479,6 @@ def fire_hooks(
             hooks_dir = get_context().hooks_dir
 
         hooks = load_hooks(hooks_dir)
-        trigger(hooks, event, context)
+        trigger(hooks, event, context, home)
     except Exception:
         logger.warning("Hook trigger failed for %s", event, exc_info=True)

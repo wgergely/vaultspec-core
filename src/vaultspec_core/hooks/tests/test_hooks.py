@@ -477,28 +477,65 @@ class TestFireHooksExplicitDirectory:
     workspace initialisation at all.
     """
 
-    def test_loads_from_the_explicit_directory_not_the_ambient_context(
-        self, tmp_path: Path
-    ) -> None:
-        explicit_dir = tmp_path / "explicit-hooks"
-        explicit_dir.mkdir()
+    @staticmethod
+    def _write_marker_hook(explicit_dir: Path, tmp_path: Path) -> tuple[Path, Path]:
+        """Write the hook and return ``(hook path, marker path)``."""
+        explicit_dir.mkdir(parents=True, exist_ok=True)
         marker = tmp_path / "fired.txt"
         script = tmp_path / "create_marker.py"
         script.write_text(
             f"import pathlib; pathlib.Path({str(marker)!r}).touch()",
             encoding="utf-8",
         )
-        (explicit_dir / "marker.yaml").write_text(
+        hook = explicit_dir / "marker.yaml"
+        hook.write_text(
             "event: config.synced\nenabled: true\nactions:\n"
             f"  - type: shell\n    command: {sys.executable} {script}\n",
             encoding="utf-8",
         )
+        return hook, marker
+
+    def test_loads_from_the_explicit_directory_not_the_ambient_context(
+        self, tmp_path: Path
+    ) -> None:
+        explicit_dir = tmp_path / "explicit-hooks"
+        home = tmp_path / "home"
+        hook, marker = self._write_marker_hook(explicit_dir, tmp_path)
+
+        # Approval is a precondition of running any hook, so this test states
+        # it outright rather than leaving the subject of the test - which
+        # directory the definitions came from - resting on an unstated one.
+        # The ledger lives under a home the test owns, never the operator's.
+        grant([hook], home)
 
         # Deliberately do not initialise any workspace context: the whole
         # point of the explicit hooks_dir parameter is that fire_hooks does
-        # not need one when it is given.
-        fire_hooks("config.synced", hooks_dir=explicit_dir)
+        # not need one when it is given. Without it, an implementation that
+        # ignored hooks_dir would have no ambient directory to fall back to,
+        # so the marker can only appear if this directory was the one read.
+        fire_hooks("config.synced", hooks_dir=explicit_dir, home=home)
 
         assert marker.exists(), (
-            "fire_hooks(hooks_dir=...) must load hooks from the directory it was given"
+            "fire_hooks(hooks_dir=...) must load hooks from the directory it "
+            "was given, and must run an approved hook it finds there"
+        )
+
+    def test_an_unapproved_hook_in_that_directory_still_does_not_run(
+        self, tmp_path: Path
+    ) -> None:
+        """Naming the directory selects hooks; it does not authorise them.
+
+        The sibling test above depends on two preconditions - the right
+        directory and a recorded approval - so this one holds the directory
+        fixed and removes only the approval. Between them, a failure says
+        which precondition broke, and this one pins the consent gate on the
+        lifecycle path ``sync`` actually takes.
+        """
+        explicit_dir = tmp_path / "explicit-hooks"
+        _, marker = self._write_marker_hook(explicit_dir, tmp_path)
+
+        fire_hooks("config.synced", hooks_dir=explicit_dir, home=tmp_path / "home")
+
+        assert not marker.exists(), (
+            "a hook named by hooks_dir ran without an operator consent record"
         )
