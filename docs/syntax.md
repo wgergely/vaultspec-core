@@ -52,8 +52,8 @@ Review the changed files, then
 [rerun validation](verification.md#check-records-before-committing).
 
 Before enabling commit-time checks with `pre-commit install`, review
-[hook behavior and project policy](framework.md#decisions-you-make-once). Installing
-`.pre-commit-config.yaml` alone does not activate the hooks.
+[hook behavior and project policy](framework.md#configure-project-integrations).
+Installing `.pre-commit-config.yaml` alone does not activate the hooks.
 
 ## Frontmatter
 

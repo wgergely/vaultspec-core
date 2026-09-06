@@ -36,7 +36,7 @@ configures a Model Context Protocol (MCP) server so your agent can call the tool
 Workflow documents live in `.vault/`; the policy lives in `.vaultspec/`. Commit both so
 teammates share the records and rules. Installation also manages ignore rules for local
 state and writes pre-commit configuration. Activating commit hooks is a
-[separate choice](docs/framework.md#decisions-you-make-once).
+[separate choice](docs/framework.md#configure-project-integrations).
 
 Keep the `uvx` prefix when running commands yourself. For persistent or project-local
 installation, see [installation options](docs/framework.md#installation-options).

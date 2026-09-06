@@ -222,8 +222,8 @@ Core from a project, follow the [uninstall reference](CLI.md#uninstall).
 
 ## Installation options
 
-The quickstart uses `uvx vaultspec-core install`. Keep the `uvx` prefix for later
-commands when using this route.
+The quickstart uses `uvx vaultspec-core install`. When using this route, keep the `uvx`
+prefix for later commands.
 
 To install the CLI once and run it from any project:
 
@@ -240,33 +240,30 @@ uv run vaultspec-core install
 ```
 
 Contributors then use `uv sync` to install dependencies and `uv run vaultspec-core` to
-run the CLI. The [CLI reference](CLI.md) explains `--mode dependency` and `--mode dev`,
-which select how generated hooks and MCP configuration launch core. For standalone
-binaries, see [Homebrew and Scoop](channels.md).
+run the CLI. Configure generated launchers under
+[project integrations](#configure-project-integrations). For standalone binaries, see
+[Homebrew and Scoop](channels.md).
 
 After updating the package, run `vaultspec-core install --upgrade` in each project to
 update its bundled rules, skills, and agents. Use `uvx` or `uv run` as appropriate for
 your installation route.
 
-## Decisions you make once
+<p id="decisions-you-make-once"></p>
 
-**Install mode.** Tool mode is the default and needs no action: hooks and the MCP server
-run vaultspec-core through `uvx`, so it never enters your project's dependency set. If
-your `pyproject.toml` lists vaultspec-core you are in dependency mode, which runs them
-through `uv run`; dev mode is the same but keeps vaultspec-core out of your built
-distributions. Pin one with `vaultspec-core install --mode <tool|dependency|dev>`. The
-choice is recorded in a committed `workspace.json` so it travels with the project. The
-[CLI reference](./CLI.md) has the details.
+## Configure project integrations
 
-**Pre-commit hooks.** Not every project wants one. A tree-wide hook that rewrites the
-working tree to the staged state will discard uncommitted changes outside the stage,
-which is unsafe when several workers share one checkout, and some teams prefer to run
-their gates explicitly. Of the four hooks written here, three only read and one mutates:
-`vaultspec-core vault sanitize annotations`, which strips generated template
-annotations. None is scoped to the files you staged.
-`vaultspec-core spec precommit disable` records that in the same `workspace.json`, so no
-later `install` or `sync` regenerates `.pre-commit-config.yaml`.
-`vaultspec-core spec precommit enable` reverses it.
+**Install mode.** Choose how generated hooks and MCP configuration launch Core with
+`vaultspec-core install --mode`. See the [install reference](CLI.md#install) for modes
+and selection rules.
+
+**Pre-commit hooks.** Generated configuration doesn't activate a Git hook. If you use
+pre-commit, run `pre-commit install` to activate it. Vault checks and annotation cleanup
+aren't limited to staged files; cleanup modifies documents. Review changes before
+committing.
+
+Use the [pre-commit controls](CLI.md#vaultspec-core-spec-precommit) to enable or disable
+configuration generation. These settings don't remove an existing configuration or
+deactivate an installed hook.
 
 **MCP clients.** Check enrollment with `vaultspec-core spec mcps status --json`. See the
 [MCP tool reference](./MCP.md#tools) for the available tools.

@@ -13,7 +13,7 @@ problems. Passing these checks doesn't prove the code behaves correctly or that 
 reviewed the feature.
 
 For hook activation and setup choices, see
-[decisions you make once](framework.md#decisions-you-make-once).
+[project integration settings](framework.md#configure-project-integrations).
 
 <p id="the-review-step"></p>
 
