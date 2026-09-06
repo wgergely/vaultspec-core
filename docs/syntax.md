@@ -32,9 +32,8 @@ they are not, because ledger rows point at the identifiers in them.
 
 ## Editing safely
 
-To change body prose, let the tool write it. `set-body` keeps the frontmatter
-byte-for-byte, refreshes `modified`, and validates the result before writing, refusing
-the write if anything comes back at error severity:
+Use `set-body` to replace prose and update `modified` and `body_hash`. By default, it
+validates the result before writing and rejects changes with validation errors:
 
 ```bash
 vaultspec-core vault set-body <document> --body-file new-body.md
@@ -49,16 +48,12 @@ body, and nothing has restamped `modified`. Run this afterwards:
 vaultspec-core vault check all --fix
 ```
 
-That is the recovery command for most of this page. It restamps, reconciles, and repairs
-what it safely can.
+Review the changed files, then
+[rerun validation](verification.md#check-records-before-committing).
 
-You will hear about a mistake at commit time. `vaultspec-core install` writes a
-`.pre-commit-config.yaml` whose first hook runs `vault check all`, so a document that
-fails validation blocks the commit rather than reaching the repository. It reads the
-whole vault rather than the files you staged, because the hooks pass no filenames; a
-Markdown file in the commit is what makes them run, not what they look at. The config is
-not itself a git hook, so nothing blocks anything until `pre-commit install` has written
-one.
+Before enabling commit-time checks with `pre-commit install`, review
+[hook behavior and project policy](framework.md#decisions-you-make-once). Installing
+`.pre-commit-config.yaml` alone does not activate the hooks.
 
 ## Frontmatter
 

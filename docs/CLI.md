@@ -661,11 +661,9 @@ ______________________________________________________________________
 vaultspec-core vault set-body [OPTIONS] REF
 ```
 
-Replace only the body prose of a document, keeping its frontmatter. The frontmatter
-block is preserved byte for byte; only the text after the closing `---` fence is
-replaced, and the `modified:` stamp is refreshed. With `--check` (the default) the
-proposed content is validated first and the write is refused if any diagnostic is an
-error.
+Replace a document's body prose and update `modified` and `body_hash`. With `--check`
+(the default), the proposed content is validated first and the write is refused if any
+diagnostic is an error.
 
 Use this when the metadata is already right and you only want to swap the prose; use
 `vaultspec-core vault edit` when the same change also touches frontmatter.
