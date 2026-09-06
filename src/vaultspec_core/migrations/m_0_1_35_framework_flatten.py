@@ -84,12 +84,19 @@ def _move_tree(src: Path, dst: Path) -> None:
     stay on :meth:`pathlib.Path.replace` rather than routing through the
     atomic writer. A rename replaces the destination *entry*; it never
     opens the destination and so never follows a symlink sitting there to
-    clobber what it names, and the companion ``target.unlink()`` removes a
-    link rather than its target for the same reason. A symlinked child that
-    is relocated stays a symlink and stays inside ``.vaultspec/``, where it
-    was already being read before the move, so the migration neither
-    creates nor widens an exposure - it only changes which managed
-    directory the entry sits in.
+    clobber what it names. A symlinked child that is relocated stays a
+    symlink and stays inside ``.vaultspec/``, where it was already being
+    read before the move, so the migration neither creates nor widens an
+    exposure - it only changes which managed directory the entry sits in.
+
+    A colliding file is overwritten by the rename itself, with no preceding
+    ``unlink``. :meth:`pathlib.Path.replace` overwrites an existing
+    destination on both POSIX and Windows, so unlinking first bought
+    nothing and cost the guarantee that matters here: between the unlink
+    and the rename the destination is gone and the source has not moved, so
+    an interruption in that window leaves neither file at the destination
+    path - and ``.vaultspec/rules/``, ``skills/``, ``templates/`` and
+    ``system/`` hold hand-authored, user-editable content.
     """
     if not dst.exists():
         src.replace(dst)
@@ -100,8 +107,6 @@ def _move_tree(src: Path, dst: Path) -> None:
         if child.is_dir():
             _move_tree(child, target)
         else:
-            if target.exists():
-                target.unlink()
             child.replace(target)
     src.rmdir()
 

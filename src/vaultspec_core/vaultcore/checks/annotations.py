@@ -104,6 +104,83 @@ def strip_template_annotations(content: str) -> tuple[str, AnnotationStats]:
     return frontmatter + body, stats
 
 
+def _strip_annotations_in_place(
+    doc_path: Path, root_dir: Path, wanted_feature: str | None
+) -> AnnotationStats | None:
+    """Strip *doc_path*'s annotations under its per-document advisory lock.
+
+    The read the replacement is derived from, the strip, and the write are
+    one critical section on the same sentinel ``execute_edit`` takes.  The
+    corpus text the checker scanned to find this document is deliberately
+    not reused: it was read a whole corpus scan ago, so composing the
+    replacement from it would overwrite anything committed since with bytes
+    that never saw the newer revision - the silent lost update that locking
+    the write alone does not prevent.
+
+    Args:
+        doc_path: The document to re-read and rewrite.
+        root_dir: The project root whose ``.vault/`` holds the document.
+        wanted_feature: The feature tag the pass is restricted to (already
+            stripped of ``#``), or ``None`` for the whole corpus.  Re-checked
+            under the lock because the revision found there may no longer be
+            the one the scan matched.
+
+    Returns:
+        The stats describing what was stripped, or ``None`` when the document
+        could not be read, no longer carries the feature tag, or has nothing
+        left to strip.
+    """
+    from ..edit_engine import document_write_lock
+
+    with document_write_lock(doc_path, root_dir):
+        return _strip_annotations_locked(doc_path, wanted_feature)
+
+
+def _strip_annotations_locked(
+    doc_path: Path, wanted_feature: str | None
+) -> AnnotationStats | None:
+    """Perform the strip under *doc_path*'s already-held lock.
+
+    Args:
+        doc_path: The document to re-read and rewrite.
+        wanted_feature: The feature tag the pass is restricted to, or ``None``.
+
+    Returns:
+        The stats describing what was stripped, or ``None`` when there was
+        nothing to write.
+    """
+    from ..parser import parse_vault_metadata
+
+    try:
+        # Read as bytes and decode without universal newlines so the source
+        # CRLF/LF convention is observable and restorable on the output.
+        raw_content = doc_path.read_bytes().decode("utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+    if wanted_feature is not None:
+        metadata, _body = parse_vault_metadata(raw_content)
+        if wanted_feature not in extract_feature_tags(metadata.tags):
+            return None
+
+    source_newline = "\r\n" if "\r\n" in raw_content else "\n"
+    cleaned_lf, stats = strip_template_annotations(raw_content)
+    if stats.total == 0:
+        # The finding came from the pre-lock scan; re-derived under the lock
+        # there is nothing left to strip.  Writing would overwrite a revision
+        # committed in between, and counting it would report a fix that never
+        # happened.
+        return None
+
+    cleaned = (
+        cleaned_lf
+        if source_newline == "\n"
+        else cleaned_lf.replace("\n", source_newline)
+    )
+    atomic_write(doc_path, cleaned)
+    return stats
+
+
 def check_annotations(
     root_dir: Path,
     *,
@@ -118,7 +195,11 @@ def check_annotations(
         root_dir: Project root directory.
         feature: Restrict checks to documents with this feature tag.
         fix: When ``True``, remove YAML comment-only frontmatter lines and
-            Markdown HTML comment blocks from matching documents.
+            Markdown HTML comment blocks from matching documents.  The scan
+            only nominates candidates: each strip is re-derived from a fresh
+            read under the document's advisory lock (see
+            :func:`_strip_annotations_in_place`), so a document another writer
+            has since changed is re-judged rather than overwritten.
         dry_run: When ``True``, report the files that would be changed without
             mutating them. Ignored unless ``fix`` is also ``True``.
         raw_texts: The ingress read's per-document ``(text, crlf)`` map (see
@@ -145,13 +226,12 @@ def check_annotations(
     else:
         sources = iter_document_texts(root_dir)
 
-    for doc_path, raw_content, has_crlf in sources:
+    for doc_path, raw_content, _has_crlf in sources:
         metadata, _body = parse_vault_metadata(raw_content)
         if wanted_feature and wanted_feature not in extract_feature_tags(metadata.tags):
             continue
 
-        source_newline = "\r\n" if has_crlf else "\n"
-        cleaned_lf, stats = strip_template_annotations(raw_content)
+        _cleaned_lf, stats = strip_template_annotations(raw_content)
         if stats.total == 0:
             continue
 
@@ -169,17 +249,14 @@ def check_annotations(
             continue
 
         if fix:
-            cleaned = (
-                cleaned_lf
-                if source_newline == "\n"
-                else cleaned_lf.replace("\n", source_newline)
-            )
-            atomic_write(doc_path, cleaned)
+            written = _strip_annotations_in_place(doc_path, root_dir, wanted_feature)
+            if written is None:
+                continue
             result.fixed_count += 1
             result.diagnostics.append(
                 CheckDiagnostic(
                     path=rel_path,
-                    message=f"Removed template annotations: {stats.describe()}",
+                    message=f"Removed template annotations: {written.describe()}",
                     severity=Severity.INFO,
                 )
             )

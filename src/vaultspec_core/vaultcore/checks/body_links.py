@@ -48,6 +48,75 @@ def _strip_non_prose(body: str) -> str:
     return _INLINE_CODE_RE.sub("", stripped)
 
 
+def _rewrite_body_wiki_links(
+    doc_path: Path, root_dir: Path, wanted_feature: str | None
+) -> int:
+    """Rewrite *doc_path*'s body wiki-links under its per-document lock.
+
+    The read, the rewrite, and the write are one critical section on the same
+    sentinel ``execute_edit`` takes.  The snapshot the checker scanned to find
+    this document is deliberately not consulted here: it was parsed a whole
+    corpus scan ago, so a replacement composed from it would overwrite
+    anything committed since with bytes that never saw the newer revision -
+    the silent lost update that locking the write alone does not prevent.
+
+    Args:
+        doc_path: The document to re-read and rewrite.
+        root_dir: The project root whose ``.vault/`` holds the document.
+        wanted_feature: The feature tag the pass is restricted to (already
+            stripped of ``#``), or ``None`` for the whole corpus.  Re-checked
+            under the lock because the revision found there may no longer be
+            the one the snapshot matched.
+
+    Returns:
+        The number of body wiki-links rewritten as code spans; ``0`` when the
+        document could not be read, no longer carries the feature tag, or has
+        no body wiki-link left.
+    """
+    from ..edit_engine import document_write_lock
+
+    with document_write_lock(doc_path, root_dir):
+        return _rewrite_body_wiki_links_locked(doc_path, wanted_feature)
+
+
+def _rewrite_body_wiki_links_locked(doc_path: Path, wanted_feature: str | None) -> int:
+    """Perform the body-link rewrite under *doc_path*'s already-held lock.
+
+    Args:
+        doc_path: The document to re-read and rewrite.
+        wanted_feature: The feature tag the pass is restricted to, or ``None``.
+
+    Returns:
+        The number of body wiki-links rewritten; ``0`` when nothing was
+        written.
+    """
+    from ..parser import parse_vault_metadata
+    from ._base import extract_feature_tags
+
+    try:
+        raw_content = doc_path.read_bytes().decode("utf-8")
+    except (OSError, UnicodeDecodeError):
+        return 0
+
+    metadata, raw_body = parse_vault_metadata(raw_content)
+    if wanted_feature is not None and wanted_feature not in extract_feature_tags(
+        metadata.tags
+    ):
+        return 0
+
+    fixed_body, replaced = rewrite_wiki_links_as_code_spans(raw_body)
+    if replaced == 0 or fixed_body == raw_body:
+        # The finding came from the pre-lock snapshot; re-derived under the
+        # lock there is no body wiki-link left.  Writing would overwrite a
+        # revision committed in between, and counting it would report a fix
+        # that never happened.
+        return 0
+
+    prefix = raw_content[: len(raw_content) - len(raw_body)]
+    atomic_write(doc_path, prefix + fixed_body)
+    return replaced
+
+
 def check_body_links(
     root_dir: Path,
     *,
@@ -69,25 +138,27 @@ def check_body_links(
         feature: Restrict checks to documents with this feature tag
             (without ``#``).
         fix: When ``True``, rewrite prose wiki-links as backtick code spans.
+            The snapshot only nominates candidates: each rewrite is
+            re-derived from a fresh read under the document's advisory lock
+            (see :func:`_rewrite_body_wiki_links`), so a document another
+            writer has since changed is re-judged rather than overwritten.
 
     Returns:
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
         check name ``"body-links"``.
     """
-    from ..parser import parse_vault_metadata
     from ._base import extract_feature_tags
 
     result = CheckResult(check_name="body-links", supports_fix=True)
+    wanted_feature = feature.lstrip("#") if feature else None
 
     for doc_path, (metadata, body) in snapshot.items():
         # Skip generated index files
         if is_generated_index(doc_path):
             continue
 
-        if feature:
-            feat = feature.lstrip("#")
-            if feat not in extract_feature_tags(metadata.tags):
-                continue
+        if wanted_feature and wanted_feature not in extract_feature_tags(metadata.tags):
+            continue
 
         rel_path = doc_path.relative_to(root_dir)
 
@@ -96,19 +167,16 @@ def check_body_links(
 
         wiki_links = extract_wiki_links(body)
         if fix and wiki_links:
-            raw_content = doc_path.read_bytes().decode("utf-8")
-            _metadata, raw_body = parse_vault_metadata(raw_content)
-            fixed_body, replaced = rewrite_wiki_links_as_code_spans(raw_body)
-            prefix = raw_content[: len(raw_content) - len(raw_body)]
-            atomic_write(doc_path, prefix + fixed_body)
-            result.fixed_count += 1
-            result.diagnostics.append(
-                CheckDiagnostic(
-                    path=rel_path,
-                    message=f"Fixed {replaced} body wiki-link(s) as code spans",
-                    severity=Severity.INFO,
+            replaced = _rewrite_body_wiki_links(doc_path, root_dir, wanted_feature)
+            if replaced:
+                result.fixed_count += 1
+                result.diagnostics.append(
+                    CheckDiagnostic(
+                        path=rel_path,
+                        message=f"Fixed {replaced} body wiki-link(s) as code spans",
+                        severity=Severity.INFO,
+                    )
                 )
-            )
         else:
             for target, count in wiki_links.items():
                 for _occurrence in range(count):

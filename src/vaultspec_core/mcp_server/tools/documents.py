@@ -1101,12 +1101,21 @@ def register_document_tools(
         failures do not abort the batch.  The affected feature indexes are
         regenerated as an automatic side effect.
 
+        A failed schema migration aborts the call, not an item: no
+        envelope, nothing written.
+
         Args:
             ctx: The MCP request context.
             documents: The document specifications to scaffold.
 
         Returns:
             A batch result with a per-item outcome for every spec.
+
+        Raises:
+            ToolError: When ``documents`` is empty or exceeds
+                ``MAX_BATCH_ITEMS``, or when a pending schema migration
+                fails and the workspace cannot be converged before the
+                first write.
         """
         if not documents:
             raise ToolError("create requires at least one document spec")
@@ -1131,7 +1140,19 @@ def register_document_tools(
         # with divergent `related:`. This is the same write intent to a
         # schema-decided location that `vault add` and `vault feature index`
         # carry, so it takes the same hook.
-        ensure_migrated(root_dir)
+        try:
+            ensure_migrated(root_dir)
+        # The SDK forwards a ToolError's own text and discards the message of
+        # everything else, so an unwrapped failure here reaches the client as
+        # the bare string "Error executing tool create" - issue #330's failure
+        # mode, one layer up. The diagnosis a failed convergence carries is
+        # the whole of what a caller can act on ("Corrupt provider manifest at
+        # <path>: ... Delete the file and re-run install"), and it is the only
+        # copy: the server's log goes to its own stderr, which the client
+        # never reads. Translated at the boundary exactly as the plan tools
+        # translate a PlanResolutionError.
+        except Exception as exc:
+            raise ToolError(f"create could not converge the workspace: {exc}") from exc
         today = vault_today().isoformat()
 
         logger.info("create: %d document(s)", len(documents))

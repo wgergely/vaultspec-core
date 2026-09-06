@@ -320,7 +320,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
             name=Tool.ANTIGRAVITY.value,
             rules_dir=shared_agents_root / Resource.RULES.value,
             skills_dir=shared_agents_root / Resource.SKILLS.value,
-            agents_dir=None,
+            agents_dir=shared_agents_root / Resource.AGENTS.value,
             config_file=target / FileName.GEMINI.value,
             rule_ref_dir=shared_agents_root / Resource.RULES.value,
             system_file=None,
@@ -332,6 +332,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
                 {
                     _pc.RULES,
                     _pc.SKILLS,
+                    _pc.AGENTS,
                     _pc.ROOT_CONFIG,
                     _pc.WORKFLOWS,
                     _pc.HOOKS,
