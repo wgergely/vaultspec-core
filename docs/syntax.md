@@ -145,26 +145,18 @@ scaffolded documents use `body-v2`. See
 
 ## Template placeholders
 
-Templates carry two kinds of placeholder, and they are not interchangeable.
-
-Author-replaced placeholders use curly braces and lowercase kebab-case: `{feature}`,
-`{topic}`, `{title}`. Fill them in as you write.
-
-Machine-filled placeholders use snake_case and are substituted by the command that
-scaffolds the document:
+Creation commands fill `{feature}` from `--feature` and `{title}` or `{topic}` from
+`--title`. Complete remaining prose placeholders before committing.
 
 | Placeholder       | Filled by                            |
 | ----------------- | ------------------------------------ |
 | `{plan_stem}`     | `vaultspec-core vault exec log`      |
 | `{document_list}` | `vaultspec-core vault feature index` |
 
-If one of these survives into a committed document, the document was created by hand
-rather than by the command that owns it. The `placeholders` check finds them, and the
-author-replaced ones above, because it matches the tokens the templates ship rather than
-every pair of braces: `{topic}` left in a body is an error and exits `1`, while a
-`{not_a_template_token}` of your own is reported clean. That is the check doing its job
-\- it looks for scaffolding you forgot to fill - but it is not a general brace scan,
-which is worth knowing before relying on it to find something else.
+The `placeholders` check reports recognized tokens, date forms, and enum forms left in
+body prose as errors. It skips comments, fenced code, and inline code except in
+headings. It doesn't check every brace expression or fill missing content. See the
+[check reference](CLI.md#vaultspec-core-vault-check) for commands and options.
 
 ## Filenames
 
