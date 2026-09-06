@@ -200,20 +200,25 @@ options.
 
 ## Customize the policy
 
-Edit resources under `.vaultspec/` through `vaultspec-core spec`, which is the command
-group that addresses the policy tree, then sync them out to each provider. A provider is
-a coding-agent integration: Claude, Codex, Gemini, or Antigravity:
+Add a project rule with its instructions:
 
 ```bash
-vaultspec-core spec rules add my-project-conventions
-vaultspec-core sync    # writes .claude/, .gemini/, .codex/, and the shared .agents/
+vaultspec-core spec rules add enforce-newline --body "All workspace source files must end with a single trailing newline."
 ```
 
-Commit `.vaultspec/` so a teammate inherits the policy on clone.
-`vaultspec-core install --upgrade` carries an older workspace onto the current policy
-after you upgrade the package.
+Edit `.vaultspec/rules/enforce-newline.md` to change the instructions. Then update the
+enabled coding-agent integrations:
 
-To remove the framework from a project, `vaultspec-core uninstall` reverses the install.
+```bash
+vaultspec-core sync
+```
+
+Review and commit the policy changes. For skills, agents, and other rule operations, see
+the
+[resource commands](CLI.md#vaultspec-core-spec-rules-vaultspec-core-spec-skills-vaultspec-core-spec-agents).
+
+For setup and upgrades, see [installation options](#installation-options). To remove
+Core from a project, follow the [uninstall reference](CLI.md#uninstall).
 
 ## Installation options
 
