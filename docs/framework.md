@@ -215,7 +215,7 @@ vaultspec-core sync
 
 Review and commit the policy changes. For skills, agents, and other rule operations, see
 the
-[resource commands](CLI.md#vaultspec-core-spec-rules-vaultspec-core-spec-skills-vaultspec-core-spec-agents).
+[resource commands](CLI.md#vaultspec-core-spec-rules--vaultspec-core-spec-skills--vaultspec-core-spec-agents).
 
 For setup and upgrades, see [installation options](#installation-options). To remove
 Core from a project, follow the [uninstall reference](CLI.md#uninstall).
