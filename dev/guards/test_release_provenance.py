@@ -21,9 +21,15 @@ it mint an OIDC token for any audience it names. The inventory of jobs holding
 it is therefore fixed here by name: a new one is a decision, not an accident.
 
 *What the documentation promises.* ``docs/channels.md`` told users to run
-``gh attestation verify`` against assets that carry no attestation. The caveat
-that replaced that instruction is temporary by construction, and the test that
-holds it here fails on the release that makes it false.
+``gh attestation verify`` against assets that carry no attestation. What
+replaced that instruction says which release provenance starts at, before
+teaching the command - a frozen fact rather than a caveat with an expiry date.
+The first attempt at this fix did write an expiring caveat, and the guards held
+it by failing once the named release was cut. That is worse than it sounds: the
+version lands in the release-please pull request, whose branch is regenerated
+and force-pushed, so the repair would have had to be made under release
+pressure on the one branch least able to hold it. The claims are worded to stay
+true instead, and the tests below hold the wording rather than a deadline.
 
 What is deliberately NOT done, because it looked like the obvious answer: a
 smoke workflow that attests a throwaway file on every push, to exercise the
@@ -77,12 +83,22 @@ MUTABLE_MANIFEST = "SHA256SUMS"
 _VERSION = re.compile(r"^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)$")
 
 _FIRST_ATTESTED = re.compile(
-    r"v(?P<version>\d+\.\d+\.\d+) is the first release whose assets will have "
+    r"v(?P<version>\d+\.\d+\.\d+) is the first release whose assets carry "
     r"build provenance"
 )
 
 _LAST_UNATTESTED = re.compile(
-    r"The wiring that mints one landed after v(?P<version>\d+\.\d+\.\d+)"
+    r"The wiring that mints attestations landed after v(?P<version>\d+\.\d+\.\d+)"
+)
+
+#: Phrasings that state the unattested condition as universal rather than as a
+#: property of releases up to a named version. Each one is true only until the
+#: first attested release ships and silently wrong afterwards, which is the
+#: same defect as the unqualified instruction - pointed the other way.
+_UNIVERSALLY_UNATTESTED = (
+    "no release published so far carries a build attestation",
+    "build provenance is not available yet",
+    "no published asset carries an attestation",
 )
 
 _SIGNER_WORKFLOW = re.compile(
@@ -433,43 +449,86 @@ def test_every_documented_signer_workflow_actually_attests() -> None:
         )
 
 
-def test_the_unattested_release_caveat_names_the_newest_release() -> None:
-    """The version the docs call the last unattested one must be the current one."""
-    matched = _LAST_UNATTESTED.search(_channels_prose())
-    assert matched is not None, (
-        "docs/channels.md no longer says which release the attestation wiring "
-        "landed after; the caveat cannot be checked against reality"
-    )
-    assert _as_tuple(matched["version"]) == _project_version(), (
-        f"docs/channels.md says the wiring landed after v{matched['version']}, "
-        f"but the newest release cut is v{'.'.join(map(str, _project_version()))}"
-    )
+def test_the_provenance_instruction_is_never_unqualified() -> None:
+    """``gh attestation verify`` must not be taught before the docs say from when.
 
+    This is the defect the module exists for. The page carried the command with
+    no statement of which releases can satisfy it while every published asset
+    was unattested, so a user following the instruction got a failure whose only
+    available readings were "this binary is not authentic" and "verification is
+    broken, skip it". The second is the expensive one: it is learned once and
+    applied to every project afterwards.
 
-def test_the_unattested_release_caveat_expires_when_it_becomes_false() -> None:
-    """The caveat must name a release that has not been cut yet.
-
-    This is the test's whole purpose. ``docs/channels.md`` currently promises
-    provenance "from v0.1.74 onward" while claiming none exists today, and both
-    halves stop being true the moment v0.1.74 ships. Release-please bumps
-    ``pyproject.toml`` in the release commit, so this fails in the release PR -
-    the first place a human can act on it - rather than after users have read a
-    page that is wrong in the other direction.
+    Asserted as an ordering rather than as the presence of a caveat, because
+    presence is satisfiable by a sentence anywhere on the page. What protects
+    the reader is meeting the boundary BEFORE the command.
     """
     prose = _channels_prose()
-    matched = _FIRST_ATTESTED.search(prose)
-    assert matched is not None, (
-        "docs/channels.md no longer names the first release to carry build "
-        "provenance; remove this guard together with the caveat"
+    boundary = _FIRST_ATTESTED.search(prose)
+    assert boundary is not None, (
+        "docs/channels.md no longer names the release build provenance starts "
+        "at, so the verification instruction is unqualified again"
     )
-    promised = _as_tuple(matched["version"])
+    taught = prose.find("gh attestation verify")
+    assert taught != -1, "docs/channels.md no longer documents `gh attestation verify`"
+    assert boundary.start() < taught, (
+        "docs/channels.md teaches `gh attestation verify` before it says which "
+        "releases carry provenance; a reader on an older release meets the "
+        "command first and reads its failure as a bad download"
+    )
+
+
+def test_the_documented_provenance_boundary_is_self_consistent() -> None:
+    """The two versions the page names must describe one boundary, not two.
+
+    Both are frozen historical facts - which release the wiring landed after,
+    and which release first carried it - so neither expires and neither may be
+    edited alone. The comparison against ``pyproject.toml`` is the one tie to
+    the present, and it holds in the only direction that can be true: the
+    wiring cannot have landed after a release that has not been cut.
+    """
+    prose = _channels_prose()
+    last = _LAST_UNATTESTED.search(prose)
+    first = _FIRST_ATTESTED.search(prose)
+    assert last is not None, (
+        "docs/channels.md no longer says which release the attestation wiring "
+        "landed after, so the boundary cannot be checked for consistency"
+    )
+    assert first is not None, (
+        "docs/channels.md no longer names the first release to carry provenance"
+    )
+
+    unattested = _as_tuple(last["version"])
+    attested = _as_tuple(first["version"])
+    assert attested > unattested, (
+        f"docs/channels.md says provenance starts at v{first['version']} but "
+        f"that the wiring landed after v{last['version']}; the first attested "
+        "release cannot precede the last unattested one"
+    )
     current = _project_version()
-    assert promised > current, (
-        f"docs/channels.md says v{matched['version']} will be the first "
-        f"attested release, but v{'.'.join(map(str, current))} is already cut. "
-        "That release carries attestations, so drop the 'not available yet' "
-        "section, restore the plain verification instruction, and delete this "
-        "test and the one above it."
+    assert unattested <= current, (
+        f"docs/channels.md says the wiring landed after v{last['version']}, "
+        f"which is newer than v{'.'.join(map(str, current))} in pyproject.toml "
+        "- that release does not exist yet"
+    )
+
+
+def test_the_docs_never_state_the_unattested_condition_as_universal() -> None:
+    """Nothing may say provenance is unavailable outright, only up to a version.
+
+    An earlier pass fixed the unqualified instruction with a "not available
+    yet" section, which trades a page that is wrong today for one that goes
+    wrong on the release that makes it false - and does so silently, with no
+    edit to notice. Every claim on the page is instead written as a property of
+    releases up to a named version, which is a fact that never changes and
+    needs no maintenance at release time.
+    """
+    prose = _channels_prose().lower()
+    offenders = [phrase for phrase in _UNIVERSALLY_UNATTESTED if phrase in prose]
+    assert not offenders, (
+        "docs/channels.md states the unattested condition as universal rather "
+        "than as a property of releases up to a named version, so it becomes "
+        f"wrong the moment an attested release ships: {offenders}"
     )
 
 

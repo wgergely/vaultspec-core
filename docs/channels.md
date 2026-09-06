@@ -92,25 +92,26 @@ that an asset came from this repository's release workflow. It's what this proje
 offers in place of a publisher signature, and unlike a signature it costs nothing to
 produce and nothing to check.
 
-### Build provenance is not available yet
+### Provenance starts at v0.1.74
 
-**No release published so far carries a build attestation.** The wiring that mints one
-landed after v0.1.73, so **v0.1.74 is the first release whose assets will have build
-provenance**. Until it's out, `gh attestation verify` fails on every asset you can
-download, and that failure means the attestation was never minted - not that your
-download is bad. Check the checksum above and stop there.
+The wiring that mints attestations landed after v0.1.73, and nothing is minted
+retroactively, so **v0.1.74 is the first release whose assets carry build provenance**.
+Assets from v0.1.73 and earlier have none and never will.
 
-From v0.1.74 onward, verify an asset's provenance with
+Check which release you downloaded from before you check provenance. If it's v0.1.73 or
+earlier there is nothing to verify: `gh attestation verify` fails on every asset in
+those releases, and that failure means the attestation was never minted - not that your
+download is bad. Compare the checksum above and stop there.
+
+For v0.1.74 and later, verify an asset's provenance with
 [GitHub CLI](https://cli.github.com/manual/gh_attestation_verify):
 
 ```sh
 gh attestation verify <asset> --repo nevenincs/vaultspec-core
 ```
 
-Replace `<asset>` with the downloaded file's path. Assets from v0.1.73 and earlier stay
-unattested permanently; nothing is minted retroactively. If verification fails on a
-release that should carry provenance, check the command's error before running the
-asset.
+Replace `<asset>` with the downloaded file's path. If verification fails on a release
+that should carry provenance, check the command's error before running the asset.
 
 To require a particular signing workflow, add `--signer-workflow`. For the release
 binaries:

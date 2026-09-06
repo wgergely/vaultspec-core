@@ -5,7 +5,7 @@ tags:
 date: '2026-09-05'
 modified: '2026-09-06'
 body_schema: 'body-v2'
-body_hash: 'sha256:16275d54a2fe313cb6756a1958d4faf49254ccd7ed78bc09beac227b5d710917'
+body_hash: 'sha256:f547d15622e8e2bc1fc79a38bd6c02c53a2854cd33d9bcb7a2ad2d3cda34d13f'
 related:
   - "[[2026-09-05-publisher-identity-research]]"
   - "[[2026-08-28-binary-portability-adr]]"
@@ -132,13 +132,23 @@ overclaim this record made on its first pass: the wiring was documented as thoug
 were already producing verifiable assets while every published release predated it, so
 the documented command failed for every download a user could obtain. A security
 instruction that reliably fails teaches people to skip security instructions, which
-costs more than the gap it was covering. The documentation now names the first release
-that will carry provenance, and a repository guard fails once that release is cut so the
-qualification cannot outlive the condition it describes.
+costs more than the gap it was covering.
 
-The deferred half acquires no wiring. What it acquires is a named trigger: the free
-route in `2026-09-05-publisher-identity-research`, whose outcome converts this record's
-accepted risk into implementable work.
+The repair for that overclaim is worth recording, because the obvious form of it was
+taken first and was wrong. A caveat saying provenance is not available yet, held by a
+guard that fails once the named release is cut, trades a page that is wrong now for one
+that goes wrong later and puts the repair in the release pull request - a branch that is
+regenerated and force-pushed, and the worst place to need an edit. The page instead
+states which release provenance starts at and which releases predate it. Those are
+frozen facts that no release makes false, so the guards hold wording rather than a
+deadline: the command may not be taught before the boundary that qualifies it, the two
+versions must describe one boundary, and no claim may state the unattested condition as
+universal.
+
+The deferred half acquired no wiring, which was the decision, and has since acquired no
+trigger either. The route that would have converted this record's accepted risk into
+implementable work is not being taken and the issues tracking publisher identity are
+closed as not planned, so what the chosen half gains is standing rather than scope.
 
 ## Rationale
 
