@@ -63,7 +63,7 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
-from . import Migration, MigrationError, MigrationResult
+from . import Migration, MigrationError, MigrationResult, MigrationScope
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -316,4 +316,7 @@ MIGRATION = Migration(
     name=_NAME,
     migrate=migrate,
     preview=preview,
+    # Removes execution records after folding them into a ledger. Only an
+    # operator who asked to converge may trigger this.
+    scope=MigrationScope.DOCUMENT_CONTENT,
 )

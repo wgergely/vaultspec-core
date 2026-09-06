@@ -28,7 +28,7 @@ import logging
 import shutil
 from typing import TYPE_CHECKING
 
-from . import Migration, MigrationError, MigrationResult
+from . import Migration, MigrationError, MigrationResult, MigrationScope
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -220,4 +220,9 @@ MIGRATION = Migration(
     target_version="0.1.35",
     name="framework_flatten",
     migrate=migrate,
+    # Relocates resource directories inside .vaultspec/. It is a layout
+    # migration, but of the framework tree, not of the corpus: no
+    # authored document changes place, so an authoring write can be
+    # correct without it.
+    scope=MigrationScope.ENVIRONMENT,
 )

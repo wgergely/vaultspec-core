@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from . import Migration, MigrationError, MigrationResult
+from . import Migration, MigrationError, MigrationResult, MigrationScope
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -199,4 +199,8 @@ MIGRATION = Migration(
     target_version=_TARGET_VERSION,
     name=_NAME,
     migrate=migrate,
+    # Rewrites the managed .gitignore block. No .vault/ document is read
+    # or written, and nothing about where an authored document lands
+    # depends on it.
+    scope=MigrationScope.ENVIRONMENT,
 )

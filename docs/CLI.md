@@ -2725,15 +2725,26 @@ are idempotent, and because they relocate, rewrite, and delete tracked `.vault/`
 documents they only run for a caller that asked to change the workspace:
 
 - `vaultspec-core install --upgrade`, `vaultspec-core migrations run`, and
-  `vaultspec-core vault repair` - converging is what you invoked them for.
-- `vaultspec-core vault add` and `vaultspec-core vault feature index` - the schema
-  decides where their write lands, so they converge before authoring.
+  `vaultspec-core vault repair` run the **whole registry** - converging is what you
+  invoked them for.
+- `vaultspec-core vault add`, `vaultspec-core vault feature index` and the MCP `create`
+  tool run **only the entries that decide where their own write lands**. Writing a
+  document into a stale layout is what leaves one feature with two tracked indexes, so
+  they fix that; they never rewrite or delete a document you did not name.
+
+That second rule is deliberately narrow. A verb that writes one document has no standing
+to rewrite forty-seven others, so returning to a long-untouched workspace and adding one
+ADR converges the layout and leaves everything else exactly where it was. The entries
+that fold and remove documents wait for one of the three commands above.
 
 Every other command, including every read (`vaultspec-core vault list`,
 `vaultspec-core vault graph`, `vaultspec-core vault check`, and the MCP query tools),
-leaves the workspace exactly as it finds it and logs a warning naming the pending
-entries instead. Run `vaultspec-core migrations status` to see them, and
-`vaultspec-core migrations run` to apply them.
+leaves the workspace exactly as it finds it.
+
+Anything left pending is reported rather than silently deferred: any command that
+observes a stale workspace logs a warning naming the outstanding entries. Run
+`vaultspec-core migrations status` to see them, and `vaultspec-core migrations run` to
+apply them - it names every document it is about to remove and asks before it does.
 
 ### Where deleted documents go
 

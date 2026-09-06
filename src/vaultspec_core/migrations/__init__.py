@@ -17,11 +17,19 @@ Triggers:
   driver from the layout-sensitive authoring callers on every surface
   (``vaultspec-core vault add``, ``vaultspec-core vault feature index``,
   and the MCP ``create`` tool), which write a document to a location the
-  schema decides.
+  schema decides. That trigger is *scoped*: it runs only entries
+  declaring :attr:`MigrationScope.WRITE_PLACEMENT`, never the ones that
+  rewrite or remove documents the user authored. A verb that writes one
+  document has standing to fix where its own write lands and no standing
+  to delete unrelated ones (issue #458).
 - :func:`vaultspec_core.vaultcore.repair.repair_vault` runs the driver
   from its preflight.
 - The ``vaultspec-core migrations`` CLI subcommand exposes
   ``status`` and ``run`` for explicit operator control.
+
+Every entry therefore declares a :class:`MigrationScope`, and the
+default for an entry that does not is the conservative one: reachable
+from an explicit convergence verb only.
 
 Nothing else triggers the driver. In particular no *read* does:
 scanning, graph construction, ``vault list``, ``vault check`` without
@@ -64,10 +72,12 @@ if TYPE_CHECKING:
 __all__ = [
     "MIGRATION_LOGGER",
     "REGISTRY",
+    "WRITE_PLACEMENT_SCOPES",
     "DeletionPreview",
     "Migration",
     "MigrationError",
     "MigrationResult",
+    "MigrationScope",
     "MigrationStatus",
     "list_pending",
     "migration_status",
@@ -123,6 +133,64 @@ def _invalidate_graph_cache(workspace: Path) -> None:
         cache_mod.cache_path(workspace).unlink(missing_ok=True)
     except OSError as exc:
         logger.debug("Graph cache invalidation skipped for %s: %s", workspace, exc)
+
+
+class MigrationScope(Enum):
+    """What kind of workspace change an entry makes.
+
+    The registry needs this because not every trigger is entitled to
+    every entry. An operator who typed ``vaultspec-core migrations run``
+    asked for the whole registry; an authoring verb that asked to write
+    one document did not, and running the whole registry underneath it
+    is how ``vaultspec-core vault add adr`` came to delete unrelated
+    execution records and Phase Summaries on a months-stale workspace
+    (issue #458). The scope says which of the two an entry belongs to,
+    so the boundary is a declared property of the migration rather than
+    a list of names maintained somewhere else.
+
+    Attributes:
+        WRITE_PLACEMENT: The entry decides *where* a newly authored
+            document lands. A verb that writes to a schema-resolved
+            location must run it first or it authors into a layout the
+            schema no longer describes - the duplicate-index split brain
+            that put the trigger in the scanner originally. Confined to
+            the documents whose location the schema owns: it may relocate
+            them, retag them, and drop a generated duplicate it has
+            already snapshotted, but it never touches a document the
+            schema did not place.
+        DOCUMENT_CONTENT: The entry rewrites or removes ``.vault/``
+            documents a human authored. Only an explicitly convergent
+            trigger runs these: ``vaultspec-core migrations run``,
+            ``vaultspec-core vault repair``, and
+            ``vaultspec-core install --upgrade``.
+        ENVIRONMENT: The entry mutates the framework tree
+            (``.vaultspec/``) or host configuration, never a ``.vault/``
+            document. Harmless to a corpus, but nothing about an
+            authoring write depends on it, so it waits for an explicit
+            trigger too rather than widening the hook for no gain.
+
+    The default on :class:`Migration` is :attr:`DOCUMENT_CONTENT`, the
+    conservative reading: an entry that has not declared itself is
+    assumed to touch user content and is therefore never run by an
+    authoring verb. Declaring the *safe* value has to be a deliberate
+    act, because the cost of guessing wrong runs one way only.
+    """
+
+    WRITE_PLACEMENT = "write_placement"
+    DOCUMENT_CONTENT = "document_content"
+    ENVIRONMENT = "environment"
+
+
+WRITE_PLACEMENT_SCOPES: frozenset[MigrationScope] = frozenset(
+    {MigrationScope.WRITE_PLACEMENT}
+)
+"""The scope set a layout-sensitive authoring write is entitled to run.
+
+Passed by :func:`vaultspec_core.cli._migration_hook.ensure_migrated` as
+``run_pending_migrations(..., scopes=WRITE_PLACEMENT_SCOPES)``. Named
+rather than inlined so the entitlement has one definition and the hook,
+its tests, and the ADR all refer to the same object.
+"""
 
 
 class MigrationStatus(Enum):
@@ -192,12 +260,21 @@ class Migration:
             differently from the run it precedes is worse than no preview,
             because it is trusted. ``None`` means the migration deletes
             nothing an operator authored; see :func:`preview_deletions`.
+        scope: What the entry changes, which decides whether a trigger
+            narrower than "the operator asked to converge" may run it.
+            See :class:`MigrationScope`. Defaults to the conservative
+            :attr:`MigrationScope.DOCUMENT_CONTENT`, so an entry added
+            without a declaration is reachable only from an explicit
+            convergence verb. Every registered entry declares it
+            explicitly regardless; the default exists to make silence
+            safe, not to excuse it.
     """
 
     target_version: str
     name: str
     migrate: Callable[[Path], MigrationResult]
     preview: Callable[[Path], list[Path]] | None = None
+    scope: MigrationScope = MigrationScope.DOCUMENT_CONTENT
 
 
 _workspace_cache_lock = threading.Lock()
@@ -225,13 +302,21 @@ def reset_workspace_cache() -> None:
 def warn_if_pending(workspace: Path) -> list[str]:
     """Report pending migrations for *workspace* without running them.
 
-    The read-side counterpart of :func:`run_pending_migrations`. A read
-    path must not converge a stale workspace - the registry's entries
-    delete and relocate tracked user documents, which no read
+    The non-converging counterpart of :func:`run_pending_migrations`. A
+    read path must not converge a stale workspace - the registry's
+    entries delete and relocate tracked user documents, which no read
     authorised (issue #443) - but it must not stay silent about the
     drift either, or a workspace upgraded by a bare package install
     would be read through a legacy layout indefinitely with nothing
     ever saying so (the failure mode of issue #408, one layer up).
+
+    :func:`vaultspec_core.cli._migration_hook.ensure_migrated` calls it
+    for the same reason from the write side: a scoped convergence leaves
+    the content entries pending on purpose, and an authoring verb that
+    left them pending in silence would reproduce that same indefinite
+    drift with a mutation in the middle of it. The message is worded for
+    both callers, and the once-per-workspace latch is shared, so a
+    process that both reads and authors still emits one notice.
 
     Emits at most one warning per workspace per process: the notice is
     advice about workspace state, not about the individual scan, and
@@ -290,8 +375,9 @@ def warn_if_pending(workspace: Path) -> list[str]:
             return []
         _notified_workspaces.add(cache_key)
     logger.warning(
-        "Workspace %s has pending schema migrations (%s); reads leave the "
-        "workspace as found. Run 'vaultspec-core migrations run' to apply them.",
+        "Workspace %s has pending schema migrations (%s); they rewrite and "
+        "remove tracked documents, so nothing applies them on your behalf. "
+        "Run 'vaultspec-core migrations run' to apply them.",
         workspace,
         ", ".join(names),
     )
@@ -509,6 +595,7 @@ def run_pending_migrations(
     *,
     use_cache: bool = False,
     registry: list[Migration] | None = None,
+    scopes: frozenset[MigrationScope] | None = None,
 ) -> list[MigrationResult]:
     """Run every registered migration whose target exceeds the manifest version.
 
@@ -545,27 +632,67 @@ def run_pending_migrations(
     :func:`vaultspec_core.cli._migration_hook.ensure_migrated`. Read
     paths call :func:`warn_if_pending` instead.
 
+    Those callers are not equally authorised, which is what ``scopes``
+    expresses. The three operator verbs asked to converge and get the
+    whole registry. The authoring hook asked to write one document and
+    gets only :attr:`MigrationScope.WRITE_PLACEMENT` entries - the ones
+    that decide where its write lands - so no authoring verb can remove
+    a document its caller never named (issue #458). A scoped run leaves
+    the rest pending, and the manifest records that faithfully: see the
+    bump rule below.
+
+    Version bookkeeping under a scoped run. The manifest carries one
+    version scalar whose meaning is "every entry at or below this has
+    run". A scoped run preserves that invariant by bumping only through
+    the unbroken prefix of pending entries it actually ran, and stopping
+    the moment it skips one. So a scoped run that applies 0.1.17 and
+    skips 0.1.21 records 0.1.17, and the skipped entries stay pending
+    for ``migrations status``, ``warn_if_pending``, and the next
+    explicit convergence. An in-scope entry above a skipped one still
+    runs; it just does not advance the version. The cost is that the
+    entry is re-run on the next invocation, which is free: idempotence
+    is already a registry-wide requirement.
+
     Performance. The authorised lazy-trigger caller passes ``use_cache=True``;
-    after the first up-to-date observation per workspace per process,
+    after the first observation that leaves this caller nothing to run,
     every subsequent call short-circuits before acquiring the
-    file lock or reading the manifest. Up-to-date workspaces pay the
-    cost of a single :func:`dict.get` plus one tuple compare per
-    ``scan_vault`` invocation.
+    file lock or reading the manifest, at the cost of a single
+    :func:`dict.get` plus one tuple compare.
+
+    The cached entry is the manifest *version*, not a verdict that the
+    workspace is converged, which is what lets a scoped caller record one
+    on a workspace it deliberately left partly migrated. Each caller
+    compares the entry against the tail of its own eligible subset, so
+    the same entry short-circuits an authoring verb with nothing above it
+    and does not short-circuit an operator verb whose content entries
+    still are. Without that, the steady state this design creates - the
+    relocation long applied, the content entries pending until someone
+    converges - would be precisely the state that never caches, and a
+    long-lived MCP server would pay a lock and a manifest read on every
+    ``create`` for the life of the process.
 
     Args:
         workspace: Workspace root directory.
         use_cache: When ``True`` (the authorised lazy-trigger path used
             by the mutating authoring verbs), short-circuits on a
-            per-process cache of workspaces previously seen up-to-date.
+            per-process cache of the manifest version each workspace was
+            last observed at.
             Operator-facing triggers
             (``vaultspec-core migrations run`` and
             ``vaultspec-core install --upgrade``) pass ``False`` so they always
             consult the manifest.
+        scopes: Restrict the run to entries whose
+            :attr:`Migration.scope` is in this set. ``None``, the
+            default, runs the whole registry and is what the three
+            operator-facing convergence verbs pass.
+            :data:`WRITE_PLACEMENT_SCOPES` is what the authoring hook
+            passes.
 
     Returns:
         Per-migration :class:`MigrationResult` entries, in execution
-        order. Empty when the workspace has no manifest or every
-        registered migration is already covered.
+        order, for the entries this call was entitled to run. Empty when
+        the workspace has no manifest, every registered migration is
+        already covered, or nothing pending falls within ``scopes``.
 
     Raises:
         VaultSpecError: When the manifest exists but cannot be parsed. The
@@ -580,6 +707,7 @@ def run_pending_migrations(
         REGISTRY if registry is None else registry,
         key=lambda m: parse_version_tuple(m.target_version),
     )
+    eligible = [m for m in registry_entries if scopes is None or m.scope in scopes]
 
     # Resolve once so symlinked or relative invocations of the same
     # workspace share a cache entry rather than racing on equivalent
@@ -590,12 +718,20 @@ def run_pending_migrations(
         with _workspace_cache_lock:
             cached_version = _workspace_cache.get(cache_key)
 
-    # REGISTRY is sorted ascending by target_version, so only the tail
-    # entry matters: if its target is at or below the cached version,
-    # every earlier entry is too. Empty registries trivially short-circuit.
+    # Only this call's tail *eligible* entry matters: the list is sorted
+    # ascending, so if the highest in-scope target is at or below the cached
+    # version, every in-scope entry below it is too and there is nothing this
+    # caller could run. Reading the tail of the eligible subset rather than of
+    # the whole registry is what keeps a scoped caller cheap on a workspace
+    # that stays permanently short of up to date: once the 0.1.17 relocation
+    # is applied, an authoring verb short-circuits on a dict lookup even
+    # though the content entries remain pending indefinitely. Sound only
+    # because the manifest version is bumped through an unbroken run prefix
+    # (see the loop below), so a recorded version still means every entry at
+    # or below it has run.
     if cached_version is not None and (
-        not registry_entries
-        or parse_version_tuple(registry_entries[-1].target_version) <= cached_version
+        not eligible
+        or parse_version_tuple(eligible[-1].target_version) <= cached_version
     ):
         return []
 
@@ -627,7 +763,20 @@ def run_pending_migrations(
         # one that looks legacy.
         current = parse_version_tuple(manifest.vaultspec_version)
         pending = list_pending(workspace, manifest=manifest, registry=registry_entries)
-        if not pending:
+        runnable = [m for m in pending if scopes is None or m.scope in scopes]
+        if not runnable:
+            # Cached even when out-of-scope entries remain pending, which is
+            # the steady state scoped convergence deliberately creates: the
+            # relocation applied long ago, the content entries wait for an
+            # operator, and nothing about that will change on its own. Sound
+            # because the entry is a *version*, not a verdict of "up to date",
+            # and every reader compares it against the tail of its own
+            # eligible subset. An unscoped caller reading 0.1.17 here still
+            # sees its own 0.1.74 tail above it and goes on to run the content
+            # entries; only a caller entitled to nothing above the recorded
+            # version short-circuits. Withholding the entry instead would make
+            # a long-lived MCP server pay an advisory lock and a manifest read
+            # on every `create` for the life of the process.
             if use_cache:
                 with _workspace_cache_lock:
                     _workspace_cache[cache_key] = current
@@ -644,7 +793,24 @@ def run_pending_migrations(
         # previous on-disk version - no per-iteration version check is
         # required to guard the bump.
         results: list[MigrationResult] = []
+        bumpable = True
         for migration in pending:
+            if scopes is not None and migration.scope not in scopes:
+                # Outside this caller's entitlement. Skipping it also closes
+                # the manifest bump for every entry after it: the version is
+                # a single scalar, so advancing it past an entry that did not
+                # run would record that entry as applied and retire it
+                # permanently. A later in-scope entry still runs - that is the
+                # point of the scope - it just cannot be written down, and
+                # re-running it next invocation costs nothing because every
+                # entry is required to be idempotent.
+                bumpable = False
+                logger.debug(
+                    "Skipping migration %s: scope %s outside caller entitlement",
+                    migration.name,
+                    migration.scope.value,
+                )
+                continue
             logger.info(
                 "Running migration %s (target_version=%s)",
                 migration.name,
@@ -662,16 +828,21 @@ def run_pending_migrations(
             # the per-file fingerprint self-healing.
             _invalidate_graph_cache(workspace)
 
-            manifest.vaultspec_version = migration.target_version
-            write_manifest_data(workspace, manifest)
+            if bumpable:
+                manifest.vaultspec_version = migration.target_version
+                write_manifest_data(workspace, manifest)
 
         # Final bump to the running package version when it exceeds
         # the highest-target migration we just applied. In production
         # the running version always equals or exceeds the most recent
         # registered target; the dual case is exercised only in tests
         # that synthesise migrations targeting a future version.
+        # Suppressed once an entry has been skipped, for the same reason the
+        # per-entry bump is: the running version covers the whole registry,
+        # and claiming it would retire the entries this caller was never
+        # entitled to run.
         running = package_version()
-        if parse_version_tuple(running) > parse_version_tuple(
+        if bumpable and parse_version_tuple(running) > parse_version_tuple(
             manifest.vaultspec_version
         ):
             manifest.vaultspec_version = running

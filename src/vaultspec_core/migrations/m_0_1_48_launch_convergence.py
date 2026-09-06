@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from . import Migration, MigrationResult
+from . import Migration, MigrationResult, MigrationScope
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -143,4 +143,6 @@ MIGRATION = Migration(
     target_version=_TARGET_VERSION,
     name=_NAME,
     migrate=migrate,
+    # Re-renders managed MCP launch entries in host configuration.
+    scope=MigrationScope.ENVIRONMENT,
 )

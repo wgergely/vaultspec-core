@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING
 import pytest
 
 from vaultspec_core.core.manifest import (
-    ManifestData,
     read_manifest_data,
     write_manifest_data,
 )
@@ -33,32 +32,9 @@ from vaultspec_core.migrations import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
     from pathlib import Path
 
 pytestmark = [pytest.mark.unit]
-
-
-@pytest.fixture
-def workspace(tmp_path: Path) -> Iterator[Path]:
-    """Create an installed-style workspace with a writable manifest.
-
-    Writes a stale ``vaultspec_version`` so the driver has something
-    to migrate. Resets the per-process workspace cache so each test
-    starts from a clean slate.
-
-    Returns:
-        The workspace root path. Tests still hit a real on-disk
-        manifest and a real workspace path; no library functions are
-        mocked.
-    """
-    fw_dir = tmp_path / ".vaultspec"
-    fw_dir.mkdir(parents=True, exist_ok=True)
-    data = ManifestData(vaultspec_version="0.1.0")
-    write_manifest_data(tmp_path, data)
-    reset_workspace_cache()
-    yield tmp_path
-    reset_workspace_cache()
 
 
 def _noop(name: str, target_version: str) -> tuple[Migration, dict[str, int]]:
