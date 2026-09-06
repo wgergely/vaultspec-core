@@ -133,6 +133,52 @@ jobs:
           fi
           echo "all ${#targets[@]} Linux target(s) are acquired"
 
+      # The offline gate is a SECOND matrix over the same targets, and this
+      # repository has now twice shipped a defect whose whole cause was a list
+      # that had to be edited in lockstep with the build matrix and was not:
+      # the preflight's hand-kept runner selectors, and the release's hand-kept
+      # target expectations (#361/#364). Both were fixed by deriving. The
+      # offline gate cannot be derived - GitHub has no way to share one matrix
+      # between two jobs - so it is asserted instead, here, on every pull
+      # request.
+      #
+      # A target present in `build` and absent from `offline` is the failure
+      # this stops: its artifact would be uploaded as `unverified-*` and never
+      # renamed, so the release would silently lose that platform. A target
+      # present in `offline` and absent from `build` fails its download and
+      # reds the release for no reason.
+      - name: Every built target is gated offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow=.github/workflows/binaries.yml
+          # One job block at a time: `target:` appears in both matrices and a
+          # file-wide grep cannot tell them apart. A job header is a key at two
+          # spaces of indentation, which is the boundary this walks.
+          targets_of() {
+            awk -v want="  $1:" '
+              $0 == want { inside = 1; next }
+              /^  [a-z][a-zA-Z0-9_-]*:[[:space:]]*$/ { inside = 0 }
+              inside && $1 == "target:" { print $2 }
+            ' "${workflow}" | sort -u
+          }
+          mapfile -t built < <(targets_of build)
+          mapfile -t gated < <(targets_of offline)
+          # Neither list may be empty, or this comparison passes vacuously -
+          # including the case where a job was renamed and the awk matches
+          # nothing at all.
+          if [ ${#built[@]} -eq 0 ] || [ ${#gated[@]} -eq 0 ]; then
+            echo "::error::derived ${#built[@]} built and ${#gated[@]} gated target(s) from ${workflow}; a job was renamed or the matrix shape moved, and this assertion cannot run"
+            exit 1
+          fi
+          echo "built:  ${built[*]}"
+          echo "gated:  ${gated[*]}"
+          if [ "${built[*]}" != "${gated[*]}" ]; then
+            echo "::error::the build matrix and the offline gate cover different targets. Every target that is built must be run with the network taken away before it can become a release asset."
+            exit 1
+          fi
+          echo "all ${#built[@]} built target(s) are gated offline"
+
   lint-and-type:
     name: Lint, Type, Config, Link, and Markdown Checks
     runs-on: ubuntu-latest

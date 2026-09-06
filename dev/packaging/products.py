@@ -111,12 +111,14 @@ VAULTSPEC_CORE = Product(
         Executable(name="vaultspec-core", summary="the vaultspec-core CLI"),
         Executable(name="vaultspec-mcp", summary="the vaultspec MCP server"),
     ),
-    # vaultspec-core is pure Python behind the bootstrap, so it runs on every
-    # target the channels serve; supported_targets is left at its default.
+    # vaultspec-core is pure Python, and every target the channels serve has a
+    # prepared distribution carrying the native dependencies it needs, so
+    # supported_targets is left at its default.
     notes=(
         "Installs vaultspec-core and vaultspec-mcp.",
-        "First launch needs network access to install the pinned package "
-        "and its dependencies.",
+        "Each binary carries its own Python, Vaultspec and every dependency, "
+        "so no launch needs a network.",
+        "Upgrade through this channel: the binaries do not update themselves.",
         "Verify with: vaultspec-core --version",
     ),
 )

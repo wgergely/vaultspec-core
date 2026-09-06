@@ -207,7 +207,7 @@ uv run vaultspec-core install
 Contributors then use `uv sync` to install dependencies and `uv run vaultspec-core` to
 run the CLI. Configure generated launchers under
 [project integrations](#configure-project-integrations). For release binaries that need
-no separate Python install, see [Homebrew and Scoop](channels.md).
+neither a separate Python install nor a network, see [Homebrew and Scoop](channels.md).
 
 After updating the package, run `vaultspec-core install --upgrade` in each project to
 update its bundled rules, skills, and agents. Use `uvx` or `uv run` as appropriate for

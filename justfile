@@ -176,17 +176,23 @@ analytics *args='':
 # ===========================================================================
 
 # Parameterised rather than a fixed `build` target, and a release-workflow
-# action rather than a routine local build. The binaries resolve
-# `vaultspec-core==<tag>` from PyPI on first launch, so the tag must already be
-# published for the result to bootstrap. `tag` is the release tag (e.g.
+# action rather than a routine local build. `tag` is the release tag (e.g.
 # vaultspec-core-v0.1.53); `rust_target` is a cargo triple (e.g.
 # x86_64-pc-windows-msvc).
+
+# WHAT THIS REPRODUCES is a published release, which is why it needs no wheel
+# argument. The binaries carry their application, so nothing is resolved at
+# launch - but something has to be resolved at BUILD time to fill the prepared
+# distribution, and without `--wheel` that is `vaultspec-core==<tag>` from
+# PyPI. The tag must therefore already be published for this recipe to run.
+# The release workflow passes the wheel it just built instead, which is what
+# makes publication a peer of the binaries there rather than an upstream.
 
 # `--no-project` matches .github/workflows/binaries.yml exactly: the binary
 # build runs against a bare interpreter with no project environment, so a local
 # reproduction and the release workflow invoke the script identically.
 
-# Build the standalone PyApp binaries for one release tag and Rust target.
+# Build the offline PyApp binaries for one release tag and Rust target.
 binaries tag rust_target outdir='dist-bin':
     uv run --no-project --python 3.13 -- python dev/binaries/build_pyapp.py --tag {{tag}} --target {{rust_target}} --outdir {{outdir}}
 

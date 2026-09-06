@@ -11,12 +11,13 @@ related:
 supersedes:
   - '2026-08-28-binary-portability-adr'
   - '2026-08-29-offline-binaries-adr'
+superseded_by: '2026-09-06-offline-binaries-prepared-distribution-adr'
 modified: '2026-09-06'
 body_schema: 'body-v2'
-body_hash: 'sha256:88d487f9540c9fa4e048407efda7249adbeeecc291298dfa820cd013ece4fb74'
+body_hash: 'sha256:c66b6261e4a934cd9c48270445abb896a47af869fcb85d38b0b5ebe595a6f0f9'
 ---
 
-# `binary-bootstrapper` adr: `the release binary is a bootstrapper and the documentation says so` | (**status:** `accepted`)
+# `binary-bootstrapper` adr: `the release binary is a bootstrapper and the documentation says so` | (**status:** `superseded`)
 
 ## Problem Statement
 

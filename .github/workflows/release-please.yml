@@ -107,10 +107,15 @@ jobs:
             -f "inputs[tag]=${TAG}"
           echo "Dispatched publish.yml for ${TAG}" >> "$GITHUB_STEP_SUMMARY"
 
-      # Standalone binaries bootstrap by installing the package from PyPI on
-      # first run, so this is dispatched alongside publish.yml (not gated on it)
-      # - the release must reach PyPI before end users launch a binary, which
-      # the paired publish dispatch handles.
+      # DISPATCHED ALONGSIDE publish.yml, and no longer merely tolerated as a
+      # race. The binaries used to install the package from PyPI on first run,
+      # so the release had to reach the index before an end user could launch
+      # one - the pairing worked, but only because the gap was short.
+      #
+      # binaries.yml now builds the wheel it bakes into every artifact from
+      # the tag itself, and the artifacts install nothing at launch. PyPI is
+      # not on their path at build time or at run time, so the two dispatches
+      # are genuinely independent rather than ordered by luck.
       - name: Dispatch binaries build workflow
         if: steps.release.outputs.release_created == 'true'
         env:

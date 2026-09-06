@@ -133,75 +133,33 @@ jobs:
             "https://github.com/${REPO}/releases/download/${tag}/${ASSET}"
           chmod +x /opt/acq/vaultspec-core
 
-      # WAIT FOR PyPI FIRST. The binary is a PyApp bootstrapper: launching it
-      # resolves `vaultspec-core==<version>` from PyPI, so until the wheel is
-      # there the artefact cannot start for a reason that has nothing to do
-      # with the artefact.
+      # A COLD START, once, with no retry, and the retry's absence is the
+      # assertion rather than a tidy-up.
       #
-      # v0.1.67 is why. This check was dispatched by the release guard the
-      # moment the assets attached, while `publish.yml` was still uploading,
-      # and three of four legs failed with:
+      # This step used to loop for ten minutes. The binary bootstrapped its
+      # application from PyPI at first launch, so a freshly tagged release was
+      # not resolvable until publish.yml had propagated to the CDN edge this
+      # machine reads: v0.1.67 failed three legs of four on exactly that, and
+      # the fourth passed only because it happened to be scheduled a minute
+      # later. The loop waited that race out, and #386 established that
+      # waiting on the binary itself was the only honest way to observe it.
       #
-      #     No solution found when resolving dependencies:
-      #     Because there is no version of vaultspec-core==0.1.67 ...
+      # The binary now carries its application and its whole dependency
+      # closure, so there is nothing left to propagate and nothing to wait
+      # for. Keeping the loop would be worse than redundant: it would turn
+      # "this artifact still reaches for the network" into a slow pass, and a
+      # real failure into a ten-minute one whose message blames an index the
+      # artifact no longer consults. A single cold start that must succeed is
+      # now the stronger check, because the property being observed changed.
       #
-      # The fourth passed only because it happened to run a minute later. A
-      # check whose result depends on which container got scheduled first is
-      # not a check, and the failure it reports is a lie about the binary.
-      #
-      # release-please dispatches publish.yml and binaries.yml together rather
-      # than in sequence, deliberately - the binaries do not need PyPI to BUILD.
-      # They need it to RUN, which is what this workflow does and nothing else
-      # in the lane does.
-      # WAIT UNTIL THE BINARY CAN ACTUALLY START, rather than until an endpoint
-      # says it should be able to. Design and evidence from #386.
-      #
-      # #386 WAS CLOSED DELIBERATELY, not by accident. Its author closed it
-      # judging #385 the better call: it targeted the measured cause more
-      # cheaply, and the only argument for this design was an `Accept`-vary
-      # risk between the HTML and PEP 691 representations of the simple index
-      # which had not been measured. GitHub records no auto-merge on #385
-      # (`autoMergeRequest: none`, merged directly, no reviews), so the
-      # restoring PR's account of an automatic merge is not what happened.
-      # The code below is unchanged by this correction - only the history is.
-      #
-      # Polling PyPI is a PROXY, and the JSON API was MEASURED to lead the
-      # resolver: on v0.1.69 it reported the version present and three seconds
-      # later `uv` inside the binary still said `no version of
-      # vaultspec-core==0.1.69`; macOS and debian failed while Windows and
-      # ubuntu passed, on one release.
-      #
-      # The SIMPLE INDEX is a different and much closer proxy - it is the
-      # surface the resolver reads, and #385 polled it from the runner, so it
-      # saw the same CDN edge. It was never shown to lead anything. #385
-      # shipped on main without a release ever exercising it, and this replaced
-      # it before v0.1.70 ran, so whether the cheap fix would have sufficed is
-      # now unknowable. Do not cite this comment as evidence that it would not
-      # have.
-      #
-      # The condition this workflow depends on is "the PyApp bootstrapper can
-      # resolve its own distribution from THIS machine". Nothing observes that
-      # except running it. The exit code is not asserted here - failing to start
-      # is the normal state for the first minute after a release - only that it
-      # eventually does; the step after this one tests the behaviour.
-      #
-      # The probe gets its OWN home so its warm cache cannot make the real
-      # check pass on a broken release.
-      - name: Wait until the published binary can bootstrap
+      # The probe gets its OWN home so a warm cache left by an earlier job on
+      # this machine cannot make a broken release look acquirable.
+      - name: The published binary starts on a machine that has never run it
         run: |
           set -eu
           export HOME=/tmp/bootstrap-probe
           rm -rf "$HOME"; mkdir -p "$HOME"
-          for attempt in $(seq 1 40); do
-            if /opt/acq/vaultspec-core --version >/dev/null 2>&1; then
-              echo "the bootstrapper resolved its distribution (attempt ${attempt})"
-              exit 0
-            fi
-            echo "waiting for the release to be resolvable from this machine (${attempt}/40)"
-            sleep 15
-          done
-          echo "::error::the published binary never resolved its distribution. It bootstraps from PyPI, so this is publish.yml not having completed - or a genuinely unresolvable release."
-          exit 1
+          /opt/acq/vaultspec-core --version
 
       - name: Use it the way a new user would
         run: |
@@ -275,44 +233,33 @@ jobs:
           # rather than the quarantine attribute.
           xattr -d com.apple.quarantine "${acq}/vaultspec-core" 2>/dev/null || true
 
-      # WAIT FOR PyPI FIRST. The binary is a PyApp bootstrapper: launching it
-      # resolves `vaultspec-core==<version>` from PyPI, so until the wheel is
-      # there the artefact cannot start for a reason that has nothing to do
-      # with the artefact.
+      # A COLD START, once, with no retry, and the retry's absence is the
+      # assertion rather than a tidy-up.
       #
-      # v0.1.67 is why. This check was dispatched by the release guard the
-      # moment the assets attached, while `publish.yml` was still uploading,
-      # and three of four legs failed with:
+      # This step used to loop for ten minutes. The binary bootstrapped its
+      # application from PyPI at first launch, so a freshly tagged release was
+      # not resolvable until publish.yml had propagated to the CDN edge this
+      # machine reads: v0.1.67 failed three legs of four on exactly that, and
+      # the fourth passed only because it happened to be scheduled a minute
+      # later. The loop waited that race out, and #386 established that
+      # waiting on the binary itself was the only honest way to observe it.
       #
-      #     No solution found when resolving dependencies:
-      #     Because there is no version of vaultspec-core==0.1.67 ...
+      # The binary now carries its application and its whole dependency
+      # closure, so there is nothing left to propagate and nothing to wait
+      # for. Keeping the loop would be worse than redundant: it would turn
+      # "this artifact still reaches for the network" into a slow pass, and a
+      # real failure into a ten-minute one whose message blames an index the
+      # artifact no longer consults. A single cold start that must succeed is
+      # now the stronger check, because the property being observed changed.
       #
-      # The fourth passed only because it happened to run a minute later. A
-      # check whose result depends on which container got scheduled first is
-      # not a check, and the failure it reports is a lie about the binary.
-      #
-      # release-please dispatches publish.yml and binaries.yml together rather
-      # than in sequence, deliberately - the binaries do not need PyPI to BUILD.
-      # They need it to RUN, which is what this workflow does and nothing else
-      # in the lane does.
-      # Same reasoning as the containerised leg above: wait on the binary
-      # resolving its own distribution, not on an endpoint that leads it.
-      # Design and evidence from #386.
-      - name: Wait until the published binary can bootstrap
+      # The probe gets its OWN home so a warm cache left by an earlier job on
+      # this machine cannot make a broken release look acquirable.
+      - name: The published binary starts on a machine that has never run it
         run: |
           set -eu
           export HOME="${RUNNER_TEMP}/bootstrap-probe"
           rm -rf "$HOME"; mkdir -p "$HOME"
-          for attempt in $(seq 1 40); do
-            if "${ACQ}/vaultspec-core" --version >/dev/null 2>&1; then
-              echo "the bootstrapper resolved its distribution (attempt ${attempt})"
-              exit 0
-            fi
-            echo "waiting for the release to be resolvable from this machine (${attempt}/40)"
-            sleep 15
-          done
-          echo "::error::the published binary never resolved its distribution. It bootstraps from PyPI, so this is publish.yml not having completed - or a genuinely unresolvable release."
-          exit 1
+          "${ACQ}/vaultspec-core" --version
 
       - name: Use it the way a new user would
         run: |
@@ -392,59 +339,51 @@ jobs:
           # Strip it so this leg tests the binary rather than the mark.
           Unblock-File -Path (Join-Path $acq 'vaultspec-core.exe')
 
-      # WAIT FOR PyPI FIRST. The binary is a PyApp bootstrapper: launching it
-      # resolves `vaultspec-core==<version>` from PyPI, so until the wheel is
-      # there the artefact cannot start for a reason that has nothing to do
-      # with the artefact.
+      # A COLD START, once, with no retry, and the retry's absence is the
+      # assertion rather than a tidy-up.
       #
-      # v0.1.67 is why. This check was dispatched by the release guard the
-      # moment the assets attached, while `publish.yml` was still uploading,
-      # and three of four legs failed with:
+      # This step used to loop for ten minutes. The binary bootstrapped its
+      # application from PyPI at first launch, so a freshly tagged release was
+      # not resolvable until publish.yml had propagated to the CDN edge this
+      # machine reads: v0.1.67 failed three legs of four on exactly that, and
+      # the fourth passed only because it happened to be scheduled a minute
+      # later. The loop waited that race out, and #386 established that
+      # waiting on the binary itself was the only honest way to observe it.
       #
-      #     No solution found when resolving dependencies:
-      #     Because there is no version of vaultspec-core==0.1.67 ...
+      # The binary now carries its application and its whole dependency
+      # closure, so there is nothing left to propagate and nothing to wait
+      # for. Keeping the loop would be worse than redundant: it would turn
+      # "this artifact still reaches for the network" into a slow pass, and a
+      # real failure into a ten-minute one whose message blames an index the
+      # artifact no longer consults. A single cold start that must succeed is
+      # now the stronger check, because the property being observed changed.
       #
-      # The fourth passed only because it happened to run a minute later. A
-      # check whose result depends on which container got scheduled first is
-      # not a check, and the failure it reports is a lie about the binary.
+      # The probe gets its OWN home so a warm cache left by an earlier job on
+      # this machine cannot make a broken release look acquirable.
       #
-      # release-please dispatches publish.yml and binaries.yml together rather
-      # than in sequence, deliberately - the binaries do not need PyPI to BUILD.
-      # They need it to RUN, which is what this workflow does and nothing else
-      # in the lane does.
-      # Same reasoning as the Linux and macOS legs: wait on the binary
-      # resolving its own distribution, not on an endpoint that leads it.
-      # Design and evidence from #386. The probe gets its own profile - shaped
-      # the way #383 established, because a bare directory is not a profile the
-      # platform API accepts - and the environment is restored afterwards so
-      # the real check still runs against its own fresh profile.
-      - name: Wait until the published binary can bootstrap
+      # The probe's home is a full profile rather than a bare directory -
+      # shaped the way #383 established, because the platform API does not
+      # accept a bare directory as one.
+      - name: The published binary starts on a machine that has never run it
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Continue'
+          $ErrorActionPreference = 'Stop'
           $probe = Join-Path $env:RUNNER_TEMP 'bootstrap-probe'
           Remove-Item -Recurse -Force $probe -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force -Path (Join-Path $probe 'AppData\Local'), (Join-Path $probe 'AppData\Roaming') | Out-Null
+          # The environment is RESTORED afterwards: this runner is self-hosted
+          # and its process environment is inherited by later steps.
           $saved = @{ USERPROFILE = $env:USERPROFILE; HOME = $env:HOME; APPDATA = $env:APPDATA; LOCALAPPDATA = $env:LOCALAPPDATA }
           $env:USERPROFILE = $probe
           $env:HOME = $probe
           $env:APPDATA = Join-Path $probe 'AppData\Roaming'
           $env:LOCALAPPDATA = Join-Path $probe 'AppData\Local'
           $exe = Join-Path $env:ACQ 'vaultspec-core.exe'
-          $ok = $false
-          for ($i = 1; $i -le 40; $i++) {
-            & $exe --version *> $null
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "the bootstrapper resolved its distribution (attempt $i)"
-              $ok = $true
-              break
-            }
-            Write-Host "waiting for the release to be resolvable from this machine ($i/40)"
-            Start-Sleep -Seconds 15
-          }
+          & $exe --version
+          $code = $LASTEXITCODE
           foreach ($k in $saved.Keys) { Set-Item -Path "env:$k" -Value $saved[$k] }
-          if (-not $ok) {
-            Write-Error "::error::the published binary never resolved its distribution. It bootstraps from PyPI, so this is publish.yml not having completed - or a genuinely unresolvable release."
+          if ($code -ne 0) {
+            Write-Output "::error::the published binary did not start on a machine that has never run it"
             exit 1
           }
 
