@@ -21,8 +21,8 @@ The harness supports Claude Code, Codex, Gemini CLI, and Antigravity.
 
 ## Install
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run
-this from your repository root:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run this
+from your repository root:
 
 ```bash
 uvx vaultspec-core install
