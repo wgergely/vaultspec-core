@@ -8,6 +8,7 @@ body_schema: 'body-v2'
 body_hash: 'sha256:ba8460db4905d72dcb3229120c72aef781d02cfdf3d162fd2c9542700dc53cac'
 related: []
 ---
+
 # `scaffold-tag-validation` audit: `Creation tag validation`
 
 ## Scope
