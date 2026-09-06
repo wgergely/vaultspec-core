@@ -23,7 +23,8 @@ import logging
 import shutil
 from typing import TYPE_CHECKING
 
-from ..core.helpers import advisory_lock
+from ..core.exceptions import VaultSpecError
+from ..core.helpers import advisory_lock, atomic_write_bytes
 from .rename_ops import rename_document_path
 
 if TYPE_CHECKING:
@@ -38,7 +39,17 @@ logger = logging.getLogger(__name__)
 #: :mod:`vaultspec_core.core.resources`, :mod:`vaultspec_core.vaultcore.batch_archive`,
 #: :mod:`vaultspec_core.vaultcore.exec_recovery`, and
 #: :mod:`vaultspec_core.vaultcore.query_rename`.
-__all__ = ["assert_within"]
+__all__ = ["RollbackError", "assert_within"]
+
+
+class RollbackError(VaultSpecError):
+    """A transaction rollback could not restore every snapshotted document.
+
+    Raised out of :meth:`RenameTransaction.__exit__` when one or more
+    snapshot restores failed, chained (``raise ... from``) to the original
+    exception that triggered the rollback so the operator sees both the
+    operation that failed and the fact that recovery did not complete.
+    """
 
 
 def assert_within(managed_root: Path, path: Path) -> Path:
@@ -63,8 +74,6 @@ def assert_within(managed_root: Path, path: Path) -> Path:
     Raises:
         VaultSpecError: When *path* resolves outside *managed_root*.
     """
-    from ..core.exceptions import VaultSpecError
-
     real_docs = managed_root.resolve(strict=False)
     real_path = path.resolve(strict=False)
     if real_path != real_docs and real_docs not in real_path.parents:
@@ -80,12 +89,24 @@ def _safe_restore_bytes(path: Path, original: bytes) -> None:
 
     A symlinked rollback target is unlinked first so the bytes land on a
     fresh regular file at the in-vault path rather than following the link
-    to an out-of-bounds destination.
+    to an out-of-bounds destination. That unlink is what makes the restore
+    succeed rather than refuse; :func:`~vaultspec_core.core.helpers.atomic_write_bytes`
+    would reject the link outright, and it stays underneath as the backstop
+    for a link created between the two calls.
+
+    The write itself goes through ``atomic_write_bytes`` rather than
+    ``Path.write_bytes``. ``write_bytes`` truncates the destination to zero
+    before it writes, so an interruption between the truncate and the flush
+    left a zero-length document on the one code path whose entire purpose is
+    to prevent data loss (issue #456). The temp-write-fsync-rename sequence
+    leaves the destination either untouched or complete, and inherits the
+    ``_replace_atomic`` retry budget that rides out a transiently held handle
+    on Windows.
     """
     if path.is_symlink():
         path.unlink()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(original)
+    atomic_write_bytes(path, original)
 
 
 def docs_lock_target(docs_dir: Path) -> Path:
@@ -243,10 +264,29 @@ class RenameTransaction:
         held on the caller's side they would already have been released by the
         time this runs, leaving the restore racing an edit. The exception is
         never suppressed.
+
+        A rollback that cannot restore every snapshot raises
+        :class:`RollbackError`, which replaces the in-flight exception as the
+        one the caller sees. It does not replace the *information*: the
+        triggering exception is named in the message and attached as
+        ``__cause__``, so a plain-text CLI renderer that prints only
+        ``str(exc)`` and a traceback both carry the whole story. Swallowing
+        the rollback failure to preserve the original would report a clean
+        rollback over a mixed vault, which is the worse of the two losses
+        (issue #456).
+
+        Raises:
+            RollbackError: When the rollback ran but could not restore every
+                snapshotted document. Its ``__cause__`` is the original
+                exception that triggered the rollback.
         """
+        trigger = exc_val if isinstance(exc_val, BaseException) else None
         try:
             if exc_type is not None:
-                self._rollback()
+                try:
+                    self._rollback(trigger)
+                except RollbackError as rollback_exc:
+                    raise rollback_exc from trigger
         finally:
             self._stack.close()
         return False
@@ -306,7 +346,7 @@ class RenameTransaction:
         """Journal a directory removed during apply (recreated on rollback)."""
         self.removed_dirs.append(path)
 
-    def _rollback(self) -> None:
+    def _rollback(self, trigger: BaseException | None = None) -> None:
         """Walk the journal in reverse to restore the pre-transaction state.
 
         The order is deliberate and identical to the former
@@ -315,7 +355,26 @@ class RenameTransaction:
         file renames (LIFO), drop any directories created during apply, and
         finally restore every snapshot's original bytes (which also recreates
         any deleted file captured in the snapshot set).
+
+        The snapshot stage is the only one that reports failure. Every earlier
+        stage is best-effort cleanup of state the restore stage supersedes; a
+        snapshot that will not restore is a document left holding the failed
+        operation's bytes, which is a mixed vault, not a debug-log event
+        (issue #456). Failures are aggregated rather than raised on the first
+        one so a single unrestorable path cannot strand the documents behind
+        it in the iteration order.
+
+        Args:
+            trigger: The exception that caused the rollback, named in the
+                failure message so the operator is not shown a recovery
+                failure detached from the operation that provoked it.
+
+        Raises:
+            RollbackError: When one or more snapshotted documents could not be
+                restored. :meth:`__exit__` chains it to *trigger*.
         """
+        unrestored: list[tuple[Path, OSError]] = []
+
         for path in self.created_files:
             with contextlib.suppress(OSError):
                 if path.is_file():
@@ -352,4 +411,26 @@ class RenameTransaction:
                 ):
                     _safe_restore_bytes(path, original)
             except OSError as exc:
-                logger.warning("Rollback could not restore %s: %s", path, exc)
+                # Keep restoring the rest of the journal - one unrestorable
+                # document must not strand the others - but record it, and
+                # let the aggregate below refuse to exit quietly.
+                logger.error("Rollback could not restore %s: %s", path, exc)
+                unrestored.append((path, exc))
+
+        if unrestored:
+            listing = "; ".join(f"{path}: {exc}" for path, exc in unrestored)
+            provoked = (
+                f" The operation was rolled back because "
+                f"{type(trigger).__name__}: {trigger}."
+                if trigger is not None
+                else ""
+            )
+            raise RollbackError(
+                f"Rollback could not restore {len(unrestored)} "
+                f"{'document' if len(unrestored) == 1 else 'documents'}; "
+                f"the vault is in a mixed state: {listing}.{provoked}",
+                hint=(
+                    "Inspect the listed paths and restore them from version "
+                    "control before running another vault mutation."
+                ),
+            )
