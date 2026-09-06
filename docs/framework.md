@@ -328,10 +328,8 @@ annotations. None is scoped to the files you staged.
 later `install` or `sync` regenerates `.pre-commit-config.yaml`.
 `vaultspec-core spec precommit enable` reverses it.
 
-**MCP clients.** `install` scaffolds an `.mcp.json` exposing the workflow to Model
-Context Protocol clients over stdio: ten tools, two of which are a gateway to the rest
-of the CLI. Verify the configuration with `vaultspec-core spec mcps status --json`; the
-[MCP reference](./MCP.md) lists the tools.
+**MCP clients.** Check enrollment with `vaultspec-core spec mcps status --json`.
+See the [MCP tool reference](./MCP.md#tools) for the available tools.
 
 ## Machine-global runtime state
 
