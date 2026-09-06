@@ -989,8 +989,8 @@ embedded in prose are preserved.
 - `summary` - Report changed files, generated indexes, unresolved work, root causes.
 
 Dry-run mode never writes generated indexes or check fixes. If migrations are pending,
-dry-run reports that state instead of entering the vault scan path that would apply lazy
-migrations on first use.
+dry-run reports that state rather than entering the index-refresh path, which converges
+the workspace before it writes.
 
 The `preflight` phase lists the documents pending migrations would remove *before* it
 runs them, and reports where their copies went afterwards. See
@@ -2825,9 +2825,11 @@ unchanged so the next invocation re-attempts it.
 When the pending migrations would delete documents, an interactive terminal is asked to
 confirm unless `--yes` is passed. Non-interactive callers - CI, `--json`, the MCP
 server, a piped or closed stdin - are warned and proceed rather than waiting for input:
-the registry also runs from `vaultspec-core install --upgrade` and lazily from every
-`vaultspec-core vault` command, so refusing here would only push a blocked script onto a
-trigger that asks nothing at all. Either way, every removed document is copied into
+the registry also runs from `vaultspec-core install --upgrade`,
+`vaultspec-core vault repair`, and the authoring verbs that let the schema decide where
+they write (`vaultspec-core vault add`, `vaultspec-core vault feature index`, and the
+MCP `create` tool), so refusing here would only push a blocked script onto a trigger
+that asks nothing at all. Either way, every removed document is copied into
 `.vault/.trash/` first.
 
 Exit codes: `0` on success (including the no-pending no-op and every dry run), `1` if

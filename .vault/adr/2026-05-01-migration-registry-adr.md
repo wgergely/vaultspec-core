@@ -1,16 +1,17 @@
 ---
 tags:
-  - '#adr'
-  - '#migration-registry'
+  - "#adr"
+  - "#migration-registry"
 date: '2026-05-01'
-modified: '2026-06-13'
-body_hash: 'sha256:3cbe63fbcb24910ce6042d38610343fd37bc1c4acd4888182f6aa9b4fcf34e13'
 related:
-  - '[[2026-05-01-migration-registry-research]]'
-  - '[[2026-04-30-vault-index-folder-adr]]'
+  - "[[2026-05-01-migration-registry-research]]"
+  - "[[2026-04-30-vault-index-folder-adr]]"
+superseded_by: '2026-09-06-migration-registry-write-boundary-adr'
+modified: '2026-09-06'
+body_hash: 'sha256:0ebe68dc1c66679a07c4fcfad95b0ddb68a5ee389face6e809d29af4c49d7dbc'
 ---
 
-# `migration-registry` adr: versioned schema migration | (**status:** `accepted`)
+# `migration-registry` adr: versioned schema migration | (**status:** `superseded`)
 
 ## Problem Statement
 
