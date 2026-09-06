@@ -3,15 +3,15 @@ tags:
   - '#adr'
   - '#publisher-identity'
 date: '2026-09-05'
-modified: '2026-09-05'
+modified: '2026-09-06'
 body_schema: 'body-v2'
-body_hash: 'sha256:86b0ed1cdbbbba5973ed789699a3260dde4504c18fade93de0342834dd9840e5'
+body_hash: 'sha256:25e4f9f6f715542efbf38e84fd51389188bd0d23c2b74c6a7d92ccd1616fdef9'
 related:
   - "[[2026-09-05-publisher-identity-research]]"
   - "[[2026-08-28-binary-portability-adr]]"
 ---
 
-# `publisher-identity` adr: `attest provenance now; defer publisher identity to a route that costs nothing` | (**status:** `proposed`)
+# `publisher-identity` adr: `attest provenance now; defer publisher identity to a route that costs nothing` | (**status:** `accepted`)
 
 ## Problem Statement
 
@@ -89,11 +89,31 @@ to, and that gate is in service.
 
 ## Implementation
 
-The release job attests every artifact before it may become a release asset, so the
-ordering is the enforcement: the attestation runs ahead of upload and its failure leaves
-the upload unrun. Every attached asset is then re-verified against the published record
-as the job's final step, which is what distinguishes an attestation that was made from
-one that was merely attempted.
+Provenance is minted in a dedicated job that holds the signing credential and nothing
+else, and no artifact may become a release asset unless that job succeeded. The ordering
+is still the enforcement; it is a job edge rather than step ordering, because the
+alternative put a capability that mints OIDC tokens for any audience in the same job as
+the channel deploy key and the packaging code that generates the distribution pointers.
+Those two do not compose - an SSH key is not federated by any token - but the widest
+credential in the repository sat in its most crowded job for no reason beyond that being
+where it was first written. Every attached asset is then re-verified against the
+published record, against the subject set the signing job reports rather than one the
+verifying job derives for itself, which is what distinguishes an attestation that was
+made from one that was merely attempted.
+
+One field of the record is knowingly wrong, and is recorded here so it is not later
+rediscovered as a defect. The predicate carries the runner environment of the job that
+signed, not of the job that built; the build matrix is mixed, and each leg emits two
+binaries, so attesting from the self-hosted fleet describes the two artifacts of the
+single hosted leg as self-hosted. The alternatives were weighed and are worse: signing
+on a hosted runner would misdescribe the other six instead, and signing inside each
+build leg - the only shape under which the field is true everywhere - would spread the
+token-minting capability across four jobs, two of which run as root in a reused
+workspace and compile a third-party crate tree. The inaccurate field is one no verifier
+reads, and it has an independent path to becoming true: moving that leg onto the fleet
+is already proposed and is blocked on a host change rather than on anything in the
+release workflow. A token-minting capability in three more jobs has no path to shrinking
+on its own, which is what settles the trade.
 
 Both checks refuse to pass vacuously. An empty artifact set fails rather than attesting
 nothing, and a verification pass that examined no asset fails rather than reporting
@@ -107,11 +127,28 @@ punish missing metadata would cost users more than the gap does.
 
 The user-facing documentation states both what can be verified and what the verification
 does not prove, because the failure mode of overclaiming here is a user who believes the
-download is signed and therefore stops checking.
+download is signed and therefore stops checking. It also states WHEN, which is the
+overclaim this record made on its first pass: the wiring was documented as though it
+were already producing verifiable assets while every published release predated it, so
+the documented command failed for every download a user could obtain. A security
+instruction that reliably fails teaches people to skip security instructions, which
+costs more than the gap it was covering.
 
-The deferred half acquires no wiring. What it acquires is a named trigger: the free
-route in `2026-09-05-publisher-identity-research`, whose outcome converts this record's
-accepted risk into implementable work.
+The repair for that overclaim is worth recording, because the obvious form of it was
+taken first and was wrong. A caveat saying provenance is not available yet, held by a
+guard that fails once the named release is cut, trades a page that is wrong now for one
+that goes wrong later and puts the repair in the release pull request - a branch that is
+regenerated and force-pushed, and the worst place to need an edit. The page instead
+states which release provenance starts at and which releases predate it. Those are
+frozen facts that no release makes false, so the guards hold wording rather than a
+deadline: the command may not be taught before the boundary that qualifies it, the two
+versions must describe one boundary, and no claim may state the unattested condition as
+universal.
+
+The deferred half acquired no wiring, which was the decision, and has since acquired no
+trigger either. The route that would have converted this record's accepted risk into
+implementable work is not being taken and the issues tracking publisher identity are
+closed as not planned, so what the chosen half gains is standing rather than scope.
 
 ## Rationale
 
@@ -157,3 +194,12 @@ The pitfall this record most needs to survive is being read as a to-do. It is no
 Signing wiring written before the identity exists is the outcome this decision rejects,
 and a future reader who finds the deferred half unimplemented is looking at the decision
 working rather than at work left undone.
+
+The deferral has since been closed in the direction this record left open. Publisher
+identity is settled as not planned - the issues tracking it on both platforms are closed
+without work, because a paid per-year identity tied to a legal entity is not something
+this project buys. Nothing in the chosen half changes; what changes is its standing.
+Attestation is no longer the available half of a two-part answer whose other half is
+pending. It is the whole verification story, so the operating-system friction recorded
+above is permanent and is documented as permanent, and a weakness in the attestation
+lane is now a user-facing defect rather than a shortfall in a supplementary check.
