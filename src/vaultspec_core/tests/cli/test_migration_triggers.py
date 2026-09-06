@@ -93,6 +93,15 @@ def _plant_legacy_index(workspace: Path, feature: str) -> Path:
     return legacy
 
 
+def _flatten(text: str) -> str:
+    """Collapse console wrapping so a diagnostic can be matched whole.
+
+    Rich hard-wraps to the terminal width, so a message asserted verbatim
+    would otherwise be hostage to where the break lands.
+    """
+    return " ".join(text.split())
+
+
 def _rewind_manifest(workspace: Path, version: str = "0.1.0") -> None:
     """Set the manifest's ``vaultspec_version`` to a pre-migration value."""
     data = read_manifest_data(workspace)
@@ -315,9 +324,14 @@ class TestVaultCheckWarnsWithoutMutation:
 
         result = factory.run("vault", "check", "structure")
 
-        assert "Pending schema migration" in result.stdout or (
-            "migration" in result.stdout.lower()
-        ), f"expected pending-migration warning, got:\n{result.stdout}"
+        # Specific enough to fail if the checker stops naming the file, its
+        # misplacement, or the destination the schema would move it to. The
+        # previous ``or "migration" in stdout.lower()`` arm passed on any
+        # output that happened to contain the word.
+        flat = _flatten(result.stdout)
+        assert "Misplaced feature index at .vault/ root" in flat, flat
+        assert legacy.name in flat, flat
+        assert "Pending schema migration to .vault/index/." in flat, flat
         assert legacy.exists(), "vault check must not mutate"
 
     def test_check_fix_does_not_mutate_indexes(self, tmp_path: Path):

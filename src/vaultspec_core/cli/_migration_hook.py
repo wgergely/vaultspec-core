@@ -14,24 +14,33 @@ by "is this a vault command":
   ``vaultspec-core vault repair`` converge because converging is what the
   operator invoked them for.  They call
   :func:`vaultspec_core.migrations.run_pending_migrations` directly.
-- ``vaultspec-core vault add`` and ``vaultspec-core vault feature index``
-  converge through :func:`ensure_migrated` because *where* they write is
-  decided by the schema.  A generated feature index written against a legacy
-  layout leaves the workspace with two indexes for one feature, one at the
-  legacy root and one under ``.vault/index/`` - the split brain that put the
-  trigger in the scanner in the first place.
-- Nothing else converges.  Verbs that edit, link, archive, or log against a
+- ``vaultspec-core vault add``, ``vaultspec-core vault feature index`` and
+  the MCP ``create`` tool converge through :func:`ensure_migrated` because
+  *where* they write is decided by the schema.  A generated feature index
+  written against a legacy layout leaves the workspace with two indexes for
+  one feature, one at the legacy root and one under ``.vault/index/`` - the
+  split brain that put the trigger in the scanner in the first place.
+- Nothing else converges.  Callers that edit, link, archive, or log against a
   document the *user named* (``vault edit``, ``vault link``, ``vault archive``,
-  ``vault exec``, ``plan step check``) write to a path they were handed, so a
-  stale layout elsewhere in the workspace cannot misplace their write.  They
-  have no more standing to rewrite 47 unrelated documents than a read does.
+  ``vault exec``, ``plan step check``, and their MCP equivalents ``edit``,
+  ``log`` and ``plan_edit``) write to a path they were handed, so a stale
+  layout elsewhere in the workspace cannot misplace their write.  They have no
+  more standing to rewrite 47 unrelated documents than a read does.
 - Reads converge nothing and instead surface the drift through
   :func:`vaultspec_core.migrations.warn_if_pending`.
 
+The test is the *write*, never the surface.  Drawing it around CLI verbs is
+what left the MCP ``create`` tool - the primary authoring surface for agents -
+writing a schema-placed feature index against a legacy layout after the
+scanner trigger came out.  Any future surface that scaffolds a document or
+regenerates an index takes this hook too; the module keeps living under
+``cli/`` because that is where the call sites it documents mostly are, not
+because the rule is a CLI rule.
+
 This module is the write-side mirror of
-:mod:`vaultspec_core.cli._cache_hook`: a verb that must drop the graph cache
-*after* it writes is a verb whose write the schema might have placed, and the
-two hooks bracket exactly such a write.
+:mod:`vaultspec_core.cli._cache_hook`: a caller that must drop the graph cache
+*after* it writes is a caller whose write the schema might have placed, and
+the two hooks bracket exactly such a write.
 """
 
 from __future__ import annotations

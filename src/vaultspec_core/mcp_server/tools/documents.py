@@ -12,6 +12,14 @@ optimistic-concurrency guard, pre-write conformance checks, and post-write
 blob hash.  Both surface the unified per-item envelope from
 :mod:`vaultspec_core.mcp_server.results`; whole-call failures (an empty
 batch) raise to the protocol ``isError`` layer.
+
+``create`` decides *where* it writes from the schema - the document path and
+the regenerated feature index path both come from the current layout - so it
+converges the workspace through
+:func:`vaultspec_core.cli._migration_hook.ensure_migrated` first, exactly as
+its CLI counterparts ``vault add`` and ``vault feature index`` do.  ``find``
+and ``edit`` do not: a read converges nothing, and an edit writes to a path
+the caller named.
 """
 
 from __future__ import annotations
@@ -25,6 +33,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from ...cli._migration_hook import ensure_migrated
 from ...core.types import get_context as _get_ctx
 from ...vaultcore.models import DocType, vault_today
 from ..envelope import LeanModel, compact_result
@@ -1080,6 +1089,16 @@ def register_document_tools(
 
         _ = ctx
         root_dir = _get_ctx().target_dir
+        # Converge before the first write, not merely before the index
+        # regeneration below: `create_vault_doc` and
+        # `generate_feature_index_result` both resolve their destination from
+        # the *current* schema, so against a legacy layout this tool lands the
+        # new document and a second generated index beside the ones the
+        # workspace already has - one feature, two `generated: true` indexes
+        # with divergent `related:`. This is the same write intent to a
+        # schema-decided location that `vault add` and `vault feature index`
+        # carry, so it takes the same hook.
+        ensure_migrated(root_dir)
         today = vault_today().isoformat()
 
         logger.info("create: %d document(s)", len(documents))

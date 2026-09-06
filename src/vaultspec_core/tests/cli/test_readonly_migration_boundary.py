@@ -134,17 +134,17 @@ def pending_workspace() -> Iterator[Path]:
         shutil.rmtree(root, ignore_errors=True)
 
 
-def _assert_pending(root: Path) -> None:
+def _assert_pending(root: Path, expected: str = "exec_ledger_only") -> None:
     """Fail loudly if the fixture is not actually in the pending state.
 
     Without this the unchanged-bytes assertions below would pass vacuously
-    the moment a manifest key is renamed or ``exec_ledger_only`` retires.
+    the moment a manifest key is renamed or *expected* retires.
     """
     from vaultspec_core.migrations import MigrationStatus, migration_status
 
     status, names = migration_status(root)
     assert status is MigrationStatus.PENDING, f"fixture is not pending: {status}"
-    assert "exec_ledger_only" in names, names
+    assert expected in names, names
 
 
 async def test_find_leaves_vault_documents_untouched(pending_workspace: Path) -> None:
@@ -266,3 +266,197 @@ def test_migrations_run_still_converges(pending_workspace: Path) -> None:
 
     assert result.exit_code == 0, result.stdout
     assert not summary.exists(), "the authorised path must still converge"
+
+
+# ---------------------------------------------------------------------------
+# The write side of the same boundary, over MCP
+# ---------------------------------------------------------------------------
+
+_INDEX_FEATURE = "alpha"
+
+# Below the ``index_subfolder`` target (0.1.17), so relocating the planted
+# root index is genuinely pending rather than merely registered.
+_INDEX_REWIND_TO = "0.1.0"
+
+
+@pytest.fixture
+def legacy_index_workspace() -> Iterator[Path]:
+    """An installed workspace holding a legacy root-level feature index.
+
+    The shape ``index_subfolder`` converges: one ``#alpha`` ADR plus the
+    generated index the pre-0.1.17 layout put at the ``.vault/`` root
+    instead of under ``.vault/index/``.
+    """
+    reset_config()
+    reset_workspace_cache()
+    root = Path(tempfile.mkdtemp(prefix="vsc-443-write-")).resolve()
+    try:
+        WorkspaceFactory(root).install("core")
+        vault = root / ".vault"
+        (vault / f"{_INDEX_FEATURE}.index.md").write_text(
+            "---\ngenerated: true\ntags:\n  - '#index'\n"
+            f"  - '#{_INDEX_FEATURE}'\ndate: '2026-04-30'\nrelated: []\n---\n\n"
+            f"# {_INDEX_FEATURE} index\n",
+            encoding="utf-8",
+        )
+        (vault / "adr").mkdir(parents=True, exist_ok=True)
+        (vault / "adr" / f"2026-04-30-{_INDEX_FEATURE}-adr.md").write_text(
+            f"---\ntags:\n  - '#adr'\n  - '#{_INDEX_FEATURE}'\n"
+            "date: '2026-04-30'\nmodified: '2026-04-30'\nrelated: []\n---\n\n"
+            f"# `{_INDEX_FEATURE}` adr\n\n## Description\n\nProse.\n",
+            encoding="utf-8",
+        )
+        data = read_manifest_data(root)
+        data.vaultspec_version = _INDEX_REWIND_TO
+        write_manifest_data(root, data)
+        init_paths(root)
+        reset_workspace_cache()
+        yield root
+    finally:
+        reset_config()
+        reset_workspace_cache()
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def _feature_indexes(root: Path) -> list[str]:
+    """Every generated feature index in the workspace, by relative path."""
+    return sorted(
+        path.relative_to(root).as_posix()
+        for path in (root / ".vault").rglob("*.index.md")
+        if path.is_file()
+    )
+
+
+async def test_mcp_create_converges_before_it_writes(
+    legacy_index_workspace: Path,
+) -> None:
+    """The write side is a surface-independent rule, and ``create`` is a write.
+
+    ``create`` scaffolds through ``create_vault_doc`` and then regenerates the
+    affected feature index through ``generate_feature_index_result``.  Both
+    resolve their destination from the *current* schema, so against a legacy
+    layout the tool wrote a second ``.vault/index/alpha.index.md`` beside the
+    root-level one the workspace already had: one feature, two tracked indexes
+    both marked ``generated: true``, with divergent ``related:``.
+
+    Closing the scanner trigger for reads (issue #443) removed the accidental
+    convergence this surface had been relying on, so it needs the same
+    explicit hook the CLI authoring verbs took.
+    """
+    from vaultspec_core.mcp_server.app import create_server
+
+    _assert_pending(legacy_index_workspace, "index_subfolder")
+    assert _feature_indexes(legacy_index_workspace) == [
+        f".vault/{_INDEX_FEATURE}.index.md"
+    ]
+
+    async with Client(create_server()) as client:
+        result = await client.call_tool(
+            "create",
+            {
+                "documents": [
+                    {
+                        "type": "research",
+                        "feature": _INDEX_FEATURE,
+                        "title": "converge before writing",
+                    }
+                ]
+            },
+        )
+    errors = [c.text for c in result.content if isinstance(c, TextContent)]
+    assert not result.is_error, errors
+
+    assert _feature_indexes(legacy_index_workspace) == [
+        f".vault/index/{_INDEX_FEATURE}.index.md"
+    ], "one feature must end with exactly one index, at the canonical location"
+
+
+async def test_mcp_create_places_the_document_by_the_current_schema(
+    legacy_index_workspace: Path,
+) -> None:
+    """Convergence has to precede the scaffold, not just the index rebuild.
+
+    ``create_vault_doc`` picks the new document's path from the schema too, so
+    a hook that only guarded the index regeneration would still write the
+    document itself against the stale layout.  Pinning that the created
+    document is readable back through the post-migration corpus keeps the hook
+    ahead of the item loop rather than beside the index call.
+    """
+    from vaultspec_core.mcp_server.app import create_server
+
+    _assert_pending(legacy_index_workspace, "index_subfolder")
+
+    async with Client(create_server()) as client:
+        result = await client.call_tool(
+            "create",
+            {
+                "documents": [
+                    {
+                        "type": "research",
+                        "feature": _INDEX_FEATURE,
+                        "title": "scaffolded after convergence",
+                    }
+                ]
+            },
+        )
+    assert not result.is_error, [
+        c.text for c in result.content if isinstance(c, TextContent)
+    ]
+
+    from vaultspec_core.migrations import MigrationStatus, migration_status
+
+    status, names = migration_status(legacy_index_workspace)
+    assert status is MigrationStatus.UP_TO_DATE, (status, names)
+
+    created = sorted(
+        (legacy_index_workspace / ".vault" / "research").glob("*-research.md")
+    )
+    assert len(created) == 1, created
+    index_text = (
+        legacy_index_workspace / ".vault" / "index" / f"{_INDEX_FEATURE}.index.md"
+    ).read_text(encoding="utf-8")
+    assert created[0].stem in index_text, index_text
+
+
+def test_a_workspace_seen_clean_can_still_report_later_drift(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Observing a workspace is not warning about it.
+
+    The notice latch closed on the first *observation*, so an up-to-date
+    workspace - or one read before ``vaultspec-core install`` had run in it -
+    was silenced for the life of the process.  In the CLI that is one command;
+    in the long-lived ``vaultspec-mcp`` server it is forever, which is the
+    exact indefinite-silent-drift failure the notice exists to prevent.
+    """
+    import logging
+
+    from vaultspec_core.migrations import MIGRATION_LOGGER, warn_if_pending
+
+    reset_config()
+    reset_workspace_cache()
+    root = Path(tempfile.mkdtemp(prefix="vsc-443-latch-")).resolve()
+    try:
+        # Read once before the workspace exists at all, and once after it is
+        # installed and up to date. Neither observation may consume the latch.
+        assert warn_if_pending(root) == []
+        WorkspaceFactory(root).install("core")
+        init_paths(root)
+        assert warn_if_pending(root) == []
+
+        data = read_manifest_data(root)
+        data.vaultspec_version = _INDEX_REWIND_TO
+        write_manifest_data(root, data)
+
+        with caplog.at_level(logging.WARNING, logger=MIGRATION_LOGGER):
+            first = warn_if_pending(root)
+            second = warn_if_pending(root)
+    finally:
+        reset_config()
+        reset_workspace_cache()
+        shutil.rmtree(root, ignore_errors=True)
+
+    assert "index_subfolder" in first, first
+    assert second == [], "the latch still bounds the notice to one per workspace"
+    notices = [r.getMessage() for r in caplog.records if r.name == MIGRATION_LOGGER]
+    assert len(notices) == 1, notices

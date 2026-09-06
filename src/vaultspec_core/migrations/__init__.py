@@ -14,9 +14,10 @@ Triggers:
 - :func:`vaultspec_core.core.commands.install_run` runs the driver in
   the upgrade branch so explicit upgrades migrate immediately.
 - :func:`vaultspec_core.cli._migration_hook.ensure_migrated` runs the
-  driver from the two layout-sensitive authoring verbs
-  (``vaultspec-core vault add`` and ``vaultspec-core vault feature index``),
-  which write a document to a location the schema decides.
+  driver from the layout-sensitive authoring callers on every surface
+  (``vaultspec-core vault add``, ``vaultspec-core vault feature index``,
+  and the MCP ``create`` tool), which write a document to a location the
+  schema decides.
 - :func:`vaultspec_core.vaultcore.repair.repair_vault` runs the driver
   from its preflight.
 - The ``vaultspec-core migrations`` CLI subcommand exposes
@@ -220,14 +221,23 @@ def warn_if_pending(workspace: Path) -> list[str]:
     Emits at most one warning per workspace per process: the notice is
     advice about workspace state, not about the individual scan, and
     repeating it once per :func:`~vaultspec_core.vaultcore.scanner.scan_vault`
-    call would bury it. The same latch bounds the manifest read to one
-    per workspace per process, so a warm read path pays a single set
-    membership test.
+    call would bury it.
+
+    The latch closes on a *warning*, not on an observation. A workspace
+    seen up to date, seen without a manifest, or seen through a
+    transient I/O failure is left unlatched, so the manifest is read
+    again on the next call and drift that appears later is still
+    reported. That matters most in the long-lived ``vaultspec-mcp``
+    process, where a workspace first read before ``vaultspec-core
+    install`` ran in it would otherwise be silenced for the life of the
+    server. The cost is a manifest read per call for workspaces that
+    have nothing to report; a warm *warned* workspace still pays a
+    single set membership test.
 
     Never raises and never writes: an unreadable manifest, a missing
-    workspace, or any other I/O failure degrades to "nothing pending",
-    because a diagnostic that can break a read is worse than a
-    diagnostic that is occasionally absent.
+    workspace, an unresolvable path, or any other I/O failure degrades
+    to "nothing pending", because a diagnostic that can break a read is
+    worse than a diagnostic that is occasionally absent.
 
     Args:
         workspace: Workspace root directory.
@@ -239,12 +249,16 @@ def warn_if_pending(workspace: Path) -> list[str]:
     """
     try:
         cache_key = workspace.resolve()
-    except OSError:
+    # `resolve` reaches `os.path.realpath`, whose syscalls reject an
+    # embedded null byte with ValueError rather than OSError on some
+    # platforms and versions. Either way it must not escape into the read
+    # path: this function is called from `scan_vault`, so an exception here
+    # breaks every read in exchange for a diagnostic.
+    except (OSError, ValueError):
         return []
     with _workspace_cache_lock:
         if cache_key in _notified_workspaces:
             return []
-        _notified_workspaces.add(cache_key)
     try:
         status, names = migration_status(workspace)
     # Deliberately broad: a diagnostic that can break a read is worse
@@ -254,6 +268,12 @@ def warn_if_pending(workspace: Path) -> list[str]:
         return []
     if status is not MigrationStatus.PENDING:
         return []
+    with _workspace_cache_lock:
+        # Re-checked under the lock: two threads may have both passed the
+        # membership test above and reached here, and only one may warn.
+        if cache_key in _notified_workspaces:
+            return []
+        _notified_workspaces.add(cache_key)
     logger.warning(
         "Workspace %s has pending schema migrations (%s); reads leave the "
         "workspace as found. Run 'vaultspec-core migrations run' to apply them.",
@@ -423,7 +443,7 @@ def run_pending_migrations(
     Authorisation. Every caller of this function is an explicit,
     mutating entry point: ``vaultspec-core install --upgrade``,
     ``vaultspec-core migrations run``, ``vaultspec-core vault repair``,
-    and the two layout-sensitive authoring verbs behind
+    and the layout-sensitive authoring callers behind
     :func:`vaultspec_core.cli._migration_hook.ensure_migrated`. Read
     paths call :func:`warn_if_pending` instead.
 
