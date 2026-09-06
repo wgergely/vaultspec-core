@@ -168,35 +168,35 @@ Ask your agent to use `vaultspec-code-review` to compare the implementation with
 approved decision and plan. Follow the [review guide](./correctness.md) to record
 findings, agree on fixes, and check the resulting changes.
 
-## Everyday commands
+<p id="everyday-commands"></p>
 
-Check before you commit, and after an install or upgrade:
+## Check records and project health
+
+Before committing feature records, run:
 
 ```bash
-vaultspec-core vault check all --fix   # validate and repair the vault
-vaultspec-core doctor                  # workspace and vault health together
+vaultspec-core vault check all
 ```
 
-`--fix` applies the repairs that are safe to make automatically. Anything it leaves
-behind needs a decision: a dangling link means either the target should exist or the
-link should go, and the tool will not guess. Re-run the check to confirm the finding is
-gone. [Verifying a workspace and a vault](./verification.md) covers what each check
-proves and which conditions change the exit code.
+If it reports problems, follow
+[validation and repair](verification.md#check-records-before-committing).
 
-`vaultspec-core doctor` runs the workspace diagnosis and the vault checks under one exit
-code. `vaultspec-core spec doctor` runs the workspace half alone, reporting the
-framework, providers, builtins, `.gitignore`, and configuration.
+After installation or an upgrade, check workspace configuration and vault records:
 
-To draw a feature's document graph as a tree grouped by feature and type:
+```bash
+vaultspec-core doctor
+```
+
+To check only workspace configuration, use `vaultspec-core spec doctor`.
+
+To inspect a feature's document links, replace `search-api` with its feature tag:
 
 ```bash
 vaultspec-core vault graph --feature search-api
 ```
 
-The CLI maintains each document's `date:` and `modified:` stamps and the `body_hash:`
-fingerprint that records what the body said when it was last stamped. Never hand-edit
-them. If a check reports that a body changed without a stamp, run
-`vaultspec-core vault check all --fix` to restamp it.
+See the [graph reference](CLI.md#vaultspec-core-vault-graph) for filtering and output
+options.
 
 ## Customize the policy
 
