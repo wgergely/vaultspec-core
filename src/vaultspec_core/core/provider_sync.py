@@ -311,7 +311,7 @@ def _stamp_last_synced(target_dir: Path, candidates: Iterable[str]) -> None:
         write_manifest_data(target_dir, mdata)
 
 
-def _target_hooks_dir(target_dir: Path) -> Path:
+def target_hooks_dir(target_dir: Path) -> Path:
     """Return *target_dir*'s own ``.vaultspec/hooks`` directory.
 
     ``sync --target`` reads its source content (rules, skills, agents) from
@@ -328,6 +328,11 @@ def _target_hooks_dir(target_dir: Path) -> Path:
     Resolved independently of the ambient context (rather than read off
     ``get_context()``) so this is correct even when the ambient context is
     mid-sync and reflects the CWD/source split.
+
+    Public because the CLI's hook-consent gate must ask about the very hooks
+    this sync will fire. If the gate resolved the directory its own way, an
+    operator could be shown - and could approve - one workspace's hooks while
+    a different workspace's were the ones about to run.
 
     Falls back to the ambient context's ``hooks_dir`` if resolution fails
     for any reason: ``fire_hooks`` itself is a best-effort, silently-caught
@@ -371,7 +376,7 @@ def _sync_all_providers(
             fire_hooks(
                 "config.synced",
                 {"root": str(ctx.target_dir), "event": "config.synced"},
-                hooks_dir=_target_hooks_dir(ctx.target_dir),
+                hooks_dir=target_hooks_dir(ctx.target_dir),
             )
             logger.info("Done.")
         return results

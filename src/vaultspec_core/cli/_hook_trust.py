@@ -75,6 +75,7 @@ def consent_gate(
     event: str,
     *,
     json_output: bool = False,
+    hooks_dir: Path | None = None,
     home: Path | None = None,
 ) -> list[str]:
     """Offer the operator the choice to trust the hooks an event would run.
@@ -89,6 +90,14 @@ def consent_gate(
         json_output: Whether the calling command is emitting a JSON envelope.
             A machine-readable run has no operator to ask and must not have its
             stdout disturbed, so it never prompts.
+        hooks_dir: The directory whose hooks the caller is about to fire. It
+            must be the same directory the firing code will read, which is not
+            always the ambient one: ``sync --target`` reads its source content
+            from the CWD workspace but fires the *target* workspace's hooks.
+            Asking about one workspace's hooks while another's are the ones
+            about to run would show the operator commands that will not run and
+            withhold the ones that will. Defaults to the ambient context's
+            ``hooks_dir``, which is right for every caller with no such split.
         home: Machine-global VaultSpec home holding the consent ledger; tests
             pass their own so they never touch the operator's.
 
@@ -106,7 +115,7 @@ def consent_gate(
 
     candidates = [
         hook
-        for hook in load_hooks(ctx.hooks_dir)
+        for hook in load_hooks(ctx.hooks_dir if hooks_dir is None else hooks_dir)
         if hook.event == event and hook.enabled
     ]
     _, untrusted = partition_by_trust(candidates, home)
