@@ -97,11 +97,14 @@ managed entry whose bytes still match the fingerprint recorded when vaultspec la
 it is provably untouched, so `vaultspec-core sync`, `vaultspec-core spec mcps sync`, and
 `vaultspec-core install --upgrade` all refresh it in place - no `--force` required - and
 print exactly what changed: the entry name, the old launch command, the new launch
-command, and why. A registered migration applies the same refresh the first time any
-`vaultspec-core vault ...` command runs in a workspace provisioned by an earlier
-release, so a launch rendered before the `--no-sync` guard existed (a bare `uv run`
-shape) converges on the workspace's next contact with the CLI, whatever its provisioned
-version.
+command, and why. A registered migration applies the same refresh, so a launch rendered
+before the `--no-sync` guard existed (a bare `uv run` shape) converges whatever its
+provisioned version - but it converges when a converging command runs, not on any
+contact with the CLI. Those commands are `vaultspec-core install --upgrade`,
+`vaultspec-core migrations run`, `vaultspec-core vault repair`,
+`vaultspec-core vault add`, `vaultspec-core vault feature index`, and the MCP `create`
+tool. Everything else, reads included, observes the workspace as it finds it and reports
+any pending migrations as a warning.
 
 Two kinds of entry never converge automatically. An entry you edited by hand (its bytes
 no longer match the recorded fingerprint) is skipped with a warning and requires an
@@ -322,8 +325,9 @@ A client that tallies `items` to learn what happened will undercount on a large 
 Read `counts` for the outcome and `items` for the detail.
 
 A partially failed batch is still a successful call. It returns `status: "mixed"` and
-reports each item's outcome rather than raising a protocol error. Only a malformed
-request fails the call itself.
+reports each item's outcome rather than raising a protocol error. What fails the call
+itself is a malformed request and, for `create` only, a schema convergence that could
+not be applied before the first write; see [`create`](#create).
 
 ______________________________________________________________________
 
@@ -358,6 +362,14 @@ Behavior notes:
 - On success, `create` regenerates the feature index for every feature that received at
   least one successfully created document.
 - An empty `documents` list is a whole-call error, distinct from a per-item failure.
+- So is a failed schema convergence. `create` decides where it writes from the current
+  schema, so it applies any pending schema migrations before the first item. If that
+  fails, the whole call fails with a protocol error naming the cause and nothing is
+  written - a client that submitted three specs gets one call-level failure rather than
+  three item rows. Refusing is deliberate: writing part of the batch into a layout the
+  schema no longer describes leaves a split brain that is harder to recover from than a
+  clean refusal. Resolve it with `vaultspec-core migrations status` and
+  `vaultspec-core migrations run`, then retry the call.
 
 `create` can fail an item for these reasons:
 

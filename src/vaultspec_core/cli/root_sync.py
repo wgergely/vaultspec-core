@@ -337,9 +337,20 @@ def cmd_sync(
     active_configs = installed_tool_configs()
     active_names = resolve_active_sync_names(active_configs, provider, skip)
 
+    # The zero-enrolment notice short-circuits past `emit_outcomes`, which is
+    # also the only thing that computes the exit code - so taking it while a
+    # pass has already failed reports success for a run that did not succeed
+    # (issue #417). Whether that was reachable was long unclear, because every
+    # *resource* pass filters by the enrolled set before doing work and so
+    # fails at nothing when nothing is enrolled. The provider-hooks pass does
+    # not: it loads the workspace's canonical hook sources first and only then
+    # asks which providers want them, so an undecodable hook file fails before
+    # enrolment is ever consulted. The notice itself stays true either way and
+    # is still worth printing; only the unconditional success is withdrawn.
     if not active_names and not json_output:
         console.print("[dim]No enabled providers to sync.[/dim]")
-        raise typer.Exit(0)
+        if not any(r.errors for r in results):
+            raise typer.Exit(0)
 
     outcomes = collect_sync_outcomes(results, provider, skip)
 
