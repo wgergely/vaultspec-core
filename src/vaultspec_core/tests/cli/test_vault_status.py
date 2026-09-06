@@ -788,6 +788,59 @@ class TestJSONErrors:
         assert payload["status"] == "unchanged"
 
 
+class TestNonMappingFrontmatterDoesNotCrash:
+    """A document whose frontmatter parses to a non-mapping must not crash.
+
+    A ``---``-fenced YAML block is not guaranteed to be a mapping (a bare
+    sequence is legal YAML). Graph construction reads every document's
+    frontmatter and previously called ``.get()`` on whatever the parser
+    returned, so a single such document raised an uncaught
+    ``AttributeError`` that reached the CLI as a Rich traceback instead of
+    the ``vaultspec.error.v1``/success envelope contract this file covers -
+    breaking JSON consumers on an otherwise-healthy vault.
+    """
+
+    def test_sequence_frontmatter_document_still_yields_parseable_json(
+        self, tmp_path: Path
+    ) -> None:
+        ids = _build_vault(tmp_path)
+        malformed = (
+            tmp_path / ".vault" / "research" / "2026-03-20-widget-malformed-research.md"
+        )
+        _write(malformed, "---\n- a\n- b\n---\n\n# Malformed\nBody.\n")
+
+        result = _run(tmp_path, "--json")
+
+        assert result.exit_code == 0, result.output
+        # The actual contract under test: stdout - the stream a JSON consumer
+        # actually reads - must be parseable JSON, not a traceback, regardless
+        # of the malformed document in the vault. Diagnostic logging (the
+        # parser's WARNING for the non-mapping frontmatter) goes to stderr,
+        # so this deliberately reads ``result.stdout`` rather than the
+        # combined ``result.output``.
+        payload = json.loads(result.stdout)
+        assert payload["schema"] == "vaultspec.vault.status.v1"
+        assert payload["status"] == "unchanged"
+        # The rest of the vault still renders; the malformed document did
+        # not abort the whole rollup.
+        plan_stems = [p["stem"] for p in payload["data"]["plans_in_flight"]]
+        assert ids["plan"] in plan_stems
+
+    def test_sequence_frontmatter_document_does_not_crash_human_output(
+        self, tmp_path: Path
+    ) -> None:
+        ids = _build_vault(tmp_path)
+        malformed = (
+            tmp_path / ".vault" / "research" / "2026-03-20-widget-malformed-research.md"
+        )
+        _write(malformed, "---\n- a\n- b\n---\n\n# Malformed\nBody.\n")
+
+        result = _run(tmp_path)
+
+        assert result.exit_code == 0, result.output
+        assert ids["plan"] in result.output
+
+
 class TestExecMissingFlag:
     """A checked step lacking an execution record flags the plan line."""
 
