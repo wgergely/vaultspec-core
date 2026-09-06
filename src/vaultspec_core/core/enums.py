@@ -228,10 +228,13 @@ class GeminiBuiltinTool(StrEnum):
     ``isValidToolName`` against these strings; any drift causes
     ``Invalid tool name`` errors at agent load time.
 
-    Drift is guarded at test time by the live source-pin test
-    (``src/vaultspec_core/tests/cli/test_agents_render.py::TestUpstreamGeminiToolPin``),
-    which fetches ``base-declarations.ts`` from the upstream main
-    branch and asserts every enum value matches the upstream constant.
+    These values are FROZEN against gemini-cli ``v0.47.0``, the last
+    release verified against this repository, and NOTHING re-checks them
+    against upstream. The live source-pin test that once did was removed
+    after its ref was pinned to a tag: comparing an immutable ref to an
+    unchanged enum has a constant result and cannot detect drift. Upstream
+    Gemini CLI is discontinued, so no successor guard was added.
+    Revalidate by hand before trusting these against any newer release.
     """
 
     GLOB = "glob"
