@@ -38,7 +38,7 @@ jobs:
   # repository-wide outage.
   lockfile:
     name: Lockfile In Sync
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -62,7 +62,7 @@ jobs:
   # moved the system interpreter. This job compares the two directly.
   interpreter-pin:
     name: Interpreter Matches Pin
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -84,7 +84,7 @@ jobs:
 
   workflow-lint:
     name: Workflow Lint
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -135,7 +135,7 @@ jobs:
 
   lint-and-type:
     name: Lint, Type, Config, Link, and Markdown Checks
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -220,7 +220,7 @@ jobs:
 
   code-health:
     name: Code Health (advisory)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -252,7 +252,7 @@ jobs:
 
   tests:
     name: Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -290,21 +290,29 @@ jobs:
         run: just test repo
 
   broad-tests:
-    name: broad (${{ matrix.os }})
+    name: broad (${{ matrix.name }})
     # The required "Tests" gate above is marker-scoped to `unit`, which hides the
     # much larger integration/behavioural suite. This job runs the full suite
     # (excluding only the `claude` marker, which needs that CLI installed) on
     # BOTH Linux and Windows, so a green CI no longer implies
     # "every test passed" when only the unit slice ran on a single OS - and so
-    # platform-specific test hardcodes are caught automatically. Both hosted
+    # platform-specific test hardcodes are caught automatically. Both fleet
     # runners are symlink-capable, so the symlink-requiring filesystem tests run
     # in full. This is a required status check on both legs: a failure on either
     # OS blocks the merge, so "green" means green on every platform.
+    #
+    # The leg carries its own display name because `runs-on` is now a label
+    # SET rather than a single image string, and a joined label array reads
+    # badly as a status-check name.
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - name: linux
+            runner: [self-hosted, Linux, X64, build]
+          - name: windows
+            runner: [self-hosted, Windows, X64]
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -323,8 +331,8 @@ jobs:
         uses: taiki-e/install-action@just
 
       - name: Install dependencies
-        # bash is available on windows-latest via Git Bash; using it on both
-        # OSes keeps the just invocation and argument quoting identical.
+        # bash is available on the Windows fleet runner via Git Bash; using it
+        # on both OSes keeps the just invocation and argument quoting identical.
         shell: bash
         run: just deps sync
 
@@ -334,7 +342,7 @@ jobs:
 
   windows-vault-repair:
     name: Windows Vault Repair Tests
-    runs-on: windows-latest
+    runs-on: [self-hosted, Windows, X64]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -360,7 +368,7 @@ jobs:
 
   vault-audit:
     name: Vault Audit
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -396,7 +404,7 @@ jobs:
 
   dependency-audit:
     name: Dependency Audit (uv audit)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
         uses: actions/checkout@v6

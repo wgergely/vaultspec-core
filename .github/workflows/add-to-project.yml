@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   add-to-project:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, build]
     steps:
       - uses: actions/add-to-project@v2
         id: add

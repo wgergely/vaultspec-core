@@ -59,10 +59,17 @@ jobs:
         # binary reached users having never been started anywhere. The coverage
         # assertion in ci.yml is what stops this recurring silently.
         #
-        # The arm64 legs run on the SAME hosted runner class that BUILDS that
-        # target, so their availability is already proven by the build rather
-        # than assumed here. Every image here publishes an arm64 variant, so
-        # the older-libc property holds identically on each architecture.
+        # The arm64 legs run on the SAME fleet runner that BUILDS that target,
+        # so their availability tracks the build's rather than being assumed
+        # here. Every image here publishes an arm64 variant, so the older-libc
+        # property holds identically on each architecture.
+        #
+        # KNOWN BROKEN: those three legs set `container:`, and the ARM64 runner
+        # is itself a container on colima whose `/home/runner` is a named
+        # volume with no matching path in the VM. The sibling job container
+        # mounts an empty directory and the leg dies in `Initialize
+        # containers`. Re-enrolling that runner with a bind-mounted home fixes
+        # it; see the note under the build job's `runs-on` in binaries.yml.
         include:
           # AT the declared floor, on both architectures. Nothing else here
           # tests 2.28 itself: the Debian and Ubuntu images below sit
@@ -81,7 +88,7 @@ jobs:
           - image: almalinux:8
             setup: dnf install -y -q curl git
             arch: aarch64
-            runner: ubuntu-24.04-arm
+            runner: [self-hosted, ARM64, Linux]
             asset: vaultspec-core-aarch64-unknown-linux-gnu
           # Above the floor and below the build host, which is the band a user
           # is most likely to be in. bookworm is 2.36, jammy is 2.35.
@@ -98,12 +105,12 @@ jobs:
           - image: debian:bookworm-slim
             setup: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl git ca-certificates
             arch: aarch64
-            runner: ubuntu-24.04-arm
+            runner: [self-hosted, ARM64, Linux]
             asset: vaultspec-core-aarch64-unknown-linux-gnu
           - image: ubuntu:22.04
             setup: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl git ca-certificates
             arch: aarch64
-            runner: ubuntu-24.04-arm
+            runner: [self-hosted, ARM64, Linux]
             asset: vaultspec-core-aarch64-unknown-linux-gnu
     runs-on: ${{ matrix.runner }}
     container: ${{ matrix.image }}

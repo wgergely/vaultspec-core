@@ -11,10 +11,12 @@
 # unrelated PR merged on top 80 minutes later and happened to re-validate the
 # tree. That was luck, not a mechanism.
 #
-# This runs on GitHub-hosted infrastructure ON PURPOSE. A sentinel on the
-# self-hosted fleet is unavailable in precisely the conditions it exists to
-# report, and one of the three shapes it must catch is a run that was never
-# created because no runner picked it up.
+# This runs on the self-hosted fleet, because this repository uses no
+# GitHub-hosted runners. That is a real weakness in a sentinel: it is
+# unavailable in some of the conditions it exists to report, and one of the
+# three shapes it must catch is a run that was never created because no runner
+# picked it up. A fleet-wide outage silences the sentinel along with the CI it
+# watches, so a long gap in this job's own schedule is itself a signal.
 name: Main CI Sentinel
 
 on:
@@ -36,7 +38,7 @@ concurrency:
 jobs:
   assert-main-was-validated:
     name: Assert main's tip has a CI verdict
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, build]
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Kept in one place: the issue is found again by exact title, which is

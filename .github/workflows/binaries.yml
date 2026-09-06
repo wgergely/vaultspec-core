@@ -43,16 +43,21 @@ jobs:
   # file can rescue it. v0.1.57, v0.1.58 and v0.1.59 ran 19h53m, 24h00m03s and
   # 24h00m03s before failing, and all three shipped no binaries.
   #
-  # One of this matrix's three legs lands on the power-gated MacBook, which
-  # serves runners only on AC. That is correct behaviour and this job does not
-  # fight it - it just refuses to spend a day discovering it. Dispatch again
-  # once the host is on AC, or set `allow_queue` to wait deliberately.
+  # TWO of this matrix's four legs land on the power-gated MacBook - macOS and
+  # linux-aarch64 both - and it serves runners only on AC. That is correct
+  # behaviour and this job does not fight it; it just refuses to spend a day
+  # discovering it. Dispatch again once the host is on AC, or set
+  # `allow_queue` to wait deliberately.
   #
-  # Hosted, deliberately: a preflight that needs the fleet cannot report that
-  # the fleet is down.
+  # Runs on the fleet, like everything else here: this repository uses no
+  # GitHub-hosted runners. That costs this preflight its independence - if the
+  # Linux/X64 runner is itself down, this job QUEUES rather than reporting the
+  # outage, and the guard is silent exactly when the fleet is worst. It still
+  # catches the common case it was built for, a fleet that is up but missing
+  # the selector a build leg asks for. Set `allow_queue` to wait deliberately.
   preflight:
     name: Preflight runners
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, build]
     steps:
       # Only the workflow directory, only this commit: the step below reads the
       # matrix out of this file to learn which selectors it must check.
@@ -180,10 +185,10 @@ jobs:
           # can differ in ways the floor check does not measure, and the whole
           # point of pinning is that the build environment is an input.
           #
-          # HOSTED, and the only leg that is. See the note below `runs-on` for
-          # why that is now the honest choice rather than a concession.
+          # On the fleet's ARM64 host, like every other leg. See the note
+          # below `runs-on` for the container constraint that still applies.
           - name: linux-aarch64
-            runner: ubuntu-24.04-arm
+            runner: [self-hosted, ARM64, Linux]
             target: aarch64-unknown-linux-gnu
             container: quay.io/pypa/manylinux_2_28_aarch64@sha256:29a6ceb78de5b00494e6e7456a72782a4cb54238de102e7491d15fe47789b4d1
           - name: windows-x86_64
@@ -235,44 +240,45 @@ jobs:
           # while the laptop is unplugged does not fail, it waits. That is true
           # of the macOS legs above as well; this leg is not special.
           #
-          # THIS HOST STILL CANNOT SERVE linux-aarch64, and that has not
-          # changed - the leg above simply stopped asking it to.
+          # THIS HOST STILL CANNOT SERVE linux-aarch64, and the leg above is
+          # now asking it to anyway, because there is nowhere else to ask.
           #
-          # The colima-hosted ARM64 runner has no reachable docker daemon, so a
-          # pinned manylinux image dies in `Initialize containers` before
-          # checkout; and an uncontainerised build there produces an artifact
-          # requiring GLIBC_2.39 against a declared floor of 2.28. Both routes
-          # were closed, which is why this leg was absent rather than broken.
+          # The docker daemon IS reachable from the colima ARM64 runner
+          # (client 29.6.1, server 29.5.2) - that part of the older note is out
+          # of date. What still closes the containerised route is the runner's
+          # `/home/runner`: it is a NAMED VOLUME with no matching path inside
+          # the colima VM, so a sibling job container mounts an empty directory
+          # and the job dies in `Initialize containers` before checkout. The
+          # uncontainerised route stays closed too - a build there produces an
+          # artifact requiring GLIBC_2.39 against a declared floor of 2.28.
           #
           # The standing note said to restore it "the moment this label is
-          # served by a host that can run the pinned image". That host was
-          # always available: `ubuntu-24.04-arm` is a GitHub-hosted ARM64
-          # runner with a working docker daemon, and it is FREE for public
-          # repositories - which this repository is. The blocker was never the
-          # gap analysis above, all of which still holds; it was the blanket
-          # "hosted runners are cost-prohibitive" assumption recorded under
-          # `runs-on`, which is true of private repositories and was carried
-          # over to this one without being re-checked.
+          # served by a host that can run the pinned image". No such host is
+          # available: this repository uses NO GitHub-hosted runners, so the
+          # leg is served by the colima ARM64 runner described above and the
+          # gap analysis still holds in full. See the note below `runs-on` for
+          # what has to change on the host before this leg can pass.
           #
           # `HOMEBREW_TARGETS` already named this triple and `generate.py` has
           # been printing `::warning::no Homebrew coverage for:
           # aarch64-unknown-linux-gnu` on every release. That warning should
           # now stop by itself; if it does not, the asset name and the formula
           # disagree and that is a real defect, not a leftover.
-    # Artifact builds run on the shared self-hosted fleet, with ONE exception:
-    # linux-aarch64 runs on a GitHub-hosted ARM64 runner because no host in
-    # this fleet can build that target to its declared floor.
+    # Every artifact build runs on the shared self-hosted fleet. There is no
+    # exception and no hosted fallback: GitHub-hosted runners are not used in
+    # this repository at all, whatever they would cost.
     #
-    # The note this replaces said hosted multiplatform runners are
-    # "cost-prohibitive". That is true for private repositories, where ARM64
-    # and macOS hosted minutes bill at a multiplier. It is NOT true here:
-    # hosted runners are free for public repositories, and this one is public.
-    # The claim was correct where it was first written and was then applied to
-    # a repository it did not describe, which cost this project one build
-    # target for as long as it stood.
+    # KNOWN BROKEN: the linux-aarch64 leg. It asks for a `container:`, and the
+    # ARM64 runner is itself a container on colima. It CAN reach the docker
+    # daemon, but its `/home/runner` is a NAMED VOLUME whose path does not
+    # exist inside the colima VM, so the sibling job container mounts an empty
+    # directory and the leg dies in `Initialize containers` before checkout.
+    # The fix is to re-enrol that runner with its home BIND-MOUNTED from the
+    # identical path in the VM; that is a host change, not a workflow change,
+    # and until it is made this leg fails rather than queues.
     #
-    # publish.yml carries the same sentence for the same reason; it is worth
-    # re-reading there rather than assuming it transfers.
+    # acquisition.yml's three aarch64 legs are blocked on the same host change
+    # for the same reason.
     runs-on: ${{ matrix.runner }}
     # Empty for every leg but the two Linux ones, which GitHub reads as
     # "no container".
@@ -746,12 +752,11 @@ jobs:
           # expectation was left behind, so the assertion failed on a target
           # nothing was building any more.
           #
-          # That target is back in the matrix, on a hosted arm64 runner that can
-          # start the pinned manylinux image. It was absent for as long as the
-          # only arm64 host was a container with no reachable docker daemon,
-          # where an uncontainerised build produced GLIBC_2.39 against a
-          # declared 2.28 floor. Deriving is what made both the removal and the
-          # restoration cost one edit instead of two.
+          # That target is back in the matrix, on the fleet's ARM64 host. That
+          # leg cannot pass until the host is re-enrolled with a bind-mounted
+          # runner home - see the note under the build job's `runs-on` - so
+          # this assertion is expected to name it as missing until then.
+          # Deriving is what makes a matrix change cost one edit instead of two.
           workflow=.github/workflows/binaries.yml
           mapfile -t expected < <(awk '/^[[:space:]]+target:[[:space:]]/ {print $2}' "${workflow}" | sort -u)
           # A derivation that yields nothing would turn this guard into a no-op
@@ -800,22 +805,22 @@ jobs:
     name: Verify the release carries artifacts
     needs: release
     if: ${{ always() }}
-    # HOSTED, for the same reason the preflight above is hosted: a guard that
-    # needs the fleet cannot act when the fleet is the problem.
+    # On the fleet, because this repository uses no GitHub-hosted runners.
     #
-    # This job's whole purpose is to demote a release whose build just failed -
-    # and a build fails most often when the fleet is congested or down, which
-    # is exactly when a self-hosted job will not be scheduled. It is not
+    # Accept what that costs: this job demotes a release whose build just
+    # failed, and a build fails most often when the fleet is congested or
+    # down - exactly when this job will not be scheduled either. It is not
     # hypothetical: vaultspec-dashboard v0.1.7 failed every Compose leg, and
     # its guard then sat QUEUED for over an hour behind the one Linux/X64
     # runner it shares with the build, while the empty release went on serving
-    # as `latest` and had to be demoted by hand.
+    # as `latest` and had to be demoted by hand. That failure mode is live
+    # again here; a release left serving as `latest` after a failed build is
+    # demoted by hand until the fleet drains.
     #
-    # Nothing here needs a fleet capability. The job calls `gh release view`,
-    # `gh release edit` and `gh workflow run`, and reads the workflow file with
-    # awk - all of which a hosted runner does, without competing for the
-    # machine that just failed.
-    runs-on: ubuntu-latest
+    # Nothing here needs a fleet capability - `gh release view`, `gh release
+    # edit`, `gh workflow run`, and awk over the workflow file - so the only
+    # cost is contending with the build for the same Linux/X64 machine.
+    runs-on: [self-hosted, Linux, X64, build]
     permissions:
       contents: write
       # Dispatching the acquisition check is a write to the Actions API.

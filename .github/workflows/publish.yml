@@ -31,14 +31,15 @@ concurrency:
 jobs:
   build:
     name: Build
-    # Hosted, deliberately. The distribution is a py3-none-any wheel, so the
-    # build host cannot affect the artifact, and this repo is public - hosted
-    # minutes are free. The cost argument that keeps binaries.yml on the fleet
-    # is about the multi-platform compile matrix, not a two-minute pure-Python
-    # build. Pinning this path to the fleet is what let 0.1.58 and 0.1.59 tag
-    # while PyPI stayed on 0.1.57: publishing a release must not depend on a
-    # laptop being plugged in.
-    runs-on: ubuntu-latest
+    # On the fleet, because this repository uses no GitHub-hosted runners.
+    #
+    # The distribution is a py3-none-any wheel, so the build host cannot affect
+    # the artifact - but availability still matters, and this is the path that
+    # let 0.1.58 and 0.1.59 tag while PyPI stayed on 0.1.57. The Linux/X64
+    # runner is on the workstation, which is NOT power-gated, so publishing no
+    # longer waits on a laptop being plugged in; it does now wait on that one
+    # machine being up and free.
+    runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -72,7 +73,7 @@ jobs:
   smoke-test:
     name: Smoke Test
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -100,7 +101,7 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     needs: smoke-test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, build]
     environment:
       name: pypi
     permissions:
