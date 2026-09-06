@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Build the standalone ``vaultspec-core`` and ``vaultspec-mcp`` binaries with PyApp.
+"""Build the ``vaultspec-core`` and ``vaultspec-mcp`` release binaries with PyApp.
 
 PyApp (https://ofek.dev/pyapp) is a Rust bootstrapper from the Hatch
 ecosystem. It is configured entirely through ``PYAPP_*`` environment
@@ -17,11 +17,13 @@ in their execution entry point:
 
 The distribution source is the published PyPI package pinned to the release
 version: PyApp installs it into a per-user data directory on first launch
-(PYAPP_PROJECT_NAME + PYAPP_PROJECT_VERSION), while the CPython runtime is
-embedded into the binary itself (PYAPP_DISTRIBUTION_EMBED). The binary
-therefore needs no Python on the user's machine, but does resolve
-``vaultspec-core==<version>`` from PyPI on first run - so the release must
-be published to PyPI for the binary to bootstrap.
+(PYAPP_PROJECT_NAME + PYAPP_PROJECT_VERSION) using ``uv`` as the installer
+(PYAPP_UV_ENABLED), while the CPython runtime is embedded into the binary
+itself (PYAPP_DISTRIBUTION_EMBED). The binary therefore needs no Python on
+the user's machine, but first launch does need network access: it fetches
+``uv`` itself and resolves ``vaultspec-core==<version>`` and its dependency
+closure from PyPI - so the release must be published to PyPI for the binary
+to bootstrap. Later launches reuse what was installed and need no network.
 
 Usage::
 

@@ -40,7 +40,8 @@ state and writes pre-commit configuration. Activating commit hooks is a
 
 Keep the `uvx` prefix when running commands yourself. For persistent or project-local
 installation, see [installation options](docs/framework.md#installation-options).
-[Homebrew and Scoop](docs/channels.md) provide standalone binaries.
+[Homebrew and Scoop](docs/channels.md) provide binaries that need no separate Python
+install, but first launch still needs network access.
 
 ## Start a feature
 
