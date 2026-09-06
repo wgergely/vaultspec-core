@@ -21,8 +21,7 @@ The harness supports Claude Code, Codex, Gemini CLI, and Antigravity.
 
 ## Install
 
-Install uv (`curl -LsSf https://astral.sh/uv/install.sh | sh`, or see the
-[installation guide](https://docs.astral.sh/uv/getting-started/installation/)), then run
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run
 this from your repository root:
 
 ```bash
