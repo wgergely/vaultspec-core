@@ -2641,10 +2641,11 @@ documents they only run for a caller that asked to change the workspace:
 - `vaultspec-core vault add` and `vaultspec-core vault feature index` - the schema
   decides where their write lands, so they converge before authoring.
 
-Every other command, including every read (`vault list`, `vault graph`, `vault check`,
-and the MCP query tools), leaves the workspace exactly as it finds it and logs a warning
-naming the pending entries instead. Run `vaultspec-core migrations status` to see them,
-and `vaultspec-core migrations run` to apply them.
+Every other command, including every read (`vaultspec-core vault list`,
+`vaultspec-core vault graph`, `vaultspec-core vault check`, and the MCP query tools),
+leaves the workspace exactly as it finds it and logs a warning naming the pending
+entries instead. Run `vaultspec-core migrations status` to see them, and
+`vaultspec-core migrations run` to apply them.
 
 ### vaultspec-core migrations status
 
