@@ -1,29 +1,6 @@
-# vaultspec framework manual
+# Run the Vaultspec workflow
 
-Commit your feature documents in `.vault/` and your project rules, skills, agents, and
-workspace policy in `.vaultspec/`. Include `.vaultspec/workspace.json` so the policy
-travels with the project. The managed `.gitignore` entries exclude local caches, logs,
-and state.
-
-<p id="what-an-absent-managed-file-means"></p>
-
-## Manage generated files
-
-Use the [Gitignore](CLI.md#vaultspec-core-spec-gitignore),
-[Gitattributes](CLI.md#vaultspec-core-spec-gitattributes), and
-[Precommit](CLI.md#vaultspec-core-spec-precommit) controls to set project policy for
-those files.
-
-Enabling or disabling changes only workspace policy; it doesn't edit or remove existing
-files. Disabling Precommit also leaves any active Git hook installed.
-
-Deleting a managed Git block or the pre-commit YAML stops ordinary sync from managing
-that output locally. Install or upgrade can recreate it unless project policy disables
-generation.
-
-For [Model Context Protocol (MCP)](MCP.md), edit the canonical JSON server definitions.
-Core merges Vaultspec-owned entries into enabled provider configurations and preserves
-unrelated entries.
+Start from a [configured project](../README.md#install).
 
 <p id="how-a-feature-flows-into-the-vault"></p>
 
@@ -257,6 +234,31 @@ deactivate an installed hook.
 [MCP tool reference](./MCP.md#tools) for the available tools.
 
 <p id="machine-global-runtime-state"></p>
+
+<p id="what-an-absent-managed-file-means"></p>
+
+## Manage generated files
+
+Commit your feature documents in `.vault/` and your project rules, skills, agents, and
+workspace policy in `.vaultspec/`. Include `.vaultspec/workspace.json` so the policy
+travels with the project. The managed `.gitignore` entries exclude local caches, logs,
+and state.
+
+Use the [Gitignore](CLI.md#vaultspec-core-spec-gitignore),
+[Gitattributes](CLI.md#vaultspec-core-spec-gitattributes), and
+[Precommit](CLI.md#vaultspec-core-spec-precommit) controls to set project policy for
+those files.
+
+Enabling or disabling changes only workspace policy; it doesn't edit or remove existing
+files. Disabling Precommit also leaves any active Git hook installed.
+
+Deleting a managed Git block or the pre-commit YAML stops ordinary sync from managing
+that output locally. Install or upgrade can recreate it unless project policy disables
+generation.
+
+For [Model Context Protocol (MCP)](MCP.md), edit the canonical JSON server definitions.
+Core merges Vaultspec-owned entries into enabled provider configurations and preserves
+unrelated entries.
 
 ## Per-account runtime state
 
