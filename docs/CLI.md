@@ -2820,9 +2820,10 @@ unchanged so the next invocation re-attempts it.
 When the pending migrations would delete documents, an interactive terminal is asked to
 confirm unless `--yes` is passed. Non-interactive callers - CI, `--json`, the MCP
 server, a piped or closed stdin - are warned and proceed rather than waiting for input:
-the registry also runs from `install --upgrade` and lazily from every `vault` command,
-so refusing here would only push a blocked script onto a trigger that asks nothing at
-all. Either way, every removed document is copied into `.vault/.trash/` first.
+the registry also runs from `vaultspec-core install --upgrade` and lazily from every
+`vaultspec-core vault` command, so refusing here would only push a blocked script onto a
+trigger that asks nothing at all. Either way, every removed document is copied into
+`.vault/.trash/` first.
 
 Exit codes: `0` on success (including the no-pending no-op and every dry run), `1` if
 any migration failed or an operator declined the deletion.

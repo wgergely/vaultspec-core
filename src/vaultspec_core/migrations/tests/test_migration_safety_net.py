@@ -263,12 +263,21 @@ class TestPreviewMatchesTheRun:
             assert record.read_bytes() == payload
         assert not trash_root(tmp_path).exists()
 
-    def test_the_registry_preview_covers_the_pending_entries(
+    def test_the_registry_preview_counts_each_document_once(
         self, tmp_path: Path
     ) -> None:
+        """Two pending folds plan over one corpus; only one can remove it.
+
+        Both the 0.1.58 and the 0.1.74 entry are pending on a 0.1.57
+        manifest and both plan over the same records. The first to run
+        removes them and the second finds nothing, so the registry-wide
+        preview must credit each document to exactly one entry - a union
+        that double-counted would tell the operator twice as much was at
+        stake as really is.
+        """
         from vaultspec_core.core.manifest import read_manifest_data, write_manifest_data
 
-        _corpus(tmp_path)
+        originals = _corpus(tmp_path)
         (tmp_path / ".vaultspec").mkdir(parents=True, exist_ok=True)
         manifest = read_manifest_data(tmp_path)
         manifest.vaultspec_version = "0.1.57"
@@ -277,11 +286,15 @@ class TestPreviewMatchesTheRun:
         previews = preview_deletions(tmp_path)
 
         by_name = {entry.name: entry for entry in previews}
-        assert "exec_ledger_only" in by_name
-        assert by_name["exec_ledger_only"].previewable
-        assert by_name["exec_ledger_only"].paths
+        assert {"exec_ledger_fold", "exec_ledger_only"} <= set(by_name)
         assert all(entry.previewable for entry in previews), (
             "every pending entry must be able to say what it deletes"
+        )
+        union = [path for entry in previews for path in entry.paths]
+        assert sorted(union) == sorted(originals)
+        assert len(union) == len(set(union))
+        assert by_name["exec_ledger_only"].paths == (), (
+            "the later fold cannot remove what the earlier one already did"
         )
 
     def test_an_already_folded_workspace_previews_no_deletions(
