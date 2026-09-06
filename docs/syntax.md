@@ -301,8 +301,8 @@ vaultspec-core vault plan step remove <plan> S07
 ```
 
 Run `vaultspec-core vault plan check <plan>` to check plan conventions;
-`vault check all` does not include them. See [plan read commands](CLI.md#read-commands)
-for options.
+`vault check all` does not include them. See
+[plan commands](CLI.md#vaultspec-core-vault-plan) for options.
 
 Duplicated canonical identifiers make ledger references ambiguous. Review the execution
 records before repairing a conflict; validation cannot determine which Step an existing
