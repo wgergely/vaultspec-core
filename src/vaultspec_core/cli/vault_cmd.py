@@ -283,6 +283,16 @@ def cmd_add(
     console = get_console()
     root_dir = _get_ctx().target_dir
 
+    # Converge before resolving anything: this verb writes a new document to
+    # a location the schema decides, so it must not author into a layout a
+    # pending migration is about to move. Not on ``--dry-run``: a preview
+    # writes nothing, which makes it a read, and a read converges nothing
+    # (issue #443).
+    if not dry_run:
+        from vaultspec_core.cli._migration_hook import ensure_migrated
+
+        ensure_migrated(root_dir)
+
     dt = _add_ops.resolve_doc_type(console, doc_type)
     _add_ops.validate_tier(console, dt, tier)
     topic_value = _add_ops.normalize_topic(console, dt, topic)

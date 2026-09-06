@@ -182,7 +182,7 @@ def check_markdown(
             (path, text, crlf) for path, (text, crlf) in raw_texts.items()
         )
     else:
-        sources = iter_document_texts(root_dir, run_migrations=not bool(wanted_feature))
+        sources = iter_document_texts(root_dir)
 
     for doc_path, raw_content, has_crlf in sources:
         metadata, _body = parse_vault_metadata(raw_content)

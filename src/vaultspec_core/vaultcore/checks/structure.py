@@ -275,8 +275,12 @@ def _detect_legacy_root_indexes(
     not the canonical ``<docs_dir>/<index_dir>/`` subfolder and emits
     one warning per file pointing the operator at
     ``vaultspec-core migrations run``. Mutation lives in the migration
-    registry (see :mod:`vaultspec_core.migrations`) and runs lazily on
-    every vault command, so this checker stays read-only.
+    registry (see :mod:`vaultspec_core.migrations`), which no longer runs
+    lazily on every vault command: since issue #443 it is reached only by a
+    caller that asked to converge or that is about to write to a location
+    the schema decides. So this checker stays read-only, and reporting the
+    drift is the whole of its job - the operator, not a passing read,
+    decides when the file moves.
 
     Reading from the pre-built snapshot rather than a fresh
     :func:`pathlib.Path.rglob` walk avoids a redundant filesystem scan
@@ -326,8 +330,7 @@ def _detect_legacy_root_indexes(
                 fixable=False,
                 fix_description=(
                     "Run 'vaultspec-core migrations run' to apply the "
-                    "registered schema migration. Vault commands trigger "
-                    "the same migration lazily on first use."
+                    "registered schema migration."
                 ),
             )
         )

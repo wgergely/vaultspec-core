@@ -13,12 +13,23 @@ Triggers:
 
 - :func:`vaultspec_core.core.commands.install_run` runs the driver in
   the upgrade branch so explicit upgrades migrate immediately.
-- :func:`vaultspec_core.vaultcore.scanner.scan_vault` runs the driver
-  lazily so any ``vaultspec-core vault ...`` command, for example
-  ``vaultspec-core vault add`` or ``vaultspec-core vault feature index``,
-  migrates a stale workspace before it acts.
+- :func:`vaultspec_core.cli._migration_hook.ensure_migrated` runs the
+  driver from the layout-sensitive authoring callers on every surface
+  (``vaultspec-core vault add``, ``vaultspec-core vault feature index``,
+  and the MCP ``create`` tool), which write a document to a location the
+  schema decides.
+- :func:`vaultspec_core.vaultcore.repair.repair_vault` runs the driver
+  from its preflight.
 - The ``vaultspec-core migrations`` CLI subcommand exposes
   ``status`` and ``run`` for explicit operator control.
+
+Nothing else triggers the driver. In particular no *read* does:
+scanning, graph construction, ``vault list``, ``vault check`` without
+``--fix``, the metrics pass, and every MCP query run against an
+unmigrated workspace observe the layout they find and leave it alone.
+The driver's entries delete and relocate tracked user documents, and a
+caller that only asked to read has not authorised that (issue #443).
+Reads instead surface the drift through :func:`warn_if_pending`.
 
 A migration whose body raises bubbles the exception up and prevents
 the manifest version bump. The next invocation re-attempts from the
@@ -61,6 +72,7 @@ __all__ = [
     "migration_status",
     "reset_workspace_cache",
     "run_pending_migrations",
+    "warn_if_pending",
 ]
 
 
@@ -175,20 +187,100 @@ class Migration:
 
 _workspace_cache_lock = threading.Lock()
 _workspace_cache: dict[Path, tuple[int, ...]] = {}
+_notified_workspaces: set[Path] = set()
 
 
 def reset_workspace_cache() -> None:
-    """Drop the per-process cache of recently-checked workspaces.
+    """Drop the per-process caches of recently-checked workspaces.
 
-    The lazy trigger inside
-    :func:`vaultspec_core.vaultcore.scanner.scan_vault` records each
-    workspace it has already vetted so the manifest read does not
-    repeat for every scan within a single CLI invocation. Tests need
-    a way to clear that cache between fixtures so each scenario
-    starts from a clean slate.
+    The authorised lazy trigger in
+    :func:`vaultspec_core.cli._migration_hook.ensure_migrated` records
+    each workspace it has already vetted so the manifest read does not
+    repeat for every scan within a single CLI invocation, and
+    :func:`warn_if_pending` records each workspace it has already
+    warned about so a read emits the notice once rather than once per
+    scan. Tests need a way to clear both between fixtures so each
+    scenario starts from a clean slate.
     """
     with _workspace_cache_lock:
         _workspace_cache.clear()
+        _notified_workspaces.clear()
+
+
+def warn_if_pending(workspace: Path) -> list[str]:
+    """Report pending migrations for *workspace* without running them.
+
+    The read-side counterpart of :func:`run_pending_migrations`. A read
+    path must not converge a stale workspace - the registry's entries
+    delete and relocate tracked user documents, which no read
+    authorised (issue #443) - but it must not stay silent about the
+    drift either, or a workspace upgraded by a bare package install
+    would be read through a legacy layout indefinitely with nothing
+    ever saying so (the failure mode of issue #408, one layer up).
+
+    Emits at most one warning per workspace per process: the notice is
+    advice about workspace state, not about the individual scan, and
+    repeating it once per :func:`~vaultspec_core.vaultcore.scanner.scan_vault`
+    call would bury it.
+
+    The latch closes on a *warning*, not on an observation. A workspace
+    seen up to date, seen without a manifest, or seen through a
+    transient I/O failure is left unlatched, so the manifest is read
+    again on the next call and drift that appears later is still
+    reported. That matters most in the long-lived ``vaultspec-mcp``
+    process, where a workspace first read before ``vaultspec-core
+    install`` ran in it would otherwise be silenced for the life of the
+    server. The cost is a manifest read per call for workspaces that
+    have nothing to report; a warm *warned* workspace still pays a
+    single set membership test.
+
+    Never raises and never writes: an unreadable manifest, a missing
+    workspace, an unresolvable path, or any other I/O failure degrades
+    to "nothing pending", because a diagnostic that can break a read is
+    worse than a diagnostic that is occasionally absent.
+
+    Args:
+        workspace: Workspace root directory.
+
+    Returns:
+        Names of the pending migrations, or an empty list when the
+        workspace is up to date, uninstalled, unreadable, or has
+        already been warned about in this process.
+    """
+    try:
+        cache_key = workspace.resolve()
+    # `resolve` reaches `os.path.realpath`, whose syscalls reject an
+    # embedded null byte with ValueError rather than OSError on some
+    # platforms and versions. Either way it must not escape into the read
+    # path: this function is called from `scan_vault`, so an exception here
+    # breaks every read in exchange for a diagnostic.
+    except (OSError, ValueError):
+        return []
+    with _workspace_cache_lock:
+        if cache_key in _notified_workspaces:
+            return []
+    try:
+        status, names = migration_status(workspace)
+    # Deliberately broad: a diagnostic that can break a read is worse
+    # than a diagnostic that is occasionally absent.
+    except Exception:
+        logger.debug("Migration status unavailable for %s", workspace, exc_info=True)
+        return []
+    if status is not MigrationStatus.PENDING:
+        return []
+    with _workspace_cache_lock:
+        # Re-checked under the lock: two threads may have both passed the
+        # membership test above and reached here, and only one may warn.
+        if cache_key in _notified_workspaces:
+            return []
+        _notified_workspaces.add(cache_key)
+    logger.warning(
+        "Workspace %s has pending schema migrations (%s); reads leave the "
+        "workspace as found. Run 'vaultspec-core migrations run' to apply them.",
+        workspace,
+        ", ".join(names),
+    )
+    return names
 
 
 def _build_registry() -> list[Migration]:
@@ -348,7 +440,14 @@ def run_pending_migrations(
     but never the manifest, which is the documented contract for
     every entry.
 
-    Performance. The lazy-trigger caller passes ``use_cache=True``;
+    Authorisation. Every caller of this function is an explicit,
+    mutating entry point: ``vaultspec-core install --upgrade``,
+    ``vaultspec-core migrations run``, ``vaultspec-core vault repair``,
+    and the layout-sensitive authoring callers behind
+    :func:`vaultspec_core.cli._migration_hook.ensure_migrated`. Read
+    paths call :func:`warn_if_pending` instead.
+
+    Performance. The authorised lazy-trigger caller passes ``use_cache=True``;
     after the first up-to-date observation per workspace per process,
     every subsequent call short-circuits before acquiring the
     file lock or reading the manifest. Up-to-date workspaces pay the
@@ -357,9 +456,10 @@ def run_pending_migrations(
 
     Args:
         workspace: Workspace root directory.
-        use_cache: When ``True`` (the lazy-trigger path), short-circuits
-            on a per-process cache of workspaces previously seen
-            up-to-date. Explicit triggers
+        use_cache: When ``True`` (the authorised lazy-trigger path used
+            by the mutating authoring verbs), short-circuits on a
+            per-process cache of workspaces previously seen up-to-date.
+            Operator-facing triggers
             (``vaultspec-core migrations run`` and
             ``vaultspec-core install --upgrade``) pass ``False`` so they always
             consult the manifest.
