@@ -27,11 +27,34 @@ __all__ = ["check_references", "check_schema"]
 logger = logging.getLogger(__name__)
 
 
-def _add_related_link(doc_path: Path, link_name: str) -> bool:
+def _add_related_link(doc_path: Path, root_dir: Path, link_name: str) -> bool:
     """Append a ``[[wiki-link]]`` to the ``related:`` field in frontmatter.
 
     Creates the ``related:`` field if absent. No-ops when the link is
     already present anywhere in the file.
+
+    The read, the frontmatter surgery, and the write are one critical
+    section on *doc_path*'s per-document advisory lock - the same sentinel
+    ``execute_edit`` takes. The already-present short-circuit is re-derived
+    inside it too, so a link another writer added between the checker's
+    graph build and this call is seen rather than duplicated.
+
+    Args:
+        doc_path: Absolute path to the vault document to modify.
+        root_dir: Project root owning the document's ``.vault/``.
+        link_name: Stem of the target document (without ``[[]]`` wrappers).
+
+    Returns:
+        ``True`` if the file was modified, ``False`` otherwise.
+    """
+    from ..edit_engine import document_write_lock
+
+    with document_write_lock(doc_path, root_dir):
+        return _add_related_link_locked(doc_path, link_name)
+
+
+def _add_related_link_locked(doc_path: Path, link_name: str) -> bool:
+    """Perform the ``related:`` append under *doc_path*'s already-held lock.
 
     Args:
         doc_path: Absolute path to the vault document to modify.
@@ -93,15 +116,7 @@ def _add_related_link(doc_path: Path, link_name: str) -> bool:
     new_content = (
         rendered if source_newline == "\n" else rendered.replace("\n", source_newline)
     )
-    bak = doc_path.with_suffix(doc_path.suffix + ".bak")
-    bak.write_bytes(doc_path.read_bytes())
-    try:
-        atomic_write(doc_path, new_content)
-    except Exception:
-        if bak.exists():
-            bak.replace(doc_path)
-        raise
-    bak.unlink(missing_ok=True)
+    atomic_write(doc_path, new_content)
     logger.info("Added %s to related field in %s", link, doc_path.name)
     return True
 
@@ -181,7 +196,7 @@ def check_references(
                     # Add to the first ADR or plan in this feature
                     target_doc = (adr_docs or plan_docs)[0]
                     if target_doc.path is not None and _add_related_link(
-                        target_doc.path, research_node.name
+                        target_doc.path, root_dir, research_node.name
                     ):
                         result.fixed_count += 1
                         result.diagnostics.append(
@@ -277,6 +292,7 @@ def _primary_feature_name(node: DocNode) -> str | None:
 
 def _fix_missing_link(
     node: DocNode,
+    root_dir: Path,
     rel_path: Path,
     feat_name: str | None,
     feat_type_index: dict[str, dict[str, list[DocNode]]],
@@ -302,7 +318,7 @@ def _fix_missing_link(
     candidates = next(
         (by_type[t] for t in candidate_types if by_type.get(t)), no_candidates
     )
-    if not candidates or not _add_related_link(node.path, candidates[0].name):
+    if not candidates or not _add_related_link(node.path, root_dir, candidates[0].name):
         return False
     result.fixed_count += 1
     result.diagnostics.append(
@@ -317,6 +333,7 @@ def _fix_missing_link(
 
 def _check_adr_grounding(
     node: DocNode,
+    root_dir: Path,
     rel_path: Path,
     feat_name: str | None,
     linked_types: set[str],
@@ -333,7 +350,14 @@ def _check_adr_grounding(
         return
 
     if _fix_missing_link(
-        node, rel_path, feat_name, feat_type_index, grounding_types, result, fix=fix
+        node,
+        root_dir,
+        rel_path,
+        feat_name,
+        feat_type_index,
+        grounding_types,
+        result,
+        fix=fix,
     ):
         return
 
@@ -356,6 +380,7 @@ def _check_adr_grounding(
 
 def _check_plan_grounding(
     node: DocNode,
+    root_dir: Path,
     rel_path: Path,
     feat_name: str | None,
     linked_types: set[str],
@@ -366,7 +391,7 @@ def _check_plan_grounding(
 ) -> None:
     """Require a plan to reference an ADR, and nudge it toward research."""
     if "adr" not in linked_types and not _fix_missing_link(
-        node, rel_path, feat_name, feat_type_index, ("adr",), result, fix=fix
+        node, root_dir, rel_path, feat_name, feat_type_index, ("adr",), result, fix=fix
     ):
         result.diagnostics.append(
             CheckDiagnostic(
@@ -387,7 +412,14 @@ def _check_plan_grounding(
     # ADR off the back of an audit is grounded, not unevidenced.
     grounding_types = ("research", "reference", "audit")
     if not linked_types & set(grounding_types) and not _fix_missing_link(
-        node, rel_path, feat_name, feat_type_index, grounding_types, result, fix=fix
+        node,
+        root_dir,
+        rel_path,
+        feat_name,
+        feat_type_index,
+        grounding_types,
+        result,
+        fix=fix,
     ):
         result.diagnostics.append(
             CheckDiagnostic(
@@ -459,6 +491,7 @@ def check_schema(
         if node.doc_type == DocType.ADR:
             _check_adr_grounding(
                 node,
+                root_dir,
                 rel_path,
                 feat_name,
                 linked_types,
@@ -469,6 +502,7 @@ def check_schema(
         elif node.doc_type == DocType.PLAN:
             _check_plan_grounding(
                 node,
+                root_dir,
                 rel_path,
                 feat_name,
                 linked_types,

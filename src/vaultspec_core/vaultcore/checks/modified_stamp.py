@@ -129,20 +129,57 @@ def filename_date(path: Path) -> str | None:
     return normalize_date(match.group(1))
 
 
-def _rewrite(doc_path: Path, transform: Callable[[str], str | None]) -> bool:
+def _rewrite(
+    doc_path: Path,
+    transform: Callable[[str], str | None],
+    *,
+    root_dir: Path | None,
+) -> bool:
     """Apply *transform* to *doc_path*'s text and write the result back.
 
     Centralises the guarded read-modify-write every frontmatter writer in
-    this module performs: the stale-cased-path guard, the byte-level read
-    that keeps the source CRLF/LF convention observable, the LF
-    normalisation the transforms operate on, and the backup-and-restore
-    around :func:`~vaultspec_core.core.helpers.atomic_write`.
+    this module performs: the per-document advisory lock, the stale-cased-path
+    guard, the byte-level read that keeps the source CRLF/LF convention
+    observable, and the LF normalisation the transforms operate on.
+
+    Locking is an explicit argument rather than an unconditional acquisition
+    because the two callers differ in what already holds a lock. Passing
+    *root_dir* takes *doc_path*'s per-document sentinel - the same one
+    ``execute_edit`` takes - across the read, the transform, and the write,
+    which is what a checker running concurrently with an editing session
+    requires. Passing ``None`` runs the cycle unlocked, and is reserved for
+    the schema-migration bodies: those already execute inside the migration
+    driver's manifest lock, and giving them a docs-domain lock would add a
+    manifest-to-document edge to a lock graph whose primitive is
+    non-reentrant and has no timeout.
 
     Args:
         doc_path: Document to rewrite.
         transform: Receives the document's LF-normalised full text and
             returns the replacement text, or ``None`` to decline the write
             (no canonical anchor exists for the field being written).
+        root_dir: Project root whose per-document lock guards the cycle, or
+            ``None`` to run it unlocked (migration bodies only).
+
+    Returns:
+        ``True`` when the file was rewritten, ``False`` otherwise.
+    """
+    if root_dir is None:
+        return _rewrite_locked(doc_path, transform)
+
+    from ..edit_engine import document_write_lock
+
+    with document_write_lock(doc_path, root_dir):
+        return _rewrite_locked(doc_path, transform)
+
+
+def _rewrite_locked(doc_path: Path, transform: Callable[[str], str | None]) -> bool:
+    """Run the read-transform-write cycle; the caller owns the locking.
+
+    Args:
+        doc_path: Document to rewrite.
+        transform: Receives the document's LF-normalised full text and
+            returns the replacement text, or ``None`` to decline the write.
 
     Returns:
         ``True`` when the file was rewritten, ``False`` otherwise.
@@ -161,8 +198,7 @@ def _rewrite(doc_path: Path, transform: Callable[[str], str | None]) -> bool:
         return False
 
     try:
-        raw = doc_path.read_bytes()
-        content = raw.decode("utf-8")
+        content = doc_path.read_bytes().decode("utf-8")
     except (OSError, UnicodeDecodeError):
         return False
 
@@ -174,15 +210,7 @@ def _rewrite(doc_path: Path, transform: Callable[[str], str | None]) -> bool:
     rendered = (
         new_text if source_newline == "\n" else new_text.replace("\n", source_newline)
     )
-    bak = doc_path.with_suffix(doc_path.suffix + ".bak")
-    bak.write_bytes(raw)
-    try:
-        atomic_write(doc_path, rendered)
-    except Exception:
-        if bak.exists():
-            bak.replace(doc_path)
-        raise
-    bak.unlink(missing_ok=True)
+    atomic_write(doc_path, rendered)
     return True
 
 
@@ -239,7 +267,7 @@ def _stamp_frontmatter(text: str, value: str) -> str | None:
     return text[:insert_at] + stamp_line + text[insert_at:]
 
 
-def write_stamp(doc_path: Path, value: str) -> bool:
+def write_stamp(doc_path: Path, value: str, *, root_dir: Path | None) -> bool:
     """Set the ``modified:`` stamp to *value* and re-attest ``body_hash:``.
 
     Both fields move in one write, which is what makes the staleness fix
@@ -252,6 +280,10 @@ def write_stamp(doc_path: Path, value: str) -> bool:
     Args:
         doc_path: Document to rewrite.
         value: Canonical ``yyyy-mm-dd`` date string to stamp.
+        root_dir: Project root whose per-document advisory lock serialises
+            the read-modify-write against a concurrent editor, or ``None``
+            to run it unlocked. See :func:`_rewrite` for which callers may
+            pass ``None`` and why.
 
     Returns:
         ``True`` when the file was rewritten, ``False`` otherwise.
@@ -263,10 +295,10 @@ def write_stamp(doc_path: Path, value: str) -> bool:
             return None
         return set_body_hash(stamped)
 
-    return _rewrite(doc_path, transform)
+    return _rewrite(doc_path, transform, root_dir=root_dir)
 
 
-def seed_body_hash(doc_path: Path) -> bool:
+def seed_body_hash(doc_path: Path, *, root_dir: Path | None) -> bool:
     """Attest *doc_path*'s current body without touching its ``modified:``.
 
     The amnesty half of the modified-stamp-provenance decision: a document
@@ -278,6 +310,10 @@ def seed_body_hash(doc_path: Path) -> bool:
 
     Args:
         doc_path: Document to seed.
+        root_dir: Project root whose per-document advisory lock serialises
+            the read-modify-write against a concurrent editor, or ``None``
+            to run it unlocked. See :func:`_rewrite` for which callers may
+            pass ``None`` and why.
 
     Returns:
         ``True`` when the file was rewritten, ``False`` when it could not
@@ -289,7 +325,7 @@ def seed_body_hash(doc_path: Path) -> bool:
         seeded = set_body_hash(text)
         return None if seeded == text else seeded
 
-    return _rewrite(doc_path, transform)
+    return _rewrite(doc_path, transform, root_dir=root_dir)
 
 
 @dataclass(frozen=True)
@@ -478,6 +514,7 @@ def _emit(
     finding: _Finding,
     *,
     doc_path: Path,
+    root_dir: Path,
     rel_path: Path,
     fix: bool,
 ) -> bool:
@@ -492,7 +529,11 @@ def _emit(
         ``True`` when the finding was applied to disk, ``False`` when it
         was reported unfixed.
     """
-    if fix and finding.stamp is not None and write_stamp(doc_path, finding.stamp):
+    if (
+        fix
+        and finding.stamp is not None
+        and write_stamp(doc_path, finding.stamp, root_dir=root_dir)
+    ):
         result.fixed_count += 1
         result.diagnostics.append(
             CheckDiagnostic(
@@ -588,7 +629,12 @@ def check_modified_stamp(
         applied = False
         if finding is not None:
             applied = _emit(
-                result, finding, doc_path=doc_path, rel_path=rel_path, fix=fix
+                result,
+                finding,
+                doc_path=doc_path,
+                root_dir=root_dir,
+                rel_path=rel_path,
+                fix=fix,
             )
 
         # Seeding runs only when no fix already wrote this document: every
@@ -601,7 +647,7 @@ def check_modified_stamp(
             fix
             and not applied
             and not is_canonical_digest(metadata.body_hash)
-            and seed_body_hash(doc_path)
+            and seed_body_hash(doc_path, root_dir=root_dir)
         ):
             result.fixed_count += 1
             result.diagnostics.append(

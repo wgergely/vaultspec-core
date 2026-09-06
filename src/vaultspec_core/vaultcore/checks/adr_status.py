@@ -76,8 +76,31 @@ def _find_h1_status(body: str) -> tuple[int, str, bool] | None:
     return None
 
 
-def _normalize_h1_quote(doc_path: Path, token: str) -> bool:
+def _normalize_h1_quote(doc_path: Path, root_dir: Path, token: str) -> bool:
     """Rewrite the H1 status token to the canonical backtick-quoted form.
+
+    The read, the heading rewrite, the stamp refresh, and the write are one
+    critical section on *doc_path*'s per-document advisory lock - the same
+    sentinel ``execute_edit`` takes - so the replacement is always derived
+    from the bytes it overwrites rather than from a revision a concurrent
+    editor has since superseded.
+
+    Args:
+        doc_path: Absolute path to the ADR document.
+        root_dir: Project root owning the document's ``.vault/``.
+        token: The canonical status value to write.
+
+    Returns:
+        ``True`` when the file was modified.
+    """
+    from ..edit_engine import document_write_lock
+
+    with document_write_lock(doc_path, root_dir):
+        return _normalize_h1_quote_locked(doc_path, token)
+
+
+def _normalize_h1_quote_locked(doc_path: Path, token: str) -> bool:
+    """Perform the H1 quoting rewrite under *doc_path*'s already-held lock.
 
     Args:
         doc_path: Absolute path to the ADR document.
@@ -87,8 +110,7 @@ def _normalize_h1_quote(doc_path: Path, token: str) -> bool:
         ``True`` when the file was modified.
     """
     try:
-        raw_bytes = doc_path.read_bytes()
-        raw = raw_bytes.decode("utf-8")
+        raw = doc_path.read_bytes().decode("utf-8")
     except (OSError, UnicodeDecodeError):
         return False
 
@@ -118,15 +140,7 @@ def _normalize_h1_quote(doc_path: Path, token: str) -> bool:
     # ending convention, so apply it before reapplying CRLF below.
     rendered = refresh_modified_stamp(rendered, vault_today())
     new_content = rendered if newline == "\n" else rendered.replace("\n", newline)
-    bak = doc_path.with_suffix(doc_path.suffix + ".bak")
-    bak.write_bytes(raw_bytes)
-    try:
-        atomic_write(doc_path, new_content)
-    except Exception:
-        if bak.exists():
-            bak.replace(doc_path)
-        raise
-    bak.unlink(missing_ok=True)
+    atomic_write(doc_path, new_content)
     logger.info("Normalized H1 status quoting in %s", doc_path.name)
     return True
 
@@ -212,7 +226,7 @@ def check_adr_status(
             continue
 
         if not quoted:
-            if fix and _normalize_h1_quote(path, status.value):
+            if fix and _normalize_h1_quote(path, root_dir, status.value):
                 result.fixed_count += 1
                 result.diagnostics.append(
                     CheckDiagnostic(

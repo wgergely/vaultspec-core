@@ -22,6 +22,49 @@ __all__ = ["check_links"]
 _MD_LINK_PATTERN = re.compile(r"\[\[([^\]|]+)\.md(\|[^\]]+)?\]\]")
 
 
+def _rewrite_md_links(doc_path: Path, root_dir: Path) -> bool:
+    """Strip ``.md`` from every wiki-link in *doc_path*, under its own lock.
+
+    The read and the write are one critical section on *doc_path*'s
+    per-document advisory lock - the same sentinel ``execute_edit`` takes.
+    The substitution is computed from bytes read inside that section, so a
+    concurrent editor cannot land a revision between the read and the write
+    and have it silently overwritten by a replacement derived from the
+    superseded bytes.
+
+    Args:
+        doc_path: The document to rewrite.
+        root_dir: Project root owning the document's ``.vault/``.
+
+    Returns:
+        ``True`` when the document was rewritten, ``False`` when it could
+        not be read or carried no ``.md`` wiki-link once the lock was held
+        (another writer may have fixed or removed it in the interim).
+    """
+    from ..edit_engine import document_write_lock
+
+    with document_write_lock(doc_path, root_dir):
+        try:
+            # Read as bytes and decode without universal newlines so CRLF
+            # endings survive the regex substitution; the pattern is
+            # line-internal and does not touch newlines, so reading bytes is
+            # sufficient to preserve the source convention.
+            content = doc_path.read_bytes().decode("utf-8")
+        except (OSError, UnicodeDecodeError):
+            return False
+        fixed_content = _MD_LINK_PATTERN.sub(
+            lambda m: f"[[{m.group(1)}{m.group(2) or ''}]]",
+            content,
+        )
+        if fixed_content == content:
+            # The finding came from the pre-lock snapshot; re-derived under
+            # the lock there is nothing left to change. Reporting a fix that
+            # did not happen would be a false count.
+            return False
+        atomic_write(doc_path, fixed_content)
+        return True
+
+
 def check_links(
     root_dir: Path,
     *,
@@ -66,28 +109,8 @@ def check_links(
         bad_count = len(matches)
 
         if fix:
-            try:
-                # Read as bytes and decode without universal newlines so
-                # CRLF endings survive the regex substitution; the
-                # pattern is line-internal and does not touch newlines,
-                # so reading bytes is sufficient to preserve the source
-                # convention.
-                content = doc_path.read_bytes().decode("utf-8")
-            except (OSError, UnicodeDecodeError):
+            if not _rewrite_md_links(doc_path, root_dir):
                 continue
-            fixed_content = _MD_LINK_PATTERN.sub(
-                lambda m: f"[[{m.group(1)}{m.group(2) or ''}]]",
-                content,
-            )
-            bak = doc_path.with_suffix(doc_path.suffix + ".bak")
-            bak.write_bytes(doc_path.read_bytes())
-            try:
-                atomic_write(doc_path, fixed_content)
-            except Exception:
-                if bak.exists():
-                    bak.replace(doc_path)
-                raise
-            bak.unlink(missing_ok=True)
             result.fixed_count += 1
             result.diagnostics.append(
                 CheckDiagnostic(

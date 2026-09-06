@@ -192,7 +192,34 @@ def _render_frontmatter_lines(
 
 
 def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
-    """Attempt to fix common frontmatter issues. Returns fix description or None."""
+    """Attempt to fix common frontmatter issues. Returns fix description or None.
+
+    The read, the recomposition, and the write all run inside *doc_path*'s
+    per-document advisory lock, so the frontmatter this pass rewrites is the
+    frontmatter it actually read. Composing outside the lock would let a
+    concurrent ``vault edit`` land between the read and the write, and the
+    replacement - individually atomic, derived from bytes that no longer
+    exist - would silently discard that edit.
+    """
+    from ..edit_engine import document_write_lock
+
+    with document_write_lock(doc_path, root_dir):
+        return _fix_frontmatter_locked(doc_path, root_dir)
+
+
+def _fix_frontmatter_locked(doc_path: Path, root_dir: Path) -> str | None:
+    """Recompose and rewrite *doc_path*'s frontmatter under its held lock.
+
+    Args:
+        doc_path: The document being fixed; its per-document lock is already
+            held by :func:`_fix_frontmatter`.
+        root_dir: Project root, used to derive the document's type.
+
+    Returns:
+        A ``"; "``-joined description of the fixes applied, or ``None`` when
+        the document is unreadable, carries no frontmatter fence, or needs
+        no fix.
+    """
     from ..scanner import get_doc_type
 
     source = _read_source_text(doc_path)
@@ -245,15 +272,7 @@ def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
     new_content = (
         rendered if source_newline == "\n" else rendered.replace("\n", source_newline)
     )
-    bak = doc_path.with_suffix(doc_path.suffix + ".bak")
-    bak.write_bytes(doc_path.read_bytes())
-    try:
-        atomic_write(doc_path, new_content)
-    except Exception:
-        if bak.exists():
-            bak.replace(doc_path)
-        raise
-    bak.unlink(missing_ok=True)
+    atomic_write(doc_path, new_content)
     return "; ".join(fixes_applied)
 
 

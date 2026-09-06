@@ -767,6 +767,15 @@ def _restamp_modified(root_dir: Path, rewritten: Iterable[str]) -> bool:
     document's line-ending convention is preserved because the helper
     operates on the raw text.
 
+    Each document's reload and rewrite run inside its own per-document
+    advisory lock - the sentinel ``execute_edit`` takes - so the stamp this
+    pass writes is computed from the bytes it overwrites. Restamping outside
+    that lock would let an edit that lands between the read and the write be
+    discarded by a replacement derived from the superseded revision: an
+    individually-atomic write, no error on either side, and the edit simply
+    gone. The lock is taken and released per document rather than held across
+    the loop, so a long repair run never freezes the whole corpus.
+
     Args:
         root_dir: Project root the relative paths resolve against.
         rewritten: Relative POSIX paths the fix phase changed.
@@ -776,6 +785,7 @@ def _restamp_modified(root_dir: Path, rewritten: Iterable[str]) -> bool:
         the caller knows to re-fingerprint.
     """
     from ..core.helpers import atomic_write
+    from .edit_engine import document_write_lock
     from .models import refresh_modified_stamp, vault_today
 
     today = vault_today()
@@ -797,14 +807,15 @@ def _restamp_modified(root_dir: Path, rewritten: Iterable[str]) -> bool:
                 continue
         except OSError:
             continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            continue
-        stamped = refresh_modified_stamp(text, today)
-        if stamped != text:
-            atomic_write(path, stamped)
-            changed = True
+        with document_write_lock(path, root_dir):
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            stamped = refresh_modified_stamp(text, today)
+            if stamped != text:
+                atomic_write(path, stamped)
+                changed = True
     return changed
 
 
