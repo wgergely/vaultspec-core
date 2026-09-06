@@ -10,6 +10,9 @@ name. All assertions are against the real filesystem; no mocks.
 
 from __future__ import annotations
 
+import ast
+import importlib
+import pathlib
 from typing import TYPE_CHECKING
 
 import pytest
@@ -202,3 +205,78 @@ class TestRegistry:
         entry = next((m for m in REGISTRY if m.name == "framework_flatten"), None)
         assert entry is not None
         assert entry.target_version == "0.1.35"
+
+
+class TestCollidingFileMove:
+    """The merge's file-level collision path.
+
+    Relocating a resource directory onto one that already exists moves each
+    child individually, and a child whose name is already taken at the
+    destination has to displace it. That displacement is a single rename:
+    :meth:`pathlib.Path.replace` overwrites an existing destination on both
+    POSIX and Windows, so there is no reason to remove the destination
+    first - and every reason not to, because between such a removal and the
+    rename the destination path holds nothing at all while the source has
+    not yet moved, and an interruption there loses both copies of
+    hand-authored ``.vaultspec/`` content.
+    """
+
+    def test_colliding_file_is_overwritten_by_the_relocated_copy(self, tmp_path: Path):
+        """A name taken at the destination ends up holding the moved file."""
+        vs = tmp_path / ".vaultspec"
+        (vs / "templates").mkdir(parents=True)
+        (vs / "templates" / "shared.md").write_text("customised", encoding="utf-8")
+        (vs / "rules" / "templates").mkdir(parents=True)
+        (vs / "rules" / "templates" / "shared.md").write_text(
+            "legacy", encoding="utf-8"
+        )
+        (vs / "rules" / "rules").mkdir(parents=True)
+        (vs / "rules" / "rules" / "r.builtin.md").write_text("r", encoding="utf-8")
+
+        migrate(tmp_path)
+
+        # The relocated copy wins the collision, and the source is gone
+        # rather than left behind beside a hole at the destination.
+        assert (vs / "templates" / "shared.md").read_text(encoding="utf-8") == "legacy"
+        assert not (vs / "rules" / "templates").exists()
+
+    def test_move_tree_never_removes_the_destination_before_renaming(self):
+        """``_move_tree`` reaches the rename with no destructive step before it.
+
+        The crash window this closes is, by construction, not observable
+        from a completed single-threaded run: the ``unlink`` it replaces was
+        redundant precisely because ``replace`` already overwrites, so the
+        end state is identical either way and only an interruption *inside*
+        the window tells the two apart. The invariant that survives is
+        therefore structural - the relocation must not be preceded by a
+        removal of the very path it is about to write - and it is asserted
+        against the shipped source rather than a description of it.
+        """
+        module = importlib.import_module(
+            "vaultspec_core.migrations.m_0_1_35_framework_flatten"
+        )
+        assert module.__file__ is not None
+        tree = ast.parse(
+            pathlib.Path(module.__file__).read_text(encoding="utf-8"),
+        )
+        move_tree = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "_move_tree"
+        )
+        removals = sorted(
+            {
+                node.func.attr
+                for node in ast.walk(move_tree)
+                if isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr in {"unlink", "rmtree", "remove"}
+            }
+        )
+        assert not removals, (
+            "_move_tree removes a path before relocating onto it "
+            f"({removals}): an interruption between the removal and the "
+            "rename leaves neither the destination nor the source at the "
+            "destination path. Path.replace already overwrites on both "
+            "POSIX and Windows, so the removal buys nothing."
+        )
