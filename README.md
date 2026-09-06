@@ -46,12 +46,12 @@ installation, see [installation options](docs/framework.md#installation-options)
 
 Open your repository in your coding agent and describe the work:
 
-> Start a new vaultspec pipeline to research options for adding full-text search to the
-> API.
+> Use vaultspec-research to investigate adding full-text search to the API.
+> Use the feature tag search-api.
 
 The workflow covers research, an architecture decision record (ADR), an implementation
 plan, execution, and review. The ADR records the chosen approach and its consequences.
-Review the decisions and approve the plan before implementation.
+Approve the ADR before planning, then approve the plan before implementation.
 
 The agent creates documents through the tools, then writes the research and other prose.
 Records stay in the repository as Markdown. The installed rules tell the agent to
