@@ -319,3 +319,67 @@ class TestIdempotenceSurvivesTheNet:
         assert second.snapshot is None
         assert _sole_snapshot(tmp_path) == first
         assert sorted(path.name for path in first.rglob("*")) == contents
+
+
+class TestTheNetIsNotItselfMigrated:
+    """A later run must not treat a snapshot as a document to converge.
+
+    Every registry entry that walks the docs tree skips the non-corpus
+    subtrees, so a backup cannot be rewritten, relocated, or removed by the
+    migration that made it. Without that, the index relocation would move a
+    snapshotted index straight back out of the safety net one run after
+    putting it there.
+    """
+
+    def test_a_snapshotted_index_is_left_where_it_is(self, tmp_path: Path) -> None:
+        from vaultspec_core.migrations.m_0_1_17_index_subfolder import (
+            migrate as migrate_indexes,
+        )
+        from vaultspec_core.migrations.m_0_1_17_index_subfolder import (
+            preview as preview_indexes,
+        )
+
+        docs = tmp_path / ".vault"
+        index_dir = docs / "index"
+        index_dir.mkdir(parents=True)
+        payload = "---\ngenerated: true\ntags:\n  - '#index'\n---\n\n# demo\n"
+        (index_dir / "demo.index.md").write_text(payload, encoding="utf-8")
+        legacy = docs / "demo.index.md"
+        legacy.write_text(payload, encoding="utf-8")
+
+        first = migrate_indexes(tmp_path)
+
+        assert first.counts["removed"] == 1
+        assert not legacy.exists()
+        copy = _sole_snapshot(tmp_path) / "demo.index.md"
+        assert copy.read_text(encoding="utf-8") == payload
+
+        second = migrate_indexes(tmp_path)
+
+        assert preview_indexes(tmp_path) == []
+        assert second.counts == {"moved": 0, "tagged": 0, "removed": 0}
+        assert copy.read_text(encoding="utf-8") == payload, (
+            "a snapshot must not be relocated or removed by a later run"
+        )
+
+    def test_a_snapshotted_document_is_not_stamped_or_hashed(
+        self, tmp_path: Path
+    ) -> None:
+        from vaultspec_core.migrations.m_0_1_29_modified_stamp_backfill import (
+            migrate as backfill_stamps,
+        )
+        from vaultspec_core.migrations.m_0_1_55_body_hash_seed import (
+            migrate as seed_hashes,
+        )
+
+        originals = _corpus(tmp_path, count=1)
+        record, payload = next(iter(originals.items()))
+        migrate(tmp_path)
+        copy = _sole_snapshot(tmp_path) / "exec" / _FOLDER / record.name
+
+        backfill_stamps(tmp_path)
+        seed_hashes(tmp_path)
+
+        assert copy.read_bytes() == payload, (
+            "a rewriting migration must not touch a backup"
+        )

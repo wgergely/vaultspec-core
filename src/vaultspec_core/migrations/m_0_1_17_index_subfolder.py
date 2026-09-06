@@ -44,8 +44,14 @@ def _legacy_indexes(workspace: Path) -> tuple[list[Path], Path]:
 
     The single definition of what this migration considers, so
     :func:`preview` reports the same candidates :func:`migrate` acts on.
+
+    Non-corpus subtrees are skipped. An archived index is not a live index,
+    and a snapshot of one under ``.trash/`` is a *backup* of a document this
+    migration already removed - relocating it would empty the safety net one
+    run after filling it.
     """
     from ..config import get_config
+    from ..vaultcore.exclusions import is_excluded_vault_path
 
     cfg = get_config()
     docs_dir = workspace / cfg.docs_dir
@@ -56,6 +62,8 @@ def _legacy_indexes(workspace: Path) -> tuple[list[Path], Path]:
     legacy_files: list[Path] = []
     for item in sorted(docs_dir.rglob("*.index.md")):
         if item.parent == index_dir:
+            continue
+        if is_excluded_vault_path(item.relative_to(docs_dir)):
             continue
         if item.is_symlink():
             # `rglob` does not descend THROUGH a symlinked directory, but a
@@ -161,7 +169,7 @@ def migrate(workspace: Path) -> MigrationResult:
     legacy_files, index_dir = _legacy_indexes(workspace)
     if not legacy_files:
         return MigrationResult(
-            name="index_subfolder",
+            name=_NAME,
             target_version="0.1.17",
             summary="no legacy indexes found; nothing to migrate",
             counts=counts,
