@@ -88,7 +88,7 @@ class PlatformFloorError(RuntimeError):
 
 @dataclass(frozen=True)
 class Binary:
-    """One console entry point rendered as a standalone binary."""
+    """One console entry point rendered as a release binary."""
 
     name: str
     # Exactly one of exec_module / exec_spec is set (PyApp execution modes

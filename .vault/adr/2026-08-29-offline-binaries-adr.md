@@ -1,17 +1,18 @@
 ---
 tags:
-  - '#adr'
-  - '#offline-binaries'
+  - "#adr"
+  - "#offline-binaries"
 date: '2026-08-29'
-modified: '2026-08-29'
-body_schema: 'body-v2'
-body_hash: 'sha256:d17baef28e0ee4fd7062c8a34e667f538f3ebe679e0c1cd9c4937bd3673e0c14'
 related:
   - "[[2026-08-28-binary-portability-adr]]"
-  - '[[2026-08-29-offline-binaries-research]]'
+  - "[[2026-08-29-offline-binaries-research]]"
+superseded_by: '2026-09-06-binary-bootstrapper-adr'
+modified: '2026-09-06'
+body_schema: 'body-v2'
+body_hash: 'sha256:dc44ef5b190391b9e447ce11b4251bc5483e185be0fb0c985f5e544b38d200e5'
 ---
 
-# `offline-binaries` adr: `ship a prepared distribution and stop installing at first launch` | (**status:** `proposed`)
+# `offline-binaries` adr: `ship a prepared distribution and stop installing at first launch` | (**status:** `superseded`)
 
 ## Problem Statement
 
