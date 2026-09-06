@@ -417,6 +417,29 @@ class DocumentMetadata:
     body_schema: str | None = None
     body_hash: str | None = None
 
+    @property
+    def parsed_date(self) -> _dt.date | None:
+        """Return ``date`` as a calendar date, or ``None`` when it is not one.
+
+        ``date`` is retained as the raw authored string because the
+        check/fix reconciliation path has to see the deviation it is asked
+        to normalize; canonicalizing it at parse time would make that
+        repair invisible. This property is the typed companion: every
+        consumer that needs the *value* rather than the authored text -
+        above all any consumer that would otherwise let the string decide a
+        filesystem path - reads it here and gets a
+        :class:`datetime.date` or nothing.
+
+        A ``None`` means the stamp is unparseable. That is a finding, never
+        a fatal read: a document with a broken date still parses, still
+        lists, and is still repairable. Refusal belongs at the surfaces that
+        would act on the value.
+
+        Returns:
+            The parsed :class:`datetime.date`, or ``None``.
+        """
+        return parse_lenient_date(self.date)
+
     def validate(self) -> list[str]:
         """Validate the metadata against the vault schema rules.
 

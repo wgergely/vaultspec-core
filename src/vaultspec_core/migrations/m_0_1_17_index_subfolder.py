@@ -26,6 +26,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from ..core.helpers import atomic_write
+from ..vaultcore.rename_engine import assert_within
 from . import Migration, MigrationError, MigrationResult
 
 if TYPE_CHECKING:
@@ -61,6 +62,12 @@ def migrate(workspace: Path) -> MigrationResult:
     derived artifacts, so the migration must never force manual
     conflict resolution for their content.
 
+    A symlinked candidate is skipped rather than adopted, and every
+    destination is checked for containment in the docs tree before it is
+    written or unlinked: a generated index is always a regular file inside
+    the vault, and relocating anything else would import content from
+    outside the workspace into the directory agents read.
+
     Args:
         workspace: Workspace root directory.
 
@@ -90,11 +97,27 @@ def migrate(workspace: Path) -> MigrationResult:
         )
 
     index_dir = docs_dir / cfg.index_dir
-    legacy_files = sorted(
-        item
-        for item in docs_dir.rglob("*.index.md")
-        if item.is_file() and item.parent != index_dir
-    )
+    legacy_files: list[Path] = []
+    for item in sorted(docs_dir.rglob("*.index.md")):
+        if item.parent == index_dir:
+            continue
+        if item.is_symlink():
+            # `rglob` does not descend THROUGH a symlinked directory, but a
+            # symlinked FILE still satisfies `is_file()` because that call
+            # follows the link. Adopting one would relocate whatever it
+            # points at into `.vault/index/` - either by copying its bytes
+            # or by moving the link itself - and the index directory is read
+            # back into an agent's context, so a migration would become the
+            # step that pulls outside content in. A generated feature index
+            # is never a link; skip it and say so.
+            logger.warning(
+                "Migration index_subfolder: skipping symlinked index %s; "
+                "a generated feature index is always a regular file",
+                item,
+            )
+            continue
+        if item.is_file():
+            legacy_files.append(item)
     if not legacy_files:
         return MigrationResult(
             name="index_subfolder",
@@ -108,6 +131,12 @@ def migrate(workspace: Path) -> MigrationResult:
 
     for legacy in legacy_files:
         target = index_dir / legacy.name
+        # `legacy.name` is a filename read off the filesystem, not composed
+        # from document content, so it cannot traverse - but the index
+        # directory itself can be a link, and the destination is written to
+        # and unlinked. Resolve both sides and refuse anything that lands
+        # outside the docs tree.
+        assert_within(docs_dir, target)
 
         if target.exists():
             try:

@@ -17,6 +17,7 @@ from .enums import Tool
 from .exceptions import ResourceExistsError
 from .helpers import (
     atomic_write,
+    atomic_write_bytes,
     build_file,
     collect_md_resources,
     ensure_dir,
@@ -266,7 +267,12 @@ def converge_spec_layer_gitignore(rules_src_dir: Path) -> bool:
 
     try:
         rules_src_dir.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(want)
+        # Through the shared atomic writer rather than `write_bytes`: a
+        # symlink at this path would otherwise be followed and whatever it
+        # names overwritten with the shipped policy. The writer refuses a
+        # symlinked destination outright, and this convergence runs on every
+        # `sync`.
+        atomic_write_bytes(dest, want)
     except OSError as exc:
         logger.error("Failed to converge nested rules .gitignore at %s: %s", dest, exc)
         return False

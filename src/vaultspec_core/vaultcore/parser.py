@@ -140,6 +140,12 @@ def parse_vault_metadata(content: str) -> tuple[DocumentMetadata, str]:
     used by the vault schema (``- "value"`` items under ``tags:`` /
     ``related:``).
 
+    Date-shaped fields are stored as authored so the check/fix pass can see
+    and repair a non-canonical stamp; the parsed reading is
+    :attr:`~vaultspec_core.vaultcore.models.DocumentMetadata.parsed_date`,
+    which is what a consumer acting on the value - rather than reporting it
+    - is expected to read.
+
     Args:
         content: Raw markdown text, optionally beginning with ``---`` fenced
             YAML frontmatter.
@@ -179,6 +185,13 @@ def parse_vault_metadata(content: str) -> tuple[DocumentMetadata, str]:
             current_key = key
 
             if key == "date":
+                # Retained as authored: `vault check all --fix` normalizes
+                # non-canonical stamps and can only do so while it can still
+                # see what was written. The typed reading lives on
+                # `DocumentMetadata.parsed_date`, and every consumer that
+                # would let this value decide a path reads it there - the
+                # raw string is text for reporting and repair, never a path
+                # segment.
                 metadata.date = val.strip("\"'")
             elif key == "modified":
                 metadata.modified = val.strip("\"'") or None

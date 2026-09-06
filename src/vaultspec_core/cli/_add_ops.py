@@ -111,6 +111,34 @@ def normalize_feature(console: Console, feature: str) -> str:
     return result.value
 
 
+def resolve_date(console: Console, date: str | None) -> str:
+    """Resolve ``--date`` to a canonical date token, defaulting to today.
+
+    The flag is held to the same admission discipline as ``--feature`` and
+    ``--topic``: the value is parsed into a calendar date and re-rendered
+    from it, so a value that is not a date is refused here - before the
+    scaffolder composes a filename from it - rather than reported as an
+    advisory once the document is already on disk.
+
+    Args:
+        console: The console the failure is rendered to.
+        date: The operator's ``--date`` value, or ``None`` for today.
+
+    Returns:
+        The canonical ``yyyy-mm-dd`` string.
+    """
+    from vaultspec_core.vaultcore.models import vault_today
+    from vaultspec_core.vaultcore.normalize import normalize_vault_date
+
+    if date is None:
+        # Today on the vault's single canonical clock (UTC).
+        return vault_today().isoformat()
+    result = normalize_vault_date(date, label="--date value")
+    if not result.ok or result.value is None:
+        fail(console, str(result.error))
+    return result.value
+
+
 def normalize_extra_tags(console: Console, tags: list[str] | None) -> list[str] | None:
     """Validate additional ``--tags`` through the same shared normalizer."""
     from vaultspec_core.vaultcore.normalize import normalize_feature_tag
