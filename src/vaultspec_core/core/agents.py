@@ -48,9 +48,8 @@ def _toml_quote(value: str) -> str:
 # at sync time so the source files stay single-authored.
 # Mapping from the Claude tool vocabulary used in
 # `.vaultspec/agents/*.md` to canonical Gemini built-in tool
-# identifiers (`GeminiBuiltinTool` enum members). The enum values are
-# pinned to upstream gemini-cli constants by a live drift test in
-# `src/vaultspec_core/tests/cli/test_agents_render.py::TestUpstreamGeminiToolPin`.
+# identifiers (`GeminiBuiltinTool` enum members), whose values are frozen
+# against gemini-cli v0.47.0 - see that enum's docstring.
 _CLAUDE_TO_GEMINI_TOOLS: dict[str, GeminiBuiltinTool] = {
     "Read": GeminiBuiltinTool.READ_FILE,
     "Write": GeminiBuiltinTool.WRITE_FILE,

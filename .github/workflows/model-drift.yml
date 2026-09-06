@@ -7,6 +7,12 @@ name: Model Drift
 # re-checks the three registries against the vendors' current lineups and
 # opens a PR when they have diverged.
 #
+# Scope note. This job tracks VENDOR MODEL LINEUPS, not CLI products. The
+# Google registry is tracked because `AntigravityModels` mirrors it
+# value-for-value and Antigravity is a current provider - not because of the
+# Gemini CLI, which is frozen and no longer extended. A Google drift PR
+# updates identifiers; it is never a reason to grow the Gemini CLI surface.
+#
 # ---------------------------------------------------------------------------
 # DORMANT BY DESIGN - this workflow is parked, not scheduled.
 #
@@ -117,7 +123,10 @@ jobs:
             each with exactly three members - HIGH, MEDIUM, LOW:
 
             - `ClaudeModels`  - Anthropic (Claude)
-            - `GeminiModels`  - Google (Gemini)
+            - `GeminiModels`  - Google (Gemini model API). These are model
+              identifiers, not Gemini CLI versions; the registry is live
+              because Antigravity mirrors it, and stays tracked even though
+              the Gemini CLI provider is frozen.
             - `CodexModels`   - OpenAI (Codex CLI)
             - `AntigravityModels` - reference-only; it MUST mirror
               `GeminiModels` value-for-value, and is never emitted into any
@@ -185,10 +194,17 @@ jobs:
                strings the vendor has actually retired or deprecated - a
                previous-generation model that is still served does not belong
                there.
-            3. `src/vaultspec_core/tests/cli/test_agents_render.py` - update
-               the tier-resolution fixtures that assert concrete model strings.
+            3. Any test asserting a concrete model string for a changed tier.
+               At the time of writing that is
+               `src/vaultspec_core/tests/cli/test_agents_render.py`, whose
+               tier-resolution fixtures cover Claude only; grep for the old
+               identifier rather than assuming a file list.
 
             Do NOT touch anything else. In particular:
+
+            - Do not add, extend, or "improve" the Gemini CLI provider. It is
+              frozen: identifier updates are in scope, new provider surface is
+              not.
 
             - Leave `.vault/` alone. It is a development-records corpus, and
               its model mentions are historical records of what was observed.

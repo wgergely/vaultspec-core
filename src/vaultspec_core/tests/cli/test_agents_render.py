@@ -5,16 +5,15 @@ Covers the renderer factory in :mod:`vaultspec_core.core.agents`:
 ``_render_gemini_agent``, the Claude->Gemini tool mapping, and a
 parametrized regression guard over every source agent under
 ``.vaultspec/agents/``.
+
+Every check here is offline and deterministic: it reads the shipped source
+agents, renders them, and asserts against the vocabulary this package
+declares. Nothing in this module reaches a network or a provider binary.
 """
 
 from __future__ import annotations
 
-import os
-import re
-import shutil
-import subprocess
 import tomllib
-import urllib.request
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -44,45 +43,6 @@ pytestmark = [pytest.mark.unit]
 # own accessor rather than by walking out to a repository root.
 _AGENTS_SRC = builtins_root() / "agents"
 _GEMINI_TOOL_SET = frozenset(t.value for t in GeminiBuiltinTool)
-
-# URL of the upstream gemini-cli source file that defines the canonical
-# tool name string constants. The live drift test below fetches this
-# file and asserts every `GeminiBuiltinTool` enum value still matches
-# the corresponding `*_TOOL_NAME` constant.
-#
-# Pinned to a specific release tag rather than `main`. The Gemini CLI
-# consumer service was retired 2026-06-18 (transitioning to the Antigravity
-# CLI), and Google declined to commit to the repo's long-term future, so a
-# `main` ref is no longer a stable contract: it could break on upstream
-# archival/rewrite rather than on a real drift. v0.47.0 (published
-# 2026-06-18) is the verified-current release; bump this tag intentionally
-# when revalidating the tool vocabulary against a newer Gemini CLI / agy.
-_UPSTREAM_GEMINI_CLI_REF = "v0.47.0"
-_UPSTREAM_BASE_DECLARATIONS_URL = (
-    f"https://raw.githubusercontent.com/google-gemini/gemini-cli/"
-    f"{_UPSTREAM_GEMINI_CLI_REF}/"
-    "packages/core/src/tools/definitions/base-declarations.ts"
-)
-
-# Mapping from `GeminiBuiltinTool` member name -> upstream constant
-# name in `base-declarations.ts`. The live test fetches the file,
-# parses each constant's string value with the regex below, and
-# asserts equality.
-_ENUM_TO_UPSTREAM_CONSTANT: dict[GeminiBuiltinTool, str] = {
-    GeminiBuiltinTool.GLOB: "GLOB_TOOL_NAME",
-    GeminiBuiltinTool.GREP_SEARCH: "GREP_TOOL_NAME",
-    GeminiBuiltinTool.READ_FILE: "READ_FILE_TOOL_NAME",
-    GeminiBuiltinTool.RUN_SHELL_COMMAND: "SHELL_TOOL_NAME",
-    GeminiBuiltinTool.WRITE_FILE: "WRITE_FILE_TOOL_NAME",
-    GeminiBuiltinTool.REPLACE: "EDIT_TOOL_NAME",
-    GeminiBuiltinTool.GOOGLE_WEB_SEARCH: "WEB_SEARCH_TOOL_NAME",
-    GeminiBuiltinTool.WEB_FETCH: "WEB_FETCH_TOOL_NAME",
-}
-
-_TOOL_NAME_DECL_RE = re.compile(
-    r"export\s+const\s+(?P<name>[A-Z_]+_TOOL_NAME)\s*[:=]\s*"
-    r"(?:[A-Za-z]+\s*=\s*)?['\"](?P<value>[^'\"]+)['\"]",
-)
 
 
 def _fm(rendered: str) -> dict[str, object]:
@@ -437,184 +397,3 @@ class TestClaudeOnlyHostTools:
         meta = {"tools": ["Read", "SendMessage", "TaskUpdate"]}
         out = _render_claude_agent("x.md", meta, "body")
         assert _fm(out)["tools"] == ["Read", "SendMessage", "TaskUpdate"]
-
-
-def _fetch_upstream_base_declarations() -> str:
-    """Fetch `base-declarations.ts` from gemini-cli main.
-
-    Hard-fails on any network or HTTP error. The ``network`` marker on the
-    calling test class keeps it out of the gating suites (which run
-    ``not network``); it is an opt-in drift guard run explicitly with
-    ``-m network``, and once selected must reach upstream and verify the
-    constants.
-    """
-    req = urllib.request.Request(
-        _UPSTREAM_BASE_DECLARATIONS_URL,
-        headers={"User-Agent": "vaultspec-core-tests"},
-    )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        return resp.read().decode("utf-8")
-
-
-@pytest.mark.network
-@pytest.mark.integration
-class TestUpstreamGeminiToolPin:
-    """Live drift guard against `google-gemini/gemini-cli` main.
-
-    Fetches `packages/core/src/tools/definitions/base-declarations.ts`
-    from the upstream main branch, parses every `*_TOOL_NAME` constant,
-    and asserts that every `GeminiBuiltinTool` enum value still equals
-    the corresponding upstream constant. Any drift fails immediately.
-    """
-
-    @pytest.fixture(scope="class")
-    def upstream_constants(self) -> dict[str, str]:
-        source = _fetch_upstream_base_declarations()
-        constants: dict[str, str] = {}
-        for match in _TOOL_NAME_DECL_RE.finditer(source):
-            constants[match.group("name")] = match.group("value")
-        assert constants, (
-            "regex failed to extract any *_TOOL_NAME constants from upstream "
-            "base-declarations.ts; the upstream file format may have changed"
-        )
-        return constants
-
-    @pytest.mark.parametrize(
-        "enum_member",
-        list(_ENUM_TO_UPSTREAM_CONSTANT.keys()),
-        ids=lambda m: m.name,
-    )
-    def test_enum_value_matches_upstream(
-        self,
-        enum_member: GeminiBuiltinTool,
-        upstream_constants: dict[str, str],
-    ):
-        upstream_name = _ENUM_TO_UPSTREAM_CONSTANT[enum_member]
-        assert upstream_name in upstream_constants, (
-            f"upstream constant {upstream_name!r} not found in "
-            f"base-declarations.ts; the upstream file may have removed or "
-            f"renamed it"
-        )
-        upstream_value = upstream_constants[upstream_name]
-        assert enum_member.value == upstream_value, (
-            f"GeminiBuiltinTool.{enum_member.name} drift: "
-            f"local={enum_member.value!r} upstream={upstream_value!r} "
-            f"({upstream_name})"
-        )
-
-    def test_no_local_enum_member_is_orphaned(self, upstream_constants: dict[str, str]):
-        for member in GeminiBuiltinTool:
-            assert member in _ENUM_TO_UPSTREAM_CONSTANT, (
-                f"GeminiBuiltinTool.{member.name} has no entry in "
-                f"_ENUM_TO_UPSTREAM_CONSTANT; add the upstream constant "
-                f"name so the live drift test can verify it"
-            )
-
-
-@pytest.mark.gemini
-@pytest.mark.integration
-class TestGeminiCliLoadsRenderedAgents:
-    """Live load test: invoke real `gemini` CLI against rendered agents.
-
-    For each source agent under `.vaultspec/agents/`:
-      1. render via :func:`vaultspec_core.core.agents.transform_agent`
-      2. write the result into a tmp ``.gemini/agents/`` directory
-      3. invoke ``gemini --skip-trust skills list`` with the tmp dir as
-         CWD - in current gemini-cli, headless ``-p`` mode short-circuits
-         project-agent loading, so this surface is what actually walks
-         ``.gemini/agents/*.md`` and emits validation errors. The
-         ``--skip-trust`` flag opts the workspace into the loader without
-         requiring per-workspace trust persistence.
-      4. assert no ``Agent loading error`` / ``Invalid tool name`` lines
-         appear in the combined stdout/stderr.
-
-    The ``@pytest.mark.gemini`` marker is what keeps this test out of a
-    default run: `pyproject.toml`'s `addopts` deselects it there, matching
-    what `dev.toolchain.EXCLUDED_MARKERS` already passes explicitly to every
-    `just test` lane. A binary missing after an explicit `-m gemini`
-    selection is still asserted rather than skipped - this suite's own
-    quality guard (`dev/guards/test_test_suite_quality.py`) forbids
-    `pytest.skip`, so a hard assertion naming the missing requirement is the
-    established pattern (see `test_mcp_hosts.py`'s `_host_executable`).
-
-    The probe also verifies the bogus agent path actually fails: a
-    deliberately broken agent file is written alongside the rendered
-    ones, gemini is invoked once with both, and the test asserts that
-    the broken agent shows up in the error list AND that none of the
-    rendered ones do. This prevents false greens from a probe command
-    that does not actually load agents.
-    """
-
-    def _invoke_gemini(self, gemini_bin: str, cwd: Path) -> tuple[str, list[str]]:
-        env = os.environ.copy()
-        env["NO_COLOR"] = "1"
-        env["CI"] = "1"
-        result = subprocess.run(
-            [gemini_bin, "--skip-trust", "skills", "list"],
-            cwd=cwd,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=180,
-            check=False,
-        )
-        combined = (result.stdout or "") + "\n" + (result.stderr or "")
-        errors = [
-            line
-            for line in combined.splitlines()
-            if "Agent loading error" in line or "Invalid tool name" in line
-        ]
-        return combined, errors
-
-    def test_all_source_agents_load(self, tmp_path: Path):
-        gemini_bin = shutil.which("gemini")
-        assert gemini_bin is not None, (
-            "gemini CLI not on PATH; the @pytest.mark.gemini marker keeps this "
-            "test out of a default run - install gemini-cli before selecting "
-            "it explicitly with `-m gemini`"
-        )
-
-        agents_dir = tmp_path / ".gemini" / "agents"
-        agents_dir.mkdir(parents=True)
-
-        # Render every shipped source agent.
-        rendered_names: set[str] = set()
-        for agent_path in _SOURCE_AGENTS:
-            meta, body = parse_frontmatter(agent_path.read_text(encoding="utf-8"))
-            rendered = transform_agent(Tool.GEMINI, agent_path.name, meta, body)
-            (agents_dir / agent_path.name).write_text(rendered, encoding="utf-8")
-            rendered_names.add(agent_path.stem)
-
-        # Plant a deliberately invalid agent so we can prove the probe
-        # actually triggers agent validation in this gemini build. Without
-        # this canary a future gemini change that defers loading would
-        # silently turn the test into a no-op.
-        canary_name = "vaultspec-render-canary-invalid"
-        (agents_dir / f"{canary_name}.md").write_text(
-            "---\n"
-            f"name: {canary_name}\n"
-            "description: deliberately invalid; proves the probe loads agents\n"
-            "tools: [zzz_definitely_not_a_real_gemini_tool]\n"
-            "---\n\nx\n",
-            encoding="utf-8",
-        )
-
-        _combined, errors = self._invoke_gemini(gemini_bin, tmp_path)
-
-        # The canary MUST show up in errors; if it doesn't, the probe is
-        # not actually loading agents and the test is a false green.
-        canary_hit = [e for e in errors if canary_name in e]
-        assert canary_hit, (
-            "Canary check failed: gemini did not emit an Agent loading error "
-            f"for the deliberately broken {canary_name}.md. The probe command "
-            "no longer triggers agent validation; update the test."
-        )
-
-        # Every rendered shipped agent must be absent from the error list.
-        offenders = [
-            line for line in errors if any(name in line for name in rendered_names)
-        ]
-        assert not offenders, (
-            "gemini CLI rejected at least one rendered shipped agent:\n"
-            + "\n".join(offenders)
-        )
