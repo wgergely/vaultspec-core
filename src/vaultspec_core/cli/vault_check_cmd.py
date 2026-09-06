@@ -54,6 +54,7 @@ __all__ = [
     "cmd_check_exec_mapping",
     "cmd_check_feature_rename_integrity",
     "cmd_check_features",
+    "cmd_check_foreign",
     "cmd_check_frontmatter",
     "cmd_check_links",
     "cmd_check_markdown",
@@ -989,6 +990,36 @@ def cmd_check_feature_rename_integrity(
         limit=limit,
         offset=offset,
         command="vault.check.feature-rename-integrity",
+    )
+
+
+@check_app.command("foreign")
+def cmd_check_foreign(
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    limit: LimitOption = None,
+    offset: OffsetOption = 0,
+    target: TargetOption = None,
+) -> None:
+    """Warn about files the framework did not place inside managed roots.
+
+    Detection only, vault-wide, and takes no ``--feature``: a foreign file
+    has no vault frontmatter to carry a feature tag in the first place.
+    """
+    apply_target(target)
+    from vaultspec_core.core.types import get_context as _get_ctx
+    from vaultspec_core.vaultcore.checks import check_foreign
+
+    result = check_foreign(_get_ctx().target_dir)
+    _render_and_exit(
+        result,
+        verbose,
+        json_output=json_output,
+        limit=limit,
+        offset=offset,
+        command="vault.check.foreign",
     )
 
 

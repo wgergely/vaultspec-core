@@ -186,6 +186,8 @@ full options.
   UTF-8 (detection only).
 - `vaultspec-core vault check feature-rename-integrity` - Surface exec folders whose
   feature disagrees with their records' tag.
+- `vaultspec-core vault check foreign` - Warn about files the framework did not place
+  inside managed roots.
 
 #### Sanitize
 
@@ -1496,12 +1498,15 @@ the frontmatter name. Pick the one whose side you trust.
   valid UTF-8 (detection only).
 - `code-boundary` (`--fix`: no, `--feature`: yes) - Scan source files for references to
   the project's own vault records (opt-in; findings are advisory).
+- `foreign` (`--fix`: no, `--feature`: no) - Warn about files the framework did not
+  place inside the managed `.vaultspec/` or `.vault/` trees (detection only; findings
+  are warnings, never errors).
 
 `yes` = fully supported, `partial` = only the sub-checks that accept `--fix` apply fixes
 (`all` dispatches to every check it runs), `no` = flag rejected with error. `all` runs
-nineteen of the twenty checks above: `code-boundary` is opt-in and runs only when named,
-so an exit-0 `all` makes no claim about it. `structure` does not support `--feature`
-filtering.
+twenty of the twenty-one checks above: `code-boundary` is opt-in and runs only when
+named, so an exit-0 `all` makes no claim about it. `structure` does not support
+`--feature` filtering.
 
 Use `vaultspec-core vault repair` when the operator goal is end-to-end recovery with
 generated index refresh, post-fix validation, and a final delta report.

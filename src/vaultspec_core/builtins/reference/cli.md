@@ -120,6 +120,8 @@ hand-edit between the markers.
   UTF-8 (detection only).
 - `vaultspec-core vault check feature-rename-integrity` - Surface exec folders whose
   feature disagrees with their records' tag.
+- `vaultspec-core vault check foreign` - Warn about files the framework did not place
+  inside managed roots.
 
 #### Sanitize
 
