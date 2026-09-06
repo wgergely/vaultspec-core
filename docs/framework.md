@@ -152,25 +152,15 @@ See [plan commands](CLI.md#vaultspec-core-vault-plan) for arguments and examples
 
 ## Execute a plan
 
-`/vaultspec-execute` works the plan from its next open step, appending each step's rows
-to the plan's ledger in `.vault/exec/`. Those rows are what make a step's completion
-auditable: they name what was changed, so `status` can later pair every closed step with
-evidence.
+After approving the plan, ask your agent to use `/vaultspec-execute`. It starts from the
+next open Step and records changes in the plan's execution ledger.
 
-To resume interrupted work, ask the agent to continue, or point it at a specific step.
-`vaultspec-core status <feature>` names the next open step, which is the same one it
-will pick up.
+To resume interrupted work, ask the agent to continue or specify a Step. Use
+[status](CLI.md#vaultspec-core-status) to check progress and the next open Step.
 
-Mark step state yourself when you need to correct the record:
-
-```bash
-vaultspec-core vault plan step check    # mark closed
-vaultspec-core vault plan step uncheck  # reopen
-vaultspec-core vault plan step toggle   # flip
-```
-
-Reopen a step rather than deleting its record when work turns out to be incomplete. The
-retired-identifier rule means a reopened step keeps its history.
+If a closed Step is incomplete, reopen it with `vaultspec-core vault plan step uncheck`
+and keep its execution records. See the
+[plan commands](CLI.md#vaultspec-core-vault-plan) for arguments and other state changes.
 
 ## Review the result
 
