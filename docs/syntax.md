@@ -110,10 +110,8 @@ The feature tag is kebab-case and identical across every document in the feature
 lifecycle. It is what makes a trail findable: research, decision, plan, and audit all
 carry `#payment-retries`, so one filter returns the whole story.
 
-A third tag reads as a second feature tag and fails the `frontmatter` check, which
-reports `Exactly one feature tag (#<feature>) required`. Note that
-`vaultspec-core vault add --tags` will happily write one, so a document scaffolded with
-that flag fails validation immediately. Resist the urge to add `#urgent` or `#frontend`.
+Use only the directory tag and the feature tag; `vault add --tags` rejects additional
+tags.
 
 ## Linking
 
