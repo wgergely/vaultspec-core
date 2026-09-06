@@ -166,6 +166,7 @@ class TestCorruptManifestRefusesToMigrate:
             capture_output=True,
             text=True,
             cwd=tmp_path,
+            timeout=180,
         )
 
         output = completed.stdout + completed.stderr
