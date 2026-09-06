@@ -268,33 +268,23 @@ deactivate an installed hook.
 **MCP clients.** Check enrollment with `vaultspec-core spec mcps status --json`. See the
 [MCP tool reference](./MCP.md#tools) for the available tools.
 
-## Machine-global runtime state
+<p id="machine-global-runtime-state"></p>
 
-`~/.vaultspec/` is a per-account directory shared by vaultspec tools across every
-repository on the machine. It is separate from a repository's `.vaultspec/`, which holds
-that project's policy. You do not manage it by hand:
+## Per-account runtime state
 
-```text
-~/.vaultspec/
-├── mcp-ownership.json
-└── procs/
-    └── leases/
+`~/.vaultspec/` stores per-account runtime state shared across repositories. Project
+policy stays in the repository's `.vaultspec/` directory.
+
+To diagnose runtime state, run:
+
+```bash
+vaultspec-core spec doctor --json
 ```
 
-`procs/` holds process records and lease markers that coordinate concurrent sessions. A
-record is stale when the process id it names is no longer alive.
-`vaultspec-core spec doctor` reports the registry without changing it: an absent
-`procs/` is informational, a live process id is healthy, and a dead one produces a
-warning naming the stale record. The command never repairs or removes records. Reclaim a
-stale record only through the tool that wrote it, and attach
-`vaultspec-core spec doctor --json` when reporting a problem.
-
-Tools that write into this namespace own their own record schemas, heartbeats, and
-cleanup; vaultspec-core owns only the paths and the staleness rule, and its sync, prune,
-and uninstall operations never rewrite the namespace. If you are building such a tool,
-resolve the paths through `vaultspec_core.core.core_home_layout()` rather than spelling
-them out, write records atomically, claim leases with an exclusive-creation primitive,
-and keep credentials out of them.
+The process-registry check reports records in `~/.vaultspec/procs/` whose processes no
+longer run. It doesn't modify those records. Don't delete runtime records by hand. If
+the check reports a stale record, include the JSON output in a
+[bug report](https://github.com/nevenincs/vaultspec-core/issues).
 
 ## Related documentation
 
