@@ -42,7 +42,7 @@ license = { file = "LICENSE" }
 name = "vaultspec-core"
 readme = "README.md"
 requires-python = ">=3.13,<3.15"
-version = "0.1.73"
+version = "0.1.74"
 
   [project.urls]
   "Bug Tracker" = "https://github.com/nevenincs/vaultspec-core/issues"
