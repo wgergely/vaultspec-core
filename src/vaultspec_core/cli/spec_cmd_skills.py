@@ -158,7 +158,15 @@ def cmd_skills_show(
 def cmd_skills_edit(
     name: Annotated[str, typer.Argument(help="Skill name")],
     editor: Annotated[
-        str | None, typer.Option("--editor", help="Override the editor binary to use")
+        str | None,
+        typer.Option(
+            "--editor",
+            help=(
+                "Override the editor for this invocation. Must name a known "
+                "editor program; arguments are allowed (e.g. 'code --wait'). "
+                "For an editor outside that set, use VAULTSPEC_EDITOR."
+            ),
+        ),
     ] = None,
     target: TargetOption = None,
 ) -> None:

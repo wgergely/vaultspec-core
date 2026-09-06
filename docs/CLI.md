@@ -2157,7 +2157,8 @@ vaultspec-core spec agents [OPTIONS] COMMAND [ARGS]...
   scaffold from a named template instead of an empty body.
 - `show NAME` - Print resource content to stdout.
 - `edit NAME [--editor EDITOR]` - Open in configured editor. Resolution order: --editor
-  flag, local config, VISUAL, EDITOR, vi.
+  flag, local config, VISUAL, EDITOR, vi. See
+  [which editors are accepted](#which-editors-are-accepted).
 - `remove NAME [--yes|--force]` (`-y`) - Delete a resource. Prompts unless confirmed.
 - `rename OLD_NAME NEW_NAME` - Rename a resource.
 - `sync` (`--dry-run`, `--force`) - Resource-scoped sync; use top-level
@@ -2170,6 +2171,43 @@ vaultspec-core spec agents [OPTIONS] COMMAND [ARGS]...
 `add` accepts the unified `--body` flag for direct content or `--from-file` to read from
 a file. Rules carry no description, so `rules add` has no `--description`; only skills
 support `--template`.
+
+#### Which editors are accepted
+
+The editor setting names a command that is executed, so it is validated before anything
+is launched. Two rules apply to every source.
+
+The command must be a program name or path followed by plain arguments. Arguments are
+expected and supported - `code --wait` and `subl -n -w` are both fine, and a quoted path
+containing spaces is fine - but shell metacharacters (`;`, `&`, `|`, `` ` ``, `$`, `%`,
+`(`, `)`), quoting syntax and control characters are refused. The editor is launched
+directly rather than through a shell, so those characters have no meaning here.
+
+The program itself must be a known text editor when the value arrives through the
+`--editor` flag or through the project-local `editor` config key. Those two travel: a
+flag can be composed by automation, and `.vaultspec/config.toml` is committed with the
+workspace, so cloning a repository is enough to inherit its value. Roughly eighty
+editors are recognised, including `vi`, `vim`, `nvim`, `nano`, `micro`, `emacs`,
+`helix`, `code`, `codium`, `cursor`, `zed`, `subl`, `kate`, `gedit`, `notepad`, and the
+JetBrains launchers. A rejection message lists the full set.
+
+The `VAULTSPEC_EDITOR`, `VISUAL` and `EDITOR` environment variables are **not** limited
+to that set. Setting an environment variable for a process already requires the ability
+to run code as that user, so screening it would protect nothing while stranding anyone
+whose editor is not recognised. If your editor is refused by the flag or the config key,
+set it in the environment instead:
+
+```bash
+export VAULTSPEC_EDITOR="/opt/my-editor --wait"
+```
+
+An editor named by a source that is simply not installed is skipped, and resolution
+continues down the ladder as before; only a value that resolves and is then refused
+stops the command, so the reason is never silently swallowed.
+
+Editing is interactive by definition. A command invoked through the MCP gateway's
+`invoke` tool has no terminal attached, so no editor is opened for it from any source,
+and the gateway refuses `--editor` outright rather than passing it through.
 
 `vaultspec-core spec <resource> sync` commands are narrow maintenance surfaces. They do
 not guarantee that provider-facing config stubs such as `AGENTS.md`, `CLAUDE.md`,
@@ -2741,6 +2779,13 @@ vaultspec-core config set [OPTIONS] KEY VALUE
 
 Write a local configuration value. Supported keys: `editor`.
 
+The `editor` value is validated on write and again every time it is used, so a file
+written by an older version or edited by hand cannot slip past the check. See
+[which editors are accepted](#which-editors-are-accepted). Reading and clearing keep
+working on a value the edit path refuses - `vaultspec-core config get editor`,
+`vaultspec-core config list`, and `vaultspec-core config unset editor` are all
+unaffected - so an inherited setting can always be inspected and removed.
+
 #### Options
 
 - `--json` (default off) - Emit machine-readable output.
@@ -2819,7 +2864,9 @@ overridden by the `--target` flag.
 - `VAULTSPEC_EDITOR` (str, default `zed -w`) - Editor command for
   `vaultspec-core spec {rules|skills|agents} edit`. Overridden by the project-local
   config `editor` value, and the `--editor` flag. Resolved in order: `--editor` flag,
-  project config, `$VISUAL`, `$EDITOR`/`VAULTSPEC_EDITOR`, `vi`.
+  project config, `$VISUAL`, `$EDITOR`/`VAULTSPEC_EDITOR`, `vi`. Unlike the flag and the
+  config key, an editor named here is not restricted to the recognised set; see
+  [which editors are accepted](#which-editors-are-accepted).
 - `VAULTSPEC_JSON_PRETTY` (str, unset by default) - Indents `--json` output. Any value
   other than `0`, `false`, `no`, `off`, or the empty string turns it on; without it the
   envelope is written as one compact line.

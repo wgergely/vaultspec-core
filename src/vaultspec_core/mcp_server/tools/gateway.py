@@ -19,6 +19,17 @@ appended only where the catalog says the verb supports it. Caller argument
 values enter the command solely as discrete, validated argv items, so no
 argument text can inject a shell command.
 
+Argv hygiene alone is not the whole contract, because a few declared flags name
+a command for the CLI to *execute* rather than data for it to process. For
+those, discrete-argv-item handling is beside the point: the value is a command
+either way. Two further measures cover them. The flags in
+:data:`~vaultspec_core.mcp_server.catalog.BLOCKED_FLAGS` are refused whichever
+verb declares them and are withheld from the schemas ``discover`` returns; and
+every spawned child is marked through
+:data:`~vaultspec_core.core.editor.GATEWAY_ENV_MARKER`, so the CLI itself knows
+it has no terminal and declines to open an editor no matter which source the
+editor command came from.
+
 Both handlers keep the copied-context isolation wrapper, and both declare
 structured output through typed Pydantic return models.
 """
@@ -28,6 +39,7 @@ from __future__ import annotations
 import functools
 import json
 import logging
+import os
 import subprocess
 import sys
 from typing import TYPE_CHECKING, Any, cast
@@ -37,8 +49,10 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from ...core.editor import GATEWAY_ENV_MARKER
 from ...core.types import get_context as _get_ctx
 from ..catalog import (
+    BLOCKED_FLAGS,
     RESERVED_FLAGS,
     CatalogEntry,
     CatalogParseError,
@@ -359,6 +373,12 @@ def _render_flags(flag_lookup: Any, arguments: dict[str, Any]) -> list[str]:
     so a caller can neither shadow the injected ``--target`` / ``--json`` nor
     smuggle an unknown token.
 
+    Flags listed in :data:`~vaultspec_core.mcp_server.catalog.BLOCKED_FLAGS`
+    are rejected even though the verb declares them: a declared flag whose
+    *value* is a command to execute is screened by neither of the other two
+    checks, because the name is legitimate and the value is never examined
+    here.
+
     Args:
         flag_lookup: The entry's ``flag(name)`` resolver.
         arguments: The caller's argument object.
@@ -367,7 +387,7 @@ def _render_flags(flag_lookup: Any, arguments: dict[str, Any]) -> list[str]:
         The rendered argv fragments.
 
     Raises:
-        ToolError: On a reserved or undeclared flag.
+        ToolError: On a reserved, blocked, or undeclared flag.
     """
     rendered: list[str] = []
     for key, value in arguments.items():
@@ -376,6 +396,13 @@ def _render_flags(flag_lookup: Any, arguments: dict[str, Any]) -> list[str]:
             msg = (
                 f"argument {key!r} maps to reserved flag {flag_name!r}; "
                 "the gateway manages --target and --json itself"
+            )
+            raise ToolError(msg)
+        if flag_name in BLOCKED_FLAGS:
+            msg = (
+                f"flag {flag_name!r} is not available through the gateway; it "
+                "names a command for the CLI to execute, which is meaningful "
+                "only for an invocation that has a terminal attached"
             )
             raise ToolError(msg)
         declared = flag_lookup(flag_name)
@@ -395,6 +422,29 @@ def _render_flags(flag_lookup: Any, arguments: dict[str, Any]) -> list[str]:
 def _parse_verb(verb: str) -> tuple[str, ...]:
     """Split a submitted verb string into a normalized path tuple."""
     return tuple(verb.split())
+
+
+def _child_environment() -> dict[str, str]:
+    """Build the environment for an ``invoke`` subprocess.
+
+    The server's own environment plus one marker,
+    :data:`~vaultspec_core.core.editor.GATEWAY_ENV_MARKER`, telling the child
+    that it was started by a tool call rather than by a person at a terminal.
+    The child refuses to launch an interactive editor when it sees the marker.
+
+    The marker is assigned here, after copying, so a value inherited from the
+    server's own environment cannot suppress it; and because a caller's only
+    channels into ``invoke`` are the verb path, the argument object and the
+    positionals - none of which reach this mapping - the distinction it draws
+    cannot be spoofed from the outside. It fails closed: the marker's absence
+    is what permits editing, and the marker is set unconditionally.
+
+    Returns:
+        The environment mapping to hand to :func:`subprocess.run`.
+    """
+    env = dict(os.environ)
+    env[GATEWAY_ENV_MARKER] = "1"
+    return env
 
 
 # ---------------------------------------------------------------------------
@@ -498,6 +548,7 @@ def register_gateway_tools(
                         help=flag.help,
                     )
                     for flag in entry.flags
+                    if flag.name not in BLOCKED_FLAGS
                 ],
                 arguments=[
                     ArgumentSchema(
@@ -588,6 +639,7 @@ def register_gateway_tools(
         try:
             completed = subprocess.run(
                 argv,
+                env=_child_environment(),
                 stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
