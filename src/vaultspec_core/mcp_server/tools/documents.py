@@ -144,7 +144,9 @@ class DocumentSpec(LeanModel):
             is rejected (auto-generated) and so is ``exec``: execution is
             logged with the ``log`` tool.
         title: Optional document title, rendered into the heading.
-        date: Optional ISO-8601 date; defaults to today (UTC).
+        date: Optional ISO-8601 date; defaults to today (UTC). Parsed as
+            a calendar date and refused when it is not one, before the
+            document's path is composed from it.
         content: Optional seed prose appended as a ``## Context`` section
             after scaffolding, routed through the shared edit engine.
         related: Optional references (path, stem, filename, or wiki-link)
@@ -351,7 +353,10 @@ def _scaffold_one(
     if topic_error is not None:
         return _create_failure(index, target, topic_error)
 
-    date_str = spec.date or today
+    date_str, date_error = _resolve_date(spec, today)
+    if date_error is not None:
+        return _create_failure(index, target, date_error)
+
     try:
         created = create_vault_doc(
             root_dir,
@@ -384,6 +389,34 @@ def _scaffold_one(
         warnings=warnings,
     )
     return item, feature
+
+
+def _resolve_date(spec: DocumentSpec, today: str) -> tuple[str, str | None]:
+    """Admit the spec's optional date, defaulting to today.
+
+    The tool schema declares ``date`` as a free string, and the scaffolder
+    names the document's directory and filename from it, so the value is
+    parsed into a calendar date and re-rendered from that parse here -
+    between the schema and the write - rather than being forwarded as the
+    model supplied it. The accepted forms are the vault's usual lenient set;
+    only a value that is not a date at all is refused.
+
+    Args:
+        spec: The document specification carrying the optional date.
+        today: The default ISO date used when the spec omits one.
+
+    Returns:
+        A two-tuple ``(date, None)`` on success, or ``(today, message)``
+        when the supplied value is not a date.
+    """
+    from ...vaultcore.normalize import normalize_vault_date
+
+    if not spec.date:
+        return today, None
+    result = normalize_vault_date(spec.date, label="date")
+    if not result.ok or result.value is None:
+        return today, str(result.error)
+    return result.value, None
 
 
 def _dependency_diagnostics(

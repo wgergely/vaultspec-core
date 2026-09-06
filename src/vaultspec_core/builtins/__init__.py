@@ -9,9 +9,10 @@ Uses :mod:`importlib.resources` for package-relative file access.
 from __future__ import annotations
 
 import logging
-import shutil
 from importlib import resources
 from pathlib import Path
+
+from ..core.helpers import atomic_write_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,16 @@ def seed_builtins(
         if action != "[UNCHANGED]" and not dry_run:
             try:
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src_file, dest)
+                # The bytes are already in hand from the change comparison
+                # above, so seeding writes them through the shared atomic
+                # writer instead of `shutil.copy2`. `copy2` opens the
+                # destination for writing and therefore follows a symlink
+                # sitting at that path, silently overwriting whatever it
+                # names; the writer refuses a symlinked destination. Source
+                # timestamps are not preserved, which nothing reads: a
+                # seeded builtin's freshness is decided by comparing its
+                # bytes, as it is three lines above.
+                atomic_write_bytes(dest, src_bytes)
             except OSError as exc:
                 logger.warning("Failed to seed %s: %s", rel, exc)
                 continue

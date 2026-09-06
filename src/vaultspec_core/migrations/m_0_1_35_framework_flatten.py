@@ -79,6 +79,17 @@ def _move_tree(src: Path, dst: Path) -> None:
     *src* is merged in - recursing for subdirectories and overwriting
     colliding files - and the emptied *src* is removed. The framework
     directory is a single filesystem, so the renames stay atomic.
+
+    Every mutation here is a MOVE, not a write, which is why these calls
+    stay on :meth:`pathlib.Path.replace` rather than routing through the
+    atomic writer. A rename replaces the destination *entry*; it never
+    opens the destination and so never follows a symlink sitting there to
+    clobber what it names, and the companion ``target.unlink()`` removes a
+    link rather than its target for the same reason. A symlinked child that
+    is relocated stays a symlink and stays inside ``.vaultspec/``, where it
+    was already being read before the move, so the migration neither
+    creates nor widens an exposure - it only changes which managed
+    directory the entry sits in.
     """
     if not dst.exists():
         src.replace(dst)

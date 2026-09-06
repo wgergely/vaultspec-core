@@ -13,6 +13,7 @@ to one ledger through the shared advisory lock.
 from __future__ import annotations
 
 import datetime as _dt
+import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -28,6 +29,10 @@ from .exec_ledger import (
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from .query_listing import VaultDocument
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "ExecLogError",
@@ -148,6 +153,61 @@ def parse_verify_spec(spec: str) -> tuple[str, str]:
     return command.strip(), result
 
 
+def _resolve_plan_date(plan_doc: VaultDocument) -> str:
+    """Return the plan's date as a canonical token for naming its ledger.
+
+    The ledger's folder and its filename are both named from the parent
+    plan's date, and that date is document content - a plan obtained with a
+    repository decides those two path segments. It is therefore admitted as
+    a calendar date and re-rendered from the parse, so what reaches the
+    composition is digits and hyphens whatever the file said.
+
+    An unusable stamp falls back to the ``yyyy-mm-dd`` prefix of the plan's
+    own filename rather than failing the command. Every vault document's
+    name begins with its date by schema, so the fallback is available in
+    practice, and it is the same substitution the document lister already
+    makes for a plan carrying no ``date:`` at all - extending it from a
+    missing stamp to an unusable one keeps a workspace with one bad
+    frontmatter line working instead of blocking execution logging on it.
+    The fallback is announced, and it is admitted through the same parse, so
+    it can no more steer a path than the frontmatter value could.
+
+    Args:
+        plan_doc: The parent plan the ledger records.
+
+    Returns:
+        A canonical ``yyyy-mm-dd`` string.
+
+    Raises:
+        ExecLogError: When neither the frontmatter stamp nor the filename
+            prefix is a calendar date, leaving nothing to name the ledger.
+    """
+    from .normalize import normalize_vault_date
+
+    stated = normalize_vault_date(plan_doc.date, label="plan date")
+    if stated.ok and stated.value is not None:
+        return stated.value
+
+    from_name = normalize_vault_date(plan_doc.path.stem[:10], label="plan date")
+    if from_name.ok and from_name.value is not None:
+        logger.warning(
+            "Plan '%s' carries an unusable date: %s Naming this ledger from "
+            "the plan's filename date '%s' instead; correct the plan's "
+            "`date:` frontmatter to silence this.",
+            plan_doc.path.name,
+            stated.error,
+            from_name.value,
+        )
+        return from_name.value
+
+    raise ExecLogError(
+        f"Plan '{plan_doc.path.name}' has no usable date: {stated.error} "
+        "Its filename carries no `yyyy-mm-dd` prefix to fall back on, so "
+        "there is nothing to name the ledger from. Set the plan's `date:` "
+        "frontmatter to its calendar date before logging execution."
+    )
+
+
 def log_step(
     root_dir: Path, request: LogRequest, *, dry_run: bool = False
 ) -> LogOutcome:
@@ -208,9 +268,7 @@ def log_step(
     except (StepNotFoundError, AmbiguousStepError) as exc:
         raise ExecLogError(str(exc)) from exc
 
-    plan = ParentPlan(
-        date=plan_doc.date or plan_doc.path.stem[:10], stem=plan_doc.path.stem
-    )
+    plan = ParentPlan(date=_resolve_plan_date(plan_doc), stem=plan_doc.path.stem)
     identity = DocumentIdentity(
         doc_type=DocType.EXEC, feature=feature, date=plan.date or ""
     )

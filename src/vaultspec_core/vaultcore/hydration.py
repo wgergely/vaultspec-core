@@ -19,6 +19,8 @@ from typing import TYPE_CHECKING
 from ..core.exceptions import ResourceExistsError, VaultSpecError
 from .body_schema import CURRENT_BODY_SCHEMA
 from .models import DocType
+from .normalize import normalize_vault_date
+from .query_rename import assert_within_docs
 
 __all__ = [
     "AUTHOR_FILLED_PLACEHOLDERS",
@@ -133,7 +135,10 @@ class DocumentIdentity:
     Attributes:
         doc_type: The type of vault document to create.
         feature: Feature name in kebab-case (leading ``#`` stripped).
-        date: ISO 8601 date string (e.g. ``2026-02-06``).
+        date: The document's date. Admitted by the scaffolder as a calendar
+            date and re-rendered as ``yyyy-mm-dd`` before it names anything,
+            so the lenient forms the vault's parser accepts may be passed
+            here and a value that is not a date is refused.
         topic: Optional kebab-case narrative infix. Admitted only for the
             narrative trio (``audit``, ``reference``, ``research``) and
             ``adr``; the filename resolves to
@@ -488,6 +493,36 @@ def _inject_extra_tags(content: str, extra_tags: list[str]) -> str:
     return content
 
 
+def _admit_date(raw: str | None, *, label: str) -> str:
+    """Return *raw* as a canonical ``yyyy-mm-dd`` token, or refuse it.
+
+    The scaffolder composes a document's directory and filename from its
+    date, so an unparsed date is a path segment the caller chose. Routing it
+    through :func:`~vaultspec_core.vaultcore.normalize.normalize_vault_date`
+    means the value that reaches the composition is re-rendered from a
+    parsed :class:`datetime.date` and can carry nothing but digits and
+    hyphens.
+
+    Args:
+        raw: The candidate date value.
+        label: The noun used in the failure message, distinguishing the
+            document's own date from its parent plan's.
+
+    Returns:
+        The canonical ``yyyy-mm-dd`` string.
+
+    Raises:
+        VaultSpecError: When the value is absent or does not parse as a
+            calendar date.
+    """
+    if not raw:
+        raise VaultSpecError(f"A {label} is required to name the document.")
+    result = normalize_vault_date(raw, label=label)
+    if not result.ok or result.value is None:
+        raise VaultSpecError(str(result.error))
+    return result.value
+
+
 def create_vault_doc(
     root_dir: pathlib.Path,
     identity: DocumentIdentity,
@@ -524,7 +559,9 @@ def create_vault_doc(
         ResourceExistsError: If the target file already exists and the
             write policy does not force an overwrite.
         VaultSpecError: If supplied tags are not the required directory and
-            feature tags.
+            feature tags; if the identity's date (or the parent plan's) is
+            not a calendar date; or if the composed destination resolves
+            outside the vault's document root.
     """
     from ..config import get_config
 
@@ -537,10 +574,21 @@ def create_vault_doc(
 
     doc_type = identity.doc_type
     feature = identity.feature
-    date_str = identity.date
     topic = identity.topic
-    plan_date = exec_binding.plan.date
     plan_stem = exec_binding.plan.stem
+
+    # Admission for the two date-shaped values that become path segments.
+    # Both are parsed into a real calendar date and re-rendered from it, so
+    # what reaches the filename below is ten characters of digits and
+    # hyphens by construction rather than by inspection of the caller's
+    # string. This is the chokepoint: it holds for every surface that
+    # scaffolds a document, so no caller has to remember to validate first.
+    date_str = _admit_date(identity.date, label="document date")
+    plan_date = (
+        _admit_date(exec_binding.plan.date, label="parent plan date")
+        if exec_binding.plan.date
+        else None
+    )
 
     if fields.extra_tags:
         required_tags = {doc_type.tag, f"#{feature}"}
@@ -621,6 +669,16 @@ def create_vault_doc(
         target_dir = root_dir / get_config().docs_dir / doc_type.value
 
     target_path = target_dir / filename
+
+    # Containment backstop. The date admission above closes the field this
+    # advisory was raised for, but the guard is bound to the composed path
+    # rather than to any one field, so the next identity value that grows a
+    # path segment inherits it without a second audit. Both sides resolve
+    # before comparison, so a `..` segment, an absolute value, and a
+    # symlinked type directory are all refused alike.
+    docs_root = root_dir / get_config().docs_dir
+    assert_within_docs(docs_root, target_dir)
+    assert_within_docs(docs_root, target_path)
 
     if not write.force:
         if target_path.exists():
