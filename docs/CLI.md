@@ -978,7 +978,8 @@ embedded in prose are preserved.
 
 #### Phases
 
-- `preflight` - Report migration status and platform path behavior.
+- `preflight` - Report migration status and platform path behavior, name every document
+  the pending migrations are about to remove, then apply them.
 - `check` - Run the current vault health suite without mutation.
 - `fix` - Apply supported safe check-level fixes, or report planned fixes.
 - `index` - Refresh or preview generated `.vault/index/<feature>.index.md` files.
@@ -988,6 +989,12 @@ embedded in prose are preserved.
 Dry-run mode never writes generated indexes or check fixes. If migrations are pending,
 dry-run reports that state instead of entering the vault scan path that would apply lazy
 migrations on first use.
+
+The `preflight` phase lists the documents pending migrations would remove *before* it
+runs them, and reports where their copies went afterwards. See
+[where deleted documents go](#where-deleted-documents-go): a repair on a stale workspace
+is the run with the most pending destructive entries, and every document it removes is
+copied to `.vault/.trash/` first.
 
 #### Examples
 
@@ -2723,6 +2730,46 @@ leaves the workspace exactly as it finds it and logs a warning naming the pendin
 entries instead. Run `vaultspec-core migrations status` to see them, and
 `vaultspec-core migrations run` to apply them.
 
+### Where deleted documents go
+
+Some migrations remove `.vault/` documents - the execution-record folds replace a folder
+of per-Step records with one ledger, and that consolidation is not expressible as an
+additive rewrite. Before any of them unlinks a file, a byte-identical copy of it is
+written to:
+
+```text
+.vault/.trash/<YYYYMMDD-HHMMSS>-<migration>/<the document's path under .vault/>
+```
+
+Each snapshot directory also carries a `RESTORE.txt` naming every copy's original
+location, so a file can be identified by the path it had rather than by its name alone.
+
+- **How long they stay: forever.** Nothing in vaultspec ever deletes a snapshot. A
+  safety net that expires on a timer is not a safety net, and for a document authored
+  since the last commit - or in a workspace whose `.vault/` is not in git at all - the
+  snapshot is the only copy that exists. The directory is listed in the managed
+  `.gitignore` block, so it never enters the repository. Delete it yourself when you
+  have decided the documents are not coming back; `.vault/.trash/` is always safe to
+  remove in whole or in part.
+
+- **How to get one back: copy it.** There is no restore command, because a snapshot is a
+  plain directory of unmodified files and copying one back is the whole operation. Read
+  `RESTORE.txt` for the destination, then:
+
+  ```bash
+  cp .vault/.trash/20260517-120000-exec_ledger_only/exec/2026-05-17-demo/2026-05-17-demo-P01-S01.md     .vault/exec/2026-05-17-demo/
+  ```
+
+- **If the copy cannot be written, nothing is deleted.** A full disk or an unwritable
+  `.vault/` fails the migration before the first unlink and leaves the manifest version
+  alone, so the next run re-attempts. Deleting because the backup failed is the one
+  outcome worse than not deleting.
+
+Preview a deletion before it happens with `vaultspec-core migrations run --dry-run`,
+which enumerates every path the run would remove and changes nothing. The list comes
+from the same planner the real run applies, so it is the run rather than a description
+of one.
+
 ### vaultspec-core migrations status
 
 ```bash
@@ -2765,17 +2812,34 @@ unchanged so the next invocation re-attempts it.
 
 - `--target DIR` (`-t`, default cwd) - Migrate a workspace other than the current
   directory.
+- `--dry-run` (default off) - List every document the pending migrations would delete
+  and change nothing.
+- `--yes` (`-y`, default off) - Skip the confirmation prompt for deletions.
 - `--json` (default off) - Emit per-entry summaries and counts as JSON.
 
-Exit codes: `0` on success (including the no-pending no-op), `1` if any migration
-failed.
+When the pending migrations would delete documents, an interactive terminal is asked to
+confirm unless `--yes` is passed. Non-interactive callers - CI, `--json`, the MCP
+server, a piped or closed stdin - are warned and proceed rather than waiting for input:
+the registry also runs from `vaultspec-core install --upgrade` and lazily from every
+`vaultspec-core vault` command, so refusing here would only push a blocked script onto a
+trigger that asks nothing at all. Either way, every removed document is copied into
+`.vault/.trash/` first.
+
+Exit codes: `0` on success (including the no-pending no-op and every dry run), `1` if
+any migration failed or an operator declined the deletion.
 
 #### Examples
+
+- **Preview every document the pending migrations would delete**:
+
+  ```bash
+  vaultspec-core migrations run --dry-run
+  ```
 
 - **Execute all pending schema migrations and upgrade the workspace**:
 
   ```bash
-  vaultspec-core migrations run
+  vaultspec-core migrations run --yes
   ```
 
 ______________________________________________________________________
@@ -2897,6 +2961,16 @@ overridden by the `--target` flag.
 - `VAULTSPEC_IO_BUFFER_SIZE` (int, default `8192`) - I/O read buffer size in bytes.
 - `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` (int, default `1000000`) - Subprocess stdout capture
   limit in bytes.
+- `VAULTSPEC_LOCK_TIMEOUT_SECONDS` (float, default `120.0`) - Total seconds a single
+  advisory-lock acquisition may wait before failing with a diagnosable timeout instead
+  of blocking indefinitely. Covers the in-process and cross-process layers combined.
+  Raise it if a large corpus or a slow network volume makes legitimate contention exceed
+  the budget.
+- `VAULTSPEC_LOCK_TIMEOUT_SECONDS` (float, default `120.0`) - Total seconds a single
+  advisory-lock acquisition may wait before failing with a diagnosable timeout instead
+  of blocking indefinitely. Covers the in-process and cross-process layers combined.
+  Raise it if a large corpus or a slow network volume makes legitimate contention exceed
+  the budget.
 - `VAULTSPEC_LOG_LEVEL` (str, default `INFO`) - Root log level for the CLI, for example
   `DEBUG`, `INFO`, or `WARNING`. Overridden by `--debug` when set.
 - `VAULTSPEC_EDITOR` (str, default `zed -w`) - Editor command for

@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from .exclusions import is_excluded_vault_path
 from .models import DocType
 
 __all__ = [
@@ -34,9 +35,11 @@ if TYPE_CHECKING:
 def scan_vault(root_dir: pathlib.Path) -> Iterator[pathlib.Path]:
     """Yield all markdown files under the configured docs directory.
 
-    Skips hidden ``.obsidian`` subtrees and ``_archive``. Reports the
-    corpus exactly as it is on disk: the scan never converges the
-    workspace schema.
+    Skips the non-corpus subtrees named by
+    :data:`~vaultspec_core.vaultcore.exclusions.EXCLUDED_VAULT_DIR_NAMES` -
+    editor state, archived documents, and the pre-deletion snapshots under
+    ``.trash/``. Reports the corpus exactly as it is on disk: the scan never
+    converges the workspace schema.
 
     This function used to run the migration registry before walking the
     tree, on the reasoning that every vault command should observe a
@@ -71,7 +74,7 @@ def scan_vault(root_dir: pathlib.Path) -> Iterator[pathlib.Path]:
     file_count = 0
     for path in docs_dir.rglob("*.md"):
         # Skip internal config and archived documents
-        if ".obsidian" in path.parts or "_archive" in path.parts:
+        if is_excluded_vault_path(path):
             logger.debug("Skipping excluded path: %s", path)
             continue
         file_count += 1

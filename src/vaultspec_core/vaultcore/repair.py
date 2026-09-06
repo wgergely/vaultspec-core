@@ -9,6 +9,7 @@ phases.
 
 from __future__ import annotations
 
+import logging
 import pathlib
 import tempfile
 from dataclasses import dataclass, field
@@ -32,6 +33,11 @@ __all__ = [
 ]
 
 _FINGERPRINT_EXCLUDED_DIR_NAMES = frozenset({"data", "logs", "_archive"})
+
+#: Deleted paths carried on the preflight payload before the rest are counted.
+_DELETION_PREVIEW_LIMIT = 50
+
+logger = logging.getLogger(__name__)
 
 
 class RepairPhase(StrEnum):
@@ -196,6 +202,30 @@ def _stage_preflight(state: _PipelineState) -> bool:
         "applied_migrations": [],
         "skipped": False,
     }
+    # Computed before the migrations run, which is the only time it can be
+    # computed at all: `applied_migrations` is populated afterwards and
+    # reports what was removed in the past tense. An operator reaching for
+    # "repair" after noticing something wrong is the one most likely to be
+    # on a stale manifest, so this is the run with the most pending
+    # destructive entries and the one that most needs to say so first.
+    doomed = _pending_deletions(state.root_dir)
+    if doomed:
+        preflight["pending_deletions"] = _deletion_section(state.root_dir, doomed)
+        # The journal, not `unresolved`: the later stages rebuild
+        # `run.unresolved` from their own check results, so a warning
+        # recorded here would survive only on the paths that stop early.
+        # The journal is append-only for the whole run.
+        _record_journal(
+            run,
+            RepairPhase.PREFLIGHT,
+            action="migration_deletions",
+            status="warning",
+            message=(
+                f"Pending migrations remove {len(doomed)} document(s); copies "
+                "are kept under .vault/.trash/. Preview them with "
+                "vaultspec-core migrations run --dry-run."
+            ),
+        )
     if state.dry_run and status == MigrationStatus.PENDING:
         preflight["skipped"] = True
         preflight["message"] = (
@@ -235,8 +265,49 @@ def _stage_preflight(state: _PipelineState) -> bool:
             }
             for result in applied
         ]
+        snapshots = [result.snapshot for result in applied if result.snapshot]
+        if snapshots:
+            preflight["snapshots"] = snapshots
     run.phases.append(preflight)
     return False
+
+
+def _pending_deletions(root_dir: Path) -> list[Path]:
+    """Return every document the pending migrations would delete.
+
+    Never raises: a preview that fails must not turn a repair into an
+    error, and the deletions still happen with a snapshot behind them. The
+    empty list then means "not known", which
+    :func:`_deletion_section` does not have to distinguish because it is
+    only called when the list is non-empty.
+
+    Args:
+        root_dir: Project root directory.
+
+    Returns:
+        The deletion set in execution order, empty when there is none or
+        when it could not be computed.
+    """
+    from ..migrations import preview_deletions
+
+    try:
+        return [
+            path for preview in preview_deletions(root_dir) for path in preview.paths
+        ]
+    except Exception:
+        logger.exception("Could not preview pending migration deletions")
+        return []
+
+
+def _deletion_section(root_dir: Path, doomed: list[Path]) -> dict[str, Any]:
+    """Window *doomed* for the preflight payload.
+
+    Bounded for the same reason every other repair section is: the payload
+    grows with how stale the workspace is, and the fold on the measured
+    production corpus removes thousands of records.
+    """
+    paths = [_rel_str(path, root_dir) for path in doomed]
+    return windowed_section(paths, limit=_DELETION_PREVIEW_LIMIT)
 
 
 def _stage_check(state: _PipelineState) -> bool:

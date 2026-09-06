@@ -472,6 +472,7 @@ def fold_exec_records(
         sources_from,
         summarize,
     )
+    from vaultspec_core.vaultcore.trash import human_bytes
 
     feat = normalize_feature(console, feature)
     exec_root = root_dir / get_config().docs_dir / "exec"
@@ -514,7 +515,7 @@ def fold_exec_records(
         )
         raise typer.Exit(code=1)
 
-    ledger_path = apply_fold(
+    outcome = apply_fold(
         root_dir,
         plan,
         feature=feat,
@@ -522,12 +523,23 @@ def fold_exec_records(
         plan_stem=plan_stem,
         dry_run=dry_run,
     )
+    ledger_path = outcome.ledger_path
     if not json_output:
         if dry_run:
             console.print(f"[dim]Would write:[/dim] {ledger_path}")
+            console.print(
+                f"[dim]Would remove:[/dim] {len(plan.removed)} record(s); "
+                "copies would be kept under .vault/.trash/"
+            )
         else:
             console.print(
                 f"[green]Folded:[/green] {len(plan.removed)} record(s) into "
                 f"{ledger_path.name}"
             )
+            if outcome.snapshot is not None:
+                console.print(
+                    f"[dim]Backup:[/dim] {outcome.snapshot.files} record(s) "
+                    f"({human_bytes(outcome.snapshot.total_bytes)}) copied to "
+                    f"{outcome.snapshot.root}"
+                )
     return ledger_path, plan

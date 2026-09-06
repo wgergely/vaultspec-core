@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 
 from ..core.exceptions import ResourceExistsError, VaultSpecError
 from .body_schema import CURRENT_BODY_SCHEMA
+from .exclusions import is_excluded_vault_path
 from .models import DocType
 from .normalize import normalize_vault_date
 from .query_rename import assert_within_docs
@@ -694,6 +695,12 @@ def create_vault_doc(
         docs_dir = root_dir / get_config().docs_dir
         if docs_dir.exists():
             for existing in docs_dir.rglob("*.md"):
+                # A pre-deletion snapshot under `.trash/` keeps the stem of the
+                # document it backs up, and an archived document keeps its
+                # own. Neither is a live graph key, so neither may block a
+                # legitimate creation.
+                if is_excluded_vault_path(existing.relative_to(docs_dir)):
+                    continue
                 if existing.stem == stem and existing != target_path:
                     raise ResourceExistsError(
                         f"A file with stem '{stem}' already exists at "

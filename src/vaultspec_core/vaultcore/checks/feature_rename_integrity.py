@@ -192,13 +192,14 @@ def _conflicts_from_disk(
     exec_dir: Path,
 ) -> list[tuple[Path, str, dict[str, Path]]]:
     """Derive per-folder tag conflicts by walking the exec tree directly."""
+    from ..exclusions import is_excluded_vault_path
     from ..parser import parse_frontmatter
 
     conflicts: list[tuple[Path, str, dict[str, Path]]] = []
     for folder in sorted(exec_dir.iterdir()):
         if folder.is_symlink() or not folder.is_dir():
             continue
-        if ".obsidian" in folder.parts or "_archive" in folder.parts:
+        if is_excluded_vault_path(folder):
             continue
         match = _EXEC_FOLDER_RE.match(folder.name)
         if match is None:
