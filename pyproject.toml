@@ -130,11 +130,10 @@ packages = ["src/vaultspec_core"]
 # Every marker gating on something not installed/reachable by default is
 # deselected here too, not just by the `just test` lanes' explicit `-m`: a
 # bare `pytest` invocation (a contributor's shell, an editor's test runner)
-# has no other gate, and without this a `@pytest.mark.gemini`/`claude` test
-# shells out to a real external CLI, and a `@pytest.mark.network` test hits
-# a live upstream, on every default run. Kept in sync by hand with
+# has no other gate, and without this a `@pytest.mark.claude` test shells out
+# to a real external CLI on every default run. Kept in sync by hand with
 # `dev.toolchain.EXCLUDED_MARKERS`, which a repo guard cross-checks.
-addopts = "-m 'not benchmark and not gemini and not claude and not network'"
+addopts = "-m 'not benchmark and not claude'"
 asyncio_mode = "auto"
 log_cli = true
 log_cli_date_format = "%H:%M:%S"
@@ -162,8 +161,6 @@ markers = [
   # is how the two populations got confused in the first place.
   "repo: asserts a fact about this checkout, not about the shipped library",
   "integration: requires CLI tools and network",
-  "network: requires live network access (upstream drift guards); excluded from gating suites",
-  "gemini: requires Gemini CLI installed",
   "claude: requires Claude CLI installed",
   "timeout: timeout in seconds for individual tests",
   "e2e: end-to-end tests requiring real LLM API keys",

@@ -6,6 +6,7 @@ import pytest
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
+from vaultspec_core.core.manifest import read_manifest
 
 pytestmark = [pytest.mark.unit]
 
@@ -33,6 +34,102 @@ class TestUninstallForce:
         result = runner.invoke(app, ["-t", str(tmp_path), "uninstall", "--dry-run"])
         # Should not require --force for dry-run
         assert "--force" not in result.output or result.exit_code == 0
+
+
+def _install_both_gemini_md_owners(target: Path, runner: CliRunner) -> None:
+    """Install antigravity and gemini, asserting both really landed.
+
+    Gemini alone creates `GEMINI.md` and `.agents/` too, so a silently failed
+    antigravity install would leave every assertion in these tests still
+    passing while proving nothing about shared ownership. Checking the
+    manifest is what makes the precondition load-bearing rather than assumed.
+    """
+    for provider in ("antigravity", "gemini"):
+        result = runner.invoke(app, ["-t", str(target), "install", provider, "--force"])
+        assert result.exit_code == 0, result.output
+
+    assert {"antigravity", "gemini"} <= read_manifest(target)
+    assert (target / "GEMINI.md").is_file()
+
+
+class TestUninstallSharedFileOwnership:
+    """GEMINI.md is `config_file` for both gemini and antigravity.
+
+    Removing it while its other owner is still installed strands that owner
+    without its root context file (issue #492). Two independent paths can do
+    that removal and they have to agree, but only one of them was broken.
+    The named-provider path asks the manifest, via `providers_sharing_file`,
+    which providers still claim the file, and was already correct.
+    `_uninstall_everything`'s `--skip` loop instead read the static
+    `_UNINSTALL_FILE_OWNERS` map, which named one owner per file. Both paths
+    are covered here so the correct one cannot regress into the broken one.
+    """
+
+    def test_uninstall_one_provider_preserves_a_file_the_other_still_owns(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        """Uninstalling gemini alone must not strand antigravity's GEMINI.md.
+
+        This path already held before the fix, because it derives ownership
+        from the manifest rather than from a static map. It is pinned so a
+        later refactor routing it through `_UNINSTALL_FILE_OWNERS` has to
+        keep giving the same answer.
+        """
+        _install_both_gemini_md_owners(tmp_path, runner)
+
+        result = runner.invoke(
+            app, ["-t", str(tmp_path), "uninstall", "gemini", "--force"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert (tmp_path / "GEMINI.md").is_file()
+        assert (tmp_path / ".agents").is_dir()
+
+        # The reverse direction: once antigravity is gone too, nothing owns
+        # GEMINI.md any longer and it must finally be removed.
+        result = runner.invoke(
+            app, ["-t", str(tmp_path), "uninstall", "antigravity", "--force"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert not (tmp_path / "GEMINI.md").exists()
+
+    def test_full_uninstall_skipping_one_owner_preserves_a_shared_file(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        """`uninstall --skip antigravity` must not remove antigravity's config.
+
+        This exercises `_uninstall_everything`'s file-removal loop directly,
+        the path that stayed a plain str->str map after `_UNINSTALL_DIR_OWNERS`
+        was widened to a list, and the only path where the bug was reachable.
+        Before the fix this test failed: the full uninstall took GEMINI.md
+        despite `--skip antigravity` naming one of its owners.
+        """
+        _install_both_gemini_md_owners(tmp_path, runner)
+
+        result = runner.invoke(
+            app,
+            [
+                "-t",
+                str(tmp_path),
+                "uninstall",
+                "--skip",
+                "antigravity",
+                "--force",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert (tmp_path / "GEMINI.md").is_file()
+        assert (tmp_path / ".agents").is_dir()
+
+        # With no owner left to skip, a second full uninstall removes it.
+        result = runner.invoke(
+            app, ["-t", str(tmp_path), "uninstall", "--force", "--remove-vault"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert not (tmp_path / "GEMINI.md").exists()
 
 
 class TestUninstallCoreCascade:
