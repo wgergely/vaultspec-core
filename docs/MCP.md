@@ -1,9 +1,10 @@
 # vaultspec MCP server
 
-The server exposes Vaultspec document and workflow tools to Model Context Protocol
-(MCP) clients using JSON-RPC over standard input and output.
+The server exposes Vaultspec document and workflow tools to Model Context Protocol (MCP)
+clients using JSON-RPC over standard input and output.
 
-For the workflow and document types, see [how a feature flows into the vault](./framework.md#how-a-feature-flows-into-the-vault).
+For the workflow and document types, see
+[how a feature flows into the vault](./framework.md#how-a-feature-flows-into-the-vault).
 
 ## Setup
 
@@ -83,8 +84,8 @@ Use `--read-only` to limit the tools the server advertises:
 vaultspec-mcp --read-only
 ```
 
-This exposes only `status`, `find`, `check`, and `discover` to connected clients.
-In this mode, `check` has no `fix` parameter.
+This exposes only `status`, `find`, `check`, and `discover` to connected clients. In
+this mode, `check` has no `fix` parameter.
 
 ### Install modes
 
