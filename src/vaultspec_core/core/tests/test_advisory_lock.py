@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import errno
 import json
+import logging
+import pathlib
 import subprocess
 import sys
 import textwrap
@@ -13,9 +15,14 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from vaultspec_core.core.exceptions import (
+    AdvisoryLockTimeoutError,
+    VaultSpecError,
+)
 from vaultspec_core.core.helpers import (
     _WINDOWS_LOCK_RETRY_INTERVAL_SECONDS,
     _is_windows_lock_contention,
+    _resolve_lock_timeout,
     advisory_lock,
 )
 
@@ -444,3 +451,373 @@ class TestUpgradeFinalizeHoldsTheManifestLock:
         assert mdata.resolved_mode == InstallMode.TOOL
         assert mdata.gitignore_managed
         assert mdata.gitattributes_managed
+
+
+# `msvcrt.locking(LK_LOCK)` blocks for about ten seconds inside a single call
+# before it reports a locking violation, so a Windows acquire cannot notice an
+# exhausted budget any sooner than that. The bound below is what "the timeout
+# fired promptly" means on the slowest of the two platforms; POSIX returns
+# within a poll interval of the budget itself.
+_TIMEOUT_OBSERVATION_CEILING_SECONDS = 25.0
+
+
+@pytest.mark.unit
+class TestAdvisoryLockTimeout:
+    """A cycle must surface as a diagnosable error, not a silent hang (#457).
+
+    `advisory_lock` is a non-reentrant `threading.Lock` over a blocking OS
+    lock. Both layers used to wait forever, so a caller that reached the same
+    sentinel twice on one thread - directly, or through a call graph that
+    loops back into a lock-taking helper - stopped dead with no traceback, no
+    log line and no way to tell a deadlock from slow I/O. The workspace lock
+    graph has such a cycle latent in it today, held shut only by a per-process
+    cache documented as a performance optimisation.
+
+    The point of the budget is not to make the cycle correct. It is to make it
+    *reportable*, so the next one is a bug report instead of a killed process.
+    """
+
+    def test_a_same_thread_reacquire_reports_instead_of_hanging(
+        self, tmp_path: Path
+    ) -> None:
+        """The exact shape of the latent cycle: one thread, one sentinel, twice.
+
+        Without the budget this call never returns and the test process has to
+        be killed - which is precisely the failure this fixes, so the
+        assertion is that it *returns at all*, with an error that names what
+        went wrong.
+        """
+        target = tmp_path / "cycle.json"
+        target.write_text("{}")
+
+        started = time.monotonic()
+        with (
+            advisory_lock(target),
+            pytest.raises(AdvisoryLockTimeoutError) as caught,
+            advisory_lock(target, timeout=1.0),
+        ):
+            pytest.fail("advisory_lock is reentrant; the cycle is silent")
+        elapsed = time.monotonic() - started
+
+        assert elapsed < _TIMEOUT_OBSERVATION_CEILING_SECONDS
+
+        error = caught.value
+        # The thread layer, not the OS layer: a self-deadlock never reaches
+        # the file lock, and saying which layer gave up is what separates
+        # "you have a cycle" from "a peer process is holding this".
+        assert error.layer == "thread"
+        assert error.timeout == 1.0
+        assert error.sentinel == tmp_path / "cycle.json.lock"
+
+    def test_the_error_names_the_sentinel_the_budget_and_the_cause(
+        self, tmp_path: Path
+    ) -> None:
+        """An operator reading only the message must be able to act on it."""
+        target = tmp_path / "diagnosable.json"
+        target.write_text("{}")
+
+        with (
+            advisory_lock(target),
+            pytest.raises(AdvisoryLockTimeoutError) as caught,
+            advisory_lock(target, timeout=0.5),
+        ):
+            pass
+
+        message = str(caught.value)
+        assert "diagnosable.json.lock" in message
+        assert "0.5" in message
+        assert "thread layer" in message
+
+        hint = caught.value.hint
+        assert "cycle" in hint
+        # The escape hatch has to be in the hint, or an operator hitting a
+        # legitimately slow acquire has no way out but a source change.
+        assert "VAULTSPEC_LOCK_TIMEOUT_SECONDS" in hint
+
+    def test_a_timeout_leaves_nothing_held(self, tmp_path: Path) -> None:
+        """The failed acquire must not leak the thread lock it timed out on.
+
+        A budget that reported the deadlock but left the sentinel wedged would
+        convert a hang into a hang plus an error message.
+        """
+        target = tmp_path / "released.json"
+        target.write_text("{}")
+
+        with (
+            advisory_lock(target),
+            pytest.raises(AdvisoryLockTimeoutError),
+            advisory_lock(target, timeout=0.5),
+        ):
+            pass
+
+        acquired = False
+        with advisory_lock(target, timeout=5.0):
+            acquired = True
+        assert acquired, "the sentinel stayed held after a timed-out acquire"
+
+    def test_it_is_not_an_oserror(self) -> None:
+        """Deliberate: an OSError here would be swallowed by write paths.
+
+        The modules that take advisory locks catch `OSError` in several places
+        to log a warning and carry on past an unreadable file. `TimeoutError`
+        is an `OSError`, so inheriting from it would let the one failure this
+        class exists to make visible disappear into a handler written for
+        something else.
+        """
+        error = AdvisoryLockTimeoutError(pathlib.Path("x.lock"), 1.0, "thread")
+
+        assert not isinstance(error, OSError)
+        assert isinstance(error, VaultSpecError)
+
+    def test_a_cross_process_deadline_reports_the_os_layer(
+        self, tmp_path: Path
+    ) -> None:
+        """A peer holding the file lock longer than the budget is diagnosable too.
+
+        The thread layer is uncontended here - the holder is a different
+        process - so this exercises the OS layer's deadline specifically, and
+        the reported layer is what tells an operator to go looking for another
+        process rather than for a cycle in this one.
+        """
+        target = tmp_path / "peer.json"
+        target.write_text("{}")
+
+        child_script = textwrap.dedent(f"""\
+            import time
+            from pathlib import Path
+            from vaultspec_core.core.helpers import advisory_lock
+
+            with advisory_lock(Path(r"{target}")):
+                print("held", flush=True)
+                time.sleep(40)
+        """)
+        proc = subprocess.Popen(
+            [sys.executable, "-c", child_script],
+            cwd=str(tmp_path),
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            assert proc.stdout is not None
+            assert proc.stdout.readline().strip() == "held"
+
+            started = time.monotonic()
+            with (
+                pytest.raises(AdvisoryLockTimeoutError) as caught,
+                advisory_lock(target, timeout=1.0),
+            ):
+                pytest.fail("acquired a lock another process holds")
+            elapsed = time.monotonic() - started
+        finally:
+            proc.kill()
+            proc.wait(timeout=30)
+
+        assert elapsed < _TIMEOUT_OBSERVATION_CEILING_SECONDS
+        assert caught.value.layer == "os"
+        assert "another" in caught.value.hint.lower()
+
+    def test_the_default_budget_is_read_from_config(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The budget is configurable, because no single number fits every corpus.
+
+        A 1,229-document repair on a network volume and a two-document test
+        workspace have wait profiles orders of magnitude apart; an operator
+        who hits the ceiling legitimately needs a way past it that is not a
+        source change.
+        """
+        from vaultspec_core.config import get_config, reset_config
+
+        monkeypatch.setenv("VAULTSPEC_LOCK_TIMEOUT_SECONDS", "7.5")
+        reset_config()
+        try:
+            assert get_config().lock_timeout_seconds == 7.5
+            assert _resolve_lock_timeout(None) == 7.5
+            # An explicit argument still wins over the environment.
+            assert _resolve_lock_timeout(2.0) == 2.0
+            # A negative budget is clamped rather than passed through:
+            # `threading.Lock.acquire` reads -1 as "block forever", which is
+            # the unbounded wait this budget exists to remove, and rejects
+            # other negatives outright.
+            assert _resolve_lock_timeout(-1.0) == 0.0
+        finally:
+            monkeypatch.delenv("VAULTSPEC_LOCK_TIMEOUT_SECONDS", raising=False)
+            reset_config()
+
+    def test_the_default_budget_is_far_longer_than_a_real_critical_section(
+        self,
+    ) -> None:
+        """Guards the number itself against being tightened into a live bug.
+
+        Too short and legitimate contention starts failing: `vault repair`
+        holds a feature-index sentinel across a full-corpus graph build, and
+        the `exec_ledger_only` migration folds every execution record in the
+        workspace under the docs-domain sentinel. Both run in tens of seconds
+        on a large vault over a slow volume. Too long and the timeout is
+        indistinguishable from the hang it replaced.
+
+        Explicitly *not* `_WINDOWS_REPLACE_RETRY_BUDGET_SECONDS` (2s): that
+        budget rides out an antivirus scanner's momentary handle on one file,
+        a different phenomenon at a different timescale from a peer holding a
+        workspace lock.
+        """
+        from vaultspec_core.config import VaultSpecConfig
+        from vaultspec_core.core.helpers import (
+            _WINDOWS_REPLACE_RETRY_BUDGET_SECONDS,
+        )
+
+        budget = VaultSpecConfig().lock_timeout_seconds
+
+        assert budget > _WINDOWS_REPLACE_RETRY_BUDGET_SECONDS * 10
+        # Longer than msvcrt's own ten-second internal budget by enough that a
+        # Windows acquire gets several attempts before giving up.
+        assert budget >= 60.0
+        assert budget <= 600.0
+
+
+@pytest.mark.unit
+class TestTimeoutDoesNotBreakLegitimateBlocking:
+    """The budget must bound deadlock without bounding ordinary contention.
+
+    A timeout that made two processes fail to serialise would trade a rare
+    latent hang for a common lost update. These hold the sentinel for real,
+    across real processes and real threads, on the *default* budget.
+    """
+
+    def test_two_processes_still_serialise_on_the_default_budget(
+        self, tmp_path: Path
+    ) -> None:
+        """A held sentinel is waited out, not abandoned, and both writes land."""
+        target = tmp_path / "serialised.json"
+        target.write_text(json.dumps({"order": []}))
+        hold_seconds = 3
+
+        child_script = textwrap.dedent(f"""\
+            import json, time
+            from pathlib import Path
+            from vaultspec_core.core.helpers import advisory_lock
+
+            target = Path(r"{target}")
+            with advisory_lock(target):
+                print("held", flush=True)
+                time.sleep({hold_seconds})
+                data = json.loads(target.read_text())
+                data["order"].append("child")
+                target.write_text(json.dumps(data))
+        """)
+        proc = subprocess.Popen(
+            [sys.executable, "-c", child_script],
+            cwd=str(tmp_path),
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        assert proc.stdout is not None
+        assert proc.stdout.readline().strip() == "held"
+
+        started = time.monotonic()
+        with advisory_lock(target):
+            waited = time.monotonic() - started
+            data = json.loads(target.read_text())
+            data["order"].append("parent")
+            target.write_text(json.dumps(data))
+
+        proc.wait(timeout=60)
+        assert proc.returncode == 0, "the holder failed rather than completing"
+
+        # Waiting out the holder is the property: had the budget fired, the
+        # parent would have raised, and had the lock not been taken at all the
+        # parent would have gone first and lost the child's append.
+        assert waited >= hold_seconds - 0.5, (
+            f"acquired after only {waited:.1f}s; the lock did not serialise"
+        )
+        assert json.loads(target.read_text())["order"] == ["child", "parent"]
+
+    def test_sustained_thread_contention_never_times_out(self, tmp_path: Path) -> None:
+        """Queued threads wait their turn instead of exhausting the budget.
+
+        Twelve threads each taking the same sentinel means the last one queues
+        behind eleven critical sections. That is legitimate contention, and it
+        must resolve by waiting.
+        """
+        target = tmp_path / "queued.json"
+        target.write_text(json.dumps({"counter": 0}))
+        n_threads = 12
+        errors: list[str] = []
+        barrier = threading.Barrier(n_threads)
+
+        def worker() -> None:
+            try:
+                barrier.wait(timeout=30)
+                for _ in range(10):
+                    with advisory_lock(target):
+                        data = json.loads(target.read_text())
+                        data["counter"] += 1
+                        target.write_text(json.dumps(data))
+            except Exception as exc:
+                errors.append(f"{threading.current_thread().name}: {exc!r}")
+
+        threads = [
+            threading.Thread(target=worker, name=f"queued-{i}")
+            for i in range(n_threads)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=120)
+            assert not thread.is_alive(), f"{thread.name} never finished"
+
+        assert not errors, f"the budget fired on legitimate contention: {errors}"
+        assert json.loads(target.read_text())["counter"] == n_threads * 10
+
+
+@pytest.mark.unit
+class TestAdvisoryLockSkipIsNoLongerSilent:
+    """A lock that does nothing must at least say so (#457).
+
+    `advisory_lock` no-ops when the sentinel's parent directory is absent, so
+    that a dry run does not create directories as a side effect. The skip is
+    load-bearing - `_apply_rename_plan` documents relying on it, and the
+    callers that must not skip (`execute_edit`,
+    `generate_feature_index_result`) create the parent themselves first - so
+    turning it into an error would break them.
+
+    What was wrong is that it was *silent*: a caller inside the `with` block
+    believes it is protected and there was nothing, anywhere, recording that
+    it was not. The skip stays; the silence does not.
+    """
+
+    def test_a_skipped_lock_warns_and_names_the_sentinel(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        target = tmp_path / "absent" / "thing.json"
+
+        with (
+            caplog.at_level(logging.WARNING, logger="vaultspec_core.core.helpers"),
+            advisory_lock(target),
+        ):
+            pass
+
+        assert not (tmp_path / "absent").exists(), (
+            "the skip must not gain a directory-creating side effect"
+        )
+        warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert len(warnings) == 1
+        message = warnings[0].getMessage()
+        assert "thing.json.lock" in message
+        assert str(tmp_path / "absent") in message
+
+    def test_a_real_lock_does_not_warn(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The guard on the guard: no warning when the sentinel is real."""
+        target = tmp_path / "present.json"
+        target.write_text("{}")
+
+        with (
+            caplog.at_level(logging.WARNING, logger="vaultspec_core.core.helpers"),
+            advisory_lock(target),
+        ):
+            pass
+
+        assert (tmp_path / "present.json.lock").exists()
+        assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
